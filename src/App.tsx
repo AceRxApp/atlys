@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchCities, saveEmailSignup } from './supabase';
-import { searchNearby, formatDistance } from './services/places';
+import { fetchCities, saveEmailSignup, fetchEmailSignups, fetchAllCities, toggleCityActive } from './supabase';
+import { searchNearby, formatDistance, getHoursStatus } from './services/places';
 import type { Place } from './services/places';
 import { useLocation } from './hooks/useLocation';
 
@@ -18,6 +18,7 @@ interface City {
   timezone: string;
   lat?: number;
   lng?: number;
+  is_active?: boolean;
 }
 
 interface Stop {
@@ -26,12 +27,19 @@ interface Stop {
   addedAt: Date;
 }
 
-type Screen = 'home' | 'vibes' | 'planner';
+interface AdminSignup {
+  id: string;
+  email: string;
+  city: string | null;
+  signed_up_at: string;
+}
+
+type Screen = 'home' | 'explore' | 'plan';
 type Vibe = 'food' | 'cultural' | 'nightlife' | 'hidden';
 type QuickFilter = 'open' | 'walking' | 'topRated' | 'budget';
 
 // ============================================================================
-// CITY COORDINATES (for cities selected from dropdown)
+// CITY COORDINATES
 // ============================================================================
 
 const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
@@ -82,51 +90,30 @@ const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
 
 const HomeIcon = ({ active }: { active: boolean }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-    <defs>
-      <linearGradient id="hg" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#F59E0B" />
-        <stop offset="100%" stopColor="#FBBF24" />
-      </linearGradient>
-    </defs>
+    <defs><linearGradient id="hg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#F59E0B" /><stop offset="100%" stopColor="#FBBF24" /></linearGradient></defs>
     <path d="M3 10.5L12 3L21 10.5V20C21 20.5523 20.5523 21 20 21H15V15C15 14.4477 14.5523 14 14 14H10C9.44772 14 9 14.4477 9 15V21H4C3.44772 21 3 20.5523 3 20V10.5Z"
       stroke={active ? "url(#hg)" : "#78716C"} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"
       fill={active ? "rgba(245,158,11,0.15)" : "none"} />
   </svg>
 );
 
-const VibesIcon = ({ active }: { active: boolean }) => (
+const ExploreIcon = ({ active }: { active: boolean }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-    <defs>
-      <linearGradient id="vg" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#F59E0B" />
-        <stop offset="100%" stopColor="#FBBF24" />
-      </linearGradient>
-    </defs>
-    <circle cx="12" cy="12" r="9" stroke={active ? "url(#vg)" : "#78716C"} strokeWidth="1.75" fill="none" />
-    <circle cx="12" cy="12" r="5" stroke={active ? "url(#vg)" : "#78716C"} strokeWidth="1.75" fill={active ? "rgba(245,158,11,0.1)" : "none"} />
-    <circle cx="12" cy="12" r="2" fill={active ? "url(#vg)" : "#78716C"} />
+    <defs><linearGradient id="eg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#F59E0B" /><stop offset="100%" stopColor="#FBBF24" /></linearGradient></defs>
+    <circle cx="11" cy="11" r="7" stroke={active ? "url(#eg)" : "#78716C"} strokeWidth="1.75" fill={active ? "rgba(245,158,11,0.1)" : "none"} />
+    <path d="M21 21L16.5 16.5" stroke={active ? "url(#eg)" : "#78716C"} strokeWidth="1.75" strokeLinecap="round" />
   </svg>
 );
 
 const PlanIcon = ({ active }: { active: boolean }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-    <defs>
-      <linearGradient id="pg" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#F59E0B" />
-        <stop offset="100%" stopColor="#FBBF24" />
-      </linearGradient>
-    </defs>
-    <rect x="5" y="3" width="14" height="16" rx="2" stroke={active ? "url(#pg)" : "#78716C"} strokeWidth="1.5"
-      fill={active ? "rgba(245,158,11,0.05)" : "none"} opacity="0.5" />
-    <rect x="6" y="5" width="14" height="16" rx="2" stroke={active ? "url(#pg)" : "#78716C"} strokeWidth="1.75"
-      fill={active ? "rgba(245,158,11,0.15)" : "rgba(28,25,23,0.5)"} />
-    <line x1="9" y1="10" x2="17" y2="10" stroke={active ? "url(#pg)" : "#78716C"} strokeWidth="1.5" strokeLinecap="round" />
-    <line x1="9" y1="14" x2="15" y2="14" stroke={active ? "url(#pg)" : "#78716C"} strokeWidth="1.5" strokeLinecap="round" />
-    <line x1="9" y1="18" x2="13" y2="18" stroke={active ? "url(#pg)" : "#78716C"} strokeWidth="1.5" strokeLinecap="round" />
+    <defs><linearGradient id="pg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#F59E0B" /><stop offset="100%" stopColor="#FBBF24" /></linearGradient></defs>
+    <path d="M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15" stroke={active ? "url(#pg)" : "#78716C"} strokeWidth="1.75" strokeLinecap="round" />
+    <rect x="9" y="3" width="6" height="4" rx="1" stroke={active ? "url(#pg)" : "#78716C"} strokeWidth="1.5" fill={active ? "rgba(245,158,11,0.15)" : "none"} />
+    <path d="M9 12L11 14L15 10" stroke={active ? "url(#pg)" : "#78716C"} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
-// Small action icons for place cards
 const DirectionsIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polygon points="3 11 22 2 13 21 11 13 3 11" />
@@ -154,15 +141,35 @@ const LocationIcon = () => (
   </svg>
 );
 
+const GearIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#78716C" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </svg>
+);
+
+const CloseIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
+
+const WebsiteIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+  </svg>
+);
+
 // ============================================================================
-// VIBE DEFINITIONS
+// VIBE + FILTER DEFINITIONS
 // ============================================================================
 
-const VIBES: { id: Vibe; emoji: string; label: string; description: string }[] = [
-  { id: 'food', emoji: '🍜', label: 'Foodie', description: 'Local eats & cafes' },
-  { id: 'cultural', emoji: '🏛️', label: 'Cultural', description: 'Art, history & museums' },
-  { id: 'nightlife', emoji: '🌙', label: 'Nightlife', description: 'Bars & late nights' },
-  { id: 'hidden', emoji: '💎', label: 'Hidden Gems', description: 'Off the beaten path' },
+const VIBES: { id: Vibe; emoji: string; label: string }[] = [
+  { id: 'food', emoji: '🍜', label: 'Foodie' },
+  { id: 'cultural', emoji: '🏛️', label: 'Cultural' },
+  { id: 'nightlife', emoji: '🌙', label: 'Nightlife' },
+  { id: 'hidden', emoji: '💎', label: 'Hidden Gems' },
 ];
 
 const QUICK_FILTERS: { id: QuickFilter; label: string }[] = [
@@ -173,11 +180,24 @@ const QUICK_FILTERS: { id: QuickFilter; label: string }[] = [
 ];
 
 // ============================================================================
-// MAIN APP COMPONENT
+// SHARED STYLES
+// ============================================================================
+
+const cardStyle: React.CSSProperties = {
+  background: 'rgba(28, 25, 23, 0.8)',
+  backdropFilter: 'blur(20px)',
+  borderRadius: '16px',
+  padding: '16px',
+  marginBottom: '12px',
+  border: '1px solid rgba(255,255,255,0.06)',
+};
+
+// ============================================================================
+// MAIN APP
 // ============================================================================
 
 export default function App() {
-  // Core state
+  // --- Core state ---
   const [screen, setScreen] = useState<Screen>('home');
   const [cities, setCities] = useState<City[]>([]);
   const [selectedCity, setSelectedCity] = useState<City | null>(null);
@@ -190,178 +210,249 @@ export default function App() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [useGps, setUseGps] = useState(false);
   const [searchRadius, setSearchRadius] = useState(1500);
+
+  // --- Email signup ---
   const [showEmailSignup, setShowEmailSignup] = useState(false);
   const [emailInput, setEmailInput] = useState('');
   const [emailSaved, setEmailSaved] = useState(() => localStorage.getItem('nxstops_email_saved') === 'true');
   const [emailSubmitting, setEmailSubmitting] = useState(false);
+
+  // --- Modals ---
   const [surprisePlace, setSurprisePlace] = useState<Place | null>(null);
+  const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
 
-  const location = useLocation();
+  // --- Admin ---
+  const [showAdmin, setShowAdmin] = useState(false);
+  const [adminSignups, setAdminSignups] = useState<AdminSignup[]>([]);
+  const [adminCities, setAdminCities] = useState<City[]>([]);
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminTab, setAdminTab] = useState<'dashboard' | 'signups' | 'cities'>('dashboard');
 
-  // Load cities from Supabase on mount
+  // --- Toast ---
+  const [toast, setToast] = useState<string | null>(null);
+
+  const loc = useLocation();
+
+  // --------------------------------------------------------------------------
+  // HELPERS
+  // --------------------------------------------------------------------------
+
+  const getPlanKey = useCallback(() => {
+    if (useGps && loc.city) return `nxstops_plan_gps_${loc.city.toLowerCase().replace(/\s+/g, '_')}`;
+    if (selectedCity) return `nxstops_plan_${selectedCity.name.toLowerCase().replace(/\s+/g, '_')}`;
+    return 'nxstops_plan_default';
+  }, [useGps, loc.city, selectedCity]);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
+  }, []);
+
+  const getGreeting = (): string => {
+    const h = currentTime.getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    if (h < 21) return 'Good evening';
+    return 'Good night';
+  };
+
+  const getTimeSuggestion = (): string => {
+    const h = currentTime.getHours();
+    if (h >= 6 && h < 11) return 'Perfect time for coffee & brunch';
+    if (h >= 11 && h < 14) return 'Lunch spots & afternoon vibes';
+    if (h >= 14 && h < 17) return 'Explore something new nearby';
+    if (h >= 17 && h < 21) return 'Dinner & evening plans await';
+    return 'Late night spots still open';
+  };
+
+  const cityLabel = useGps ? (loc.city || 'Near You') : (selectedCity?.name || '');
+
+  // --------------------------------------------------------------------------
+  // EFFECTS
+  // --------------------------------------------------------------------------
+
+  // Load cities
   useEffect(() => {
-    async function loadCities() {
+    (async () => {
       const data = await fetchCities();
       setCities(data);
       setLoading(false);
-    }
-    loadCities();
+    })();
   }, []);
 
-  // Auto-switch to GPS mode when location is available
+  // Auto-GPS
   useEffect(() => {
-    if (location.hasLocation && !selectedCity) {
-      setUseGps(true);
-    }
-  }, [location.hasLocation, selectedCity]);
+    if (loc.hasLocation && !selectedCity) setUseGps(true);
+  }, [loc.hasLocation, selectedCity]);
 
-  // Load saved day plan from localStorage
+  // Load saved plan (city-isolated)
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('nxstops_dayplan');
+      const key = getPlanKey();
+      const saved = localStorage.getItem(key);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed.expires > Date.now()) {
           setDayPlan(parsed.stops.map((s: Stop) => ({ ...s, addedAt: new Date(s.addedAt) })));
         } else {
-          localStorage.removeItem('nxstops_dayplan');
+          localStorage.removeItem(key);
+          setDayPlan([]);
         }
+      } else {
+        setDayPlan([]);
       }
-    } catch { /* ignore corrupt data */ }
-  }, []);
+    } catch { setDayPlan([]); }
+  }, [getPlanKey]);
 
-  // Save day plan to localStorage
+  // Save plan (city-isolated)
   useEffect(() => {
+    const key = getPlanKey();
     if (dayPlan.length > 0) {
-      localStorage.setItem('nxstops_dayplan', JSON.stringify({
-        stops: dayPlan,
-        expires: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
-      }));
+      localStorage.setItem(key, JSON.stringify({ stops: dayPlan, expires: Date.now() + 7 * 24 * 60 * 60 * 1000 }));
     } else {
-      localStorage.removeItem('nxstops_dayplan');
+      localStorage.removeItem(key);
     }
-  }, [dayPlan]);
+  }, [dayPlan, getPlanKey]);
 
-  // Update time every minute
+  // Clock
   useEffect(() => {
-    const interval = setInterval(() => setCurrentTime(new Date()), 60000);
-    return () => clearInterval(interval);
+    const i = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(i);
   }, []);
 
-  // Fetch places from Google Places API
+  // Fetch places
   const fetchPlaces = useCallback(async () => {
     let lat: number | undefined;
     let lng: number | undefined;
-
-    if (useGps && location.lat && location.lng) {
-      lat = location.lat;
-      lng = location.lng;
-    } else if (selectedCity) {
-      const coords = CITY_COORDS[selectedCity.name.toLowerCase()];
-      if (coords) {
-        lat = coords.lat;
-        lng = coords.lng;
-      }
+    if (useGps && loc.lat && loc.lng) { lat = loc.lat; lng = loc.lng; }
+    else if (selectedCity) {
+      const c = CITY_COORDS[selectedCity.name.toLowerCase()];
+      if (c) { lat = c.lat; lng = c.lng; }
     }
-
     if (!lat || !lng) return;
-
     setPlacesLoading(true);
     const results = await searchNearby(lat, lng, selectedVibes, searchRadius);
     setPlaces(results);
     setPlacesLoading(false);
-  }, [useGps, location.lat, location.lng, selectedCity, selectedVibes, searchRadius]);
+  }, [useGps, loc.lat, loc.lng, selectedCity, selectedVibes, searchRadius]);
 
-  // Fetch when vibes change or location changes or city changes
   useEffect(() => {
-    if (screen === 'planner' || (screen === 'vibes' && (useGps || selectedCity))) {
-      fetchPlaces();
-    }
+    if (screen === 'explore' && (useGps || selectedCity)) fetchPlaces();
   }, [screen, fetchPlaces]);
 
-  // Apply quick filters to places
+  // --------------------------------------------------------------------------
+  // FILTERED PLACES
+  // --------------------------------------------------------------------------
+
   const filteredPlaces = places.filter(place => {
-    for (const filter of quickFilters) {
-      switch (filter) {
-        case 'open':
-          if (!place.openNow) return false;
-          break;
-        case 'walking':
-          if (place.distance !== null && place.distance > 1) return false;
-          break;
-        case 'topRated':
-          if (place.rating < 4.5) return false;
-          break;
-        case 'budget':
-          if (place.priceLevel > 2 && place.priceLevel !== -1) return false;
-          break;
+    for (const f of quickFilters) {
+      switch (f) {
+        case 'open': if (!place.openNow) return false; break;
+        case 'walking': if (place.distance !== null && place.distance > 1) return false; break;
+        case 'topRated': if (place.rating < 4.5) return false; break;
+        case 'budget': if (place.priceLevel > 2 && place.priceLevel !== -1) return false; break;
       }
     }
     return true;
   });
 
-  // Day plan helpers
+  // --------------------------------------------------------------------------
+  // DAY PLAN HANDLERS
+  // --------------------------------------------------------------------------
+
   const addToPlan = (place: Place) => {
     if (dayPlan.find(s => s.place.placeId === place.placeId)) return;
-    setDayPlan([...dayPlan, { id: crypto.randomUUID(), place, addedAt: new Date() }]);
+    setDayPlan(prev => [...prev, { id: crypto.randomUUID(), place, addedAt: new Date() }]);
+    showToast(`Added ${place.name} to your plan`);
   };
 
   const removeFromPlan = (stopId: string) => {
-    setDayPlan(dayPlan.filter(s => s.id !== stopId));
+    setDayPlan(prev => prev.filter(s => s.id !== stopId));
   };
 
   const isInPlan = (placeId: string) => dayPlan.some(s => s.place.placeId === placeId);
 
-  // Time greeting
-  const getGreeting = (): string => {
-    const hour = currentTime.getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    if (hour < 21) return 'Good evening';
-    return 'Good night';
+  const clearPlan = () => {
+    setDayPlan([]);
+    showToast('Plan cleared');
   };
 
-  // Time-aware suggestion text
-  const getTimeSuggestion = (): string => {
-    const hour = currentTime.getHours();
-    if (hour >= 6 && hour < 11) return 'Perfect time for coffee & brunch';
-    if (hour >= 11 && hour < 14) return 'Lunch spots & afternoon vibes';
-    if (hour >= 14 && hour < 17) return 'Explore something new nearby';
-    if (hour >= 17 && hour < 21) return 'Dinner & evening plans await';
-    return 'Late night spots still open';
+  const movePlanStop = (index: number, direction: 'up' | 'down') => {
+    const newPlan = [...dayPlan];
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (target < 0 || target >= newPlan.length) return;
+    [newPlan[index], newPlan[target]] = [newPlan[target], newPlan[index]];
+    setDayPlan(newPlan);
   };
 
-  // Share place
-  const sharePlace = async (place: Place) => {
+  const getRouteUrl = () => {
+    if (dayPlan.length === 0) return '';
+    const points = dayPlan.map(s => `${s.place.lat},${s.place.lng}`);
+    return `https://www.google.com/maps/dir/${points.join('/')}`;
+  };
+
+  const sharePlan = async () => {
+    const text = dayPlan.map((s, i) => `${i + 1}. ${s.place.name} (${s.place.categoryDisplay})`).join('\n');
+    const summary = `My ${cityLabel} Day Plan:\n${text}\n\nPlanned with NxStops`;
     if (navigator.share) {
-      await navigator.share({
-        title: place.name,
-        text: `Check out ${place.name} on NxStops`,
-        url: place.googleMapsUrl,
-      });
+      await navigator.share({ title: `${cityLabel} Day Plan`, text: summary });
+    } else {
+      await navigator.clipboard.writeText(summary);
+      showToast('Plan copied to clipboard');
     }
   };
 
-  // Email signup handler
+  // --------------------------------------------------------------------------
+  // OTHER HANDLERS
+  // --------------------------------------------------------------------------
+
+  const sharePlace = async (place: Place) => {
+    if (navigator.share) {
+      await navigator.share({ title: place.name, text: `Check out ${place.name} on NxStops`, url: place.googleMapsUrl });
+    } else if (place.googleMapsUrl) {
+      await navigator.clipboard.writeText(place.googleMapsUrl);
+      showToast('Link copied');
+    }
+  };
+
   const handleEmailSignup = async () => {
     if (!emailInput || !emailInput.includes('@')) return;
     setEmailSubmitting(true);
-    await saveEmailSignup(emailInput, useGps ? (location.city || undefined) : selectedCity?.name);
+    await saveEmailSignup(emailInput, useGps ? (loc.city || undefined) : selectedCity?.name);
     localStorage.setItem('nxstops_email_saved', 'true');
     setEmailSaved(true);
     setShowEmailSignup(false);
     setEmailSubmitting(false);
+    showToast('You\'re signed up!');
   };
 
-  // Surprise Me — pick a random open place
   const handleSurpriseMe = () => {
-    const openPlaces = places.filter(p => p.openNow);
-    if (openPlaces.length === 0) return;
-    const random = openPlaces[Math.floor(Math.random() * openPlaces.length)];
-    setSurprisePlace(random);
+    const open = places.filter(p => p.openNow);
+    if (open.length === 0) { showToast('No open places found'); return; }
+    setSurprisePlace(open[Math.floor(Math.random() * open.length)]);
   };
 
-  // Price dots
+  const openAdmin = async () => {
+    setShowAdmin(true);
+    setAdminLoading(true);
+    const [signups, allCities] = await Promise.all([fetchEmailSignups(), fetchAllCities()]);
+    setAdminSignups(signups as AdminSignup[]);
+    setAdminCities(allCities as City[]);
+    setAdminLoading(false);
+  };
+
+  const handleToggleCity = async (cityId: string, isActive: boolean) => {
+    const ok = await toggleCityActive(cityId, !isActive);
+    if (ok) {
+      setAdminCities(prev => prev.map(c => c.id === cityId ? { ...c, is_active: !isActive } : c));
+      showToast(`City ${!isActive ? 'activated' : 'deactivated'}`);
+    }
+  };
+
+  // --------------------------------------------------------------------------
+  // SUB-COMPONENTS
+  // --------------------------------------------------------------------------
+
   const PriceDots = ({ level }: { level: number }) => {
     if (level < 0) return null;
     return (
@@ -373,7 +464,6 @@ export default function App() {
     );
   };
 
-  // Star rating
   const StarRating = ({ rating, count }: { rating: number; count: number }) => (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '13px' }}>
       <span style={{ color: '#F59E0B' }}>★</span>
@@ -382,19 +472,13 @@ export default function App() {
     </span>
   );
 
-  // Skeleton loader
   const SkeletonCard = () => (
-    <div style={{
-      ...cardStyle,
-      height: '280px',
-      overflow: 'hidden',
-    }}>
+    <div style={{ ...cardStyle, height: '280px', overflow: 'hidden' }}>
       <div style={{ height: '160px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', marginBottom: '12px' }}>
         <div style={{
           width: '100%', height: '100%', borderRadius: '12px',
           background: 'linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.03) 75%)',
-          backgroundSize: '200% 100%',
-          animation: 'shimmer 1.5s infinite',
+          backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite',
         }} />
       </div>
       <div style={{ height: '16px', width: '60%', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', marginBottom: '8px' }} />
@@ -402,76 +486,145 @@ export default function App() {
     </div>
   );
 
-  // ============================================================================
-  // STYLES
-  // ============================================================================
+  // --------------------------------------------------------------------------
+  // PLACE CARD COMPONENT
+  // --------------------------------------------------------------------------
 
-  const cardStyle: React.CSSProperties = {
-    background: 'rgba(28, 25, 23, 0.8)',
-    backdropFilter: 'blur(20px)',
-    borderRadius: '16px',
-    padding: '16px',
-    marginBottom: '12px',
-    border: '1px solid rgba(255,255,255,0.06)',
+  const PlaceCard = ({ place }: { place: Place }) => {
+    const inPlan = isInPlan(place.placeId);
+    const hoursStatus = getHoursStatus(place.hours, place.openNow);
+
+    return (
+      <div
+        style={{ ...cardStyle, padding: 0, overflow: 'hidden', opacity: place.openNow ? 1 : 0.6, cursor: 'pointer' }}
+        onClick={() => setSelectedPlace(place)}
+      >
+        {/* Photo */}
+        {place.photoUrl && (
+          <div style={{
+            height: '160px', width: '100%', position: 'relative',
+            background: `linear-gradient(to bottom, transparent 60%, rgba(12,10,9,0.9)), url(${place.photoUrl})`,
+            backgroundSize: 'cover', backgroundPosition: 'center',
+          }}>
+            <div style={{
+              position: 'absolute', top: '10px', left: '10px',
+              padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 600,
+              background: place.openNow ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
+              color: place.openNow ? '#34D399' : '#F87171', backdropFilter: 'blur(8px)',
+            }}>
+              {hoursStatus.text}
+            </div>
+            {place.distance != null && (
+              <div style={{
+                position: 'absolute', top: '10px', right: '10px',
+                padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 500,
+                background: 'rgba(0,0,0,0.5)', color: '#FFFBEB', backdropFilter: 'blur(8px)',
+              }}>
+                {formatDistance(place.distance)}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div style={{ padding: '14px 16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0, flex: 1 }}>{place.name}</h3>
+            {place.rating > 0 && <StarRating rating={place.rating} count={place.reviewCount} />}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+            {place.categoryDisplay && (
+              <span style={{ padding: '3px 8px', background: 'rgba(245,158,11,0.12)', color: '#F59E0B', borderRadius: '6px', fontSize: '11px', fontWeight: 500 }}>
+                {place.categoryDisplay}
+              </span>
+            )}
+            <PriceDots level={place.priceLevel} />
+            {!place.photoUrl && place.distance != null && (
+              <span style={{ fontSize: '11px', color: '#A8A29E' }}>{formatDistance(place.distance)}</span>
+            )}
+            {!place.photoUrl && (
+              <span style={{ fontSize: '11px', color: place.openNow ? '#34D399' : '#F87171' }}>{hoursStatus.text}</span>
+            )}
+          </div>
+
+          {/* Action Row */}
+          <div style={{ display: 'flex', gap: '8px' }} onClick={e => e.stopPropagation()}>
+            <button
+              onClick={() => inPlan ? removeFromPlan(dayPlan.find(s => s.place.placeId === place.placeId)!.id) : addToPlan(place)}
+              style={{
+                flex: 1, padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
+                cursor: 'pointer',
+                background: inPlan ? 'transparent' : 'linear-gradient(135deg, #F59E0B, #D97706)',
+                color: inPlan ? '#F59E0B' : '#0C0A09',
+                border: inPlan ? '1.5px solid #F59E0B' : 'none',
+              }}
+            >
+              {inPlan ? '✓ Saved' : '+ Add'}
+            </button>
+            {place.googleMapsUrl && (
+              <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+                style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', color: '#A8A29E', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+                <DirectionsIcon />
+              </a>
+            )}
+            {place.phone && (
+              <a href={`tel:${place.phone}`}
+                style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', color: '#A8A29E', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+                <PhoneIcon />
+              </a>
+            )}
+            <button onClick={() => sharePlace(place)}
+              style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', color: '#A8A29E', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ShareIcon />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
-  // ============================================================================
+  // ==========================================================================
   // HOME SCREEN
-  // ============================================================================
+  // ==========================================================================
 
   const HomeScreen = () => (
     <div>
+      {/* Greeting */}
       <div style={{ marginBottom: '24px' }}>
         <h1 style={{ fontSize: '26px', fontWeight: 700, marginBottom: '4px' }}>
           {getGreeting()} ✨
         </h1>
-        <p style={{ color: '#A8A29E', fontSize: '14px' }}>
-          {getTimeSuggestion()}
-        </p>
+        <p style={{ color: '#A8A29E', fontSize: '14px' }}>{getTimeSuggestion()}</p>
       </div>
 
-      {/* GPS Location Card */}
-      {location.hasLocation && (
+      {/* GPS Card */}
+      {loc.hasLocation && (
         <button
-          onClick={() => {
-            setUseGps(true);
-            setSelectedCity(null);
-            setScreen('vibes');
-          }}
+          onClick={() => { setUseGps(true); setSelectedCity(null); setScreen('explore'); }}
           style={{
-            ...cardStyle,
-            width: '100%',
-            cursor: 'pointer',
-            textAlign: 'left',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '14px',
+            ...cardStyle, width: '100%', cursor: 'pointer', textAlign: 'left',
+            display: 'flex', alignItems: 'center', gap: '14px',
             border: useGps ? '2px solid #F59E0B' : '1px solid rgba(255,255,255,0.06)',
-            background: useGps ? 'rgba(245, 158, 11, 0.08)' : 'rgba(28, 25, 23, 0.8)',
+            background: useGps ? 'rgba(245,158,11,0.08)' : 'rgba(28,25,23,0.8)',
           }}
         >
           <div style={{
             width: '44px', height: '44px', borderRadius: '12px',
             background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}>
             <LocationIcon />
           </div>
           <div>
-            <div style={{ fontWeight: 600, fontSize: '15px', color: '#FFFBEB' }}>
-              {location.city || 'Near You'}
-            </div>
-            <div style={{ fontSize: '12px', color: '#A8A29E' }}>
-              Use your current location
-            </div>
+            <div style={{ fontWeight: 600, fontSize: '15px', color: '#FFFBEB' }}>{loc.city || 'Near You'}</div>
+            <div style={{ fontSize: '12px', color: '#A8A29E' }}>Use your current location</div>
           </div>
           <div style={{ marginLeft: 'auto', color: '#F59E0B', fontSize: '20px' }}>→</div>
         </button>
       )}
 
       {/* Divider */}
-      {location.hasLocation && (
+      {loc.hasLocation && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '16px 0' }}>
           <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
           <span style={{ fontSize: '12px', color: '#78716C' }}>or pick a city</span>
@@ -499,18 +652,14 @@ export default function App() {
         >
           <option value="">Choose a city...</option>
           {cities.map(city => (
-            <option key={city.id} value={city.id}>
-              {city.name}, {city.country}
-            </option>
+            <option key={city.id} value={city.id}>{city.name}, {city.country}</option>
           ))}
         </select>
       </div>
 
       {/* City Banner */}
       {selectedCity && (
-        <div style={{
-          ...cardStyle, padding: 0, overflow: 'hidden', position: 'relative', marginTop: '4px',
-        }}>
+        <div style={{ ...cardStyle, padding: 0, overflow: 'hidden', marginTop: '4px' }}>
           <div style={{
             height: '140px',
             background: selectedCity.banner_url
@@ -530,11 +679,10 @@ export default function App() {
         <button
           onClick={() => setShowEmailSignup(true)}
           style={{
-            ...cardStyle,
-            width: '100%', cursor: 'pointer', textAlign: 'left',
+            ...cardStyle, width: '100%', cursor: 'pointer', textAlign: 'left',
             display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px',
             background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(217,119,6,0.05))',
-            border: '1px solid rgba(245, 158, 11, 0.15)',
+            border: '1px solid rgba(245,158,11,0.15)',
           }}
         >
           <div style={{ fontSize: '24px' }}>📬</div>
@@ -546,7 +694,7 @@ export default function App() {
         </button>
       )}
 
-      {/* Start Button */}
+      {/* Start Exploring */}
       {(selectedCity || useGps) && (
         <button
           style={{
@@ -554,142 +702,68 @@ export default function App() {
             color: '#0C0A09', border: 'none', borderRadius: '14px',
             padding: '16px', fontSize: '16px', fontWeight: 600,
             cursor: 'pointer', width: '100%', marginTop: '12px',
-            boxShadow: '0 4px 20px rgba(245, 158, 11, 0.3)',
+            boxShadow: '0 4px 20px rgba(245,158,11,0.3)',
           }}
-          onClick={() => setScreen('vibes')}
+          onClick={() => setScreen('explore')}
         >
-          Choose Your Vibes →
+          Start Exploring →
         </button>
       )}
     </div>
   );
 
-  // ============================================================================
-  // VIBES SCREEN
-  // ============================================================================
+  // ==========================================================================
+  // EXPLORE SCREEN (Merged Vibes + Discovery)
+  // ==========================================================================
 
-  const VibesScreen = () => (
+  const ExploreScreen = () => (
     <div>
-      <div style={{ marginBottom: '20px' }}>
-        <button
-          onClick={() => setScreen('home')}
-          style={{ background: 'none', border: 'none', color: '#A8A29E', fontSize: '14px', cursor: 'pointer', marginBottom: '12px', padding: 0 }}
-        >
-          ← Back
-        </button>
-        <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '4px' }}>
-          What's your vibe?
+      {/* Header */}
+      <div style={{ marginBottom: '12px' }}>
+        <h1 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '2px' }}>
+          {cityLabel} 📍
         </h1>
-        <p style={{ color: '#A8A29E', fontSize: '14px' }}>
-          Pick what you're in the mood for
-        </p>
+        <p style={{ color: '#78716C', fontSize: '13px' }}>{filteredPlaces.length} places nearby</p>
       </div>
 
-      {/* Vibe Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+      {/* Vibe Chips */}
+      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px', marginBottom: '4px', scrollbarWidth: 'none' }}>
         {VIBES.map(vibe => {
-          const isSelected = selectedVibes.includes(vibe.id);
+          const active = selectedVibes.includes(vibe.id);
           return (
             <button
               key={vibe.id}
               onClick={() => {
-                setSelectedVibes(isSelected
-                  ? selectedVibes.filter(v => v !== vibe.id)
-                  : [...selectedVibes, vibe.id]
-                );
+                setSelectedVibes(active ? selectedVibes.filter(v => v !== vibe.id) : [...selectedVibes, vibe.id]);
+                setSearchRadius(1500); // reset radius on vibe change
               }}
               style={{
-                ...cardStyle,
-                cursor: 'pointer', textAlign: 'left',
-                border: isSelected ? '2px solid #F59E0B' : '1px solid rgba(255,255,255,0.06)',
-                background: isSelected ? 'rgba(245, 158, 11, 0.08)' : 'rgba(28, 25, 23, 0.8)',
-                padding: '16px',
+                padding: '8px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: 500,
+                border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                background: active ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'rgba(255,255,255,0.05)',
+                color: active ? '#0C0A09' : '#A8A29E',
               }}
             >
-              <div style={{ fontSize: '28px', marginBottom: '6px' }}>{vibe.emoji}</div>
-              <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '2px', color: isSelected ? '#FFFBEB' : '#d4d0cc' }}>{vibe.label}</div>
-              <div style={{ fontSize: '11px', color: '#78716C' }}>{vibe.description}</div>
+              {vibe.emoji} {vibe.label}
             </button>
           );
         })}
       </div>
 
-      {/* Continue Button */}
-      <button
-        style={{
-          background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
-          color: '#0C0A09', border: 'none', borderRadius: '14px',
-          padding: '16px', fontSize: '16px', fontWeight: 600,
-          cursor: 'pointer', width: '100%',
-          boxShadow: '0 4px 20px rgba(245, 158, 11, 0.3)',
-        }}
-        onClick={() => {
-          setScreen('planner');
-          fetchPlaces();
-        }}
-      >
-        {selectedVibes.length === 0 ? 'Show Everything' : `Show ${selectedVibes.map(v => VIBES.find(vb => vb.id === v)?.label).join(' & ')} →`}
-      </button>
-    </div>
-  );
-
-  // ============================================================================
-  // PLANNER SCREEN
-  // ============================================================================
-
-  const PlannerScreen = () => (
-    <div>
-      {/* Header */}
-      <div style={{ marginBottom: '16px' }}>
-        <button
-          onClick={() => setScreen('vibes')}
-          style={{ background: 'none', border: 'none', color: '#A8A29E', fontSize: '14px', cursor: 'pointer', marginBottom: '10px', padding: 0 }}
-        >
-          ← Change Vibes
-        </button>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h1 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '2px' }}>
-              {useGps ? (location.city || 'Near You') : selectedCity?.name} 📍
-            </h1>
-            <p style={{ color: '#78716C', fontSize: '13px' }}>
-              {selectedVibes.length > 0
-                ? selectedVibes.map(v => VIBES.find(vb => vb.id === v)?.emoji).join(' ')
-                : 'All vibes'}
-            </p>
-          </div>
-          {dayPlan.length > 0 && (
-            <div style={{
-              background: 'rgba(245, 158, 11, 0.15)', padding: '6px 12px',
-              borderRadius: '20px', fontSize: '13px', color: '#F59E0B', fontWeight: 600,
-            }}>
-              {dayPlan.length} stop{dayPlan.length !== 1 ? 's' : ''}
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Quick Filters */}
-      <div style={{
-        display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px',
-        marginBottom: '12px', scrollbarWidth: 'none',
-      }}>
+      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '12px', scrollbarWidth: 'none' }}>
         {QUICK_FILTERS.map(filter => {
-          const isActive = quickFilters.includes(filter.id);
+          const active = quickFilters.includes(filter.id);
           return (
             <button
               key={filter.id}
-              onClick={() => {
-                setQuickFilters(isActive
-                  ? quickFilters.filter(f => f !== filter.id)
-                  : [...quickFilters, filter.id]
-                );
-              }}
+              onClick={() => setQuickFilters(active ? quickFilters.filter(f => f !== filter.id) : [...quickFilters, filter.id])}
               style={{
-                padding: '8px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 500,
-                border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                background: isActive ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255,255,255,0.05)',
-                color: isActive ? '#F59E0B' : '#A8A29E',
+                padding: '6px 12px', borderRadius: '16px', fontSize: '11px', fontWeight: 500,
+                border: active ? '1px solid rgba(245,158,11,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                background: active ? 'rgba(245,158,11,0.12)' : 'transparent',
+                color: active ? '#F59E0B' : '#78716C',
               }}
             >
               {filter.label}
@@ -698,268 +772,607 @@ export default function App() {
         })}
       </div>
 
-      {/* Day Plan Summary */}
-      {dayPlan.length > 0 && (
-        <div style={{ ...cardStyle, marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '12px', color: '#F59E0B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
-            Your Day Plan
-          </h3>
-          {dayPlan.map((stop, index) => (
-            <div key={stop.id} style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '10px 0',
-              borderBottom: index < dayPlan.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{
-                  width: '22px', height: '22px', borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #F59E0B, #D97706)',
-                  color: '#0C0A09', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '11px', fontWeight: 700, flexShrink: 0,
-                }}>
-                  {index + 1}
-                </div>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: '13px' }}>{stop.place.name}</div>
-                  <div style={{ fontSize: '11px', color: '#78716C' }}>
-                    {stop.place.categoryDisplay}
-                    {stop.place.distance != null && ` · ${formatDistance(stop.place.distance)}`}
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={() => removeFromPlan(stop.id)}
-                style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', padding: '4px 8px', fontSize: '16px' }}
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Loading */}
+      {placesLoading && <><SkeletonCard /><SkeletonCard /><SkeletonCard /></>}
 
-      {/* Discover Places */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-        <h3 style={{ fontSize: '12px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-          Discover ({filteredPlaces.length})
-        </h3>
-      </div>
-
-      {/* Loading State */}
-      {placesLoading && (
-        <>
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
-        </>
-      )}
-
-      {/* Empty State */}
+      {/* Empty: filters too strict */}
       {!placesLoading && filteredPlaces.length === 0 && places.length > 0 && (
         <div style={{ ...cardStyle, textAlign: 'center', padding: '32px 20px' }}>
           <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔍</div>
-          <p style={{ color: '#A8A29E', fontSize: '14px', marginBottom: '12px' }}>
-            Nothing matching nearby. Try removing some filters.
-          </p>
-          <button
-            onClick={() => setQuickFilters([])}
-            style={{
-              background: 'none', border: '1px solid #F59E0B', color: '#F59E0B',
-              borderRadius: '10px', padding: '10px 20px', fontSize: '13px', cursor: 'pointer',
-            }}
-          >
+          <p style={{ color: '#A8A29E', fontSize: '14px', marginBottom: '12px' }}>Nothing matching. Try removing some filters.</p>
+          <button onClick={() => setQuickFilters([])}
+            style={{ background: 'none', border: '1px solid #F59E0B', color: '#F59E0B', borderRadius: '10px', padding: '10px 20px', fontSize: '13px', cursor: 'pointer' }}>
             Clear Filters
           </button>
         </div>
       )}
 
-      {!placesLoading && filteredPlaces.length === 0 && places.length === 0 && (
+      {/* Empty: no results at all */}
+      {!placesLoading && places.length === 0 && (
         <div style={{ ...cardStyle, textAlign: 'center', padding: '32px 20px' }}>
           <div style={{ fontSize: '32px', marginBottom: '8px' }}>📍</div>
-          <p style={{ color: '#A8A29E', fontSize: '14px', marginBottom: '12px' }}>
-            {(useGps || selectedCity)
-              ? 'Loading places... If nothing shows, try selecting a city.'
-              : 'Select a city or enable location to discover places.'}
+          <p style={{ color: '#A8A29E', fontSize: '14px' }}>
+            {(useGps || selectedCity) ? 'Loading places...' : 'Select a city or enable location first.'}
           </p>
         </div>
       )}
 
       {/* Place Cards */}
-      {!placesLoading && filteredPlaces.map(place => {
-        const inPlan = isInPlan(place.placeId);
+      {!placesLoading && filteredPlaces.map(place => (
+        <PlaceCard key={place.placeId} place={place} />
+      ))}
 
-        return (
-          <div key={place.placeId} style={{
-            ...cardStyle,
-            padding: 0,
-            overflow: 'hidden',
-            opacity: place.openNow ? 1 : 0.6,
-          }}>
-            {/* Photo */}
-            {place.photoUrl && (
-              <div style={{
-                height: '160px', width: '100%',
-                background: `linear-gradient(to bottom, transparent 60%, rgba(12,10,9,0.9)), url(${place.photoUrl})`,
-                backgroundSize: 'cover', backgroundPosition: 'center',
-                position: 'relative',
-              }}>
-                {/* Open/Closed Badge */}
-                <div style={{
-                  position: 'absolute', top: '10px', left: '10px',
-                  padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 600,
-                  background: place.openNow ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                  color: place.openNow ? '#34D399' : '#F87171',
-                  backdropFilter: 'blur(8px)',
-                }}>
-                  {place.openNow ? 'Open' : 'Closed'}
-                </div>
-                {/* Distance Badge */}
-                {place.distance != null && (
-                  <div style={{
-                    position: 'absolute', top: '10px', right: '10px',
-                    padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 500,
-                    background: 'rgba(0,0,0,0.5)', color: '#FFFBEB',
-                    backdropFilter: 'blur(8px)',
-                  }}>
-                    {formatDistance(place.distance)}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Content */}
-            <div style={{ padding: '14px 16px' }}>
-              {/* Name + Rating Row */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0, flex: 1 }}>{place.name}</h3>
-                {place.rating > 0 && <StarRating rating={place.rating} count={place.reviewCount} />}
-              </div>
-
-              {/* Category + Price */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                {place.categoryDisplay && (
-                  <span style={{
-                    padding: '3px 8px', background: 'rgba(245, 158, 11, 0.12)',
-                    color: '#F59E0B', borderRadius: '6px', fontSize: '11px', fontWeight: 500,
-                  }}>
-                    {place.categoryDisplay}
-                  </span>
-                )}
-                <PriceDots level={place.priceLevel} />
-                {place.tags.slice(0, 2).map(tag => (
-                  <span key={tag} style={{
-                    padding: '3px 8px', background: 'rgba(255,255,255,0.04)',
-                    color: '#78716C', borderRadius: '6px', fontSize: '11px',
-                  }}>
-                    {tag}
-                  </span>
-                ))}
-              </div>
-
-              {/* Address */}
-              {place.address && (
-                <p style={{ fontSize: '12px', color: '#78716C', marginBottom: '12px', lineHeight: 1.3 }}>
-                  {place.address}
-                </p>
-              )}
-
-              {/* No photo fallback: show distance + open status inline */}
-              {!place.photoUrl && (
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', fontSize: '12px' }}>
-                  {place.distance != null && (
-                    <span style={{ color: '#A8A29E' }}>📍 {formatDistance(place.distance)}</span>
-                  )}
-                  <span style={{ color: place.openNow ? '#34D399' : '#F87171' }}>
-                    {place.openNow ? '● Open' : '● Closed'}
-                  </span>
-                </div>
-              )}
-
-              {/* Action Buttons Row */}
-              <div style={{ display: 'flex', gap: '8px' }}>
-                {/* Add to Plan - Primary */}
-                <button
-                  onClick={() => inPlan ? removeFromPlan(dayPlan.find(s => s.place.placeId === place.placeId)!.id) : addToPlan(place)}
-                  style={{
-                    flex: 1, padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
-                    cursor: 'pointer', border: 'none',
-                    background: inPlan ? 'transparent' : 'linear-gradient(135deg, #F59E0B, #D97706)',
-                    color: inPlan ? '#F59E0B' : '#0C0A09',
-                    ...(inPlan ? { border: '1.5px solid #F59E0B' } : {}),
-                  }}
-                >
-                  {inPlan ? '✓ Saved' : '+ Add'}
-                </button>
-
-                {/* Directions */}
-                {place.googleMapsUrl && (
-                  <a
-                    href={place.googleMapsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      padding: '10px 14px', borderRadius: '10px',
-                      background: 'rgba(255,255,255,0.06)', color: '#A8A29E',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      textDecoration: 'none',
-                    }}
-                  >
-                    <DirectionsIcon />
-                  </a>
-                )}
-
-                {/* Call */}
-                {place.phone && (
-                  <a
-                    href={`tel:${place.phone}`}
-                    style={{
-                      padding: '10px 14px', borderRadius: '10px',
-                      background: 'rgba(255,255,255,0.06)', color: '#A8A29E',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      textDecoration: 'none',
-                    }}
-                  >
-                    <PhoneIcon />
-                  </a>
-                )}
-
-                {/* Share */}
-                <button
-                  onClick={() => sharePlace(place)}
-                  style={{
-                    padding: '10px 14px', borderRadius: '10px',
-                    background: 'rgba(255,255,255,0.06)', color: '#A8A29E',
-                    border: 'none', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                >
-                  <ShareIcon />
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })}
-
-      {/* Load More / Expand Radius */}
+      {/* Expand Radius */}
       {!placesLoading && filteredPlaces.length > 0 && (
-        <button
-          onClick={() => setSearchRadius(prev => prev + 1500)}
+        <button onClick={() => setSearchRadius(prev => prev + 1500)}
           style={{
             width: '100%', padding: '14px', borderRadius: '12px', marginTop: '4px',
             background: 'none', border: '1px solid rgba(255,255,255,0.08)',
             color: '#A8A29E', fontSize: '13px', cursor: 'pointer',
-          }}
-        >
+          }}>
           Search wider area →
         </button>
       )}
     </div>
   );
 
-  // ============================================================================
+  // ==========================================================================
+  // PLAN SCREEN (Redesigned Timeline)
+  // ==========================================================================
+
+  const PlanScreen = () => {
+    if (dayPlan.length === 0) {
+      return (
+        <div style={{ textAlign: 'center', paddingTop: '60px' }}>
+          <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.6 }}>🗺️</div>
+          <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '8px' }}>No stops yet</h2>
+          <p style={{ color: '#A8A29E', fontSize: '14px', marginBottom: '24px', lineHeight: 1.5 }}>
+            Explore places and tap "+ Add" to build your day plan
+          </p>
+          <button
+            onClick={() => setScreen('explore')}
+            style={{
+              background: 'linear-gradient(135deg, #F59E0B, #D97706)', color: '#0C0A09',
+              border: 'none', borderRadius: '14px', padding: '14px 28px',
+              fontSize: '15px', fontWeight: 600, cursor: 'pointer',
+              boxShadow: '0 4px 20px rgba(245,158,11,0.3)',
+            }}
+          >
+            Start Exploring →
+          </button>
+        </div>
+      );
+    }
+
+    const totalDistance = dayPlan.reduce((sum, s) => sum + (s.place.distance || 0), 0);
+
+    return (
+      <div>
+        {/* Header */}
+        <div style={{ marginBottom: '20px' }}>
+          <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '4px' }}>
+            Your Day Plan
+          </h1>
+          <p style={{ color: '#78716C', fontSize: '13px' }}>
+            {cityLabel} · {dayPlan.length} stop{dayPlan.length !== 1 ? 's' : ''}
+            {totalDistance > 0 && ` · ~${totalDistance.toFixed(1)} km`}
+          </p>
+        </div>
+
+        {/* Timeline */}
+        <div style={{ position: 'relative', paddingLeft: '32px' }}>
+          {/* Vertical route line */}
+          <div style={{
+            position: 'absolute', left: '14px', top: '16px',
+            bottom: '16px', width: '2px',
+            background: 'linear-gradient(to bottom, #F59E0B, rgba(245,158,11,0.1))',
+            borderRadius: '1px',
+          }} />
+
+          {dayPlan.map((stop, index) => (
+            <div key={stop.id} style={{ position: 'relative', marginBottom: '16px' }}>
+              {/* Stop number circle */}
+              <div style={{
+                position: 'absolute', left: '-32px', top: '16px',
+                width: '28px', height: '28px', borderRadius: '50%',
+                background: 'linear-gradient(135deg, #F59E0B, #D97706)',
+                color: '#0C0A09', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '12px', fontWeight: 700, zIndex: 1,
+                boxShadow: '0 0 0 4px #0C0A09',
+              }}>
+                {index + 1}
+              </div>
+
+              {/* Stop card */}
+              <div style={{
+                ...cardStyle, marginBottom: 0, overflow: 'hidden',
+                border: '1px solid rgba(245,158,11,0.1)',
+              }}>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  {/* Photo thumbnail */}
+                  {stop.place.photoUrl && (
+                    <div style={{
+                      width: '80px', height: '80px', borderRadius: '12px', flexShrink: 0,
+                      background: `url(${stop.place.photoUrl})`,
+                      backgroundSize: 'cover', backgroundPosition: 'center',
+                    }} />
+                  )}
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {stop.place.name}
+                    </h3>
+                    <p style={{ fontSize: '12px', color: '#A8A29E', marginBottom: '4px' }}>
+                      {stop.place.categoryDisplay}
+                      {stop.place.distance != null && ` · ${formatDistance(stop.place.distance)}`}
+                    </p>
+                    {stop.place.rating > 0 && (
+                      <div style={{ fontSize: '12px' }}>
+                        <span style={{ color: '#F59E0B' }}>★ {stop.place.rating.toFixed(1)}</span>
+                        <span style={{ color: '#78716C' }}> ({stop.place.reviewCount})</span>
+                      </div>
+                    )}
+
+                    {/* Mini actions */}
+                    <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+                      {stop.place.googleMapsUrl && (
+                        <a href={stop.place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+                          style={{
+                            padding: '5px 10px', borderRadius: '8px', fontSize: '11px',
+                            background: 'rgba(245,158,11,0.1)', color: '#F59E0B',
+                            textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px',
+                          }}>
+                          <DirectionsIcon /> Go
+                        </a>
+                      )}
+                      {stop.place.phone && (
+                        <a href={`tel:${stop.place.phone}`}
+                          style={{
+                            padding: '5px 10px', borderRadius: '8px', fontSize: '11px',
+                            background: 'rgba(255,255,255,0.05)', color: '#A8A29E',
+                            textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px',
+                          }}>
+                          <PhoneIcon /> Call
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right controls: reorder + remove */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center', justifyContent: 'center' }}>
+                    {index > 0 && (
+                      <button onClick={() => movePlanStop(index, 'up')}
+                        style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', fontSize: '16px', padding: '2px 6px' }}>
+                        ▲
+                      </button>
+                    )}
+                    <button onClick={() => removeFromPlan(stop.id)}
+                      style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', fontSize: '18px', padding: '2px 6px' }}>
+                      ×
+                    </button>
+                    {index < dayPlan.length - 1 && (
+                      <button onClick={() => movePlanStop(index, 'down')}
+                        style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', fontSize: '16px', padding: '2px 6px' }}>
+                        ▼
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
+          {/* Full Route */}
+          <a href={getRouteUrl()} target="_blank" rel="noopener noreferrer"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+              background: 'linear-gradient(135deg, #F59E0B, #D97706)', color: '#0C0A09',
+              border: 'none', borderRadius: '14px', padding: '14px',
+              fontSize: '15px', fontWeight: 600, textDecoration: 'none',
+              boxShadow: '0 4px 20px rgba(245,158,11,0.3)',
+            }}>
+            <DirectionsIcon /> Get Full Route
+          </a>
+
+          {/* Share */}
+          <button onClick={sharePlan}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+              background: 'rgba(255,255,255,0.06)', color: '#FFFBEB',
+              border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px',
+              padding: '14px', fontSize: '15px', fontWeight: 500, cursor: 'pointer',
+            }}>
+            <ShareIcon /> Share Plan
+          </button>
+
+          {/* Clear */}
+          <button onClick={clearPlan}
+            style={{
+              background: 'none', border: 'none', color: '#78716C',
+              fontSize: '13px', cursor: 'pointer', padding: '10px',
+            }}>
+            Clear all stops
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // ==========================================================================
+  // PLACE DETAIL MODAL
+  // ==========================================================================
+
+  const PlaceDetailModal = ({ place }: { place: Place }) => {
+    const hoursStatus = getHoursStatus(place.hours, place.openNow);
+    const inPlan = isInPlan(place.placeId);
+
+    return (
+      <div
+        className="modal-backdrop"
+        style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 100,
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+        }}
+        onClick={() => setSelectedPlace(null)}
+      >
+        <div
+          className="modal-sheet"
+          style={{
+            background: '#1C1917', borderRadius: '24px 24px 0 0',
+            maxWidth: '430px', width: '100%', maxHeight: '90vh',
+            overflow: 'auto', border: '1px solid rgba(255,255,255,0.06)', borderBottom: 'none',
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Hero Photo */}
+          {place.photoUrl && (
+            <div style={{
+              height: '250px', width: '100%', position: 'relative',
+              background: `linear-gradient(to bottom, transparent 40%, #1C1917), url(${place.photoUrl})`,
+              backgroundSize: 'cover', backgroundPosition: 'center',
+            }}>
+              <button onClick={() => setSelectedPlace(null)}
+                style={{
+                  position: 'absolute', top: '16px', right: '16px',
+                  background: 'rgba(0,0,0,0.5)', border: 'none',
+                  borderRadius: '50%', width: '36px', height: '36px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', color: '#FFFBEB', backdropFilter: 'blur(8px)',
+                }}>
+                <CloseIcon />
+              </button>
+            </div>
+          )}
+
+          {/* Content */}
+          <div style={{ padding: '20px 20px 120px' }}>
+            {!place.photoUrl && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+                <button onClick={() => setSelectedPlace(null)}
+                  style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', padding: '4px' }}>
+                  <CloseIcon />
+                </button>
+              </div>
+            )}
+
+            {/* Name */}
+            <h2 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '8px' }}>{place.name}</h2>
+
+            {/* Meta row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '12px' }}>
+              {place.categoryDisplay && (
+                <span style={{ padding: '4px 10px', background: 'rgba(245,158,11,0.12)', color: '#F59E0B', borderRadius: '8px', fontSize: '12px', fontWeight: 500 }}>
+                  {place.categoryDisplay}
+                </span>
+              )}
+              {place.rating > 0 && <StarRating rating={place.rating} count={place.reviewCount} />}
+              <PriceDots level={place.priceLevel} />
+            </div>
+
+            {/* Hours status */}
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              padding: '8px 14px', borderRadius: '10px', marginBottom: '16px',
+              background: place.openNow ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+              border: `1px solid ${place.openNow ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
+            }}>
+              <div style={{
+                width: '8px', height: '8px', borderRadius: '50%',
+                background: place.openNow ? '#34D399' : '#F87171',
+              }} />
+              <span style={{ fontSize: '13px', fontWeight: 500, color: place.openNow ? '#34D399' : '#F87171' }}>
+                {hoursStatus.text}
+              </span>
+              {hoursStatus.urgent && (
+                <span style={{ fontSize: '11px', color: '#F87171', fontWeight: 600 }}>Hurry!</span>
+              )}
+            </div>
+
+            {/* Quick Actions */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '20px' }}>
+              {place.googleMapsUrl && (
+                <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
+                    padding: '12px 8px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)',
+                    color: '#A8A29E', textDecoration: 'none', fontSize: '11px',
+                  }}>
+                  <DirectionsIcon />
+                  Directions
+                </a>
+              )}
+              {place.phone && (
+                <a href={`tel:${place.phone}`}
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
+                    padding: '12px 8px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)',
+                    color: '#A8A29E', textDecoration: 'none', fontSize: '11px',
+                  }}>
+                  <PhoneIcon />
+                  Call
+                </a>
+              )}
+              {place.website && (
+                <a href={place.website} target="_blank" rel="noopener noreferrer"
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
+                    padding: '12px 8px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)',
+                    color: '#A8A29E', textDecoration: 'none', fontSize: '11px',
+                  }}>
+                  <WebsiteIcon />
+                  Website
+                </a>
+              )}
+              <button onClick={() => sharePlace(place)}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
+                  padding: '12px 8px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)',
+                  color: '#A8A29E', border: 'none', cursor: 'pointer', fontSize: '11px',
+                }}>
+                <ShareIcon />
+                Share
+              </button>
+            </div>
+
+            {/* Address */}
+            {place.address && (
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Address</div>
+                <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+                  style={{ color: '#FFFBEB', fontSize: '14px', textDecoration: 'none', lineHeight: 1.4 }}>
+                  {place.address}
+                </a>
+              </div>
+            )}
+
+            {/* Editorial Summary */}
+            {place.editorialSummary && (
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>About</div>
+                <p style={{ color: '#d4d0cc', fontSize: '14px', lineHeight: 1.5 }}>{place.editorialSummary}</p>
+              </div>
+            )}
+
+            {/* Hours */}
+            {place.hours.length > 0 && (
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Hours</div>
+                {place.hours.map((h, i) => {
+                  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                  const today = days[new Date().getDay()];
+                  const isToday = h.startsWith(today);
+                  return (
+                    <div key={i} style={{
+                      fontSize: '13px', padding: '4px 0',
+                      color: isToday ? '#FFFBEB' : '#78716C',
+                      fontWeight: isToday ? 600 : 400,
+                    }}>
+                      {h}
+                      {isToday && <span style={{ color: '#F59E0B', marginLeft: '8px', fontSize: '11px' }}>Today</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Distance */}
+            {place.distance != null && (
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Distance</div>
+                <p style={{ color: '#FFFBEB', fontSize: '14px' }}>{formatDistance(place.distance)} from you</p>
+              </div>
+            )}
+          </div>
+
+          {/* Sticky Bottom Bar */}
+          <div style={{
+            position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
+            maxWidth: '430px', width: '100%', padding: '16px 20px 32px',
+            background: 'linear-gradient(to top, #1C1917, rgba(28,25,23,0.95))',
+            borderTop: '1px solid rgba(255,255,255,0.06)',
+          }}>
+            <button
+              onClick={() => {
+                if (inPlan) {
+                  const stop = dayPlan.find(s => s.place.placeId === place.placeId);
+                  if (stop) removeFromPlan(stop.id);
+                } else {
+                  addToPlan(place);
+                }
+              }}
+              style={{
+                width: '100%', padding: '16px', borderRadius: '14px',
+                fontSize: '16px', fontWeight: 600, cursor: 'pointer',
+                background: inPlan ? 'transparent' : 'linear-gradient(135deg, #F59E0B, #D97706)',
+                color: inPlan ? '#F59E0B' : '#0C0A09',
+                border: inPlan ? '2px solid #F59E0B' : 'none',
+                boxShadow: inPlan ? 'none' : '0 4px 20px rgba(245,158,11,0.3)',
+              }}
+            >
+              {inPlan ? '✓ In Your Plan — Remove' : '+ Add to Plan'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ==========================================================================
+  // ADMIN PANEL
+  // ==========================================================================
+
+  const AdminPanel = () => (
+    <div
+      style={{
+        position: 'fixed', inset: 0, background: '#0C0A09', zIndex: 200,
+        overflow: 'auto', maxWidth: '430px', margin: '0 auto',
+      }}
+    >
+      {/* Admin Header */}
+      <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div>
+          <h1 style={{ fontSize: '20px', fontWeight: 700 }}>Admin Panel</h1>
+          <p style={{ color: '#78716C', fontSize: '11px' }}>NxStops by Nav&eacute;</p>
+        </div>
+        <button onClick={() => setShowAdmin(false)}
+          style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', padding: '8px' }}>
+          <CloseIcon />
+        </button>
+      </div>
+
+      {/* Admin Tabs */}
+      <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        {(['dashboard', 'signups', 'cities'] as const).map(tab => (
+          <button key={tab}
+            onClick={() => setAdminTab(tab)}
+            style={{
+              flex: 1, padding: '12px', fontSize: '13px', fontWeight: 500,
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: adminTab === tab ? '#F59E0B' : '#78716C',
+              borderBottom: adminTab === tab ? '2px solid #F59E0B' : '2px solid transparent',
+            }}>
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ padding: '20px' }}>
+        {adminLoading ? (
+          <div style={{ textAlign: 'center', padding: '40px' }}>
+            <div style={{ color: '#78716C', fontSize: '14px' }}>Loading admin data...</div>
+          </div>
+        ) : (
+          <>
+            {/* Dashboard */}
+            {adminTab === 'dashboard' && (
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+                  {[
+                    { label: 'Email Signups', value: adminSignups.length, emoji: '📬' },
+                    { label: 'Total Cities', value: adminCities.length, emoji: '🏙️' },
+                    { label: 'Active Cities', value: adminCities.filter(c => c.is_active).length, emoji: '✅' },
+                    { label: 'Inactive Cities', value: adminCities.filter(c => !c.is_active).length, emoji: '⏸️' },
+                  ].map(stat => (
+                    <div key={stat.label} style={{ ...cardStyle }}>
+                      <div style={{ fontSize: '24px', marginBottom: '4px' }}>{stat.emoji}</div>
+                      <div style={{ fontSize: '28px', fontWeight: 700, color: '#FFFBEB' }}>{stat.value}</div>
+                      <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{stat.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Recent Signups Preview */}
+                <h3 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '12px', color: '#A8A29E' }}>Recent Signups</h3>
+                {adminSignups.slice(0, 5).map(s => (
+                  <div key={s.id} style={{
+                    display: 'flex', justifyContent: 'space-between', padding: '10px 0',
+                    borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '13px',
+                  }}>
+                    <span style={{ color: '#FFFBEB' }}>{s.email}</span>
+                    <span style={{ color: '#78716C' }}>{s.city || 'No city'}</span>
+                  </div>
+                ))}
+                {adminSignups.length === 0 && (
+                  <p style={{ color: '#78716C', fontSize: '13px' }}>No signups yet</p>
+                )}
+              </div>
+            )}
+
+            {/* Signups Tab */}
+            {adminTab === 'signups' && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: 600 }}>All Signups ({adminSignups.length})</h3>
+                </div>
+                {adminSignups.length === 0 ? (
+                  <p style={{ color: '#78716C', fontSize: '14px', textAlign: 'center', padding: '40px' }}>No signups yet. The email signup form on the home screen collects these.</p>
+                ) : (
+                  adminSignups.map(s => (
+                    <div key={s.id} style={{
+                      ...cardStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    }}>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: '14px', color: '#FFFBEB', marginBottom: '2px' }}>{s.email}</div>
+                        <div style={{ fontSize: '12px', color: '#78716C' }}>
+                          {s.city || 'No city selected'} · {new Date(s.signed_up_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#78716C' }}>
+                        {new Date(s.signed_up_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Cities Tab */}
+            {adminTab === 'cities' && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: 600 }}>All Cities ({adminCities.length})</h3>
+                </div>
+                {adminCities.map(city => (
+                  <div key={city.id} style={{
+                    ...cardStyle, display: 'flex', alignItems: 'center', gap: '12px',
+                  }}>
+                    {city.banner_url && (
+                      <div style={{
+                        width: '48px', height: '48px', borderRadius: '10px', flexShrink: 0,
+                        background: `url(${city.banner_url})`, backgroundSize: 'cover', backgroundPosition: 'center',
+                      }} />
+                    )}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: '14px', color: '#FFFBEB' }}>{city.name}</div>
+                      <div style={{ fontSize: '12px', color: '#78716C' }}>{city.country} · {city.region}</div>
+                    </div>
+                    <button
+                      onClick={() => handleToggleCity(city.id, !!city.is_active)}
+                      style={{
+                        padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 600,
+                        cursor: 'pointer', border: 'none',
+                        background: city.is_active ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+                        color: city.is_active ? '#34D399' : '#F87171',
+                      }}
+                    >
+                      {city.is_active ? 'Active' : 'Inactive'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+
+  // ==========================================================================
   // LOADING SCREEN
-  // ============================================================================
+  // ==========================================================================
 
   if (loading && cities.length === 0) {
     return (
@@ -969,24 +1382,29 @@ export default function App() {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>✨</div>
           <div style={{
-            fontSize: '28px', fontWeight: 700,
+            fontSize: '36px', fontWeight: 700, marginBottom: '4px',
             background: 'linear-gradient(135deg, #F59E0B, #FBBF24)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-            marginBottom: '8px',
           }}>
             NxStops
           </div>
-          <div style={{ color: '#78716C', fontSize: '13px' }}>Loading...</div>
+          <div style={{ fontSize: '11px', color: '#78716C', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '24px' }}>
+            by Nav&eacute;
+          </div>
+          <div style={{
+            width: '40px', height: '3px', borderRadius: '2px', margin: '0 auto',
+            background: 'linear-gradient(90deg, rgba(245,158,11,0.3) 25%, #F59E0B 50%, rgba(245,158,11,0.3) 75%)',
+            backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite',
+          }} />
         </div>
       </div>
     );
   }
 
-  // ============================================================================
+  // ==========================================================================
   // MAIN RENDER
-  // ============================================================================
+  // ==========================================================================
 
   return (
     <div style={{
@@ -995,12 +1413,15 @@ export default function App() {
       minHeight: '100vh', color: '#FFFBEB',
       maxWidth: '430px', margin: '0 auto', position: 'relative', overflow: 'hidden',
     }}>
-      {/* Shimmer animation for skeleton loaders */}
+      {/* Shimmer animation */}
       <style>{`
-        @keyframes shimmer {
-          0% { background-position: 200% 0; }
-          100% { background-position: -200% 0; }
-        }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        @keyframes toastIn { from { opacity: 0; transform: translateY(16px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        .modal-sheet { animation: slideUp 0.3s ease-out; }
+        .modal-backdrop { animation: fadeIn 0.2s ease-out; }
       `}</style>
 
       {/* Header */}
@@ -1016,39 +1437,45 @@ export default function App() {
             NxStops
           </div>
           <div style={{ fontSize: '10px', color: '#78716C', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-            Vibes You Navigate
+            by Nav&eacute;
           </div>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: '14px', color: '#FFFBEB' }}>
-            {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '14px', color: '#FFFBEB' }}>
+              {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </div>
+            <div style={{ fontSize: '10px', color: '#78716C' }}>
+              {currentTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+            </div>
           </div>
-          <div style={{ fontSize: '10px', color: '#78716C' }}>
-            {currentTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
-          </div>
+          <button onClick={openAdmin}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px', borderRadius: '10px' }}>
+            <GearIcon />
+          </button>
         </div>
       </header>
 
       {/* Content */}
       <main style={{ padding: '0 20px 100px' }}>
         {screen === 'home' && <HomeScreen />}
-        {screen === 'vibes' && <VibesScreen />}
-        {screen === 'planner' && <PlannerScreen />}
+        {screen === 'explore' && <ExploreScreen />}
+        {screen === 'plan' && <PlanScreen />}
       </main>
 
       {/* Bottom Navigation */}
       <nav style={{
         position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
         width: '100%', maxWidth: '430px',
-        background: 'rgba(12, 10, 9, 0.95)', backdropFilter: 'blur(24px)',
+        background: 'rgba(12,10,9,0.95)', backdropFilter: 'blur(24px)',
         borderTop: '1px solid rgba(255,255,255,0.06)',
         display: 'flex', justifyContent: 'space-around',
         padding: '8px 0 28px',
       }}>
         {[
           { id: 'home' as Screen, icon: HomeIcon, label: 'Home' },
-          { id: 'vibes' as Screen, icon: VibesIcon, label: 'Vibes' },
-          { id: 'planner' as Screen, icon: PlanIcon, label: 'Plan' },
+          { id: 'explore' as Screen, icon: ExploreIcon, label: 'Explore' },
+          { id: 'plan' as Screen, icon: PlanIcon, label: 'Plan' },
         ].map(tab => {
           const isActive = screen === tab.id;
           const canNavigate = tab.id === 'home' || useGps || selectedCity;
@@ -1082,7 +1509,7 @@ export default function App() {
               }}>
                 {tab.label}
               </span>
-              {tab.id === 'planner' && dayPlan.length > 0 && (
+              {tab.id === 'plan' && dayPlan.length > 0 && (
                 <span style={{
                   position: 'absolute', top: '2px', right: '8px',
                   background: 'linear-gradient(135deg, #F59E0B, #D97706)',
@@ -1097,8 +1524,8 @@ export default function App() {
         })}
       </nav>
 
-      {/* Surprise Me Floating Button — shown on planner screen */}
-      {screen === 'planner' && places.length > 0 && !surprisePlace && (
+      {/* Surprise Me Floating Button */}
+      {screen === 'explore' && places.length > 0 && !surprisePlace && !selectedPlace && (
         <button
           onClick={handleSurpriseMe}
           style={{
@@ -1107,8 +1534,7 @@ export default function App() {
             background: 'linear-gradient(135deg, #F59E0B, #D97706)',
             border: 'none', cursor: 'pointer', color: '#0C0A09',
             fontSize: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 20px rgba(245, 158, 11, 0.4)',
-            zIndex: 50,
+            boxShadow: '0 4px 20px rgba(245,158,11,0.4)', zIndex: 50,
           }}
           title="Surprise Me"
         >
@@ -1116,22 +1542,14 @@ export default function App() {
         </button>
       )}
 
-      {/* Surprise Me Result Modal */}
+      {/* Surprise Me Modal */}
       {surprisePlace && (
-        <div
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 100,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
-          }}
-          onClick={() => setSurprisePlace(null)}
-        >
-          <div
-            style={{
-              background: '#1C1917', borderRadius: '20px', maxWidth: '380px', width: '100%',
-              overflow: 'hidden', border: '1px solid rgba(245, 158, 11, 0.2)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="modal-backdrop"
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+          onClick={() => setSurprisePlace(null)}>
+          <div className="modal-sheet"
+            style={{ background: '#1C1917', borderRadius: '20px', maxWidth: '380px', width: '100%', overflow: 'hidden', border: '1px solid rgba(245,158,11,0.2)' }}
+            onClick={e => e.stopPropagation()}>
             {surprisePlace.photoUrl && (
               <div style={{
                 height: '180px', width: '100%',
@@ -1140,13 +1558,10 @@ export default function App() {
               }} />
             )}
             <div style={{ padding: '20px', textAlign: 'center' }}>
-              <div style={{ fontSize: '14px', color: '#F59E0B', marginBottom: '4px', fontWeight: 500 }}>
-                Surprise!
-              </div>
+              <div style={{ fontSize: '14px', color: '#F59E0B', marginBottom: '4px', fontWeight: 500 }}>Surprise!</div>
               <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '6px' }}>{surprisePlace.name}</h2>
               <p style={{ color: '#A8A29E', fontSize: '13px', marginBottom: '4px' }}>
-                {surprisePlace.categoryDisplay}
-                {surprisePlace.distance != null && ` · ${formatDistance(surprisePlace.distance)}`}
+                {surprisePlace.categoryDisplay}{surprisePlace.distance != null && ` · ${formatDistance(surprisePlace.distance)}`}
               </p>
               {surprisePlace.rating > 0 && (
                 <p style={{ color: '#F59E0B', fontSize: '14px', marginBottom: '16px' }}>
@@ -1156,38 +1571,19 @@ export default function App() {
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   onClick={() => { addToPlan(surprisePlace); setSurprisePlace(null); }}
-                  style={{
-                    flex: 1, padding: '12px', borderRadius: '12px', border: 'none',
-                    background: 'linear-gradient(135deg, #F59E0B, #D97706)',
-                    color: '#0C0A09', fontSize: '14px', fontWeight: 600, cursor: 'pointer',
-                  }}
-                >
+                  style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: 'linear-gradient(135deg, #F59E0B, #D97706)', color: '#0C0A09', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
                   + Add to Plan
                 </button>
                 {surprisePlace.googleMapsUrl && (
-                  <a
-                    href={surprisePlace.googleMapsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      flex: 1, padding: '12px', borderRadius: '12px',
-                      background: 'rgba(255,255,255,0.08)', color: '#FFFBEB',
-                      fontSize: '14px', fontWeight: 600, textDecoration: 'none',
-                      textAlign: 'center',
-                    }}
-                  >
+                  <a href={surprisePlace.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+                    style={{ flex: 1, padding: '12px', borderRadius: '12px', background: 'rgba(255,255,255,0.08)', color: '#FFFBEB', fontSize: '14px', fontWeight: 600, textDecoration: 'none', textAlign: 'center' }}>
                     Directions
                   </a>
                 )}
               </div>
               <button
                 onClick={() => { setSurprisePlace(null); handleSurpriseMe(); }}
-                style={{
-                  width: '100%', padding: '12px', borderRadius: '12px', marginTop: '8px',
-                  background: 'none', border: '1px solid rgba(255,255,255,0.1)',
-                  color: '#A8A29E', fontSize: '13px', cursor: 'pointer',
-                }}
-              >
+                style={{ width: '100%', padding: '12px', borderRadius: '12px', marginTop: '8px', background: 'none', border: '1px solid rgba(255,255,255,0.1)', color: '#A8A29E', fontSize: '13px', cursor: 'pointer' }}>
                 🎲 Try another
               </button>
             </div>
@@ -1195,68 +1591,57 @@ export default function App() {
         </div>
       )}
 
+      {/* Place Detail Modal */}
+      {selectedPlace && <PlaceDetailModal place={selectedPlace} />}
+
       {/* Email Signup Modal */}
       {showEmailSignup && (
-        <div
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 100,
-            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-          }}
-          onClick={() => setShowEmailSignup(false)}
-        >
-          <div
-            style={{
-              background: '#1C1917', borderRadius: '20px 20px 0 0', maxWidth: '430px', width: '100%',
-              padding: '28px 24px 40px', border: '1px solid rgba(255,255,255,0.06)',
-              borderBottom: 'none',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="modal-backdrop"
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+          onClick={() => setShowEmailSignup(false)}>
+          <div className="modal-sheet"
+            style={{ background: '#1C1917', borderRadius: '20px 20px 0 0', maxWidth: '430px', width: '100%', padding: '28px 24px 40px', border: '1px solid rgba(255,255,255,0.06)', borderBottom: 'none' }}
+            onClick={e => e.stopPropagation()}>
             <div style={{ textAlign: 'center', marginBottom: '20px' }}>
               <div style={{ fontSize: '32px', marginBottom: '8px' }}>✨</div>
-              <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '6px' }}>
-                Get your city guide
-              </h2>
-              <p style={{ color: '#A8A29E', fontSize: '14px' }}>
-                We'll send curated picks and hidden gems straight to your inbox
-              </p>
+              <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '6px' }}>Get your city guide</h2>
+              <p style={{ color: '#A8A29E', fontSize: '14px' }}>We'll send curated picks and hidden gems straight to your inbox</p>
             </div>
-            <input
-              type="email"
-              placeholder="your@email.com"
-              value={emailInput}
-              onChange={(e) => setEmailInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleEmailSignup()}
-              style={{
-                width: '100%', padding: '16px', borderRadius: '12px',
-                border: '1px solid rgba(255,255,255,0.1)', background: '#0C0A09',
-                color: '#FFFBEB', fontSize: '16px', marginBottom: '12px',
-                outline: 'none',
-              }}
-            />
-            <button
-              onClick={handleEmailSignup}
-              disabled={emailSubmitting || !emailInput.includes('@')}
+            <input type="email" placeholder="your@email.com" value={emailInput}
+              onChange={e => setEmailInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleEmailSignup()}
+              style={{ width: '100%', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: '#0C0A09', color: '#FFFBEB', fontSize: '16px', marginBottom: '12px', outline: 'none' }} />
+            <button onClick={handleEmailSignup} disabled={emailSubmitting || !emailInput.includes('@')}
               style={{
                 width: '100%', padding: '16px', borderRadius: '14px', border: 'none',
                 background: emailInput.includes('@') ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'rgba(255,255,255,0.1)',
                 color: emailInput.includes('@') ? '#0C0A09' : '#78716C',
                 fontSize: '16px', fontWeight: 600, cursor: emailInput.includes('@') ? 'pointer' : 'default',
-              }}
-            >
+              }}>
               {emailSubmitting ? 'Saving...' : 'Send me the guide'}
             </button>
-            <button
-              onClick={() => setShowEmailSignup(false)}
-              style={{
-                width: '100%', padding: '12px', marginTop: '8px',
-                background: 'none', border: 'none', color: '#78716C',
-                fontSize: '13px', cursor: 'pointer',
-              }}
-            >
+            <button onClick={() => setShowEmailSignup(false)}
+              style={{ width: '100%', padding: '12px', marginTop: '8px', background: 'none', border: 'none', color: '#78716C', fontSize: '13px', cursor: 'pointer' }}>
               Maybe later
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Admin Panel */}
+      {showAdmin && <AdminPanel />}
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: '100px', left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(28,25,23,0.95)', backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(245,158,11,0.2)', borderRadius: '12px',
+          padding: '12px 20px', fontSize: '14px', fontWeight: 500, color: '#FFFBEB',
+          zIndex: 300, animation: 'toastIn 0.3s ease-out',
+          boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
+        }}>
+          {toast}
         </div>
       )}
     </div>

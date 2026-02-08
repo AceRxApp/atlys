@@ -42,8 +42,50 @@ export async function saveEmailSignup(email: string, city?: string) {
     .insert({ email, city: city || null, signed_up_at: new Date().toISOString() });
 
   if (error) {
-    // If table doesn't exist yet, log but don't crash
     console.error('Error saving email signup:', error);
+    return false;
+  }
+  return true;
+}
+
+// ============================================================================
+// ADMIN FUNCTIONS
+// ============================================================================
+
+export async function fetchEmailSignups() {
+  const { data, error } = await supabase
+    .from('email_signups')
+    .select('*')
+    .order('signed_up_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching signups:', error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function fetchAllCities() {
+  const { data, error } = await supabase
+    .from('cities')
+    .select('*')
+    .order('name');
+
+  if (error) {
+    console.error('Error fetching all cities:', error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function toggleCityActive(cityId: string, isActive: boolean) {
+  const { error } = await supabase
+    .from('cities')
+    .update({ is_active: isActive })
+    .eq('id', cityId);
+
+  if (error) {
+    console.error('Error toggling city:', error);
     return false;
   }
   return true;

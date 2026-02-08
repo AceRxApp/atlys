@@ -73,6 +73,61 @@ export function formatDistance(km: number): string {
 }
 
 // ============================================================================
+// HOURS STATUS HELPER
+// ============================================================================
+
+export function getHoursStatus(hours: string[], openNow: boolean): { text: string; urgent: boolean } {
+  if (!hours.length) return { text: openNow ? 'Open' : 'Closed', urgent: false };
+
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const now = new Date();
+  const today = days[now.getDay()];
+
+  const todayHours = hours.find(h => h.startsWith(today));
+  if (!todayHours) return { text: openNow ? 'Open' : 'Closed', urgent: false };
+
+  if (todayHours.includes('Open 24 hours')) return { text: 'Open 24h', urgent: false };
+  if (todayHours.includes('Closed')) return { text: 'Closed today', urgent: false };
+
+  // Parse closing time — format: "Monday: 8:00 AM – 10:00 PM"
+  const closingMatch = todayHours.match(/[–\-]\s*(\d{1,2}:\d{2}\s*[AP]M)/i);
+  const openingMatch = todayHours.match(/:\s*(\d{1,2}:\d{2}\s*[AP]M)/i);
+
+  if (openNow && closingMatch) {
+    const closeStr = closingMatch[1].trim();
+    const closeDate = parseTimeToday(closeStr);
+    if (closeDate) {
+      const diffMs = closeDate.getTime() - now.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+      if (diffHours > 0 && diffHours <= 2) {
+        const mins = Math.round(diffMs / (1000 * 60));
+        return { text: `Closes in ${mins < 60 ? `${mins}m` : `${Math.floor(diffHours)}h ${mins % 60}m`}`, urgent: true };
+      }
+      return { text: `Open til ${closeStr}`, urgent: false };
+    }
+  }
+
+  if (!openNow && openingMatch) {
+    return { text: `Opens ${openingMatch[1].trim()}`, urgent: false };
+  }
+
+  return { text: openNow ? 'Open' : 'Closed', urgent: false };
+}
+
+function parseTimeToday(timeStr: string): Date | null {
+  const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!match) return null;
+  let hours = parseInt(match[1]);
+  const minutes = parseInt(match[2]);
+  const isPM = match[3].toUpperCase() === 'PM';
+  if (isPM && hours !== 12) hours += 12;
+  if (!isPM && hours === 12) hours = 0;
+  const d = new Date();
+  d.setHours(hours, minutes, 0, 0);
+  return d;
+}
+
+// ============================================================================
 // TRANSFORM GOOGLE PLACES RESPONSE → Our Place type
 // ============================================================================
 
