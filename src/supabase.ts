@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import type { Session } from '@supabase/supabase-js';
 
 const SUPABASE_URL = 'https://hwtsyigwsucpefadznnp.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3dHN5aWd3c3VjcGVmYWR6bm5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwODcwOTgsImV4cCI6MjA4NTY2MzA5OH0.EnqHcTqoPN1pfSEUggwm_mMUNWME8kNcih5EvB4JlD4';
@@ -89,4 +90,38 @@ export async function toggleCityActive(cityId: string, isActive: boolean) {
     return false;
   }
   return true;
+}
+
+// ============================================================================
+// AUTH FUNCTIONS
+// ============================================================================
+
+export async function authSignUp(email: string, password: string, name?: string) {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { full_name: name || '' } },
+  });
+  return { data, error };
+}
+
+export async function authSignIn(email: string, password: string) {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  return { data, error };
+}
+
+export async function authSignOut() {
+  const { error } = await supabase.auth.signOut();
+  return { error };
+}
+
+export async function authGetSession(): Promise<Session | null> {
+  const { data } = await supabase.auth.getSession();
+  return data.session;
+}
+
+export function authOnStateChange(callback: (session: Session | null) => void) {
+  return supabase.auth.onAuthStateChange((_event, session) => {
+    callback(session);
+  });
 }

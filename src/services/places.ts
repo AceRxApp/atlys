@@ -35,7 +35,10 @@ export interface Place {
 // ============================================================================
 
 export const VIBE_TYPE_MAP: Record<string, string[]> = {
-  food: ['restaurant', 'cafe', 'bakery', 'meal_delivery', 'meal_takeaway', 'coffee_shop', 'ice_cream_shop', 'steak_house', 'seafood_restaurant', 'pizza_restaurant', 'sushi_restaurant', 'brunch_restaurant', 'breakfast_restaurant'],
+  restaurants: ['restaurant', 'steak_house', 'seafood_restaurant', 'pizza_restaurant', 'sushi_restaurant', 'brunch_restaurant', 'breakfast_restaurant'],
+  foodtrucks: ['meal_takeaway', 'meal_delivery'],
+  drinks: ['cafe', 'coffee_shop', 'bar', 'cocktail_bar', 'wine_bar'],
+  placestoeat: ['bakery', 'ice_cream_shop', 'fast_food_restaurant', 'sandwich_shop'],
   cultural: ['museum', 'art_gallery', 'tourist_attraction', 'church', 'library', 'performing_arts_theater', 'cultural_center', 'historical_landmark'],
   nightlife: ['bar', 'night_club', 'casino', 'karaoke', 'comedy_club', 'cocktail_bar', 'wine_bar'],
   hidden: ['park', 'book_store', 'spa', 'botanical_garden', 'flea_market', 'farmers_market', 'garden', 'hiking_area', 'yoga_studio'],

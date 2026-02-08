@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchCities, saveEmailSignup, fetchEmailSignups, fetchAllCities, toggleCityActive } from './supabase';
+import { fetchCities, saveEmailSignup, fetchEmailSignups, fetchAllCities, toggleCityActive, authSignUp, authSignIn, authSignOut, authGetSession, authOnStateChange } from './supabase';
 import { searchNearby, formatDistance, getHoursStatus } from './services/places';
 import type { Place } from './services/places';
 import { useLocation } from './hooks/useLocation';
+import type { User } from '@supabase/supabase-js';
 
 // ============================================================================
 // TYPES
@@ -35,8 +36,10 @@ interface AdminSignup {
 }
 
 type Screen = 'home' | 'explore' | 'plan';
-type Vibe = 'food' | 'cultural' | 'nightlife' | 'hidden';
+type Vibe = 'restaurants' | 'foodtrucks' | 'drinks' | 'placestoeat' | 'events' | 'cultural' | 'nightlife' | 'hidden';
 type QuickFilter = 'open' | 'walking' | 'topRated' | 'budget' | 'family' | 'solo';
+
+const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL as string) || '';
 
 // ============================================================================
 // CITY COORDINATES
@@ -89,6 +92,12 @@ const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
 // ============================================================================
 
 const NIGHTLIFE_TYPES = ['bar', 'night_club', 'casino', 'cocktail_bar', 'wine_bar', 'karaoke', 'comedy_club'];
+
+const RESERVABLE_TYPES = [
+  'restaurant', 'steak_house', 'seafood_restaurant', 'pizza_restaurant',
+  'sushi_restaurant', 'brunch_restaurant', 'breakfast_restaurant',
+  'bar', 'cocktail_bar', 'wine_bar',
+];
 
 const EMERGENCY_BY_COUNTRY: Record<string, { police: string; emergency: string }> = {
   'USA': { police: '911', emergency: '911' },
@@ -207,7 +216,11 @@ const ShieldIcon = () => (
 // ============================================================================
 
 const VIBES: { id: Vibe; emoji: string; label: string }[] = [
-  { id: 'food', emoji: '🍜', label: 'Foodie' },
+  { id: 'restaurants', emoji: '🍽️', label: 'Restaurants' },
+  { id: 'foodtrucks', emoji: '🚚', label: 'Food Trucks' },
+  { id: 'drinks', emoji: '☕', label: 'Drinks' },
+  { id: 'placestoeat', emoji: '🍰', label: 'Places to Eat' },
+  { id: 'events', emoji: '🎫', label: 'Events' },
   { id: 'cultural', emoji: '🏛️', label: 'Cultural' },
   { id: 'nightlife', emoji: '🌙', label: 'Nightlife' },
   { id: 'hidden', emoji: '💎', label: 'Hidden Gems' },
@@ -267,12 +280,29 @@ export default function App() {
   // --- Safety ---
   const [showSafety, setShowSafety] = useState(false);
 
+  // --- Auth ---
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authScreen, setAuthScreen] = useState<'signin' | 'signup'>('signin');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authName, setAuthName] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authSubmitting, setAuthSubmitting] = useState(false);
+
   // --- Admin ---
   const [showAdmin, setShowAdmin] = useState(false);
   const [adminSignups, setAdminSignups] = useState<AdminSignup[]>([]);
   const [adminCities, setAdminCities] = useState<City[]>([]);
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminTab, setAdminTab] = useState<'dashboard' | 'signups' | 'cities'>('dashboard');
+
+  // --- Events ---
+  const [events, setEvents] = useState<{ id: string; name: string; date: string; time: string; venue: string; venueAddress: string; imageUrl: string | null; url: string; category: string; lat: number | null; lng: number | null }[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+
+  // --- Map ---
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
   // --- Toast ---
   const [toast, setToast] = useState<string | null>(null);
@@ -316,6 +346,18 @@ export default function App() {
   // --------------------------------------------------------------------------
   // EFFECTS
   // --------------------------------------------------------------------------
+
+  // Auth session
+  useEffect(() => {
+    authGetSession().then(session => {
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+    const { data: { subscription } } = authOnStateChange(session => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Load cities
   useEffect(() => {
@@ -377,7 +419,8 @@ export default function App() {
     }
     if (!lat || !lng) return;
     setPlacesLoading(true);
-    const results = await searchNearby(lat, lng, selectedVibes, searchRadius);
+    const placeVibes = selectedVibes.filter(v => v !== 'events');
+    const results = await searchNearby(lat, lng, placeVibes, searchRadius);
     setPlaces(results);
     setPlacesLoading(false);
   }, [useGps, loc.lat, loc.lng, selectedCity, selectedVibes, searchRadius]);
@@ -385,6 +428,34 @@ export default function App() {
   useEffect(() => {
     if (screen === 'explore' && (useGps || selectedCity)) fetchPlaces();
   }, [screen, fetchPlaces]);
+
+  // Fetch events
+  const fetchEventsData = useCallback(async () => {
+    let lat: number | undefined;
+    let lng: number | undefined;
+    if (useGps && loc.lat && loc.lng) { lat = loc.lat; lng = loc.lng; }
+    else if (selectedCity) {
+      const c = CITY_COORDS[selectedCity.name.toLowerCase()];
+      if (c) { lat = c.lat; lng = c.lng; }
+    }
+    if (!lat || !lng) return;
+    setEventsLoading(true);
+    try {
+      const params = new URLSearchParams({ lat: lat.toString(), lng: lng.toString(), radius: '25' });
+      const response = await fetch(`/api/events?${params}`);
+      if (response.ok) {
+        const data = await response.json();
+        setEvents(data.events || []);
+      }
+    } catch { /* events API may not be configured yet */ }
+    setEventsLoading(false);
+  }, [useGps, loc.lat, loc.lng, selectedCity]);
+
+  useEffect(() => {
+    if (screen === 'explore' && selectedVibes.includes('events') && (useGps || selectedCity)) {
+      fetchEventsData();
+    }
+  }, [screen, selectedVibes, fetchEventsData]);
 
   // --------------------------------------------------------------------------
   // FILTERED PLACES
@@ -449,6 +520,41 @@ export default function App() {
       showToast('Plan copied to clipboard');
     }
   };
+
+  // --------------------------------------------------------------------------
+  // AUTH HANDLERS
+  // --------------------------------------------------------------------------
+
+  const handleSignIn = async () => {
+    setAuthError(null);
+    setAuthSubmitting(true);
+    const { error } = await authSignIn(authEmail, authPassword);
+    if (error) setAuthError(error.message);
+    setAuthSubmitting(false);
+  };
+
+  const handleSignUp = async () => {
+    setAuthError(null);
+    setAuthSubmitting(true);
+    const { data, error } = await authSignUp(authEmail, authPassword, authName || undefined);
+    if (error) {
+      setAuthError(error.message);
+    } else if (data.session) {
+      // Auto-signed in (email confirmation disabled)
+    } else {
+      showToast('Check your email to confirm your account');
+      setAuthScreen('signin');
+    }
+    setAuthSubmitting(false);
+  };
+
+  const handleSignOut = async () => {
+    await authSignOut();
+    setUser(null);
+    setScreen('home');
+  };
+
+  const isReservable = (place: Place): boolean => RESERVABLE_TYPES.includes(place.category);
 
   // --------------------------------------------------------------------------
   // OTHER HANDLERS
@@ -631,6 +737,12 @@ export default function App() {
                 <PhoneIcon />
               </a>
             )}
+            {isReservable(place) && place.googleMapsUrl && (
+              <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+                style={{ padding: '10px 12px', borderRadius: '10px', background: 'rgba(34,197,94,0.1)', color: '#34D399', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', fontSize: '11px', fontWeight: 600, border: '1px solid rgba(34,197,94,0.2)' }}>
+                Reserve
+              </a>
+            )}
             <button onClick={() => sharePlace(place)}
               style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', color: '#A8A29E', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ShareIcon />
@@ -640,6 +752,71 @@ export default function App() {
       </div>
     );
   };
+
+  // --------------------------------------------------------------------------
+  // EVENT CARD
+  // --------------------------------------------------------------------------
+
+  const formatEventDate = (dateStr: string): string => {
+    if (!dateStr) return 'TBA';
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+
+  const formatEventTime = (timeStr: string): string => {
+    if (!timeStr) return '';
+    const [h, m] = timeStr.split(':').map(Number);
+    const isPM = h >= 12;
+    const hour12 = h % 12 || 12;
+    return `${hour12}:${m.toString().padStart(2, '0')} ${isPM ? 'PM' : 'AM'}`;
+  };
+
+  const EventCard = ({ event }: { event: { id: string; name: string; date: string; time: string; venue: string; venueAddress: string; imageUrl: string | null; url: string; category: string } }) => (
+    <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+      {event.imageUrl && (
+        <div style={{
+          height: '140px', width: '100%', position: 'relative',
+          background: `linear-gradient(to bottom, transparent 50%, rgba(12,10,9,0.9)), url(${event.imageUrl})`,
+          backgroundSize: 'cover', backgroundPosition: 'center',
+        }}>
+          <div style={{
+            position: 'absolute', top: '10px', left: '10px',
+            padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 600,
+            background: 'rgba(168,85,247,0.2)', color: '#C084FC', backdropFilter: 'blur(8px)',
+          }}>
+            {event.category}
+          </div>
+        </div>
+      )}
+      <div style={{ padding: '14px 16px' }}>
+        <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>{event.name}</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+          <span style={{ fontSize: '13px', color: '#F59E0B', fontWeight: 500 }}>
+            {formatEventDate(event.date)}
+          </span>
+          {event.time && (
+            <span style={{ fontSize: '12px', color: '#A8A29E' }}>
+              {formatEventTime(event.time)}
+            </span>
+          )}
+        </div>
+        <p style={{ fontSize: '12px', color: '#A8A29E', marginBottom: '10px' }}>
+          {event.venue}{event.venueAddress ? ` — ${event.venueAddress}` : ''}
+        </p>
+        {event.url && (
+          <a href={event.url} target="_blank" rel="noopener noreferrer"
+            style={{
+              display: 'block', width: '100%', padding: '10px', borderRadius: '10px',
+              background: 'linear-gradient(135deg, #8B5CF6, #7C3AED)',
+              color: '#FFFBEB', fontSize: '13px', fontWeight: 600,
+              textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box',
+            }}>
+            Get Tickets
+          </a>
+        )}
+      </div>
+    </div>
+  );
 
   // ==========================================================================
   // HOME SCREEN
@@ -777,11 +954,32 @@ export default function App() {
   const ExploreScreen = () => (
     <div>
       {/* Header */}
-      <div style={{ marginBottom: '12px' }}>
-        <h1 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '2px' }}>
-          {cityLabel} 📍
-        </h1>
-        <p style={{ color: '#78716C', fontSize: '13px' }}>{filteredPlaces.length} places nearby</p>
+      <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h1 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '2px' }}>
+            {cityLabel} 📍
+          </h1>
+          <p style={{ color: '#78716C', fontSize: '13px' }}>{filteredPlaces.length} places nearby</p>
+        </div>
+        <div style={{ display: 'flex', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
+          <button onClick={() => setViewMode('list')}
+            style={{
+              padding: '6px 14px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer',
+              background: viewMode === 'list' ? 'rgba(245,158,11,0.15)' : 'transparent',
+              color: viewMode === 'list' ? '#F59E0B' : '#78716C',
+            }}>
+            List
+          </button>
+          <button onClick={() => setViewMode('map')}
+            style={{
+              padding: '6px 14px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer',
+              borderLeft: '1px solid rgba(255,255,255,0.1)',
+              background: viewMode === 'map' ? 'rgba(245,158,11,0.15)' : 'transparent',
+              color: viewMode === 'map' ? '#F59E0B' : '#78716C',
+            }}>
+            Map
+          </button>
+        </div>
       </div>
 
       {/* Vibe Chips */}
@@ -830,46 +1028,71 @@ export default function App() {
         })}
       </div>
 
-      {/* Loading */}
-      {placesLoading && <><SkeletonCard /><SkeletonCard /><SkeletonCard /></>}
-
-      {/* Empty: filters too strict */}
-      {!placesLoading && filteredPlaces.length === 0 && places.length > 0 && (
-        <div style={{ ...cardStyle, textAlign: 'center', padding: '32px 20px' }}>
-          <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔍</div>
-          <p style={{ color: '#A8A29E', fontSize: '14px', marginBottom: '12px' }}>Nothing matching. Try removing some filters.</p>
-          <button onClick={() => setQuickFilters([])}
-            style={{ background: 'none', border: '1px solid #F59E0B', color: '#F59E0B', borderRadius: '10px', padding: '10px 20px', fontSize: '13px', cursor: 'pointer' }}>
-            Clear Filters
-          </button>
+      {/* Map View */}
+      {viewMode === 'map' ? (
+        <div style={{
+          height: 'calc(100vh - 280px)', borderRadius: '16px', overflow: 'hidden',
+          border: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(28,25,23,0.8)',
+        }}>
+          <div style={{ textAlign: 'center', padding: '32px' }}>
+            <div style={{ fontSize: '40px', marginBottom: '12px' }}>🗺️</div>
+            <p style={{ color: '#A8A29E', fontSize: '14px', marginBottom: '8px' }}>Interactive map coming soon</p>
+            <p style={{ color: '#78716C', fontSize: '12px' }}>
+              {filteredPlaces.length} pins ready · Requires Google Maps setup
+            </p>
+          </div>
         </div>
-      )}
+      ) : (
+        <>
+          {/* Loading */}
+          {placesLoading && <><SkeletonCard /><SkeletonCard /><SkeletonCard /></>}
 
-      {/* Empty: no results at all */}
-      {!placesLoading && places.length === 0 && (
-        <div style={{ ...cardStyle, textAlign: 'center', padding: '32px 20px' }}>
-          <div style={{ fontSize: '32px', marginBottom: '8px' }}>📍</div>
-          <p style={{ color: '#A8A29E', fontSize: '14px' }}>
-            {(useGps || selectedCity) ? 'Loading places...' : 'Select a city or enable location first.'}
-          </p>
-        </div>
-      )}
+          {/* Event Cards */}
+          {!eventsLoading && selectedVibes.includes('events') && events.map(event => (
+            <EventCard key={event.id} event={event} />
+          ))}
+          {eventsLoading && selectedVibes.includes('events') && <><SkeletonCard /><SkeletonCard /></>}
 
-      {/* Place Cards */}
-      {!placesLoading && filteredPlaces.map(place => (
-        <PlaceCard key={place.placeId} place={place} />
-      ))}
+          {/* Empty: filters too strict */}
+          {!placesLoading && filteredPlaces.length === 0 && places.length > 0 && (
+            <div style={{ ...cardStyle, textAlign: 'center', padding: '32px 20px' }}>
+              <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔍</div>
+              <p style={{ color: '#A8A29E', fontSize: '14px', marginBottom: '12px' }}>Nothing matching. Try removing some filters.</p>
+              <button onClick={() => setQuickFilters([])}
+                style={{ background: 'none', border: '1px solid #F59E0B', color: '#F59E0B', borderRadius: '10px', padding: '10px 20px', fontSize: '13px', cursor: 'pointer' }}>
+                Clear Filters
+              </button>
+            </div>
+          )}
 
-      {/* Expand Radius */}
-      {!placesLoading && filteredPlaces.length > 0 && (
-        <button onClick={() => setSearchRadius(prev => prev + 1500)}
-          style={{
-            width: '100%', padding: '14px', borderRadius: '12px', marginTop: '4px',
-            background: 'none', border: '1px solid rgba(255,255,255,0.08)',
-            color: '#A8A29E', fontSize: '13px', cursor: 'pointer',
-          }}>
-          Search wider area →
-        </button>
+          {/* Empty: no results at all */}
+          {!placesLoading && places.length === 0 && !selectedVibes.includes('events') && (
+            <div style={{ ...cardStyle, textAlign: 'center', padding: '32px 20px' }}>
+              <div style={{ fontSize: '32px', marginBottom: '8px' }}>📍</div>
+              <p style={{ color: '#A8A29E', fontSize: '14px' }}>
+                {(useGps || selectedCity) ? 'Loading places...' : 'Select a city or enable location first.'}
+              </p>
+            </div>
+          )}
+
+          {/* Place Cards */}
+          {!placesLoading && filteredPlaces.map(place => (
+            <PlaceCard key={place.placeId} place={place} />
+          ))}
+
+          {/* Expand Radius */}
+          {!placesLoading && filteredPlaces.length > 0 && (
+            <button onClick={() => setSearchRadius(prev => prev + 1500)}
+              style={{
+                width: '100%', padding: '14px', borderRadius: '12px', marginTop: '4px',
+                background: 'none', border: '1px solid rgba(255,255,255,0.08)',
+                color: '#A8A29E', fontSize: '13px', cursor: 'pointer',
+              }}>
+              Search wider area →
+            </button>
+          )}
+        </>
       )}
     </div>
   );
@@ -1195,6 +1418,27 @@ export default function App() {
               </button>
             </div>
 
+            {/* Reserve */}
+            {isReservable(place) && (
+              <div style={{ marginBottom: '16px' }}>
+                <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                    width: '100%', padding: '14px', borderRadius: '12px', boxSizing: 'border-box',
+                    background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)',
+                    color: '#34D399', textDecoration: 'none', fontSize: '14px', fontWeight: 600,
+                  }}>
+                  Reserve a Table
+                </a>
+                {place.website && (
+                  <a href={place.website} target="_blank" rel="noopener noreferrer"
+                    style={{ display: 'block', textAlign: 'center', marginTop: '8px', color: '#A8A29E', fontSize: '12px', textDecoration: 'none' }}>
+                    or visit their website
+                  </a>
+                )}
+              </div>
+            )}
+
             {/* Address */}
             {place.address && (
               <div style={{ marginBottom: '16px' }}>
@@ -1432,7 +1676,7 @@ export default function App() {
   // LOADING SCREEN
   // ==========================================================================
 
-  if (loading && cities.length === 0) {
+  if (authLoading || (loading && cities.length === 0)) {
     return (
       <div style={{
         fontFamily: "'DM Sans', system-ui, sans-serif",
@@ -1455,6 +1699,76 @@ export default function App() {
             background: 'linear-gradient(90deg, rgba(245,158,11,0.3) 25%, #F59E0B 50%, rgba(245,158,11,0.3) 75%)',
             backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite',
           }} />
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================================================
+  // AUTH SCREEN
+  // ==========================================================================
+
+  if (!user) {
+    return (
+      <div style={{
+        fontFamily: "'DM Sans', system-ui, sans-serif",
+        background: '#0C0A09', minHeight: '100vh', color: '#FFFBEB',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        maxWidth: '430px', margin: '0 auto', padding: '20px',
+      }}>
+        <style>{`@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}</style>
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <div style={{
+            fontSize: '36px', fontWeight: 700, marginBottom: '4px',
+            background: 'linear-gradient(135deg, #F59E0B, #FBBF24)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          }}>NxStops</div>
+          <div style={{ fontSize: '11px', color: '#78716C', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+            by Nav&eacute;
+          </div>
+        </div>
+
+        <div style={{ ...cardStyle, width: '100%', maxWidth: '360px' }}>
+          <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px', textAlign: 'center' }}>
+            {authScreen === 'signin' ? 'Welcome Back' : 'Create Account'}
+          </h2>
+
+          {authScreen === 'signup' && (
+            <input type="text" placeholder="Name (optional)" value={authName}
+              onChange={e => setAuthName(e.target.value)}
+              style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: '#0C0A09', color: '#FFFBEB', fontSize: '15px', marginBottom: '10px', outline: 'none', boxSizing: 'border-box' }} />
+          )}
+          <input type="email" placeholder="Email" value={authEmail}
+            onChange={e => setAuthEmail(e.target.value)}
+            style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: '#0C0A09', color: '#FFFBEB', fontSize: '15px', marginBottom: '10px', outline: 'none', boxSizing: 'border-box' }} />
+          <input type="password" placeholder="Password (min 6 characters)" value={authPassword}
+            onChange={e => setAuthPassword(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && (authScreen === 'signin' ? handleSignIn() : handleSignUp())}
+            style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: '#0C0A09', color: '#FFFBEB', fontSize: '15px', marginBottom: '16px', outline: 'none', boxSizing: 'border-box' }} />
+
+          {authError && (
+            <div style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(239,68,68,0.1)', color: '#F87171', fontSize: '13px', marginBottom: '12px' }}>
+              {authError}
+            </div>
+          )}
+
+          <button
+            onClick={authScreen === 'signin' ? handleSignIn : handleSignUp}
+            disabled={authSubmitting || !authEmail.includes('@') || authPassword.length < 6}
+            style={{
+              width: '100%', padding: '16px', borderRadius: '14px', border: 'none',
+              background: (authEmail.includes('@') && authPassword.length >= 6) ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'rgba(255,255,255,0.1)',
+              color: (authEmail.includes('@') && authPassword.length >= 6) ? '#0C0A09' : '#78716C',
+              fontSize: '16px', fontWeight: 600, cursor: 'pointer', opacity: authSubmitting ? 0.7 : 1,
+            }}
+          >
+            {authSubmitting ? 'Loading...' : authScreen === 'signin' ? 'Sign In' : 'Sign Up'}
+          </button>
+
+          <button onClick={() => { setAuthScreen(authScreen === 'signin' ? 'signup' : 'signin'); setAuthError(null); }}
+            style={{ width: '100%', padding: '12px', marginTop: '10px', background: 'none', border: 'none', color: '#A8A29E', fontSize: '13px', cursor: 'pointer' }}>
+            {authScreen === 'signin' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+          </button>
         </div>
       </div>
     );
@@ -1511,9 +1825,15 @@ export default function App() {
             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px', borderRadius: '10px' }}>
             <ShieldIcon />
           </button>
-          <button onClick={openAdmin}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px', borderRadius: '10px' }}>
-            <GearIcon />
+          {user?.email === ADMIN_EMAIL && (
+            <button onClick={openAdmin}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px', borderRadius: '10px' }}>
+              <GearIcon />
+            </button>
+          )}
+          <button onClick={handleSignOut}
+            style={{ background: 'none', border: 'none', color: '#78716C', fontSize: '10px', cursor: 'pointer', padding: '4px 6px' }}>
+            Out
           </button>
         </div>
       </header>
