@@ -33,8 +33,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return await handlePlacePhoto(req, res);
       case 'autocomplete':
         return await handleAutocomplete(req, res);
+      case 'geocode':
+        return await handleGeocode(req, res);
       default:
-        return res.status(400).json({ error: 'Invalid action. Use: nearby, details, photo, autocomplete' });
+        return res.status(400).json({ error: 'Invalid action. Use: nearby, details, photo, autocomplete, geocode' });
     }
   } catch (error) {
     console.error('API error:', error);
@@ -163,6 +165,11 @@ async function handlePlacePhoto(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'name (photo resource name) is required' });
   }
 
+  // Validate photo resource name format to prevent SSRF
+  if (!/^places\/[A-Za-z0-9\-_]+\/photos\/[A-Za-z0-9\-_]+$/.test(name as string)) {
+    return res.status(400).json({ error: 'Invalid photo name format' });
+  }
+
   const photoUrl = `https://places.googleapis.com/v1/${name}/media?maxWidthPx=${maxWidth}&key=${GOOGLE_API_KEY}`;
 
   const response = await fetch(photoUrl);
@@ -172,8 +179,9 @@ async function handlePlacePhoto(req: VercelRequest, res: VercelResponse) {
   }
 
   const contentType = response.headers.get('content-type') || 'image/jpeg';
-  res.setHeader('Content-Type', contentType);
-  res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache photos for 24h
+  const safeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  res.setHeader('Content-Type', safeTypes.includes(contentType) ? contentType : 'image/jpeg');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
 
   const buffer = await response.arrayBuffer();
   return res.status(200).send(Buffer.from(buffer));
@@ -219,4 +227,34 @@ async function handleAutocomplete(req: VercelRequest, res: VercelResponse) {
 
   const data = await response.json();
   return res.status(200).json(data);
+}
+
+// --------------------------------------------------------------------------
+// Reverse Geocode (lat/lng → city name)
+// --------------------------------------------------------------------------
+async function handleGeocode(req: VercelRequest, res: VercelResponse) {
+  const { lat, lng } = req.query;
+
+  if (!lat || !lng) {
+    return res.status(400).json({ error: 'lat and lng are required' });
+  }
+
+  const response = await fetch(
+    `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_API_KEY}&result_type=locality`
+  );
+
+  if (!response.ok) {
+    return res.status(response.status).json({ error: 'Geocoding failed' });
+  }
+
+  const data = await response.json();
+  let city = null;
+  if (data.results?.[0]) {
+    const cityComponent = data.results[0].address_components?.find(
+      (c: { types: string[] }) => c.types.includes('locality')
+    );
+    city = cityComponent?.long_name || data.results[0].formatted_address;
+  }
+
+  return res.status(200).json({ city });
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchCities } from './supabase';
-import { searchNearby, formatDistance, getPhotoUrl, getTimeAwareTypes, VIBE_TYPE_MAP } from './services/places';
+import { fetchCities, saveEmailSignup } from './supabase';
+import { searchNearby, formatDistance } from './services/places';
 import type { Place } from './services/places';
 import { useLocation } from './hooks/useLocation';
 
@@ -190,6 +190,11 @@ export default function App() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [useGps, setUseGps] = useState(false);
   const [searchRadius, setSearchRadius] = useState(1500);
+  const [showEmailSignup, setShowEmailSignup] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
+  const [emailSaved, setEmailSaved] = useState(() => localStorage.getItem('nxstops_email_saved') === 'true');
+  const [emailSubmitting, setEmailSubmitting] = useState(false);
+  const [surprisePlace, setSurprisePlace] = useState<Place | null>(null);
 
   const location = useLocation();
 
@@ -232,6 +237,8 @@ export default function App() {
         stops: dayPlan,
         expires: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
       }));
+    } else {
+      localStorage.removeItem('nxstops_dayplan');
     }
   }, [dayPlan]);
 
@@ -333,6 +340,25 @@ export default function App() {
         url: place.googleMapsUrl,
       });
     }
+  };
+
+  // Email signup handler
+  const handleEmailSignup = async () => {
+    if (!emailInput || !emailInput.includes('@')) return;
+    setEmailSubmitting(true);
+    await saveEmailSignup(emailInput, useGps ? (location.city || undefined) : selectedCity?.name);
+    localStorage.setItem('nxstops_email_saved', 'true');
+    setEmailSaved(true);
+    setShowEmailSignup(false);
+    setEmailSubmitting(false);
+  };
+
+  // Surprise Me — pick a random open place
+  const handleSurpriseMe = () => {
+    const openPlaces = places.filter(p => p.openNow);
+    if (openPlaces.length === 0) return;
+    const random = openPlaces[Math.floor(Math.random() * openPlaces.length)];
+    setSurprisePlace(random);
   };
 
   // Price dots
@@ -497,6 +523,27 @@ export default function App() {
             <p style={{ color: '#d4d0cc', fontSize: '13px' }}>{selectedCity.country}</p>
           </div>
         </div>
+      )}
+
+      {/* Email Signup Card */}
+      {!emailSaved && (
+        <button
+          onClick={() => setShowEmailSignup(true)}
+          style={{
+            ...cardStyle,
+            width: '100%', cursor: 'pointer', textAlign: 'left',
+            display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px',
+            background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(217,119,6,0.05))',
+            border: '1px solid rgba(245, 158, 11, 0.15)',
+          }}
+        >
+          <div style={{ fontSize: '24px' }}>📬</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600, fontSize: '14px', color: '#FFFBEB' }}>Get your free city guide</div>
+            <div style={{ fontSize: '12px', color: '#A8A29E' }}>Hidden gems sent to your inbox</div>
+          </div>
+          <div style={{ color: '#F59E0B', fontSize: '18px' }}>→</div>
+        </button>
       )}
 
       {/* Start Button */}
@@ -895,11 +942,9 @@ export default function App() {
       })}
 
       {/* Load More / Expand Radius */}
-      {!placesLoading && filteredPlaces.length > 0 && filteredPlaces.length < 5 && (
+      {!placesLoading && filteredPlaces.length > 0 && (
         <button
-          onClick={() => {
-            setSearchRadius(prev => prev + 1500);
-          }}
+          onClick={() => setSearchRadius(prev => prev + 1500)}
           style={{
             width: '100%', padding: '14px', borderRadius: '12px', marginTop: '4px',
             background: 'none', border: '1px solid rgba(255,255,255,0.08)',
@@ -1051,6 +1096,169 @@ export default function App() {
           );
         })}
       </nav>
+
+      {/* Surprise Me Floating Button — shown on planner screen */}
+      {screen === 'planner' && places.length > 0 && !surprisePlace && (
+        <button
+          onClick={handleSurpriseMe}
+          style={{
+            position: 'fixed', bottom: '90px', right: 'calc(50% - 195px)',
+            width: '52px', height: '52px', borderRadius: '50%',
+            background: 'linear-gradient(135deg, #F59E0B, #D97706)',
+            border: 'none', cursor: 'pointer', color: '#0C0A09',
+            fontSize: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 4px 20px rgba(245, 158, 11, 0.4)',
+            zIndex: 50,
+          }}
+          title="Surprise Me"
+        >
+          🎲
+        </button>
+      )}
+
+      {/* Surprise Me Result Modal */}
+      {surprisePlace && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 100,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
+          }}
+          onClick={() => setSurprisePlace(null)}
+        >
+          <div
+            style={{
+              background: '#1C1917', borderRadius: '20px', maxWidth: '380px', width: '100%',
+              overflow: 'hidden', border: '1px solid rgba(245, 158, 11, 0.2)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {surprisePlace.photoUrl && (
+              <div style={{
+                height: '180px', width: '100%',
+                background: `linear-gradient(to bottom, transparent 50%, #1C1917), url(${surprisePlace.photoUrl})`,
+                backgroundSize: 'cover', backgroundPosition: 'center',
+              }} />
+            )}
+            <div style={{ padding: '20px', textAlign: 'center' }}>
+              <div style={{ fontSize: '14px', color: '#F59E0B', marginBottom: '4px', fontWeight: 500 }}>
+                Surprise!
+              </div>
+              <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '6px' }}>{surprisePlace.name}</h2>
+              <p style={{ color: '#A8A29E', fontSize: '13px', marginBottom: '4px' }}>
+                {surprisePlace.categoryDisplay}
+                {surprisePlace.distance != null && ` · ${formatDistance(surprisePlace.distance)}`}
+              </p>
+              {surprisePlace.rating > 0 && (
+                <p style={{ color: '#F59E0B', fontSize: '14px', marginBottom: '16px' }}>
+                  ★ {surprisePlace.rating.toFixed(1)} ({surprisePlace.reviewCount} reviews)
+                </p>
+              )}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => { addToPlan(surprisePlace); setSurprisePlace(null); }}
+                  style={{
+                    flex: 1, padding: '12px', borderRadius: '12px', border: 'none',
+                    background: 'linear-gradient(135deg, #F59E0B, #D97706)',
+                    color: '#0C0A09', fontSize: '14px', fontWeight: 600, cursor: 'pointer',
+                  }}
+                >
+                  + Add to Plan
+                </button>
+                {surprisePlace.googleMapsUrl && (
+                  <a
+                    href={surprisePlace.googleMapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      flex: 1, padding: '12px', borderRadius: '12px',
+                      background: 'rgba(255,255,255,0.08)', color: '#FFFBEB',
+                      fontSize: '14px', fontWeight: 600, textDecoration: 'none',
+                      textAlign: 'center',
+                    }}
+                  >
+                    Directions
+                  </a>
+                )}
+              </div>
+              <button
+                onClick={() => { setSurprisePlace(null); handleSurpriseMe(); }}
+                style={{
+                  width: '100%', padding: '12px', borderRadius: '12px', marginTop: '8px',
+                  background: 'none', border: '1px solid rgba(255,255,255,0.1)',
+                  color: '#A8A29E', fontSize: '13px', cursor: 'pointer',
+                }}
+              >
+                🎲 Try another
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email Signup Modal */}
+      {showEmailSignup && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 100,
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          }}
+          onClick={() => setShowEmailSignup(false)}
+        >
+          <div
+            style={{
+              background: '#1C1917', borderRadius: '20px 20px 0 0', maxWidth: '430px', width: '100%',
+              padding: '28px 24px 40px', border: '1px solid rgba(255,255,255,0.06)',
+              borderBottom: 'none',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <div style={{ fontSize: '32px', marginBottom: '8px' }}>✨</div>
+              <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '6px' }}>
+                Get your city guide
+              </h2>
+              <p style={{ color: '#A8A29E', fontSize: '14px' }}>
+                We'll send curated picks and hidden gems straight to your inbox
+              </p>
+            </div>
+            <input
+              type="email"
+              placeholder="your@email.com"
+              value={emailInput}
+              onChange={(e) => setEmailInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleEmailSignup()}
+              style={{
+                width: '100%', padding: '16px', borderRadius: '12px',
+                border: '1px solid rgba(255,255,255,0.1)', background: '#0C0A09',
+                color: '#FFFBEB', fontSize: '16px', marginBottom: '12px',
+                outline: 'none',
+              }}
+            />
+            <button
+              onClick={handleEmailSignup}
+              disabled={emailSubmitting || !emailInput.includes('@')}
+              style={{
+                width: '100%', padding: '16px', borderRadius: '14px', border: 'none',
+                background: emailInput.includes('@') ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'rgba(255,255,255,0.1)',
+                color: emailInput.includes('@') ? '#0C0A09' : '#78716C',
+                fontSize: '16px', fontWeight: 600, cursor: emailInput.includes('@') ? 'pointer' : 'default',
+              }}
+            >
+              {emailSubmitting ? 'Saving...' : 'Send me the guide'}
+            </button>
+            <button
+              onClick={() => setShowEmailSignup(false)}
+              style={{
+                width: '100%', padding: '12px', marginTop: '8px',
+                background: 'none', border: 'none', color: '#78716C',
+                fontSize: '13px', cursor: 'pointer',
+              }}
+            >
+              Maybe later
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

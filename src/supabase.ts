@@ -27,10 +27,24 @@ export async function fetchPlacesByCity(cityId: string) {
     .eq('city_id', cityId)
     .eq('is_active', true)
     .order('popularity_score', { ascending: false });
-  
+
   if (error) {
     console.error('Error fetching places:', error);
     return [];
   }
   return data || [];
+}
+
+// Save email signup to Supabase
+export async function saveEmailSignup(email: string, city?: string) {
+  const { error } = await supabase
+    .from('email_signups')
+    .insert({ email, city: city || null, signed_up_at: new Date().toISOString() });
+
+  if (error) {
+    // If table doesn't exist yet, log but don't crash
+    console.error('Error saving email signup:', error);
+    return false;
+  }
+  return true;
 }

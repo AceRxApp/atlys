@@ -37,21 +37,16 @@ export function useLocation() {
       async (position) => {
         const { latitude, longitude } = position.coords;
 
-        // Reverse geocode to get city name using Google Maps Geocoding via our proxy
+        // Reverse geocode via server-side proxy (keeps API key hidden)
         let city: string | null = null;
         try {
           const response = await fetch(
-            `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&result_type=locality`
+            `/api/places?action=geocode&lat=${latitude}&lng=${longitude}`
           );
           const data = await response.json();
-          if (data.results?.[0]) {
-            const cityComponent = data.results[0].address_components?.find(
-              (c: { types: string[] }) => c.types.includes('locality')
-            );
-            city = cityComponent?.long_name || data.results[0].formatted_address;
-          }
+          city = data.city || null;
         } catch {
-          // Reverse geocode failed — that's okay, we still have coords
+          // Reverse geocode failed — still have coords
         }
 
         setLocation({
@@ -64,24 +59,24 @@ export function useLocation() {
         });
       },
       (error) => {
+        const isTimeout = error.code === error.TIMEOUT;
         setLocation({
           lat: null,
           lng: null,
           city: null,
           loading: false,
-          error: error.message,
+          error: isTimeout ? 'Location request timed out' : error.message,
           permissionDenied: error.code === error.PERMISSION_DENIED,
         });
       },
       {
         enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 300000, // Cache for 5 minutes
+        maximumAge: 300000,
       }
     );
   }, []);
 
-  // Request location on mount
   useEffect(() => {
     requestLocation();
   }, [requestLocation]);
