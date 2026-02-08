@@ -36,7 +36,7 @@ interface AdminSignup {
 
 type Screen = 'home' | 'explore' | 'plan';
 type Vibe = 'food' | 'cultural' | 'nightlife' | 'hidden';
-type QuickFilter = 'open' | 'walking' | 'topRated' | 'budget';
+type QuickFilter = 'open' | 'walking' | 'topRated' | 'budget' | 'family' | 'solo';
 
 // ============================================================================
 // CITY COORDINATES
@@ -82,6 +82,40 @@ const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
   'melbourne': { lat: -37.8136, lng: 144.9631 },
   'rio de janeiro': { lat: -22.9068, lng: -43.1729 },
   'buenos aires': { lat: -34.6037, lng: -58.3816 },
+};
+
+// ============================================================================
+// SAFETY DATA
+// ============================================================================
+
+const NIGHTLIFE_TYPES = ['bar', 'night_club', 'casino', 'cocktail_bar', 'wine_bar', 'karaoke', 'comedy_club'];
+
+const EMERGENCY_BY_COUNTRY: Record<string, { police: string; emergency: string }> = {
+  'USA': { police: '911', emergency: '911' },
+  'Canada': { police: '911', emergency: '911' },
+  'Mexico': { police: '911', emergency: '911' },
+  'Puerto Rico': { police: '911', emergency: '911' },
+  'UK': { police: '999', emergency: '112' },
+  'France': { police: '17', emergency: '112' },
+  'Spain': { police: '091', emergency: '112' },
+  'Italy': { police: '113', emergency: '112' },
+  'Portugal': { police: '112', emergency: '112' },
+  'Netherlands': { police: '112', emergency: '112' },
+  'Germany': { police: '110', emergency: '112' },
+  'Nigeria': { police: '199', emergency: '112' },
+  'Ghana': { police: '191', emergency: '112' },
+  'South Africa': { police: '10111', emergency: '112' },
+  'Kenya': { police: '999', emergency: '112' },
+  'Morocco': { police: '19', emergency: '15' },
+  'UAE': { police: '999', emergency: '998' },
+  'Japan': { police: '110', emergency: '119' },
+  'Thailand': { police: '191', emergency: '1669' },
+  'Singapore': { police: '999', emergency: '995' },
+  'South Korea': { police: '112', emergency: '119' },
+  'Indonesia': { police: '110', emergency: '118' },
+  'Australia': { police: '000', emergency: '000' },
+  'Brazil': { police: '190', emergency: '192' },
+  'Argentina': { police: '101', emergency: '107' },
 };
 
 // ============================================================================
@@ -161,6 +195,13 @@ const WebsiteIcon = () => (
   </svg>
 );
 
+const ShieldIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#78716C" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    <path d="M9 12l2 2 4-4" />
+  </svg>
+);
+
 // ============================================================================
 // VIBE + FILTER DEFINITIONS
 // ============================================================================
@@ -177,6 +218,8 @@ const QUICK_FILTERS: { id: QuickFilter; label: string }[] = [
   { id: 'walking', label: 'Walking Distance' },
   { id: 'topRated', label: 'Top Rated' },
   { id: 'budget', label: 'Budget' },
+  { id: 'family', label: 'Family Friendly' },
+  { id: 'solo', label: 'Solo Friendly' },
 ];
 
 // ============================================================================
@@ -220,6 +263,9 @@ export default function App() {
   // --- Modals ---
   const [surprisePlace, setSurprisePlace] = useState<Place | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
+
+  // --- Safety ---
+  const [showSafety, setShowSafety] = useState(false);
 
   // --- Admin ---
   const [showAdmin, setShowAdmin] = useState(false);
@@ -351,6 +397,8 @@ export default function App() {
         case 'walking': if (place.distance !== null && place.distance > 1) return false; break;
         case 'topRated': if (place.rating < 4.5) return false; break;
         case 'budget': if (place.priceLevel > 2 && place.priceLevel !== -1) return false; break;
+        case 'family': if (NIGHTLIFE_TYPES.includes(place.category) || place.tags.includes('nightlife')) return false; if (place.rating > 0 && place.rating < 3.5) return false; break;
+        case 'solo': if (place.reviewCount < 50) return false; if (place.rating > 0 && place.rating < 3.8) return false; break;
       }
     }
     return true;
@@ -532,10 +580,20 @@ export default function App() {
             {place.rating > 0 && <StarRating rating={place.rating} count={place.reviewCount} />}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
             {place.categoryDisplay && (
               <span style={{ padding: '3px 8px', background: 'rgba(245,158,11,0.12)', color: '#F59E0B', borderRadius: '6px', fontSize: '11px', fontWeight: 500 }}>
                 {place.categoryDisplay}
+              </span>
+            )}
+            {place.reviewCount >= 200 && (
+              <span style={{ padding: '3px 8px', background: 'rgba(34,197,94,0.1)', color: '#34D399', borderRadius: '6px', fontSize: '10px', fontWeight: 600 }}>
+                Popular
+              </span>
+            )}
+            {place.rating >= 4.0 && !NIGHTLIFE_TYPES.includes(place.category) && !place.tags.includes('nightlife') && (
+              <span style={{ padding: '3px 8px', background: 'rgba(96,165,250,0.1)', color: '#93C5FD', borderRadius: '6px', fontSize: '10px', fontWeight: 600 }}>
+                Welcoming
               </span>
             )}
             <PriceDots level={place.priceLevel} />
@@ -1449,6 +1507,10 @@ export default function App() {
               {currentTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
             </div>
           </div>
+          <button onClick={() => setShowSafety(true)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px', borderRadius: '10px' }}>
+            <ShieldIcon />
+          </button>
           <button onClick={openAdmin}
             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px', borderRadius: '10px' }}>
             <GearIcon />
@@ -1624,6 +1686,130 @@ export default function App() {
               style={{ width: '100%', padding: '12px', marginTop: '8px', background: 'none', border: 'none', color: '#78716C', fontSize: '13px', cursor: 'pointer' }}>
               Maybe later
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Safety Toolkit Modal */}
+      {showSafety && (
+        <div className="modal-backdrop"
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+          onClick={() => setShowSafety(false)}>
+          <div className="modal-sheet"
+            style={{ background: '#1C1917', borderRadius: '24px 24px 0 0', maxWidth: '430px', width: '100%', maxHeight: '85vh', overflow: 'auto', border: '1px solid rgba(255,255,255,0.06)', borderBottom: 'none' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '24px 20px 40px' }}>
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div>
+                  <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '2px' }}>Travel Toolkit</h2>
+                  <p style={{ color: '#78716C', fontSize: '12px' }}>Stay connected & informed</p>
+                </div>
+                <button onClick={() => setShowSafety(false)}
+                  style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', padding: '4px' }}>
+                  <CloseIcon />
+                </button>
+              </div>
+
+              {/* Share My Location */}
+              <button
+                onClick={async () => {
+                  if (loc.lat && loc.lng) {
+                    const url = `https://www.google.com/maps?q=${loc.lat},${loc.lng}`;
+                    const text = `Here's my current location${loc.city ? ` in ${loc.city}` : ''}`;
+                    if (navigator.share) {
+                      await navigator.share({ title: 'My Location', text, url });
+                    } else {
+                      await navigator.clipboard.writeText(`${text}: ${url}`);
+                      showToast('Location copied to clipboard');
+                    }
+                  } else {
+                    showToast('Location not available — enable GPS');
+                  }
+                }}
+                style={{
+                  ...cardStyle, width: '100%', cursor: 'pointer', textAlign: 'left',
+                  display: 'flex', alignItems: 'center', gap: '14px',
+                  background: 'linear-gradient(135deg, rgba(34,197,94,0.08), rgba(34,197,94,0.03))',
+                  border: '1px solid rgba(34,197,94,0.15)',
+                }}
+              >
+                <div style={{
+                  width: '44px', height: '44px', borderRadius: '12px', flexShrink: 0,
+                  background: 'rgba(34,197,94,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '20px',
+                }}>
+                  📍
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: '15px', color: '#FFFBEB' }}>Share My Location</div>
+                  <div style={{ fontSize: '12px', color: '#A8A29E' }}>Send your GPS pin to someone you trust</div>
+                </div>
+                <div style={{ color: '#34D399', fontSize: '18px' }}>→</div>
+              </button>
+
+              {/* Emergency Numbers */}
+              {(() => {
+                const country = selectedCity?.country || (loc.city ? Object.keys(EMERGENCY_BY_COUNTRY).find(c => {
+                  const cityNames = Object.keys(CITY_COORDS);
+                  return cityNames.some(cn => cn.toLowerCase().includes(loc.city?.toLowerCase() || ''));
+                }) : undefined);
+                const nums = country ? EMERGENCY_BY_COUNTRY[country] : null;
+                const displayCountry = selectedCity?.country || country || null;
+
+                return (
+                  <div style={{ ...cardStyle, marginTop: '4px' }}>
+                    <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
+                      Emergency Numbers{displayCountry ? ` — ${displayCountry}` : ''}
+                    </div>
+                    {nums ? (
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <a href={`tel:${nums.emergency}`}
+                          style={{
+                            flex: 1, padding: '14px', borderRadius: '12px', textAlign: 'center',
+                            background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.15)',
+                            color: '#F87171', textDecoration: 'none', fontWeight: 600, fontSize: '16px',
+                          }}>
+                          <div style={{ fontSize: '11px', color: '#A8A29E', fontWeight: 400, marginBottom: '4px' }}>Emergency</div>
+                          {nums.emergency}
+                        </a>
+                        <a href={`tel:${nums.police}`}
+                          style={{
+                            flex: 1, padding: '14px', borderRadius: '12px', textAlign: 'center',
+                            background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.15)',
+                            color: '#93C5FD', textDecoration: 'none', fontWeight: 600, fontSize: '16px',
+                          }}>
+                          <div style={{ fontSize: '11px', color: '#A8A29E', fontWeight: 400, marginBottom: '4px' }}>Police</div>
+                          {nums.police}
+                        </a>
+                      </div>
+                    ) : (
+                      <p style={{ color: '#A8A29E', fontSize: '13px' }}>Select a city to see local emergency numbers</p>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Travel Tips */}
+              <div style={{ ...cardStyle, marginTop: '4px' }}>
+                <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
+                  Quick Tips
+                </div>
+                {[
+                  { icon: '🔋', tip: 'Keep your phone charged — you\'ll need it for maps & rides' },
+                  { icon: '📱', tip: 'Download offline maps before heading out' },
+                  { icon: '🏨', tip: 'Save your accommodation address — show it to taxi drivers' },
+                  { icon: '💳', tip: 'Keep a small amount of local cash for emergencies' },
+                  { icon: '🌙', tip: 'Stick to well-lit, busy streets at night' },
+                  { icon: '👥', tip: 'Look for places with lots of reviews — popular spots are usually welcoming' },
+                ].map((item, i) => (
+                  <div key={i} style={{ display: 'flex', gap: '10px', padding: '8px 0', borderBottom: i < 5 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                    <span style={{ fontSize: '16px', flexShrink: 0 }}>{item.icon}</span>
+                    <span style={{ fontSize: '13px', color: '#d4d0cc', lineHeight: 1.4 }}>{item.tip}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}
