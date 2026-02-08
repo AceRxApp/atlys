@@ -35,8 +35,8 @@ interface AdminSignup {
   signed_up_at: string;
 }
 
-type Screen = 'home' | 'explore' | 'plan';
-type Vibe = 'restaurants' | 'foodtrucks' | 'drinks' | 'placestoeat' | 'events' | 'cultural' | 'nightlife' | 'hidden';
+type Screen = 'home' | 'discover' | 'events' | 'plan';
+type Vibe = 'restaurants' | 'foodtrucks' | 'drinks' | 'placestoeat' | 'cultural' | 'nightlife' | 'hidden';
 type QuickFilter = 'open' | 'walking' | 'topRated' | 'budget' | 'family' | 'solo';
 
 const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL as string) || '';
@@ -46,6 +46,7 @@ const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL as string) || '';
 // ============================================================================
 
 const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
+  // Original cities
   'new york': { lat: 40.7128, lng: -73.9960 },
   'los angeles': { lat: 34.0522, lng: -118.2437 },
   'miami': { lat: 25.7617, lng: -80.1918 },
@@ -85,6 +86,118 @@ const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
   'melbourne': { lat: -37.8136, lng: 144.9631 },
   'rio de janeiro': { lat: -22.9068, lng: -43.1729 },
   'buenos aires': { lat: -34.6037, lng: -58.3816 },
+  // North America
+  'boston': { lat: 42.3601, lng: -71.0589 },
+  'philadelphia': { lat: 39.9526, lng: -75.1652 },
+  'denver': { lat: 39.7392, lng: -104.9903 },
+  'portland': { lat: 45.5155, lng: -122.6789 },
+  'san diego': { lat: 32.7157, lng: -117.1611 },
+  'honolulu': { lat: 21.3069, lng: -157.8583 },
+  'detroit': { lat: 42.3314, lng: -83.0458 },
+  'minneapolis': { lat: 44.9778, lng: -93.265 },
+  'dallas': { lat: 32.7767, lng: -96.797 },
+  'houston': { lat: 29.7604, lng: -95.3698 },
+  'phoenix': { lat: 33.4484, lng: -112.074 },
+  'charlotte': { lat: 35.2271, lng: -80.8431 },
+  'tampa': { lat: 27.9506, lng: -82.4572 },
+  'orlando': { lat: 28.5383, lng: -81.3792 },
+  'savannah': { lat: 32.0809, lng: -81.0912 },
+  'charleston': { lat: 32.7765, lng: -79.9311 },
+  'memphis': { lat: 35.1495, lng: -90.049 },
+  'pittsburgh': { lat: 40.4406, lng: -79.9959 },
+  'san antonio': { lat: 29.4241, lng: -98.4936 },
+  'st. louis': { lat: 38.627, lng: -90.1994 },
+  'calgary': { lat: 51.0447, lng: -114.0719 },
+  'ottawa': { lat: 45.4215, lng: -75.6972 },
+  'quebec city': { lat: 46.8139, lng: -71.208 },
+  // Caribbean
+  'havana': { lat: 23.1136, lng: -82.3666 },
+  'kingston': { lat: 18.0179, lng: -76.8099 },
+  'nassau': { lat: 25.048, lng: -77.3554 },
+  'punta cana': { lat: 18.5601, lng: -68.3725 },
+  'bridgetown': { lat: 13.1132, lng: -59.5988 },
+  // Europe
+  'madrid': { lat: 40.4168, lng: -3.7038 },
+  'prague': { lat: 50.0755, lng: 14.4378 },
+  'vienna': { lat: 48.2082, lng: 16.3738 },
+  'budapest': { lat: 47.4979, lng: 19.0402 },
+  'dublin': { lat: 53.3498, lng: -6.2603 },
+  'edinburgh': { lat: 55.9533, lng: -3.1883 },
+  'copenhagen': { lat: 55.6761, lng: 12.5683 },
+  'stockholm': { lat: 59.3293, lng: 18.0686 },
+  'oslo': { lat: 59.9139, lng: 10.7522 },
+  'helsinki': { lat: 60.1699, lng: 24.9384 },
+  'warsaw': { lat: 52.2297, lng: 21.0122 },
+  'krakow': { lat: 50.0647, lng: 19.945 },
+  'athens': { lat: 37.9838, lng: 23.7275 },
+  'santorini': { lat: 36.3932, lng: 25.4615 },
+  'istanbul': { lat: 41.0082, lng: 28.9784 },
+  'zurich': { lat: 47.3769, lng: 8.5417 },
+  'milan': { lat: 45.4642, lng: 9.19 },
+  'florence': { lat: 43.7696, lng: 11.2558 },
+  'venice': { lat: 45.4408, lng: 12.3155 },
+  'munich': { lat: 48.1351, lng: 11.582 },
+  'brussels': { lat: 50.8503, lng: 4.3517 },
+  'nice': { lat: 43.7102, lng: 7.262 },
+  'seville': { lat: 37.3891, lng: -5.9845 },
+  // Asia
+  'hong kong': { lat: 22.3193, lng: 114.1694 },
+  'shanghai': { lat: 31.2304, lng: 121.4737 },
+  'beijing': { lat: 39.9042, lng: 116.4074 },
+  'taipei': { lat: 25.033, lng: 121.5654 },
+  'osaka': { lat: 34.6937, lng: 135.5023 },
+  'kyoto': { lat: 35.0116, lng: 135.7681 },
+  'mumbai': { lat: 19.076, lng: 72.8777 },
+  'delhi': { lat: 28.7041, lng: 77.1025 },
+  'jaipur': { lat: 26.9124, lng: 75.7873 },
+  'hanoi': { lat: 21.0278, lng: 105.8342 },
+  'ho chi minh city': { lat: 10.8231, lng: 106.6297 },
+  'kuala lumpur': { lat: 3.139, lng: 101.6869 },
+  'manila': { lat: 14.5995, lng: 120.9842 },
+  'colombo': { lat: 6.9271, lng: 79.8612 },
+  'kathmandu': { lat: 27.7172, lng: 85.324 },
+  'phnom penh': { lat: 11.5564, lng: 104.9282 },
+  'chiang mai': { lat: 18.7883, lng: 98.9853 },
+  // Africa
+  'addis ababa': { lat: 9.025, lng: 38.7469 },
+  'dar es salaam': { lat: -6.7924, lng: 39.2083 },
+  'zanzibar': { lat: -6.1659, lng: 39.2026 },
+  'dakar': { lat: 14.7167, lng: -17.4677 },
+  'casablanca': { lat: 33.5731, lng: -7.5898 },
+  'johannesburg': { lat: -26.2041, lng: 28.0473 },
+  'luanda': { lat: -8.839, lng: 13.2894 },
+  'abuja': { lat: 9.0579, lng: 7.4951 },
+  'kigali': { lat: -1.9403, lng: 29.8739 },
+  'kampala': { lat: 0.3476, lng: 32.5825 },
+  // South America
+  'bogota': { lat: 4.711, lng: -74.0721 },
+  'medellin': { lat: 6.2442, lng: -75.5812 },
+  'cartagena': { lat: 10.391, lng: -75.5364 },
+  'lima': { lat: -12.0464, lng: -77.0428 },
+  'cusco': { lat: -13.5319, lng: -71.9675 },
+  'santiago': { lat: -33.4489, lng: -70.6693 },
+  'quito': { lat: -0.1807, lng: -78.4678 },
+  'montevideo': { lat: -34.9011, lng: -56.1645 },
+  'la paz': { lat: -16.4897, lng: -68.1193 },
+  'sao paulo': { lat: -23.5505, lng: -46.6333 },
+  // Middle East
+  'abu dhabi': { lat: 24.4539, lng: 54.3773 },
+  'doha': { lat: 25.2854, lng: 51.531 },
+  'riyadh': { lat: 24.7136, lng: 46.6753 },
+  'amman': { lat: 31.9454, lng: 35.9284 },
+  'beirut': { lat: 33.8938, lng: 35.5018 },
+  'muscat': { lat: 23.588, lng: 58.3829 },
+  // Oceania
+  'auckland': { lat: -36.8485, lng: 174.7633 },
+  'queenstown': { lat: -45.0312, lng: 168.6626 },
+  'perth': { lat: -31.9505, lng: 115.8605 },
+  'brisbane': { lat: -27.4698, lng: 153.0251 },
+  'fiji': { lat: -17.7134, lng: 178.065 },
+  // Central America
+  'panama city': { lat: 8.9824, lng: -79.5199 },
+  'san jose': { lat: 9.9281, lng: -84.0907 },
+  'guatemala city': { lat: 14.6349, lng: -90.5069 },
+  'belize city': { lat: 17.5046, lng: -88.1962 },
 };
 
 // ============================================================================
@@ -140,11 +253,22 @@ const HomeIcon = ({ active }: { active: boolean }) => (
   </svg>
 );
 
-const ExploreIcon = ({ active }: { active: boolean }) => (
+const DiscoverIcon = ({ active }: { active: boolean }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
     <defs><linearGradient id="eg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#F59E0B" /><stop offset="100%" stopColor="#FBBF24" /></linearGradient></defs>
     <circle cx="11" cy="11" r="7" stroke={active ? "url(#eg)" : "#78716C"} strokeWidth="1.75" fill={active ? "rgba(245,158,11,0.1)" : "none"} />
     <path d="M21 21L16.5 16.5" stroke={active ? "url(#eg)" : "#78716C"} strokeWidth="1.75" strokeLinecap="round" />
+  </svg>
+);
+
+const EventsIcon = ({ active }: { active: boolean }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <defs><linearGradient id="evi" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#F59E0B" /><stop offset="100%" stopColor="#FBBF24" /></linearGradient></defs>
+    <rect x="3" y="4" width="18" height="17" rx="2" stroke={active ? "url(#evi)" : "#78716C"} strokeWidth="1.75" fill={active ? "rgba(245,158,11,0.1)" : "none"} />
+    <path d="M3 9H21" stroke={active ? "url(#evi)" : "#78716C"} strokeWidth="1.5" />
+    <path d="M8 2V5" stroke={active ? "url(#evi)" : "#78716C"} strokeWidth="1.75" strokeLinecap="round" />
+    <path d="M16 2V5" stroke={active ? "url(#evi)" : "#78716C"} strokeWidth="1.75" strokeLinecap="round" />
+    <circle cx="12" cy="15" r="2" fill={active ? "url(#evi)" : "#78716C"} />
   </svg>
 );
 
@@ -220,7 +344,6 @@ const VIBES: { id: Vibe; emoji: string; label: string }[] = [
   { id: 'foodtrucks', emoji: '🚚', label: 'Food Trucks' },
   { id: 'drinks', emoji: '☕', label: 'Drinks' },
   { id: 'placestoeat', emoji: '🍰', label: 'Places to Eat' },
-  { id: 'events', emoji: '🎫', label: 'Events' },
   { id: 'cultural', emoji: '🏛️', label: 'Cultural' },
   { id: 'nightlife', emoji: '🌙', label: 'Nightlife' },
   { id: 'hidden', emoji: '💎', label: 'Hidden Gems' },
@@ -258,7 +381,7 @@ export default function App() {
   const [cities, setCities] = useState<City[]>([]);
   const [selectedCity, setSelectedCity] = useState<City | null>(null);
   const [places, setPlaces] = useState<Place[]>([]);
-  const [selectedVibes, setSelectedVibes] = useState<Vibe[]>([]);
+  const [selectedVibe, setSelectedVibe] = useState<Vibe | null>(null);
   const [quickFilters, setQuickFilters] = useState<QuickFilter[]>(['open']);
   const [dayPlan, setDayPlan] = useState<Stop[]>([]);
   const [loading, setLoading] = useState(true);
@@ -419,14 +542,14 @@ export default function App() {
     }
     if (!lat || !lng) return;
     setPlacesLoading(true);
-    const placeVibes = selectedVibes.filter(v => v !== 'events');
-    const results = await searchNearby(lat, lng, placeVibes, searchRadius);
+    const vibes = selectedVibe ? [selectedVibe] : [];
+    const results = await searchNearby(lat, lng, vibes, searchRadius);
     setPlaces(results);
     setPlacesLoading(false);
-  }, [useGps, loc.lat, loc.lng, selectedCity, selectedVibes, searchRadius]);
+  }, [useGps, loc.lat, loc.lng, selectedCity, selectedVibe, searchRadius]);
 
   useEffect(() => {
-    if (screen === 'explore' && (useGps || selectedCity)) fetchPlaces();
+    if (screen === 'discover' && (useGps || selectedCity)) fetchPlaces();
   }, [screen, fetchPlaces]);
 
   // Fetch events
@@ -452,10 +575,10 @@ export default function App() {
   }, [useGps, loc.lat, loc.lng, selectedCity]);
 
   useEffect(() => {
-    if (screen === 'explore' && selectedVibes.includes('events') && (useGps || selectedCity)) {
+    if (screen === 'events' && (useGps || selectedCity)) {
       fetchEventsData();
     }
-  }, [screen, selectedVibes, fetchEventsData]);
+  }, [screen, fetchEventsData]);
 
   // --------------------------------------------------------------------------
   // FILTERED PLACES
@@ -835,7 +958,7 @@ export default function App() {
       {/* GPS Card */}
       {loc.hasLocation && (
         <button
-          onClick={() => { setUseGps(true); setSelectedCity(null); setScreen('explore'); }}
+          onClick={() => { setUseGps(true); setSelectedCity(null); setScreen('discover'); }}
           style={{
             ...cardStyle, width: '100%', cursor: 'pointer', textAlign: 'left',
             display: 'flex', alignItems: 'center', gap: '14px',
@@ -939,7 +1062,7 @@ export default function App() {
             cursor: 'pointer', width: '100%', marginTop: '12px',
             boxShadow: '0 4px 20px rgba(245,158,11,0.3)',
           }}
-          onClick={() => setScreen('explore')}
+          onClick={() => setScreen('discover')}
         >
           Start Exploring →
         </button>
@@ -948,10 +1071,10 @@ export default function App() {
   );
 
   // ==========================================================================
-  // EXPLORE SCREEN (Merged Vibes + Discovery)
+  // DISCOVER SCREEN
   // ==========================================================================
 
-  const ExploreScreen = () => (
+  const DiscoverScreen = () => (
     <div>
       {/* Header */}
       <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -982,16 +1105,16 @@ export default function App() {
         </div>
       </div>
 
-      {/* Vibe Chips */}
+      {/* Vibe Chips (exclusive selection) */}
       <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px', marginBottom: '4px', scrollbarWidth: 'none' }}>
         {VIBES.map(vibe => {
-          const active = selectedVibes.includes(vibe.id);
+          const active = selectedVibe === vibe.id;
           return (
             <button
               key={vibe.id}
               onClick={() => {
-                setSelectedVibes(active ? selectedVibes.filter(v => v !== vibe.id) : [...selectedVibes, vibe.id]);
-                setSearchRadius(1500); // reset radius on vibe change
+                setSelectedVibe(active ? null : vibe.id);
+                setSearchRadius(1500);
               }}
               style={{
                 padding: '8px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: 500,
@@ -1048,12 +1171,6 @@ export default function App() {
           {/* Loading */}
           {placesLoading && <><SkeletonCard /><SkeletonCard /><SkeletonCard /></>}
 
-          {/* Event Cards */}
-          {!eventsLoading && selectedVibes.includes('events') && events.map(event => (
-            <EventCard key={event.id} event={event} />
-          ))}
-          {eventsLoading && selectedVibes.includes('events') && <><SkeletonCard /><SkeletonCard /></>}
-
           {/* Empty: filters too strict */}
           {!placesLoading && filteredPlaces.length === 0 && places.length > 0 && (
             <div style={{ ...cardStyle, textAlign: 'center', padding: '32px 20px' }}>
@@ -1067,7 +1184,7 @@ export default function App() {
           )}
 
           {/* Empty: no results at all */}
-          {!placesLoading && places.length === 0 && !selectedVibes.includes('events') && (
+          {!placesLoading && places.length === 0 && (
             <div style={{ ...cardStyle, textAlign: 'center', padding: '32px 20px' }}>
               <div style={{ fontSize: '32px', marginBottom: '8px' }}>📍</div>
               <p style={{ color: '#A8A29E', fontSize: '14px' }}>
@@ -1098,6 +1215,50 @@ export default function App() {
   );
 
   // ==========================================================================
+  // EVENTS SCREEN
+  // ==========================================================================
+
+  const EventsScreen = () => (
+    <div>
+      {/* Header */}
+      <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h1 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '2px' }}>
+            Events {cityLabel ? `in ${cityLabel}` : ''} 🎫
+          </h1>
+          <p style={{ color: '#78716C', fontSize: '13px' }}>
+            {eventsLoading ? 'Finding events...' : `${events.length} upcoming events`}
+          </p>
+        </div>
+      </div>
+
+      {/* Events List */}
+      {eventsLoading ? (
+        <div style={{ textAlign: 'center', padding: '60px 0' }}>
+          <div style={{ width: '36px', height: '36px', border: '3px solid rgba(168,85,247,0.2)', borderTopColor: '#A855F7', borderRadius: '50%', margin: '0 auto 16px', animation: 'spin 0.8s linear infinite' }} />
+          <p style={{ color: '#78716C', fontSize: '14px' }}>Finding events nearby...</p>
+        </div>
+      ) : events.length === 0 ? (
+        <div style={{ textAlign: 'center', paddingTop: '60px' }}>
+          <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.6 }}>🎫</div>
+          <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>No events found</h2>
+          <p style={{ color: '#A8A29E', fontSize: '14px', lineHeight: 1.5 }}>
+            {!useGps && !selectedCity
+              ? 'Select a city or use GPS to discover events nearby'
+              : 'No upcoming events found in this area. Check back soon!'}
+          </p>
+        </div>
+      ) : (
+        <div>
+          {events.map(event => (
+            <EventCard key={event.id} event={event} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  // ==========================================================================
   // PLAN SCREEN (Redesigned Timeline)
   // ==========================================================================
 
@@ -1111,7 +1272,7 @@ export default function App() {
             Explore places and tap "+ Add" to build your day plan
           </p>
           <button
-            onClick={() => setScreen('explore')}
+            onClick={() => setScreen('discover')}
             style={{
               background: 'linear-gradient(135deg, #F59E0B, #D97706)', color: '#0C0A09',
               border: 'none', borderRadius: '14px', padding: '14px 28px',
@@ -1841,7 +2002,8 @@ export default function App() {
       {/* Content */}
       <main style={{ padding: '0 20px 100px' }}>
         {screen === 'home' && <HomeScreen />}
-        {screen === 'explore' && <ExploreScreen />}
+        {screen === 'discover' && <DiscoverScreen />}
+        {screen === 'events' && <EventsScreen />}
         {screen === 'plan' && <PlanScreen />}
       </main>
 
@@ -1856,7 +2018,8 @@ export default function App() {
       }}>
         {[
           { id: 'home' as Screen, icon: HomeIcon, label: 'Home' },
-          { id: 'explore' as Screen, icon: ExploreIcon, label: 'Explore' },
+          { id: 'discover' as Screen, icon: DiscoverIcon, label: 'Discover' },
+          { id: 'events' as Screen, icon: EventsIcon, label: 'Events' },
           { id: 'plan' as Screen, icon: PlanIcon, label: 'Plan' },
         ].map(tab => {
           const isActive = screen === tab.id;
@@ -1907,7 +2070,7 @@ export default function App() {
       </nav>
 
       {/* Surprise Me Floating Button */}
-      {screen === 'explore' && places.length > 0 && !surprisePlace && !selectedPlace && (
+      {screen === 'discover' && places.length > 0 && !surprisePlace && !selectedPlace && (
         <button
           onClick={handleSurpriseMe}
           style={{
