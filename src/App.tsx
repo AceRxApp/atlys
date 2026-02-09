@@ -235,6 +235,31 @@ const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
 
 const NIGHTLIFE_TYPES = ['bar', 'night_club', 'casino', 'cocktail_bar', 'wine_bar', 'karaoke', 'comedy_club'];
 
+// Weather code → description/emoji (WMO codes from Open-Meteo)
+const WEATHER_CODES: Record<number, { emoji: string; description: string }> = {
+  0: { emoji: '☀️', description: 'Clear sky' },
+  1: { emoji: '🌤️', description: 'Mostly clear' },
+  2: { emoji: '⛅', description: 'Partly cloudy' },
+  3: { emoji: '☁️', description: 'Overcast' },
+  45: { emoji: '🌫️', description: 'Foggy' },
+  48: { emoji: '🌫️', description: 'Icy fog' },
+  51: { emoji: '🌦️', description: 'Light drizzle' },
+  53: { emoji: '🌦️', description: 'Drizzle' },
+  55: { emoji: '🌧️', description: 'Heavy drizzle' },
+  61: { emoji: '🌧️', description: 'Light rain' },
+  63: { emoji: '🌧️', description: 'Rain' },
+  65: { emoji: '🌧️', description: 'Heavy rain' },
+  71: { emoji: '🌨️', description: 'Light snow' },
+  73: { emoji: '🌨️', description: 'Snow' },
+  75: { emoji: '❄️', description: 'Heavy snow' },
+  80: { emoji: '🌦️', description: 'Rain showers' },
+  81: { emoji: '🌧️', description: 'Moderate showers' },
+  82: { emoji: '⛈️', description: 'Heavy showers' },
+  95: { emoji: '⛈️', description: 'Thunderstorm' },
+  96: { emoji: '⛈️', description: 'Thunderstorm w/ hail' },
+  99: { emoji: '⛈️', description: 'Severe thunderstorm' },
+};
+
 const RESERVABLE_TYPES = [
   'restaurant', 'steak_house', 'seafood_restaurant', 'pizza_restaurant',
   'sushi_restaurant', 'brunch_restaurant', 'breakfast_restaurant',
@@ -477,9 +502,11 @@ const cardStyle: React.CSSProperties = {
 
 export default function App() {
   // --- Core state ---
-  const [screen, setScreen] = useState<Screen>('home');
+  const [screen, setScreenRaw] = useState<Screen>(() => {
+    return (sessionStorage.getItem('nxstops_screen') as Screen) || 'home';
+  });
   const [cities, setCities] = useState<City[]>([]);
-  const [selectedCity, setSelectedCity] = useState<City | null>(null);
+  const [selectedCity, setSelectedCityRaw] = useState<City | null>(null);
   const [places, setPlaces] = useState<Place[]>([]);
   const [selectedVibe, setSelectedVibe] = useState<Vibe | null>(null);
   const [quickFilters, setQuickFilters] = useState<QuickFilter[]>(['open']);
@@ -488,7 +515,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [placesLoading, setPlacesLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [useGps, setUseGps] = useState(false);
+  const [useGps, setUseGpsRaw] = useState(() => sessionStorage.getItem('nxstops_use_gps') === 'true');
   const [searchRadius, setSearchRadius] = useState(1500);
 
   // --- Email signup ---
@@ -530,6 +557,26 @@ export default function App() {
 
   // --- Toast ---
   const [toast, setToast] = useState<string | null>(null);
+
+  // --- Weather ---
+  const [weather, setWeather] = useState<{ temp: number; high: number; low: number; code: number; description: string; emoji: string; forecast: { date: string; high: number; low: number; code: number; emoji: string; description: string; precipChance: number }[] } | null>(null);
+
+  // --- Persisted setters ---
+  const setScreen = useCallback((s: Screen) => {
+    setScreenRaw(s);
+    sessionStorage.setItem('nxstops_screen', s);
+  }, []);
+
+  const setSelectedCity = useCallback((city: City | null) => {
+    setSelectedCityRaw(city);
+    if (city) sessionStorage.setItem('nxstops_selected_city', JSON.stringify(city));
+    else sessionStorage.removeItem('nxstops_selected_city');
+  }, []);
+
+  const setUseGps = useCallback((v: boolean) => {
+    setUseGpsRaw(v);
+    sessionStorage.setItem('nxstops_use_gps', String(v));
+  }, []);
 
   // --- Travel Group ---
   const [travelGroup, setTravelGroup] = useState<TravelGroup | null>(() => {
@@ -580,12 +627,17 @@ export default function App() {
     setTimeout(() => setToast(null), 2500);
   }, []);
 
+  const userName = user?.user_metadata?.full_name
+    ? (user.user_metadata.full_name as string).split(' ')[0]
+    : null;
+
   const getGreeting = (): string => {
     const h = currentTime.getHours();
-    if (h < 12) return 'Good morning';
-    if (h < 17) return 'Good afternoon';
-    if (h < 21) return 'Good evening';
-    return 'Good night';
+    const name = userName ? `, ${userName}` : '';
+    if (h < 12) return `Good morning${name}`;
+    if (h < 17) return `Good afternoon${name}`;
+    if (h < 21) return `Good evening${name}`;
+    return `Good night${name}`;
   };
 
   const getTimeSuggestion = (): string => {
@@ -653,19 +705,75 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Load cities
+  // Load cities + restore saved city
   useEffect(() => {
     (async () => {
       const data = await fetchCities();
       setCities(data);
+      // Restore saved city from sessionStorage
+      try {
+        const savedCity = sessionStorage.getItem('nxstops_selected_city');
+        if (savedCity) {
+          const parsed = JSON.parse(savedCity);
+          const match = data.find((c: City) => c.id === parsed.id);
+          if (match) setSelectedCityRaw(match);
+        }
+      } catch { /* ignore */ }
       setLoading(false);
     })();
   }, []);
 
-  // Auto-GPS
+  // Auto-GPS (only if no saved state)
   useEffect(() => {
-    if (loc.hasLocation && !selectedCity) setUseGps(true);
+    if (loc.hasLocation && !selectedCity && !sessionStorage.getItem('nxstops_selected_city') && !sessionStorage.getItem('nxstops_use_gps')) {
+      setUseGps(true);
+    }
   }, [loc.hasLocation, selectedCity]);
+
+  // Fetch weather when city/GPS changes
+  useEffect(() => {
+    let lat: number | undefined, lng: number | undefined;
+    if (useGps && loc.lat && loc.lng) { lat = loc.lat; lng = loc.lng; }
+    else if (selectedCity) {
+      const c = CITY_COORDS[selectedCity.name.toLowerCase()];
+      if (c) { lat = c.lat; lng = c.lng; }
+    }
+    if (!lat || !lng) { setWeather(null); return; }
+    const fetchWeather = async () => {
+      try {
+        const resp = await fetch(
+          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weathercode&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max&timezone=auto&forecast_days=10&temperature_unit=fahrenheit`
+        );
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const code = data.current?.weathercode ?? 0;
+        const wInfo = WEATHER_CODES[code] || { emoji: '🌡️', description: 'Unknown' };
+        const forecast = (data.daily?.time || []).map((date: string, i: number) => {
+          const dayCode = data.daily.weathercode[i] ?? 0;
+          const dInfo = WEATHER_CODES[dayCode] || { emoji: '🌡️', description: 'Unknown' };
+          return {
+            date,
+            high: Math.round(data.daily.temperature_2m_max[i]),
+            low: Math.round(data.daily.temperature_2m_min[i]),
+            code: dayCode,
+            emoji: dInfo.emoji,
+            description: dInfo.description,
+            precipChance: data.daily.precipitation_probability_max?.[i] ?? 0,
+          };
+        });
+        setWeather({
+          temp: Math.round(data.current.temperature_2m),
+          high: Math.round(data.daily.temperature_2m_max[0]),
+          low: Math.round(data.daily.temperature_2m_min[0]),
+          code,
+          description: wInfo.description,
+          emoji: wInfo.emoji,
+          forecast,
+        });
+      } catch { /* weather is non-critical */ }
+    };
+    fetchWeather();
+  }, [useGps, loc.lat, loc.lng, selectedCity]);
 
   // Load saved plan (city-isolated, multi-day)
   useEffect(() => {
@@ -1308,6 +1416,27 @@ export default function App() {
         <p style={{ color: '#A8A29E', fontSize: '14px' }}>{getTimeSuggestion()}</p>
       </div>
 
+      {/* Weather Card */}
+      {weather && (selectedCity || useGps) && (
+        <div style={{
+          ...cardStyle, display: 'flex', alignItems: 'center', gap: '14px',
+          background: 'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(147,197,253,0.04))',
+          border: '1px solid rgba(59,130,246,0.12)',
+        }}>
+          <span style={{ fontSize: '36px' }}>{weather.emoji}</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '22px', fontWeight: 700, color: '#FFFBEB' }}>
+              {weather.temp}°F
+            </div>
+            <div style={{ fontSize: '12px', color: '#93C5FD' }}>{weather.description}</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '13px', color: '#A8A29E' }}>H: {weather.high}° L: {weather.low}°</div>
+            <div style={{ fontSize: '11px', color: '#78716C' }}>{cityLabel}</div>
+          </div>
+        </div>
+      )}
+
       {/* GPS Card */}
       {loc.hasLocation && (
         <button
@@ -1504,6 +1633,15 @@ export default function App() {
   const PlacesMapView = ({ places: mapPlaces }: { places: Place[] }) => {
     const [activePin, setActivePin] = useState<string | null>(null);
     const center = getMapCenter();
+    if (!MAPS_API_KEY) {
+      return (
+        <div style={{ ...cardStyle, textAlign: 'center', padding: '40px 20px' }}>
+          <div style={{ fontSize: '32px', marginBottom: '8px' }}>🗺️</div>
+          <p style={{ color: '#A8A29E', fontSize: '14px', marginBottom: '8px' }}>Map view requires Google Maps API key</p>
+          <p style={{ color: '#57534E', fontSize: '12px' }}>Set VITE_GOOGLE_MAPS_API_KEY in your environment variables and enable Maps JavaScript API in Google Cloud Console.</p>
+        </div>
+      );
+    }
     return (
       <div style={{ height: 'calc(100vh - 280px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
         <APIProvider apiKey={MAPS_API_KEY}>
@@ -1781,6 +1919,23 @@ export default function App() {
 
   const EventsScreen = () => {
     const [eventsViewMode, setEventsViewMode] = useState<'list' | 'map'>('list');
+
+    // Filter: show events within current month, plus ticketed events further out
+    const now = new Date();
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const filteredEvents = events.filter(event => {
+      if (!event.date) return true;
+      const eventDate = new Date(event.date + 'T00:00:00');
+      // Within current month: always show
+      if (eventDate <= endOfMonth) return true;
+      // Ticketed events (has a URL): show up to 3 months out
+      if (event.url) {
+        const threeMonths = new Date(now.getFullYear(), now.getMonth() + 3, 0);
+        return eventDate <= threeMonths;
+      }
+      return false;
+    });
+
     return (
       <div>
         {/* Header */}
@@ -1790,7 +1945,7 @@ export default function App() {
               Events {cityLabel ? `in ${cityLabel}` : ''} 🎫
             </h1>
             <p style={{ color: '#78716C', fontSize: '13px' }}>
-              {eventsLoading ? 'Finding events...' : `${events.length} upcoming events`}
+              {eventsLoading ? 'Finding events...' : `${filteredEvents.length} upcoming events`}
             </p>
           </div>
           <div style={{ display: 'flex', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
@@ -1820,7 +1975,7 @@ export default function App() {
             <div style={{ width: '36px', height: '36px', border: '3px solid rgba(168,85,247,0.2)', borderTopColor: '#A855F7', borderRadius: '50%', margin: '0 auto 16px', animation: 'spin 0.8s linear infinite' }} />
             <p style={{ color: '#78716C', fontSize: '14px' }}>Finding events nearby...</p>
           </div>
-        ) : events.length === 0 ? (
+        ) : filteredEvents.length === 0 ? (
           <div style={{ textAlign: 'center', paddingTop: '60px' }}>
             <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.6 }}>🎫</div>
             <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>No events found</h2>
@@ -1831,10 +1986,10 @@ export default function App() {
             </p>
           </div>
         ) : eventsViewMode === 'map' ? (
-          <EventsMapView eventsList={events} />
+          <EventsMapView eventsList={filteredEvents} />
         ) : (
           <div>
-            {events.map(event => (
+            {filteredEvents.map(event => (
               <EventCard key={event.id} event={event} />
             ))}
           </div>
@@ -1884,6 +2039,26 @@ export default function App() {
             {cityLabel} · {totalStops} stop{totalStops !== 1 ? 's' : ''} · {dayCount} day{dayCount !== 1 ? 's' : ''}
           </p>
         </div>
+
+        {/* Trip Weather Forecast */}
+        {weather && weather.forecast.length > 0 && dayCount > 0 && (
+          <div style={{ ...cardStyle, marginBottom: '12px', padding: '12px', background: 'linear-gradient(135deg, rgba(59,130,246,0.06), rgba(147,197,253,0.03))', border: '1px solid rgba(59,130,246,0.1)' }}>
+            <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Pack for your trip</div>
+            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', scrollbarWidth: 'none' }}>
+              {weather.forecast.slice(0, dayCount).map((day, i) => (
+                <div key={day.date} style={{ textAlign: 'center', minWidth: '60px', flexShrink: 0, padding: '6px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)' }}>
+                  <div style={{ fontSize: '10px', color: '#78716C', marginBottom: '2px' }}>Day {i + 1}</div>
+                  <div style={{ fontSize: '20px', marginBottom: '2px' }}>{day.emoji}</div>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#FFFBEB' }}>{day.high}°</div>
+                  <div style={{ fontSize: '10px', color: '#78716C' }}>{day.low}°</div>
+                  {day.precipChance > 30 && (
+                    <div style={{ fontSize: '9px', color: '#93C5FD', marginTop: '2px' }}>💧 {day.precipChance}%</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Day Tabs */}
         <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '12px', scrollbarWidth: 'none' }}>
