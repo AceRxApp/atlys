@@ -3425,10 +3425,10 @@ export default function App() {
 
       {/* Content */}
       <main style={{ padding: '0 20px 100px' }}>
-        {screen === 'home' && <HomeScreen />}
-        {screen === 'discover' && <DiscoverScreen />}
-        {screen === 'events' && <EventsScreen />}
-        {screen === 'plan' && <PlanScreen />}
+        {screen === 'home' && HomeScreen()}
+        {screen === 'discover' && DiscoverScreen()}
+        {screen === 'events' && EventsScreen()}
+        {screen === 'plan' && PlanScreen()}
       </main>
 
       {/* Bottom Navigation */}
