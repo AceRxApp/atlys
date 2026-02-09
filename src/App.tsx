@@ -4,6 +4,9 @@ import { searchNearby, formatDistance, getHoursStatus } from './services/places'
 import type { Place } from './services/places';
 import { useLocation } from './hooks/useLocation';
 import type { User } from '@supabase/supabase-js';
+import { APIProvider, Map, AdvancedMarker, InfoWindow } from '@vis.gl/react-google-maps';
+
+const MAPS_API_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || '';
 
 // ============================================================================
 // TYPES
@@ -1071,6 +1074,163 @@ export default function App() {
   );
 
   // ==========================================================================
+  // MAP COMPONENTS
+  // ==========================================================================
+
+  const getMapCenter = () => {
+    if (useGps && loc.lat && loc.lng) return { lat: loc.lat, lng: loc.lng };
+    if (selectedCity) {
+      const c = CITY_COORDS[selectedCity.name.toLowerCase()];
+      if (c) return c;
+    }
+    return { lat: 40.7128, lng: -73.996 };
+  };
+
+  const PlacesMapView = ({ places: mapPlaces }: { places: Place[] }) => {
+    const [activePin, setActivePin] = useState<string | null>(null);
+    const center = getMapCenter();
+    return (
+      <div style={{ height: 'calc(100vh - 280px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <APIProvider apiKey={MAPS_API_KEY}>
+          <Map
+            defaultCenter={center}
+            defaultZoom={14}
+            gestureHandling="greedy"
+            disableDefaultUI={true}
+            mapId="nxstops-discover"
+            style={{ width: '100%', height: '100%' }}
+            colorScheme="DARK"
+          >
+            {mapPlaces.filter(p => p.lat && p.lng).map(place => (
+              <AdvancedMarker
+                key={place.placeId}
+                position={{ lat: place.lat!, lng: place.lng! }}
+                onClick={() => setActivePin(activePin === place.placeId ? null : place.placeId)}
+              >
+                <div style={{
+                  width: '32px', height: '32px', borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #F59E0B, #D97706)',
+                  border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                  cursor: 'pointer',
+                }}>
+                  {place.rating >= 4.5 ? '⭐' : '📍'}
+                </div>
+              </AdvancedMarker>
+            ))}
+            {activePin && (() => {
+              const place = mapPlaces.find(p => p.placeId === activePin);
+              if (!place || !place.lat || !place.lng) return null;
+              return (
+                <InfoWindow
+                  position={{ lat: place.lat, lng: place.lng }}
+                  onCloseClick={() => setActivePin(null)}
+                  pixelOffset={[0, -36]}
+                >
+                  <div style={{ padding: '4px', minWidth: '160px', color: '#1C1917' }}>
+                    <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '4px' }}>{place.name}</div>
+                    <div style={{ fontSize: '12px', color: '#57534E', marginBottom: '4px' }}>
+                      {place.categoryDisplay}
+                      {place.rating > 0 && ` · ★ ${place.rating.toFixed(1)}`}
+                      {place.distance != null && ` · ${formatDistance(place.distance)}`}
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+                      <button
+                        onClick={() => { setSelectedPlace(place); setActivePin(null); }}
+                        style={{ flex: 1, padding: '6px', borderRadius: '6px', border: 'none', background: '#F59E0B', color: '#0C0A09', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        Details
+                      </button>
+                      <button
+                        onClick={() => { addToPlan(place); setActivePin(null); }}
+                        style={{ flex: 1, padding: '6px', borderRadius: '6px', border: '1px solid #D6D3D1', background: 'white', color: '#1C1917', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        + Plan
+                      </button>
+                    </div>
+                  </div>
+                </InfoWindow>
+              );
+            })()}
+          </Map>
+        </APIProvider>
+      </div>
+    );
+  };
+
+  const EventsMapView = ({ eventsList }: { eventsList: typeof events }) => {
+    const [activeEventPin, setActiveEventPin] = useState<string | null>(null);
+    const center = getMapCenter();
+    const mappableEvents = eventsList.filter(e => e.lat && e.lng);
+    if (mappableEvents.length === 0) {
+      return (
+        <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+          <div style={{ fontSize: '40px', marginBottom: '12px' }}>🗺️</div>
+          <p style={{ color: '#A8A29E', fontSize: '14px' }}>No event locations available to map</p>
+        </div>
+      );
+    }
+    return (
+      <div style={{ height: 'calc(100vh - 280px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <APIProvider apiKey={MAPS_API_KEY}>
+          <Map
+            defaultCenter={center}
+            defaultZoom={11}
+            gestureHandling="greedy"
+            disableDefaultUI={true}
+            mapId="nxstops-events"
+            style={{ width: '100%', height: '100%' }}
+            colorScheme="DARK"
+          >
+            {mappableEvents.map(event => (
+              <AdvancedMarker
+                key={event.id}
+                position={{ lat: event.lat!, lng: event.lng! }}
+                onClick={() => setActiveEventPin(activeEventPin === event.id ? null : event.id)}
+              >
+                <div style={{
+                  width: '32px', height: '32px', borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #8B5CF6, #7C3AED)',
+                  border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                  cursor: 'pointer',
+                }}>
+                  🎫
+                </div>
+              </AdvancedMarker>
+            ))}
+            {activeEventPin && (() => {
+              const event = mappableEvents.find(e => e.id === activeEventPin);
+              if (!event) return null;
+              return (
+                <InfoWindow
+                  position={{ lat: event.lat!, lng: event.lng! }}
+                  onCloseClick={() => setActiveEventPin(null)}
+                  pixelOffset={[0, -36]}
+                >
+                  <div style={{ padding: '4px', minWidth: '180px', color: '#1C1917' }}>
+                    <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '4px' }}>{event.name}</div>
+                    <div style={{ fontSize: '12px', color: '#57534E', marginBottom: '2px' }}>
+                      {formatEventDate(event.date)}{event.time ? ` · ${formatEventTime(event.time)}` : ''}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#78716C', marginBottom: '8px' }}>{event.venue}</div>
+                    {event.url && (
+                      <a href={event.url} target="_blank" rel="noopener noreferrer"
+                        style={{ display: 'block', padding: '6px', borderRadius: '6px', background: '#7C3AED', color: 'white', fontSize: '11px', fontWeight: 600, textAlign: 'center', textDecoration: 'none' }}>
+                        Get Tickets
+                      </a>
+                    )}
+                  </div>
+                </InfoWindow>
+              );
+            })()}
+          </Map>
+        </APIProvider>
+      </div>
+    );
+  };
+
+  // ==========================================================================
   // DISCOVER SCREEN
   // ==========================================================================
 
@@ -1153,19 +1313,7 @@ export default function App() {
 
       {/* Map View */}
       {viewMode === 'map' ? (
-        <div style={{
-          height: 'calc(100vh - 280px)', borderRadius: '16px', overflow: 'hidden',
-          border: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(28,25,23,0.8)',
-        }}>
-          <div style={{ textAlign: 'center', padding: '32px' }}>
-            <div style={{ fontSize: '40px', marginBottom: '12px' }}>🗺️</div>
-            <p style={{ color: '#A8A29E', fontSize: '14px', marginBottom: '8px' }}>Interactive map coming soon</p>
-            <p style={{ color: '#78716C', fontSize: '12px' }}>
-              {filteredPlaces.length} pins ready · Requires Google Maps setup
-            </p>
-          </div>
-        </div>
+        <PlacesMapView places={filteredPlaces} />
       ) : (
         <>
           {/* Loading */}
@@ -1218,45 +1366,69 @@ export default function App() {
   // EVENTS SCREEN
   // ==========================================================================
 
-  const EventsScreen = () => (
-    <div>
-      {/* Header */}
-      <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <h1 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '2px' }}>
-            Events {cityLabel ? `in ${cityLabel}` : ''} 🎫
-          </h1>
-          <p style={{ color: '#78716C', fontSize: '13px' }}>
-            {eventsLoading ? 'Finding events...' : `${events.length} upcoming events`}
-          </p>
+  const EventsScreen = () => {
+    const [eventsViewMode, setEventsViewMode] = useState<'list' | 'map'>('list');
+    return (
+      <div>
+        {/* Header */}
+        <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h1 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '2px' }}>
+              Events {cityLabel ? `in ${cityLabel}` : ''} 🎫
+            </h1>
+            <p style={{ color: '#78716C', fontSize: '13px' }}>
+              {eventsLoading ? 'Finding events...' : `${events.length} upcoming events`}
+            </p>
+          </div>
+          <div style={{ display: 'flex', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
+            <button onClick={() => setEventsViewMode('list')}
+              style={{
+                padding: '6px 14px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer',
+                background: eventsViewMode === 'list' ? 'rgba(168,85,247,0.15)' : 'transparent',
+                color: eventsViewMode === 'list' ? '#A855F7' : '#78716C',
+              }}>
+              List
+            </button>
+            <button onClick={() => setEventsViewMode('map')}
+              style={{
+                padding: '6px 14px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer',
+                borderLeft: '1px solid rgba(255,255,255,0.1)',
+                background: eventsViewMode === 'map' ? 'rgba(168,85,247,0.15)' : 'transparent',
+                color: eventsViewMode === 'map' ? '#A855F7' : '#78716C',
+              }}>
+              Map
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Events List */}
-      {eventsLoading ? (
-        <div style={{ textAlign: 'center', padding: '60px 0' }}>
-          <div style={{ width: '36px', height: '36px', border: '3px solid rgba(168,85,247,0.2)', borderTopColor: '#A855F7', borderRadius: '50%', margin: '0 auto 16px', animation: 'spin 0.8s linear infinite' }} />
-          <p style={{ color: '#78716C', fontSize: '14px' }}>Finding events nearby...</p>
-        </div>
-      ) : events.length === 0 ? (
-        <div style={{ textAlign: 'center', paddingTop: '60px' }}>
-          <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.6 }}>🎫</div>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>No events found</h2>
-          <p style={{ color: '#A8A29E', fontSize: '14px', lineHeight: 1.5 }}>
-            {!useGps && !selectedCity
-              ? 'Select a city or use GPS to discover events nearby'
-              : 'No upcoming events found in this area. Check back soon!'}
-          </p>
-        </div>
-      ) : (
-        <div>
-          {events.map(event => (
-            <EventCard key={event.id} event={event} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
+        {/* Events Content */}
+        {eventsLoading ? (
+          <div style={{ textAlign: 'center', padding: '60px 0' }}>
+            <div style={{ width: '36px', height: '36px', border: '3px solid rgba(168,85,247,0.2)', borderTopColor: '#A855F7', borderRadius: '50%', margin: '0 auto 16px', animation: 'spin 0.8s linear infinite' }} />
+            <p style={{ color: '#78716C', fontSize: '14px' }}>Finding events nearby...</p>
+          </div>
+        ) : events.length === 0 ? (
+          <div style={{ textAlign: 'center', paddingTop: '60px' }}>
+            <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.6 }}>🎫</div>
+            <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>No events found</h2>
+            <p style={{ color: '#A8A29E', fontSize: '14px', lineHeight: 1.5 }}>
+              {!useGps && !selectedCity
+                ? 'Select a city or use GPS to discover events nearby'
+                : 'No upcoming events found in this area. Check back soon!'}
+            </p>
+          </div>
+        ) : eventsViewMode === 'map' ? (
+          <EventsMapView eventsList={events} />
+        ) : (
+          <div>
+            {events.map(event => (
+              <EventCard key={event.id} event={event} />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // ==========================================================================
   // PLAN SCREEN (Redesigned Timeline)
