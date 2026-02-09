@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchCities, saveEmailSignup, fetchEmailSignups, fetchAllCities, toggleCityActive, authSignUp, authSignIn, authSignOut, authGetSession, authOnStateChange } from './supabase';
+import { fetchCities, saveEmailSignup, fetchEmailSignups, fetchAllCities, toggleCityActive, authSignUp, authSignIn, authSignOut, authGetSession, authOnStateChange, saveReview, fetchReviews, fetchPlaceTagCounts } from './supabase';
+import type { Review } from './supabase';
 import { searchNearby, formatDistance, getHoursStatus } from './services/places';
 import type { Place } from './services/places';
 import { useLocation } from './hooks/useLocation';
@@ -57,6 +58,8 @@ interface AdminSignup {
 type Screen = 'home' | 'discover' | 'events' | 'plan';
 type Vibe = 'food' | 'stay' | 'todo' | 'hidden';
 type QuickFilter = 'open' | 'walking' | 'topRated' | 'budget' | 'family' | 'solo';
+type TravelGroup = 'solo' | 'couple' | 'family' | 'friends' | 'girls' | 'boys' | 'bachelorette';
+type CommunityTag = 'black-owned' | 'women-owned' | 'hispanic-owned' | 'asian-owned' | 'lgbtq-friendly' | 'kid-friendly' | 'baby-friendly' | 'wheelchair-accessible' | 'solo-friendly';
 
 const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL as string) || '';
 
@@ -244,6 +247,74 @@ const BOOKABLE_TYPES = [
   'tourist_attraction',
 ];
 
+// ============================================================================
+// TRAVEL GROUPS
+// ============================================================================
+
+const TRAVEL_GROUPS: { id: TravelGroup; emoji: string; label: string }[] = [
+  { id: 'solo', emoji: '🧳', label: 'Solo' },
+  { id: 'couple', emoji: '💑', label: 'Couple' },
+  { id: 'family', emoji: '👨‍👩‍👧', label: 'Family' },
+  { id: 'friends', emoji: '👯', label: 'Friends' },
+  { id: 'girls', emoji: '💃', label: 'Girls Trip' },
+  { id: 'boys', emoji: '🕺', label: 'Boys Trip' },
+  { id: 'bachelorette', emoji: '👰', label: 'Bachelorette' },
+];
+
+// ============================================================================
+// COMMUNITY TAGS
+// ============================================================================
+
+const COMMUNITY_TAGS: { id: CommunityTag; emoji: string; label: string }[] = [
+  { id: 'black-owned', emoji: '✊🏿', label: 'Black-owned' },
+  { id: 'women-owned', emoji: '♀️', label: 'Women-owned' },
+  { id: 'hispanic-owned', emoji: '🌎', label: 'Hispanic-owned' },
+  { id: 'asian-owned', emoji: '🏮', label: 'Asian-owned' },
+  { id: 'lgbtq-friendly', emoji: '🏳️‍🌈', label: 'LGBTQ+ friendly' },
+  { id: 'kid-friendly', emoji: '👶', label: 'Kid-friendly' },
+  { id: 'baby-friendly', emoji: '🍼', label: 'Baby-friendly' },
+  { id: 'wheelchair-accessible', emoji: '♿', label: 'Accessible' },
+  { id: 'solo-friendly', emoji: '🧭', label: 'Solo-friendly' },
+];
+
+// ============================================================================
+// CULTURAL CONTEXT
+// ============================================================================
+
+interface CityContext { tipping: string; dress: string; language: string; etiquette: string; currency: string; }
+
+const CITY_CULTURE: Record<string, CityContext> = {
+  'new york': { tipping: '15-20% at restaurants, $1-2 per drink', dress: 'Casual to smart casual. Upscale spots may require jackets.', language: 'English. Spanish widely spoken.', etiquette: 'Fast-paced. Queue culture strong. Tip everyone.', currency: 'USD. Cards accepted everywhere.' },
+  'los angeles': { tipping: '15-20% at restaurants', dress: 'Casual. Athleisure is fine almost anywhere.', language: 'English. Spanish very common.', etiquette: 'Car culture — expect to drive everywhere.', currency: 'USD. Cards accepted everywhere.' },
+  'miami': { tipping: '18-20% (often auto-added in South Beach)', dress: 'Casual/resort wear. Dress up for nightlife.', language: 'English and Spanish equally spoken.', etiquette: 'Vibrant nightlife culture. Latin influence strong.', currency: 'USD. Cards accepted everywhere.' },
+  'atlanta': { tipping: '15-20% at restaurants', dress: 'Casual to smart. Southern hospitality vibes.', language: 'English. Diverse multilingual communities.', etiquette: 'Friendly and social. "Yes ma\'am/sir" is common.', currency: 'USD. Cards accepted everywhere.' },
+  'chicago': { tipping: '18-20% at restaurants', dress: 'Layer up — weather changes fast. Smart casual for dining.', language: 'English. Large Spanish-speaking community.', etiquette: 'Deep-dish pizza is serious business. Don\'t call it "Chi-town" to locals.', currency: 'USD. Cards accepted everywhere.' },
+  'new orleans': { tipping: '18-20% at restaurants', dress: 'Casual. Comfortable shoes for walking.', language: 'English with Creole/Cajun influence.', etiquette: 'Live music culture. Second lines are a way of life.', currency: 'USD. Some cash-only spots in the Quarter.' },
+  'london': { tipping: '10-12.5% (check if service charge included)', dress: 'Smart casual. Pubs casual, restaurants smart.', language: 'English. Multicultural city.', etiquette: 'Queue rigorously. "Please" and "thank you" essential.', currency: 'GBP. Contactless widely accepted.' },
+  'paris': { tipping: 'Service included. Round up for good service.', dress: 'Smart casual. Parisians dress elegantly.', language: 'French. Say "Bonjour" before any interaction.', etiquette: 'Don\'t speak loudly in public. Greet shopkeepers.', currency: 'EUR. Cards accepted, carry some cash.' },
+  'barcelona': { tipping: 'Not expected. Round up or 5-10% for great service.', dress: 'Casual/smart casual. Beach to bar culture.', language: 'Spanish and Catalan. English in tourist areas.', etiquette: 'Late dining — dinner at 9-10 PM. Siesta culture.', currency: 'EUR. Cards widely accepted.' },
+  'rome': { tipping: 'Round up the bill. "Coperto" (cover charge) is normal.', dress: 'Smart casual. Cover shoulders at churches.', language: 'Italian. English in tourist areas.', etiquette: 'Don\'t order cappuccino after 11 AM. No splitting bills.', currency: 'EUR. Cash still common at small shops.' },
+  'amsterdam': { tipping: 'Round up or 5-10%', dress: 'Casual. Comfortable shoes for cobblestones.', language: 'Dutch. Almost everyone speaks excellent English.', etiquette: 'Bike lanes are sacred — don\'t walk in them.', currency: 'EUR. Cards/contactless preferred.' },
+  'berlin': { tipping: '5-10% at restaurants', dress: 'Casual/alternative. All-black is a vibe.', language: 'German. English widely spoken.', etiquette: 'Cash culture — many places don\'t take cards.', currency: 'EUR. Carry cash!' },
+  'tokyo': { tipping: 'No tipping. It can be offensive.', dress: 'Conservative and neat. Remove shoes when indicated.', language: 'Japanese. English limited outside tourist areas.', etiquette: 'Bow when greeting. Don\'t eat while walking. Silence on trains.', currency: 'JPY. Cash preferred at small shops.' },
+  'bangkok': { tipping: 'Not mandatory. Round up for good service.', dress: 'Light, casual. Cover shoulders/knees at temples.', language: 'Thai. English in tourist areas.', etiquette: 'Wai (bow) to show respect. Feet are lowest, head is sacred.', currency: 'THB. Cash at markets, cards at malls.' },
+  'singapore': { tipping: 'Not expected. 10% service charge usually included.', dress: 'Smart casual. Light fabrics for humidity.', language: 'English, Mandarin, Malay, Tamil — all official.', etiquette: 'No gum. Fines for littering. Clean and orderly.', currency: 'SGD. Cards/contactless everywhere.' },
+  'seoul': { tipping: 'Not expected or necessary.', dress: 'Trendy casual. K-fashion is big.', language: 'Korean. English in tourist areas.', etiquette: 'Pour drinks for elders first. Use both hands to receive.', currency: 'KRW. Cards accepted almost everywhere.' },
+  'dubai': { tipping: '10-15% if not included.', dress: 'Modest in public. Cover shoulders and knees.', language: 'Arabic and English widely spoken.', etiquette: 'No PDA. Don\'t photograph people without permission.', currency: 'AED. Cards widely accepted.' },
+  'lagos': { tipping: '10% at restaurants. Negotiate at markets.', dress: 'Smart casual. Locals dress well for outings.', language: 'English. Pidgin widely spoken.', etiquette: 'Friendly culture. Greet with handshakes.', currency: 'NGN. Cash preferred, bring small bills.' },
+  'accra': { tipping: '10% appreciated. Not mandatory.', dress: 'Casual. Light fabrics for heat.', language: 'English. Twi and other local languages.', etiquette: 'Right hand for greetings and eating.', currency: 'GHS. Cash common, cards at larger spots.' },
+  'cape town': { tipping: '10-15% at restaurants', dress: 'Casual. Layers for changeable weather.', language: 'English, Afrikaans, Xhosa widely spoken.', etiquette: 'Friendly people. Be aware of surroundings at night.', currency: 'ZAR. Cards widely accepted.' },
+  'nairobi': { tipping: '10% at restaurants. Round up for services.', dress: 'Smart casual. Respectful dress appreciated.', language: 'English and Swahili.', etiquette: 'Greet people warmly. "Jambo" goes a long way.', currency: 'KES. M-Pesa mobile payments widely used.' },
+  'marrakech': { tipping: '10% at restaurants. Small tips for guides.', dress: 'Modest. Cover shoulders and knees.', language: 'Arabic and French. Some English in tourist areas.', etiquette: 'Haggling is expected at souks. Remove shoes in homes.', currency: 'MAD. Cash essential at markets.' },
+  'mexico city': { tipping: '10-15% at restaurants. 10-20 pesos for services.', dress: 'Casual. Smart dress for upscale venues.', language: 'Spanish. English limited outside tourist areas.', etiquette: 'Friendly culture. "Por favor" and "gracias" essential.', currency: 'MXN. Cash preferred at markets.' },
+  'cancun': { tipping: '15-20% in tourist areas (USD accepted)', dress: 'Beach/resort casual. Cover up in town.', language: 'Spanish. English widely spoken in hotel zone.', etiquette: 'Respect Mayan heritage sites.', currency: 'MXN. USD widely accepted in hotel zone.' },
+  'lisbon': { tipping: 'Round up or 5-10%', dress: 'Casual. Comfortable shoes for hills.', language: 'Portuguese. English widely spoken.', etiquette: 'Fado music is sacred — listen quietly.', currency: 'EUR. Cards widely accepted.' },
+  'rio de janeiro': { tipping: '10% usually included (gorjeta).', dress: 'Very casual. Beach culture permeates.', language: 'Portuguese. Limited English.', etiquette: 'Be street-smart. Use registered taxis or apps.', currency: 'BRL. Cards accepted, carry some cash.' },
+  'havana': { tipping: '10-15% at restaurants. CUC tips for services.', dress: 'Casual. Light fabrics for heat.', language: 'Spanish. Very limited English.', etiquette: 'Cash only — ATMs unreliable. Bring euros or CAD to exchange.', currency: 'CUP. Bring foreign cash to exchange.' },
+  'kingston': { tipping: '10-15% at restaurants', dress: 'Casual. Respectful dress appreciated.', language: 'English and Jamaican Patois.', etiquette: 'Warm and welcoming. Reggae culture is a way of life.', currency: 'JMD. USD widely accepted.' },
+  'bali': { tipping: '5-10% at restaurants if no service charge.', dress: 'Casual. Sarong required at temples.', language: 'Indonesian. English in tourist areas.', etiquette: 'Don\'t touch heads. Don\'t point with feet.', currency: 'IDR. Cash at small shops, cards at hotels.' },
+};
+
 const EMERGENCY_BY_COUNTRY: Record<string, { police: string; emergency: string }> = {
   'USA': { police: '911', emergency: '911' },
   'Canada': { police: '911', emergency: '911' },
@@ -412,7 +483,8 @@ export default function App() {
   const [places, setPlaces] = useState<Place[]>([]);
   const [selectedVibe, setSelectedVibe] = useState<Vibe | null>(null);
   const [quickFilters, setQuickFilters] = useState<QuickFilter[]>(['open']);
-  const [dayPlan, setDayPlan] = useState<Stop[]>([]);
+  const [tripDays, setTripDays] = useState<Record<number, Stop[]>>({ 1: [] });
+  const [activeDay, setActiveDay] = useState(1);
   const [loading, setLoading] = useState(true);
   const [placesLoading, setPlacesLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -459,7 +531,39 @@ export default function App() {
   // --- Toast ---
   const [toast, setToast] = useState<string | null>(null);
 
+  // --- Travel Group ---
+  const [travelGroup, setTravelGroup] = useState<TravelGroup | null>(() => {
+    return (sessionStorage.getItem('nxstops_travel_group') as TravelGroup) || null;
+  });
+
+  // --- Cultural Context ---
+  const [showCulture, setShowCulture] = useState(false);
+
+  // --- Community ---
+  const [communityFilters, setCommunityFilters] = useState<CommunityTag[]>([]);
+  const [placeTagsCache, setPlaceTagsCache] = useState<Record<string, Record<string, number>>>({});
+
+  // --- Reviews ---
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewText, setReviewText] = useState('');
+  const [reviewTags, setReviewTags] = useState<CommunityTag[]>([]);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [placeReviews, setPlaceReviews] = useState<Review[]>([]);
+
   const loc = useLocation();
+
+  // Derived: active day plan (backwards compat)
+  const dayPlan = tripDays[activeDay] || [];
+  const totalStops = Object.values(tripDays).reduce((sum, stops) => sum + stops.length, 0);
+  const dayCount = Object.keys(tripDays).length;
+
+  const setActiveDayStops = useCallback((updater: Stop[] | ((prev: Stop[]) => Stop[])) => {
+    setTripDays(prev => ({
+      ...prev,
+      [activeDay]: typeof updater === 'function' ? updater(prev[activeDay] || []) : updater,
+    }));
+  }, [activeDay]);
 
   // --------------------------------------------------------------------------
   // HELPERS
@@ -494,6 +598,44 @@ export default function App() {
   };
 
   const cityLabel = useGps ? (loc.city || 'Near You') : (selectedCity?.name || '');
+  const citySlug = useGps ? (loc.city || '').toLowerCase().replace(/\s+/g, '-') : (selectedCity?.slug || '');
+
+  // Safety indicators
+  const getSafetyIndicators = (place: Place): string[] => {
+    const indicators: string[] = [];
+    if (place.rating >= 4.3 && place.reviewCount >= 100) indicators.push('Well-reviewed');
+    if (place.reviewCount >= 500) indicators.push('Popular spot');
+    if (NIGHTLIFE_TYPES.includes(place.category)) indicators.push('Night venue');
+    if ((isReservable(place) || isBookable(place)) && place.rating >= 4.0) indicators.push('Reserve ahead');
+    return indicators;
+  };
+
+  // Distance reference
+  const getDistanceReference = (): string => {
+    if (useGps && loc.hasLocation) return 'from you';
+    if (selectedCity) return `from ${selectedCity.name} center`;
+    return '';
+  };
+
+  // Transport between stops
+  const getTransportInfo = (fromStop: Stop, toStop: Stop): { emoji: string; text: string; distance: string; mapsUrl: string } | null => {
+    let fromLat: number | undefined, fromLng: number | undefined, toLat: number | undefined, toLng: number | undefined;
+    if (fromStop.type === 'place' && fromStop.place) { fromLat = fromStop.place.lat; fromLng = fromStop.place.lng; }
+    else if (fromStop.type === 'event' && fromStop.event?.lat) { fromLat = fromStop.event.lat ?? undefined; fromLng = fromStop.event.lng ?? undefined; }
+    if (toStop.type === 'place' && toStop.place) { toLat = toStop.place.lat; toLng = toStop.place.lng; }
+    else if (toStop.type === 'event' && toStop.event?.lat) { toLat = toStop.event.lat ?? undefined; toLng = toStop.event.lng ?? undefined; }
+    if (!fromLat || !fromLng || !toLat || !toLng) return null;
+    const R = 6371;
+    const dLat = ((toLat - fromLat) * Math.PI) / 180;
+    const dLng = ((toLng - fromLng) * Math.PI) / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos((fromLat * Math.PI) / 180) * Math.cos((toLat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+    const km = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const mapsUrl = `https://www.google.com/maps/dir/${fromLat},${fromLng}/${toLat},${toLng}`;
+    if (km < 0.5) return { emoji: '🚶', text: '~5 min walk', distance: `${Math.round(km * 1000)}m`, mapsUrl };
+    if (km < 1.5) return { emoji: '🚶🚕', text: `${Math.round(km * 12)} min walk or quick ride`, distance: `${km.toFixed(1)} km`, mapsUrl };
+    if (km < 5) return { emoji: '🚇🚕', text: 'Transit or ride recommended', distance: `${km.toFixed(1)} km`, mapsUrl };
+    return { emoji: '🚗🚕', text: 'Drive or ride needed', distance: `${Math.round(km)} km`, mapsUrl };
+  };
 
   // --------------------------------------------------------------------------
   // EFFECTS
@@ -525,7 +667,7 @@ export default function App() {
     if (loc.hasLocation && !selectedCity) setUseGps(true);
   }, [loc.hasLocation, selectedCity]);
 
-  // Load saved plan (city-isolated)
+  // Load saved plan (city-isolated, multi-day)
   useEffect(() => {
     try {
       const key = getPlanKey();
@@ -533,26 +675,57 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed.expires > Date.now()) {
-          setDayPlan(parsed.stops.map((s: Stop) => ({ ...s, type: s.type || 'place', addedAt: new Date(s.addedAt) })));
+          // Multi-day format
+          if (parsed.tripDays) {
+            const loaded: Record<number, Stop[]> = {};
+            for (const [day, stops] of Object.entries(parsed.tripDays)) {
+              loaded[Number(day)] = (stops as Stop[]).map(s => ({ ...s, type: s.type || 'place', addedAt: new Date(s.addedAt) }));
+            }
+            setTripDays(loaded);
+          // Legacy single-day format → migrate to Day 1
+          } else if (parsed.stops) {
+            const migrated = parsed.stops.map((s: Stop) => ({ ...s, type: s.type || 'place', addedAt: new Date(s.addedAt) }));
+            setTripDays({ 1: migrated });
+          }
+          setActiveDay(1);
         } else {
           localStorage.removeItem(key);
-          setDayPlan([]);
+          setTripDays({ 1: [] });
         }
       } else {
-        setDayPlan([]);
+        setTripDays({ 1: [] });
       }
-    } catch { setDayPlan([]); }
+    } catch { setTripDays({ 1: [] }); }
   }, [getPlanKey]);
 
-  // Save plan (city-isolated)
+  // Save plan (city-isolated, multi-day)
   useEffect(() => {
     const key = getPlanKey();
-    if (dayPlan.length > 0) {
-      localStorage.setItem(key, JSON.stringify({ stops: dayPlan, expires: Date.now() + 7 * 24 * 60 * 60 * 1000 }));
+    if (totalStops > 0) {
+      localStorage.setItem(key, JSON.stringify({ tripDays, expires: Date.now() + 7 * 24 * 60 * 60 * 1000 }));
     } else {
       localStorage.removeItem(key);
     }
-  }, [dayPlan, getPlanKey]);
+  }, [tripDays, totalStops, getPlanKey]);
+
+  // Persist travel group in sessionStorage
+  useEffect(() => {
+    if (travelGroup) sessionStorage.setItem('nxstops_travel_group', travelGroup);
+    else sessionStorage.removeItem('nxstops_travel_group');
+  }, [travelGroup]);
+
+  // Load community tags when places change
+  useEffect(() => {
+    if (places.length === 0) return;
+    const ids = places.map(p => p.placeId);
+    fetchPlaceTagCounts(ids).then(setPlaceTagsCache);
+  }, [places]);
+
+  // Load reviews when selectedPlace changes
+  useEffect(() => {
+    if (!selectedPlace) { setPlaceReviews([]); setShowReviewForm(false); return; }
+    fetchReviews(selectedPlace.placeId).then(setPlaceReviews);
+  }, [selectedPlace]);
 
   // Clock
   useEffect(() => {
@@ -614,6 +787,7 @@ export default function App() {
   // --------------------------------------------------------------------------
 
   const filteredPlaces = places.filter(place => {
+    // Quick filters
     for (const f of quickFilters) {
       switch (f) {
         case 'open': if (!place.openNow) return false; break;
@@ -624,6 +798,22 @@ export default function App() {
         case 'solo': if (place.reviewCount < 50) return false; if (place.rating > 0 && place.rating < 3.8) return false; break;
       }
     }
+    // Travel group filter
+    if (travelGroup) {
+      switch (travelGroup) {
+        case 'family': if (NIGHTLIFE_TYPES.includes(place.category)) return false; if (place.rating > 0 && place.rating < 4.0) return false; break;
+        case 'solo': if (place.reviewCount < 30) return false; break;
+        case 'bachelorette': case 'girls': case 'boys': case 'friends':
+          if (['library', 'church'].includes(place.category)) return false; break;
+      }
+    }
+    // Community tag filters
+    if (communityFilters.length > 0) {
+      const tags = placeTagsCache[place.placeId];
+      if (!tags) return false;
+      const hasMatch = communityFilters.some(f => (tags[f] || 0) >= 2);
+      if (!hasMatch) return false;
+    }
     return true;
   });
 
@@ -632,27 +822,38 @@ export default function App() {
   // --------------------------------------------------------------------------
 
   const addToPlan = (place: Place) => {
-    if (dayPlan.find(s => s.place?.placeId === place.placeId)) return;
-    setDayPlan(prev => [...prev, { id: crypto.randomUUID(), type: 'place', place, addedAt: new Date() }]);
-    showToast(`Added ${place.name} to your plan`);
+    // Check across all days
+    const allStops = Object.values(tripDays).flat();
+    if (allStops.find(s => s.place?.placeId === place.placeId)) return;
+    setActiveDayStops(prev => [...prev, { id: crypto.randomUUID(), type: 'place', place, addedAt: new Date() }]);
+    showToast(`Added ${place.name} to Day ${activeDay}`);
   };
 
   const addEventToPlan = (event: EventItem) => {
-    if (dayPlan.find(s => s.event?.id === event.id)) return;
-    setDayPlan(prev => [...prev, { id: crypto.randomUUID(), type: 'event', event, addedAt: new Date() }]);
-    showToast(`Added ${event.name} to your plan`);
+    const allStops = Object.values(tripDays).flat();
+    if (allStops.find(s => s.event?.id === event.id)) return;
+    setActiveDayStops(prev => [...prev, { id: crypto.randomUUID(), type: 'event', event, addedAt: new Date() }]);
+    showToast(`Added ${event.name} to Day ${activeDay}`);
   };
 
-  const isEventInPlan = (eventId: string) => dayPlan.some(s => s.event?.id === eventId);
+  const isEventInPlan = (eventId: string) => Object.values(tripDays).flat().some(s => s.event?.id === eventId);
 
   const removeFromPlan = (stopId: string) => {
-    setDayPlan(prev => prev.filter(s => s.id !== stopId));
+    // Search all days
+    setTripDays(prev => {
+      const updated = { ...prev };
+      for (const day of Object.keys(updated)) {
+        updated[Number(day)] = updated[Number(day)].filter(s => s.id !== stopId);
+      }
+      return updated;
+    });
   };
 
-  const isInPlan = (placeId: string) => dayPlan.some(s => s.place?.placeId === placeId);
+  const isInPlan = (placeId: string) => Object.values(tripDays).flat().some(s => s.place?.placeId === placeId);
 
   const clearPlan = () => {
-    setDayPlan([]);
+    setTripDays({ 1: [] });
+    setActiveDay(1);
     showToast('Plan cleared');
   };
 
@@ -661,7 +862,38 @@ export default function App() {
     const target = direction === 'up' ? index - 1 : index + 1;
     if (target < 0 || target >= newPlan.length) return;
     [newPlan[index], newPlan[target]] = [newPlan[target], newPlan[index]];
-    setDayPlan(newPlan);
+    setActiveDayStops(newPlan);
+  };
+
+  const addDay = () => {
+    const nextDay = Math.max(...Object.keys(tripDays).map(Number)) + 1;
+    setTripDays(prev => ({ ...prev, [nextDay]: [] }));
+    setActiveDay(nextDay);
+    showToast(`Day ${nextDay} added`);
+  };
+
+  const removeDay = (day: number) => {
+    if (dayCount <= 1) return;
+    setTripDays(prev => {
+      const updated = { ...prev };
+      delete updated[day];
+      return updated;
+    });
+    if (activeDay === day) setActiveDay(Number(Object.keys(tripDays).find(d => Number(d) !== day) || 1));
+    showToast(`Day ${day} removed`);
+  };
+
+  const moveStopToDay = (stopId: string, fromDay: number, toDay: number) => {
+    setTripDays(prev => {
+      const stop = prev[fromDay]?.find(s => s.id === stopId);
+      if (!stop) return prev;
+      return {
+        ...prev,
+        [fromDay]: prev[fromDay].filter(s => s.id !== stopId),
+        [toDay]: [...(prev[toDay] || []), stop],
+      };
+    });
+    showToast(`Moved to Day ${toDay}`);
   };
 
   const getStopName = (stop: Stop) => stop.type === 'event' ? stop.event!.name : stop.place!.name;
@@ -677,14 +909,42 @@ export default function App() {
   };
 
   const sharePlan = async () => {
-    const text = dayPlan.map((s, i) => `${i + 1}. ${getStopName(s)} (${getStopCategory(s)})`).join('\n');
-    const summary = `My ${cityLabel} Day Plan:\n${text}\n\nPlanned with NxStops`;
+    const allDays = Object.entries(tripDays).sort(([a], [b]) => Number(a) - Number(b));
+    const lines = allDays.map(([day, stops]) => {
+      if (stops.length === 0) return '';
+      const stopList = stops.map((s, i) => `  ${i + 1}. ${getStopName(s)} (${getStopCategory(s)})`).join('\n');
+      return `Day ${day}:\n${stopList}`;
+    }).filter(Boolean).join('\n\n');
+    const summary = `My ${cityLabel} Trip Plan:\n\n${lines}\n\nPlanned with NxStops`;
     if (navigator.share) {
-      await navigator.share({ title: `${cityLabel} Day Plan`, text: summary });
+      await navigator.share({ title: `${cityLabel} Trip Plan`, text: summary });
     } else {
       await navigator.clipboard.writeText(summary);
       showToast('Plan copied to clipboard');
     }
+  };
+
+  // Review submission handler
+  const handleSubmitReview = async () => {
+    if (!selectedPlace || reviewRating === 0 || !user) return;
+    setReviewSubmitting(true);
+    const result = await saveReview(selectedPlace.placeId, citySlug, reviewRating, reviewText, reviewTags);
+    if (result.success) {
+      showToast('Review submitted!');
+      setShowReviewForm(false);
+      setReviewRating(0);
+      setReviewText('');
+      setReviewTags([]);
+      // Refresh reviews
+      const updated = await fetchReviews(selectedPlace.placeId);
+      setPlaceReviews(updated);
+      // Refresh tag counts
+      const ids = places.map(p => p.placeId);
+      if (ids.length > 0) fetchPlaceTagCounts(ids).then(setPlaceTagsCache);
+    } else {
+      showToast('Failed to submit review');
+    }
+    setReviewSubmitting(false);
   };
 
   // --------------------------------------------------------------------------
@@ -853,7 +1113,7 @@ export default function App() {
                 padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 500,
                 background: 'rgba(0,0,0,0.5)', color: '#FFFBEB', backdropFilter: 'blur(8px)',
               }}>
-                {formatDistance(place.distance)}
+                {formatDistance(place.distance)} {getDistanceReference()}
               </div>
             )}
           </div>
@@ -876,24 +1136,44 @@ export default function App() {
                 Popular
               </span>
             )}
-            {place.rating >= 4.0 && !NIGHTLIFE_TYPES.includes(place.category) && !NIGHTLIFE_TYPES.includes(place.category) && (
-              <span style={{ padding: '3px 8px', background: 'rgba(96,165,250,0.1)', color: '#93C5FD', borderRadius: '6px', fontSize: '10px', fontWeight: 600 }}>
-                Welcoming
-              </span>
-            )}
             <PriceDots level={place.priceLevel} />
             {!place.photoUrl && place.distance != null && (
-              <span style={{ fontSize: '11px', color: '#A8A29E' }}>{formatDistance(place.distance)}</span>
+              <span style={{ fontSize: '11px', color: '#A8A29E' }}>{formatDistance(place.distance)} {getDistanceReference()}</span>
             )}
             {!place.photoUrl && (
               <span style={{ fontSize: '11px', color: place.openNow ? '#34D399' : '#F87171' }}>{hoursStatus.text}</span>
             )}
           </div>
 
+          {/* Safety Indicators */}
+          {getSafetyIndicators(place).length > 0 && (
+            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '6px' }}>
+              {getSafetyIndicators(place).map(ind => (
+                <span key={ind} style={{ fontSize: '10px', color: '#78716C', padding: '2px 6px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
+                  {ind}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Community Tags */}
+          {placeTagsCache[place.placeId] && Object.entries(placeTagsCache[place.placeId]).filter(([, count]) => count >= 3).length > 0 && (
+            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '6px' }}>
+              {Object.entries(placeTagsCache[place.placeId]).filter(([, count]) => count >= 3).map(([tag]) => {
+                const tagInfo = COMMUNITY_TAGS.find(t => t.id === tag);
+                return tagInfo ? (
+                  <span key={tag} style={{ fontSize: '10px', color: '#D4A574', padding: '2px 6px', background: 'rgba(212,165,116,0.08)', borderRadius: '4px' }}>
+                    {tagInfo.emoji} {tagInfo.label}
+                  </span>
+                ) : null;
+              })}
+            </div>
+          )}
+
           {/* Action Row */}
           <div style={{ display: 'flex', gap: '8px' }} onClick={e => e.stopPropagation()}>
             <button
-              onClick={() => inPlan ? removeFromPlan(dayPlan.find(s => s.place?.placeId === place.placeId)!.id) : addToPlan(place)}
+              onClick={() => inPlan ? removeFromPlan(Object.values(tripDays).flat().find(s => s.place?.placeId === place.placeId)!.id) : addToPlan(place)}
               style={{
                 flex: 1, padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
                 cursor: 'pointer',
@@ -986,7 +1266,7 @@ export default function App() {
           </p>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
-              onClick={() => inPlan ? removeFromPlan(dayPlan.find(s => s.event?.id === event.id)!.id) : addEventToPlan(event)}
+              onClick={() => inPlan ? removeFromPlan(Object.values(tripDays).flat().find(s => s.event?.id === event.id)!.id) : addEventToPlan(event)}
               style={{
                 flex: 1, padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
                 cursor: 'pointer',
@@ -1104,6 +1384,71 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Travel Group Selector */}
+      {(selectedCity || useGps) && (
+        <div style={{ ...cardStyle, marginTop: '8px' }}>
+          <label style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '10px' }}>
+            Who&apos;s traveling?
+          </label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {TRAVEL_GROUPS.map(g => {
+              const active = travelGroup === g.id;
+              return (
+                <button key={g.id} onClick={() => setTravelGroup(active ? null : g.id)}
+                  style={{
+                    padding: '8px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: 500,
+                    border: active ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                    cursor: 'pointer', background: active ? 'rgba(245,158,11,0.12)' : 'transparent',
+                    color: active ? '#F59E0B' : '#A8A29E',
+                  }}>
+                  {g.emoji} {g.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Cultural Context */}
+      {(selectedCity || (useGps && loc.city)) && (() => {
+        const key = (selectedCity?.name || loc.city || '').toLowerCase();
+        const culture = CITY_CULTURE[key];
+        if (!culture) return null;
+        return (
+          <div style={{ ...cardStyle, marginTop: '8px' }}>
+            <button
+              onClick={() => setShowCulture(!showCulture)}
+              style={{
+                width: '100%', background: 'none', border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: 0, color: '#FFFBEB',
+              }}>
+              <span style={{ fontSize: '14px', fontWeight: 600 }}>Cultural Tips</span>
+              <span style={{ color: '#78716C', fontSize: '16px', transform: showCulture ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▼</span>
+            </button>
+            {showCulture && (
+              <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {[
+                  { emoji: '💰', label: 'Tipping', value: culture.tipping },
+                  { emoji: '👔', label: 'Dress', value: culture.dress },
+                  { emoji: '🗣️', label: 'Language', value: culture.language },
+                  { emoji: '🤝', label: 'Etiquette', value: culture.etiquette },
+                  { emoji: '💵', label: 'Currency', value: culture.currency },
+                ].map(row => (
+                  <div key={row.label} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '16px', flexShrink: 0, width: '24px', textAlign: 'center' }}>{row.emoji}</span>
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>{row.label}</div>
+                      <div style={{ fontSize: '13px', color: '#d4d0cc', lineHeight: 1.4 }}>{row.value}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Email Signup Card */}
       {!emailSaved && (
@@ -1359,6 +1704,26 @@ export default function App() {
         })}
       </div>
 
+      {/* Community Tags */}
+      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '4px', scrollbarWidth: 'none' }}>
+        {COMMUNITY_TAGS.map(tag => {
+          const active = communityFilters.includes(tag.id);
+          return (
+            <button key={tag.id}
+              onClick={() => setCommunityFilters(active ? communityFilters.filter(f => f !== tag.id) : [...communityFilters, tag.id])}
+              style={{
+                padding: '6px 12px', borderRadius: '16px', fontSize: '11px', fontWeight: 500,
+                border: active ? '1px solid rgba(212,165,116,0.4)' : '1px solid rgba(255,255,255,0.06)',
+                cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                background: active ? 'rgba(212,165,116,0.12)' : 'transparent',
+                color: active ? '#D4A574' : '#57534E',
+              }}>
+              {tag.emoji} {tag.label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Map View */}
       {viewMode === 'map' ? (
         <PlacesMapView places={filteredPlaces} />
@@ -1483,13 +1848,15 @@ export default function App() {
   // ==========================================================================
 
   const PlanScreen = () => {
-    if (dayPlan.length === 0) {
+    const sortedDays = Object.keys(tripDays).map(Number).sort((a, b) => a - b);
+
+    if (totalStops === 0) {
       return (
         <div style={{ textAlign: 'center', paddingTop: '60px' }}>
           <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.6 }}>🗺️</div>
           <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '8px' }}>No stops yet</h2>
           <p style={{ color: '#A8A29E', fontSize: '14px', marginBottom: '24px', lineHeight: 1.5 }}>
-            Explore places and tap "+ Add" to build your day plan
+            Explore places and tap &quot;+ Add&quot; to build your trip plan
           </p>
           <button
             onClick={() => setScreen('discover')}
@@ -1506,177 +1873,248 @@ export default function App() {
       );
     }
 
-    const totalDistance = dayPlan.reduce((sum, s) => sum + (s.place?.distance || 0), 0);
-
     return (
       <div>
         {/* Header */}
-        <div style={{ marginBottom: '20px' }}>
+        <div style={{ marginBottom: '16px' }}>
           <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '4px' }}>
-            Your Day Plan
+            Your Trip Plan
           </h1>
           <p style={{ color: '#78716C', fontSize: '13px' }}>
-            {cityLabel} · {dayPlan.length} stop{dayPlan.length !== 1 ? 's' : ''}
-            {totalDistance > 0 && ` · ~${totalDistance.toFixed(1)} km`}
+            {cityLabel} · {totalStops} stop{totalStops !== 1 ? 's' : ''} · {dayCount} day{dayCount !== 1 ? 's' : ''}
           </p>
         </div>
 
-        {/* Timeline */}
-        <div style={{ position: 'relative', paddingLeft: '32px' }}>
-          {/* Vertical route line */}
-          <div style={{
-            position: 'absolute', left: '14px', top: '16px',
-            bottom: '16px', width: '2px',
-            background: 'linear-gradient(to bottom, #F59E0B, rgba(245,158,11,0.1))',
-            borderRadius: '1px',
-          }} />
+        {/* Day Tabs */}
+        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '12px', scrollbarWidth: 'none' }}>
+          {sortedDays.map(day => {
+            const stops = tripDays[day] || [];
+            const isActive = activeDay === day;
+            return (
+              <button key={day} onClick={() => setActiveDay(day)}
+                style={{
+                  padding: '8px 16px', borderRadius: '12px', fontSize: '13px', fontWeight: 600,
+                  border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                  background: isActive ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'rgba(255,255,255,0.06)',
+                  color: isActive ? '#0C0A09' : '#A8A29E',
+                }}>
+                Day {day} ({stops.length})
+              </button>
+            );
+          })}
+          <button onClick={addDay}
+            style={{
+              padding: '8px 16px', borderRadius: '12px', fontSize: '13px', fontWeight: 600,
+              border: '1px dashed rgba(255,255,255,0.15)', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+              background: 'transparent', color: '#78716C',
+            }}>
+            + Day
+          </button>
+        </div>
 
-          {dayPlan.map((stop, index) => (
-            <div key={stop.id} style={{ position: 'relative', marginBottom: '16px' }}>
-              {/* Stop number circle */}
-              <div style={{
-                position: 'absolute', left: '-32px', top: '16px',
-                width: '28px', height: '28px', borderRadius: '50%',
-                background: stop.type === 'event'
-                  ? 'linear-gradient(135deg, #8B5CF6, #7C3AED)'
-                  : 'linear-gradient(135deg, #F59E0B, #D97706)',
-                color: stop.type === 'event' ? '#FFFBEB' : '#0C0A09',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '12px', fontWeight: 700, zIndex: 1,
-                boxShadow: '0 0 0 4px #0C0A09',
-              }}>
-                {index + 1}
-              </div>
+        {/* Active day stops */}
+        {dayPlan.length === 0 ? (
+          <div style={{ ...cardStyle, textAlign: 'center', padding: '32px 20px' }}>
+            <p style={{ color: '#A8A29E', fontSize: '14px' }}>No stops on Day {activeDay} yet. Explore to add some!</p>
+          </div>
+        ) : (
+          <div style={{ position: 'relative', paddingLeft: '32px' }}>
+            {/* Vertical route line */}
+            <div style={{
+              position: 'absolute', left: '14px', top: '16px',
+              bottom: '16px', width: '2px',
+              background: 'linear-gradient(to bottom, #F59E0B, rgba(245,158,11,0.1))',
+              borderRadius: '1px',
+            }} />
 
-              {/* Stop card */}
-              <div style={{
-                ...cardStyle, marginBottom: 0, overflow: 'hidden',
-                border: stop.type === 'event'
-                  ? '1px solid rgba(139,92,246,0.15)'
-                  : '1px solid rgba(245,158,11,0.1)',
-              }}>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  {/* Photo thumbnail */}
-                  {stop.type === 'place' && stop.place?.photoUrl && (
-                    <div style={{
-                      width: '80px', height: '80px', borderRadius: '12px', flexShrink: 0,
-                      background: `url(${stop.place.photoUrl})`,
-                      backgroundSize: 'cover', backgroundPosition: 'center',
-                    }} />
-                  )}
-                  {stop.type === 'event' && stop.event?.imageUrl && (
-                    <div style={{
-                      width: '80px', height: '80px', borderRadius: '12px', flexShrink: 0,
-                      background: `url(${stop.event.imageUrl})`,
-                      backgroundSize: 'cover', backgroundPosition: 'center',
-                    }} />
-                  )}
+            {dayPlan.map((stop, index) => (
+              <div key={stop.id}>
+                <div style={{ position: 'relative', marginBottom: index < dayPlan.length - 1 ? '4px' : '16px' }}>
+                  {/* Stop number circle */}
+                  <div style={{
+                    position: 'absolute', left: '-32px', top: '16px',
+                    width: '28px', height: '28px', borderRadius: '50%',
+                    background: stop.type === 'event'
+                      ? 'linear-gradient(135deg, #8B5CF6, #7C3AED)'
+                      : 'linear-gradient(135deg, #F59E0B, #D97706)',
+                    color: stop.type === 'event' ? '#FFFBEB' : '#0C0A09',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '12px', fontWeight: 700, zIndex: 1,
+                    boxShadow: '0 0 0 4px #0C0A09',
+                  }}>
+                    {index + 1}
+                  </div>
 
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {getStopName(stop)}
-                    </h3>
-                    {stop.type === 'place' && stop.place && (
-                      <>
-                        <p style={{ fontSize: '12px', color: '#A8A29E', marginBottom: '4px' }}>
-                          {stop.place.categoryDisplay}
-                          {stop.place.distance != null && ` · ${formatDistance(stop.place.distance)}`}
-                        </p>
-                        {stop.place.rating > 0 && (
-                          <div style={{ fontSize: '12px' }}>
-                            <span style={{ color: '#F59E0B' }}>★ {stop.place.rating.toFixed(1)}</span>
-                            <span style={{ color: '#78716C' }}> ({stop.place.reviewCount})</span>
-                          </div>
+                  {/* Stop card */}
+                  <div style={{
+                    ...cardStyle, marginBottom: 0, overflow: 'hidden',
+                    border: stop.type === 'event'
+                      ? '1px solid rgba(139,92,246,0.15)'
+                      : '1px solid rgba(245,158,11,0.1)',
+                  }}>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      {stop.type === 'place' && stop.place?.photoUrl && (
+                        <div style={{
+                          width: '80px', height: '80px', borderRadius: '12px', flexShrink: 0,
+                          background: `url(${stop.place.photoUrl})`,
+                          backgroundSize: 'cover', backgroundPosition: 'center',
+                        }} />
+                      )}
+                      {stop.type === 'event' && stop.event?.imageUrl && (
+                        <div style={{
+                          width: '80px', height: '80px', borderRadius: '12px', flexShrink: 0,
+                          background: `url(${stop.event.imageUrl})`,
+                          backgroundSize: 'cover', backgroundPosition: 'center',
+                        }} />
+                      )}
+
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {getStopName(stop)}
+                        </h3>
+                        {stop.type === 'place' && stop.place && (
+                          <>
+                            <p style={{ fontSize: '12px', color: '#A8A29E', marginBottom: '4px' }}>
+                              {stop.place.categoryDisplay}
+                              {stop.place.distance != null && ` · ${formatDistance(stop.place.distance)} ${getDistanceReference()}`}
+                            </p>
+                            {stop.place.rating > 0 && (
+                              <div style={{ fontSize: '12px' }}>
+                                <span style={{ color: '#F59E0B' }}>★ {stop.place.rating.toFixed(1)}</span>
+                                <span style={{ color: '#78716C' }}> ({stop.place.reviewCount})</span>
+                              </div>
+                            )}
+                          </>
                         )}
-                      </>
-                    )}
-                    {stop.type === 'event' && stop.event && (
-                      <>
-                        <p style={{ fontSize: '12px', color: '#C084FC', marginBottom: '4px' }}>
-                          {formatEventDate(stop.event.date)}
-                          {stop.event.time && ` · ${formatEventTime(stop.event.time)}`}
-                        </p>
-                        <p style={{ fontSize: '12px', color: '#A8A29E' }}>
-                          {stop.event.venue}
-                        </p>
-                      </>
-                    )}
+                        {stop.type === 'event' && stop.event && (
+                          <>
+                            <p style={{ fontSize: '12px', color: '#C084FC', marginBottom: '4px' }}>
+                              {formatEventDate(stop.event.date)}
+                              {stop.event.time && ` · ${formatEventTime(stop.event.time)}`}
+                            </p>
+                            <p style={{ fontSize: '12px', color: '#A8A29E' }}>
+                              {stop.event.venue}
+                            </p>
+                          </>
+                        )}
 
-                    {/* Mini actions */}
-                    <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                      {stop.type === 'place' && stop.place?.googleMapsUrl && (
-                        <a href={stop.place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
-                          style={{
-                            padding: '5px 10px', borderRadius: '8px', fontSize: '11px',
-                            background: 'rgba(245,158,11,0.1)', color: '#F59E0B',
-                            textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px',
-                          }}>
-                          <DirectionsIcon /> Go
-                        </a>
-                      )}
-                      {stop.type === 'place' && stop.place?.phone && (
-                        <a href={`tel:${stop.place.phone}`}
-                          style={{
-                            padding: '5px 10px', borderRadius: '8px', fontSize: '11px',
-                            background: 'rgba(255,255,255,0.05)', color: '#A8A29E',
-                            textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px',
-                          }}>
-                          <PhoneIcon /> Call
-                        </a>
-                      )}
-                      {stop.type === 'event' && stop.event?.url && (
-                        <a href={stop.event.url} target="_blank" rel="noopener noreferrer"
-                          style={{
-                            padding: '5px 10px', borderRadius: '8px', fontSize: '11px',
-                            background: 'rgba(139,92,246,0.1)', color: '#C084FC',
-                            textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px',
-                          }}>
-                          🎫 Tickets
-                        </a>
-                      )}
+                        {/* Mini actions */}
+                        <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
+                          {stop.type === 'place' && stop.place?.googleMapsUrl && (
+                            <a href={stop.place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+                              style={{
+                                padding: '5px 10px', borderRadius: '8px', fontSize: '11px',
+                                background: 'rgba(245,158,11,0.1)', color: '#F59E0B',
+                                textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px',
+                              }}>
+                              <DirectionsIcon /> Go
+                            </a>
+                          )}
+                          {stop.type === 'place' && stop.place?.phone && (
+                            <a href={`tel:${stop.place.phone}`}
+                              style={{
+                                padding: '5px 10px', borderRadius: '8px', fontSize: '11px',
+                                background: 'rgba(255,255,255,0.05)', color: '#A8A29E',
+                                textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px',
+                              }}>
+                              <PhoneIcon /> Call
+                            </a>
+                          )}
+                          {stop.type === 'event' && stop.event?.url && (
+                            <a href={stop.event.url} target="_blank" rel="noopener noreferrer"
+                              style={{
+                                padding: '5px 10px', borderRadius: '8px', fontSize: '11px',
+                                background: 'rgba(139,92,246,0.1)', color: '#C084FC',
+                                textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px',
+                              }}>
+                              🎫 Tickets
+                            </a>
+                          )}
+                          {/* Move to different day */}
+                          {dayCount > 1 && (
+                            <select
+                              value=""
+                              onChange={e => { if (e.target.value) moveStopToDay(stop.id, activeDay, Number(e.target.value)); }}
+                              style={{
+                                padding: '5px 8px', borderRadius: '8px', fontSize: '11px',
+                                background: 'rgba(255,255,255,0.05)', color: '#78716C',
+                                border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
+                              }}>
+                              <option value="">Move to...</option>
+                              {sortedDays.filter(d => d !== activeDay).map(d => (
+                                <option key={d} value={d}>Day {d}</option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Right controls: reorder + remove */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center', justifyContent: 'center' }}>
+                        {index > 0 && (
+                          <button onClick={() => movePlanStop(index, 'up')}
+                            style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', fontSize: '16px', padding: '2px 6px' }}>
+                            ▲
+                          </button>
+                        )}
+                        <button onClick={() => removeFromPlan(stop.id)}
+                          style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', fontSize: '18px', padding: '2px 6px' }}>
+                          ×
+                        </button>
+                        {index < dayPlan.length - 1 && (
+                          <button onClick={() => movePlanStop(index, 'down')}
+                            style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', fontSize: '16px', padding: '2px 6px' }}>
+                            ▼
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-
-                  {/* Right controls: reorder + remove */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center', justifyContent: 'center' }}>
-                    {index > 0 && (
-                      <button onClick={() => movePlanStop(index, 'up')}
-                        style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', fontSize: '16px', padding: '2px 6px' }}>
-                        ▲
-                      </button>
-                    )}
-                    <button onClick={() => removeFromPlan(stop.id)}
-                      style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', fontSize: '18px', padding: '2px 6px' }}>
-                      ×
-                    </button>
-                    {index < dayPlan.length - 1 && (
-                      <button onClick={() => movePlanStop(index, 'down')}
-                        style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', fontSize: '16px', padding: '2px 6px' }}>
-                        ▼
-                      </button>
-                    )}
-                  </div>
                 </div>
+
+                {/* Transportation between stops */}
+                {index < dayPlan.length - 1 && (() => {
+                  const transport = getTransportInfo(stop, dayPlan[index + 1]);
+                  if (!transport) return null;
+                  return (
+                    <div style={{
+                      marginLeft: '0', marginBottom: '4px', padding: '8px 12px',
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                      background: 'rgba(255,255,255,0.02)', borderRadius: '10px',
+                      border: '1px dashed rgba(255,255,255,0.06)',
+                    }}>
+                      <span style={{ fontSize: '16px' }}>{transport.emoji}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '12px', color: '#A8A29E' }}>{transport.text}</div>
+                        <div style={{ fontSize: '11px', color: '#57534E' }}>{transport.distance}</div>
+                      </div>
+                      <a href={transport.mapsUrl} target="_blank" rel="noopener noreferrer"
+                        style={{ fontSize: '11px', color: '#F59E0B', textDecoration: 'none' }}>
+                        Directions
+                      </a>
+                    </div>
+                  );
+                })()}
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
-          {/* Full Route */}
-          <a href={getRouteUrl()} target="_blank" rel="noopener noreferrer"
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-              background: 'linear-gradient(135deg, #F59E0B, #D97706)', color: '#0C0A09',
-              border: 'none', borderRadius: '14px', padding: '14px',
-              fontSize: '15px', fontWeight: 600, textDecoration: 'none',
-              boxShadow: '0 4px 20px rgba(245,158,11,0.3)',
-            }}>
-            <DirectionsIcon /> Get Full Route
-          </a>
+          {dayPlan.length > 0 && (
+            <a href={getRouteUrl()} target="_blank" rel="noopener noreferrer"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                background: 'linear-gradient(135deg, #F59E0B, #D97706)', color: '#0C0A09',
+                border: 'none', borderRadius: '14px', padding: '14px',
+                fontSize: '15px', fontWeight: 600, textDecoration: 'none',
+                boxShadow: '0 4px 20px rgba(245,158,11,0.3)',
+              }}>
+              <DirectionsIcon /> Get Day {activeDay} Route
+            </a>
+          )}
 
-          {/* Share */}
           <button onClick={sharePlan}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
@@ -1684,10 +2122,19 @@ export default function App() {
               border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px',
               padding: '14px', fontSize: '15px', fontWeight: 500, cursor: 'pointer',
             }}>
-            <ShareIcon /> Share Plan
+            <ShareIcon /> Share Trip
           </button>
 
-          {/* Clear */}
+          {dayCount > 1 && (
+            <button onClick={() => removeDay(activeDay)}
+              style={{
+                background: 'none', border: '1px solid rgba(239,68,68,0.2)', color: '#F87171',
+                fontSize: '13px', cursor: 'pointer', padding: '10px', borderRadius: '10px',
+              }}>
+              Delete Day {activeDay}
+            </button>
+          )}
+
           <button onClick={clearPlan}
             style={{
               background: 'none', border: 'none', color: '#78716C',
@@ -1908,9 +2355,153 @@ export default function App() {
             {place.distance != null && (
               <div style={{ marginBottom: '16px' }}>
                 <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Distance</div>
-                <p style={{ color: '#FFFBEB', fontSize: '14px' }}>{formatDistance(place.distance)} from you</p>
+                <p style={{ color: '#FFFBEB', fontSize: '14px' }}>{formatDistance(place.distance)} {getDistanceReference()}</p>
               </div>
             )}
+
+            {/* Good to Know (Safety) */}
+            {getSafetyIndicators(place).length > 0 && (
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Good to know</div>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {getSafetyIndicators(place).map(ind => (
+                    <span key={ind} style={{ fontSize: '12px', color: '#A8A29E', padding: '4px 10px', background: 'rgba(255,255,255,0.04)', borderRadius: '8px' }}>
+                      {ind}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Community Tags */}
+            {placeTagsCache[place.placeId] && Object.keys(placeTagsCache[place.placeId]).length > 0 && (
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Community Tags</div>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {Object.entries(placeTagsCache[place.placeId]).map(([tag, count]) => {
+                    const tagInfo = COMMUNITY_TAGS.find(t => t.id === tag);
+                    return tagInfo ? (
+                      <span key={tag} style={{ fontSize: '12px', color: '#D4A574', padding: '4px 10px', background: 'rgba(212,165,116,0.08)', borderRadius: '8px' }}>
+                        {tagInfo.emoji} {tagInfo.label} ({count})
+                      </span>
+                    ) : null;
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Reviews Section */}
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Community Reviews</div>
+                {user && !showReviewForm && (
+                  <button onClick={() => setShowReviewForm(true)}
+                    style={{ background: 'none', border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B', borderRadius: '8px', padding: '5px 12px', fontSize: '11px', cursor: 'pointer' }}>
+                    Leave a Review
+                  </button>
+                )}
+              </div>
+
+              {/* Review Form */}
+              {showReviewForm && user && (
+                <div style={{ ...cardStyle, marginBottom: '12px', border: '1px solid rgba(245,158,11,0.15)' }}>
+                  {/* Star Rating */}
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <button key={star} onClick={() => setReviewRating(star)}
+                        style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', padding: '2px', color: star <= reviewRating ? '#F59E0B' : '#3a3632' }}>
+                        ★
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Review Text */}
+                  <textarea
+                    placeholder="Share your experience (optional)"
+                    value={reviewText}
+                    onChange={e => setReviewText(e.target.value)}
+                    style={{
+                      width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)',
+                      background: '#0C0A09', color: '#FFFBEB', fontSize: '14px', resize: 'vertical',
+                      minHeight: '60px', boxSizing: 'border-box', outline: 'none',
+                    }}
+                  />
+
+                  {/* Community Tags */}
+                  <div style={{ marginTop: '10px', marginBottom: '10px' }}>
+                    <div style={{ fontSize: '11px', color: '#78716C', marginBottom: '6px' }}>Tag this place:</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {COMMUNITY_TAGS.map(tag => {
+                        const selected = reviewTags.includes(tag.id);
+                        return (
+                          <button key={tag.id}
+                            onClick={() => setReviewTags(selected ? reviewTags.filter(t => t !== tag.id) : [...reviewTags, tag.id])}
+                            style={{
+                              padding: '4px 10px', borderRadius: '12px', fontSize: '11px',
+                              border: selected ? '1px solid rgba(212,165,116,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                              background: selected ? 'rgba(212,165,116,0.12)' : 'transparent',
+                              color: selected ? '#D4A574' : '#78716C', cursor: 'pointer',
+                            }}>
+                            {tag.emoji} {tag.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Submit */}
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={handleSubmitReview}
+                      disabled={reviewRating === 0 || reviewSubmitting}
+                      style={{
+                        flex: 1, padding: '10px', borderRadius: '10px', border: 'none',
+                        background: reviewRating > 0 ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'rgba(255,255,255,0.1)',
+                        color: reviewRating > 0 ? '#0C0A09' : '#78716C',
+                        fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: reviewSubmitting ? 0.6 : 1,
+                      }}>
+                      {reviewSubmitting ? 'Submitting...' : 'Submit Review'}
+                    </button>
+                    <button onClick={() => { setShowReviewForm(false); setReviewRating(0); setReviewText(''); setReviewTags([]); }}
+                      style={{ padding: '10px 16px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)', background: 'none', color: '#78716C', fontSize: '13px', cursor: 'pointer' }}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Existing Reviews */}
+              {placeReviews.length > 0 ? (
+                placeReviews.slice(0, 5).map(review => (
+                  <div key={review.id} style={{ ...cardStyle, marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                      <span style={{ color: '#F59E0B', fontSize: '13px' }}>
+                        {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
+                      </span>
+                      <span style={{ color: '#57534E', fontSize: '11px' }}>
+                        {new Date(review.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    {review.review_text && (
+                      <p style={{ color: '#d4d0cc', fontSize: '13px', lineHeight: 1.4, marginBottom: '6px' }}>{review.review_text}</p>
+                    )}
+                    {review.tags && review.tags.length > 0 && (
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                        {review.tags.map(tag => {
+                          const tagInfo = COMMUNITY_TAGS.find(t => t.id === tag);
+                          return tagInfo ? (
+                            <span key={tag} style={{ fontSize: '10px', color: '#D4A574', padding: '2px 6px', background: 'rgba(212,165,116,0.08)', borderRadius: '4px' }}>
+                              {tagInfo.emoji} {tagInfo.label}
+                            </span>
+                          ) : null;
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <p style={{ color: '#57534E', fontSize: '13px' }}>No reviews yet. Be the first!</p>
+              )}
+            </div>
           </div>
 
           {/* Sticky Bottom Bar */}
@@ -1923,7 +2514,7 @@ export default function App() {
             <button
               onClick={() => {
                 if (inPlan) {
-                  const stop = dayPlan.find(s => s.place?.placeId === place.placeId);
+                  const stop = Object.values(tripDays).flat().find(s => s.place?.placeId === place.placeId);
                   if (stop) removeFromPlan(stop.id);
                 } else {
                   addToPlan(place);
@@ -2317,14 +2908,14 @@ export default function App() {
               }}>
                 {tab.label}
               </span>
-              {tab.id === 'plan' && dayPlan.length > 0 && (
+              {tab.id === 'plan' && totalStops > 0 && (
                 <span style={{
                   position: 'absolute', top: '2px', right: '8px',
                   background: 'linear-gradient(135deg, #F59E0B, #D97706)',
                   color: '#0C0A09', fontSize: '9px', fontWeight: 700,
                   padding: '2px 5px', borderRadius: '8px',
                 }}>
-                  {dayPlan.length}
+                  {totalStops}
                 </span>
               )}
             </button>

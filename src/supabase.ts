@@ -124,3 +124,95 @@ export function authOnStateChange(callback: (session: Session | null) => void) {
     callback(session);
   });
 }
+
+// ============================================================================
+// REVIEWS & COMMUNITY TAGS
+// ============================================================================
+
+export interface Review {
+  id: string;
+  user_id: string;
+  place_id: string;
+  city_slug: string;
+  rating: number;
+  review_text: string | null;
+  tags: string[];
+  created_at: string;
+}
+
+export async function saveReview(
+  placeId: string,
+  citySlug: string,
+  rating: number,
+  reviewText: string,
+  tags: string[]
+) {
+  const { data, error } = await supabase
+    .from('reviews')
+    .insert({
+      place_id: placeId,
+      city_slug: citySlug,
+      rating,
+      review_text: reviewText || null,
+      tags,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error saving review:', error);
+    return { success: false, error };
+  }
+
+  // Also insert community tags
+  if (tags.length > 0) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const tagRows = tags.map(tag => ({
+        place_id: placeId,
+        city_slug: citySlug,
+        user_id: user.id,
+        tag,
+      }));
+      await supabase.from('place_tags').upsert(tagRows, { onConflict: 'place_id,user_id,tag' });
+    }
+  }
+
+  return { success: true, data };
+}
+
+export async function fetchReviews(placeId: string): Promise<Review[]> {
+  const { data, error } = await supabase
+    .from('reviews')
+    .select('*')
+    .eq('place_id', placeId)
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  if (error) {
+    console.error('Error fetching reviews:', error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function fetchPlaceTagCounts(placeIds: string[]): Promise<Record<string, Record<string, number>>> {
+  if (placeIds.length === 0) return {};
+
+  const { data, error } = await supabase
+    .from('place_tags')
+    .select('place_id, tag')
+    .in('place_id', placeIds);
+
+  if (error) {
+    console.error('Error fetching tag counts:', error);
+    return {};
+  }
+
+  const result: Record<string, Record<string, number>> = {};
+  for (const row of data || []) {
+    if (!result[row.place_id]) result[row.place_id] = {};
+    result[row.place_id][row.tag] = (result[row.place_id][row.tag] || 0) + 1;
+  }
+  return result;
+}
