@@ -39,21 +39,21 @@ export const VIBE_TYPE_MAP: Record<string, string[]> = {
     'restaurant', 'cafe', 'coffee_shop', 'bar', 'bakery',
     'steak_house', 'seafood_restaurant', 'pizza_restaurant', 'sushi_restaurant',
     'brunch_restaurant', 'breakfast_restaurant', 'fast_food_restaurant', 'sandwich_shop',
-    'ice_cream_shop', 'cocktail_bar', 'wine_bar', 'meal_takeaway',
+    'ice_cream_shop', 'meal_takeaway',
   ],
   stay: [
     'hotel', 'motel', 'resort_hotel', 'bed_and_breakfast', 'lodging',
-    'extended_stay_hotel', 'guest_house', 'hostel',
+    'extended_stay_hotel', 'hostel',
   ],
   todo: [
     'museum', 'art_gallery', 'tourist_attraction', 'performing_arts_theater',
-    'cultural_center', 'historical_landmark', 'church', 'library',
-    'night_club', 'casino', 'karaoke', 'comedy_club', 'amusement_park',
+    'community_center', 'historical_landmark', 'church', 'library',
+    'night_club', 'casino', 'amusement_park', 'event_venue',
     'aquarium', 'zoo', 'movie_theater', 'bowling_alley', 'stadium',
   ],
   hidden: [
-    'park', 'book_store', 'spa', 'botanical_garden', 'flea_market',
-    'farmers_market', 'garden', 'hiking_area', 'yoga_studio',
+    'park', 'book_store', 'spa', 'national_park', 'market',
+    'hiking_area', 'gym', 'dog_park', 'campground',
   ],
 };
 
@@ -274,6 +274,32 @@ export async function searchNearby(
   return places;
 }
 
+export async function textSearchPlaces(
+  query: string,
+  lat: number,
+  lng: number,
+  radius: number = 5000,
+): Promise<Place[]> {
+  const params = new URLSearchParams({
+    action: 'textsearch',
+    query,
+    lat: lat.toString(),
+    lng: lng.toString(),
+    radius: radius.toString(),
+  });
+
+  const response = await fetch(`${API_BASE}?${params}`);
+  if (!response.ok) {
+    console.error('Text search failed:', response.status);
+    return [];
+  }
+
+  const data = await response.json();
+  const places = (data.places || []).map((p: Record<string, unknown>) => transformPlace(p, lat, lng));
+  places.sort((a: Place, b: Place) => (a.distance ?? 999) - (b.distance ?? 999));
+  return places;
+}
+
 export async function getPlaceDetails(placeId: string): Promise<Place | null> {
   const params = new URLSearchParams({
     action: 'details',
@@ -306,7 +332,7 @@ export function getTimeAwareTypes(): string[] {
     return ['restaurant', 'museum', 'art_gallery', 'tourist_attraction', 'park'];
   } else if (hour >= 17 && hour < 22) {
     // Evening: dinner, bars
-    return ['restaurant', 'bar', 'cocktail_bar', 'wine_bar', 'steak_house'];
+    return ['restaurant', 'bar', 'steak_house', 'seafood_restaurant'];
   } else {
     // Late night: clubs, late-night food
     return ['night_club', 'bar', 'restaurant', 'casino'];

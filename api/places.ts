@@ -27,6 +27,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     switch (action) {
       case 'nearby':
         return await handleNearbySearch(req, res);
+      case 'textsearch':
+        return await handleTextSearch(req, res);
       case 'details':
         return await handlePlaceDetails(req, res);
       case 'photo':
@@ -103,6 +105,67 @@ async function handleNearbySearch(req: VercelRequest, res: VercelResponse) {
     const errorText = await response.text();
     console.error('Google Places API error:', errorText);
     return res.status(response.status).json({ error: 'Google Places API error', details: errorText });
+  }
+
+  const data = await response.json();
+  return res.status(200).json(data);
+}
+
+// --------------------------------------------------------------------------
+// Text Search
+// --------------------------------------------------------------------------
+async function handleTextSearch(req: VercelRequest, res: VercelResponse) {
+  const { query, lat, lng, radius = '5000' } = req.query;
+
+  if (!query) {
+    return res.status(400).json({ error: 'query is required' });
+  }
+
+  const body: Record<string, unknown> = {
+    textQuery: query as string,
+    maxResultCount: 20,
+  };
+
+  if (lat && lng) {
+    body.locationBias = {
+      circle: {
+        center: { latitude: parseFloat(lat as string), longitude: parseFloat(lng as string) },
+        radius: parseFloat(radius as string),
+      },
+    };
+  }
+
+  const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': GOOGLE_API_KEY,
+      'X-Goog-FieldMask': [
+        'places.id',
+        'places.displayName',
+        'places.formattedAddress',
+        'places.location',
+        'places.types',
+        'places.primaryType',
+        'places.primaryTypeDisplayName',
+        'places.rating',
+        'places.userRatingCount',
+        'places.priceLevel',
+        'places.currentOpeningHours',
+        'places.nationalPhoneNumber',
+        'places.websiteUri',
+        'places.googleMapsUri',
+        'places.photos',
+        'places.editorialSummary',
+      ].join(','),
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Google Text Search API error:', errorText);
+    return res.status(response.status).json({ error: 'Text search error', details: errorText });
   }
 
   const data = await response.json();
