@@ -35,13 +35,26 @@ export interface Place {
 // ============================================================================
 
 export const VIBE_TYPE_MAP: Record<string, string[]> = {
-  restaurants: ['restaurant', 'steak_house', 'seafood_restaurant', 'pizza_restaurant', 'sushi_restaurant', 'brunch_restaurant', 'breakfast_restaurant'],
-  foodtrucks: ['meal_takeaway', 'meal_delivery'],
-  drinks: ['cafe', 'coffee_shop', 'bar', 'cocktail_bar', 'wine_bar'],
-  placestoeat: ['bakery', 'ice_cream_shop', 'fast_food_restaurant', 'sandwich_shop'],
-  cultural: ['museum', 'art_gallery', 'tourist_attraction', 'church', 'library', 'performing_arts_theater', 'cultural_center', 'historical_landmark'],
-  nightlife: ['bar', 'night_club', 'casino', 'karaoke', 'comedy_club', 'cocktail_bar', 'wine_bar'],
-  hidden: ['park', 'book_store', 'spa', 'botanical_garden', 'flea_market', 'farmers_market', 'garden', 'hiking_area', 'yoga_studio'],
+  food: [
+    'restaurant', 'cafe', 'coffee_shop', 'bar', 'bakery',
+    'steak_house', 'seafood_restaurant', 'pizza_restaurant', 'sushi_restaurant',
+    'brunch_restaurant', 'breakfast_restaurant', 'fast_food_restaurant', 'sandwich_shop',
+    'ice_cream_shop', 'cocktail_bar', 'wine_bar', 'meal_takeaway',
+  ],
+  stay: [
+    'hotel', 'motel', 'resort_hotel', 'bed_and_breakfast', 'lodging',
+    'extended_stay_hotel', 'guest_house', 'hostel',
+  ],
+  todo: [
+    'museum', 'art_gallery', 'tourist_attraction', 'performing_arts_theater',
+    'cultural_center', 'historical_landmark', 'church', 'library',
+    'night_club', 'casino', 'karaoke', 'comedy_club', 'amusement_park',
+    'aquarium', 'zoo', 'movie_theater', 'bowling_alley', 'stadium',
+  ],
+  hidden: [
+    'park', 'book_store', 'spa', 'botanical_garden', 'flea_market',
+    'farmers_market', 'garden', 'hiking_area', 'yoga_studio',
+  ],
 };
 
 // Reverse map: Google type → vibe tag

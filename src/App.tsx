@@ -4,7 +4,7 @@ import { searchNearby, formatDistance, getHoursStatus } from './services/places'
 import type { Place } from './services/places';
 import { useLocation } from './hooks/useLocation';
 import type { User } from '@supabase/supabase-js';
-import { APIProvider, Map, AdvancedMarker, InfoWindow } from '@vis.gl/react-google-maps';
+import { APIProvider, Map, Marker, InfoWindow } from '@vis.gl/react-google-maps';
 
 const MAPS_API_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || '';
 
@@ -39,7 +39,7 @@ interface AdminSignup {
 }
 
 type Screen = 'home' | 'discover' | 'events' | 'plan';
-type Vibe = 'restaurants' | 'foodtrucks' | 'drinks' | 'placestoeat' | 'cultural' | 'nightlife' | 'hidden';
+type Vibe = 'food' | 'stay' | 'todo' | 'hidden';
 type QuickFilter = 'open' | 'walking' | 'topRated' | 'budget' | 'family' | 'solo';
 
 const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL as string) || '';
@@ -343,12 +343,9 @@ const ShieldIcon = () => (
 // ============================================================================
 
 const VIBES: { id: Vibe; emoji: string; label: string }[] = [
-  { id: 'restaurants', emoji: '🍽️', label: 'Restaurants' },
-  { id: 'foodtrucks', emoji: '🚚', label: 'Food Trucks' },
-  { id: 'drinks', emoji: '☕', label: 'Drinks' },
-  { id: 'placestoeat', emoji: '🍰', label: 'Places to Eat' },
-  { id: 'cultural', emoji: '🏛️', label: 'Cultural' },
-  { id: 'nightlife', emoji: '🌙', label: 'Nightlife' },
+  { id: 'food', emoji: '🍽️', label: 'Food & Drinks' },
+  { id: 'stay', emoji: '🏨', label: 'Places to Stay' },
+  { id: 'todo', emoji: '🎭', label: 'Things to Do' },
   { id: 'hidden', emoji: '💎', label: 'Hidden Gems' },
 ];
 
@@ -594,7 +591,7 @@ export default function App() {
         case 'walking': if (place.distance !== null && place.distance > 1) return false; break;
         case 'topRated': if (place.rating < 4.5) return false; break;
         case 'budget': if (place.priceLevel > 2 && place.priceLevel !== -1) return false; break;
-        case 'family': if (NIGHTLIFE_TYPES.includes(place.category) || place.tags.includes('nightlife')) return false; if (place.rating > 0 && place.rating < 3.5) return false; break;
+        case 'family': if (NIGHTLIFE_TYPES.includes(place.category)) return false; if (place.rating > 0 && place.rating < 3.5) return false; break;
         case 'solo': if (place.reviewCount < 50) return false; if (place.rating > 0 && place.rating < 3.8) return false; break;
       }
     }
@@ -823,7 +820,7 @@ export default function App() {
                 Popular
               </span>
             )}
-            {place.rating >= 4.0 && !NIGHTLIFE_TYPES.includes(place.category) && !place.tags.includes('nightlife') && (
+            {place.rating >= 4.0 && !NIGHTLIFE_TYPES.includes(place.category) && !NIGHTLIFE_TYPES.includes(place.category) && (
               <span style={{ padding: '3px 8px', background: 'rgba(96,165,250,0.1)', color: '#93C5FD', borderRadius: '6px', fontSize: '10px', fontWeight: 600 }}>
                 Welcoming
               </span>
@@ -1097,26 +1094,16 @@ export default function App() {
             defaultZoom={14}
             gestureHandling="greedy"
             disableDefaultUI={true}
-            mapId="nxstops-discover"
             style={{ width: '100%', height: '100%' }}
             colorScheme="DARK"
           >
             {mapPlaces.filter(p => p.lat && p.lng).map(place => (
-              <AdvancedMarker
+              <Marker
                 key={place.placeId}
                 position={{ lat: place.lat!, lng: place.lng! }}
                 onClick={() => setActivePin(activePin === place.placeId ? null : place.placeId)}
-              >
-                <div style={{
-                  width: '32px', height: '32px', borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #F59E0B, #D97706)',
-                  border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                  cursor: 'pointer',
-                }}>
-                  {place.rating >= 4.5 ? '⭐' : '📍'}
-                </div>
-              </AdvancedMarker>
+                title={place.name}
+              />
             ))}
             {activePin && (() => {
               const place = mapPlaces.find(p => p.placeId === activePin);
@@ -1125,7 +1112,6 @@ export default function App() {
                 <InfoWindow
                   position={{ lat: place.lat, lng: place.lng }}
                   onCloseClick={() => setActivePin(null)}
-                  pixelOffset={[0, -36]}
                 >
                   <div style={{ padding: '4px', minWidth: '160px', color: '#1C1917' }}>
                     <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '4px' }}>{place.name}</div>
@@ -1178,26 +1164,16 @@ export default function App() {
             defaultZoom={11}
             gestureHandling="greedy"
             disableDefaultUI={true}
-            mapId="nxstops-events"
             style={{ width: '100%', height: '100%' }}
             colorScheme="DARK"
           >
             {mappableEvents.map(event => (
-              <AdvancedMarker
+              <Marker
                 key={event.id}
                 position={{ lat: event.lat!, lng: event.lng! }}
                 onClick={() => setActiveEventPin(activeEventPin === event.id ? null : event.id)}
-              >
-                <div style={{
-                  width: '32px', height: '32px', borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #8B5CF6, #7C3AED)',
-                  border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '14px', boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                  cursor: 'pointer',
-                }}>
-                  🎫
-                </div>
-              </AdvancedMarker>
+                title={event.name}
+              />
             ))}
             {activeEventPin && (() => {
               const event = mappableEvents.find(e => e.id === activeEventPin);
@@ -1206,7 +1182,6 @@ export default function App() {
                 <InfoWindow
                   position={{ lat: event.lat!, lng: event.lng! }}
                   onCloseClick={() => setActiveEventPin(null)}
-                  pixelOffset={[0, -36]}
                 >
                   <div style={{ padding: '4px', minWidth: '180px', color: '#1C1917' }}>
                     <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '4px' }}>{event.name}</div>
