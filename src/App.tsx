@@ -234,7 +234,15 @@ const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
 // SAFETY DATA
 // ============================================================================
 
-const NIGHTLIFE_TYPES = ['bar', 'night_club', 'casino', 'cocktail_bar', 'wine_bar', 'karaoke', 'comedy_club'];
+const NIGHTLIFE_TYPES = ['bar', 'night_club', 'casino'];
+
+// Travel group type curation
+const GIRLY_TYPES = ['cafe', 'coffee_shop', 'bakery', 'brunch_restaurant', 'breakfast_restaurant', 'spa', 'ice_cream_shop', 'art_gallery', 'book_store', 'market', 'performing_arts_theater', 'restaurant'];
+const GIRLY_KEYWORDS = ['brunch', 'tea', 'dessert', 'botanical', 'garden', 'rooftop', 'cocktail', 'aesthetic', 'cute', 'vintage', 'floral', 'pink', 'boba', 'macarons', 'patisserie', 'wine'];
+const FAMILY_TYPES = ['museum', 'zoo', 'aquarium', 'amusement_park', 'park', 'national_park', 'dog_park', 'bowling_alley', 'movie_theater', 'restaurant', 'cafe', 'ice_cream_shop', 'bakery', 'tourist_attraction', 'community_center', 'library'];
+const BOYS_EXCLUDE_TYPES = ['spa', 'bakery', 'book_store'];
+const BOYS_PREFER_TYPES = ['bar', 'night_club', 'casino', 'steak_house', 'stadium', 'bowling_alley', 'gym', 'hiking_area', 'restaurant', 'seafood_restaurant'];
+
 
 // Weather code → description/emoji (WMO codes from Open-Meteo)
 const WEATHER_CODES: Record<number, { emoji: string; description: string }> = {
@@ -263,8 +271,7 @@ const WEATHER_CODES: Record<number, { emoji: string; description: string }> = {
 
 const RESERVABLE_TYPES = [
   'restaurant', 'steak_house', 'seafood_restaurant', 'pizza_restaurant',
-  'sushi_restaurant', 'brunch_restaurant', 'breakfast_restaurant',
-  'bar', 'cocktail_bar', 'wine_bar',
+  'sushi_restaurant', 'brunch_restaurant', 'breakfast_restaurant', 'bar',
 ];
 
 const BOOKABLE_TYPES = [
@@ -1056,13 +1063,42 @@ export default function App() {
         case 'solo': if (place.reviewCount < 50) return false; if (place.rating > 0 && place.rating < 3.8) return false; break;
       }
     }
-    // Travel group filter
+    // Travel group filter — curated per trip type
     if (travelGroup) {
+      const nameLower = place.name.toLowerCase();
+      const summaryLower = (place.editorialSummary || '').toLowerCase();
+      const combined = nameLower + ' ' + summaryLower;
       switch (travelGroup) {
-        case 'family': if (NIGHTLIFE_TYPES.includes(place.category)) return false; if (place.rating > 0 && place.rating < 4.0) return false; break;
-        case 'solo': if (place.reviewCount < 30) return false; break;
-        case 'bachelorette': case 'girls': case 'boys': case 'friends':
-          if (['library', 'church'].includes(place.category)) return false; break;
+        case 'girls':
+        case 'bachelorette': {
+          // Prioritize girly, cute, aesthetic places — exclude gyms, auto shops, hardware stores
+          if (['gym', 'church', 'library'].includes(place.category)) return false;
+          // Boost: if it's a girly type OR has girly keywords, keep it; otherwise need good rating
+          const isGirlyType = GIRLY_TYPES.includes(place.category);
+          const hasGirlyVibe = GIRLY_KEYWORDS.some(kw => combined.includes(kw));
+          if (!isGirlyType && !hasGirlyVibe && place.rating > 0 && place.rating < 4.0) return false;
+          break;
+        }
+        case 'family': {
+          // Exclude bars/clubs, require family-safe places with decent ratings
+          if (NIGHTLIFE_TYPES.includes(place.category)) return false;
+          if (place.rating > 0 && place.rating < 3.5) return false;
+          break;
+        }
+        case 'boys':
+        case 'friends': {
+          // Exclude overly girly-coded places, prefer action/food/nightlife
+          if (travelGroup === 'boys' && BOYS_EXCLUDE_TYPES.includes(place.category)) return false;
+          if (['library', 'church'].includes(place.category)) return false;
+          break;
+        }
+        case 'solo': {
+          // Prefer well-reviewed, established places for safety
+          if (place.reviewCount < 20) return false;
+          if (place.rating > 0 && place.rating < 3.5) return false;
+          break;
+        }
+        case 'couple': break; // All places fine for couples
       }
     }
     // Community tag filters
@@ -1273,8 +1309,9 @@ export default function App() {
   const getBookingUrl = (place: Place): string => {
     // Prefer the place's own website for reservations/bookings
     if (place.website) return place.website;
-    // Fall back to Google Maps which often has "Reserve" or "Book" links
-    return place.googleMapsUrl;
+    // Fall back to Google Search for "[place name] reservation" to find actual booking links
+    const searchQuery = encodeURIComponent(`${place.name} ${place.address ? place.address.split(',')[0] : ''} reservation`);
+    return `https://www.google.com/search?q=${searchQuery}`;
   };
 
   const getBookingLabel = (place: Place): string => {
@@ -1762,26 +1799,6 @@ export default function App() {
         );
       })()}
 
-      {/* Email Signup Card */}
-      {!emailSaved && (
-        <button
-          onClick={() => setShowEmailSignup(true)}
-          style={{
-            ...cardStyle, width: '100%', cursor: 'pointer', textAlign: 'left',
-            display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px',
-            background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(217,119,6,0.05))',
-            border: '1px solid rgba(245,158,11,0.15)',
-          }}
-        >
-          <div style={{ fontSize: '24px' }}>📬</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 600, fontSize: '14px', color: '#FFFBEB' }}>Get your free city guide</div>
-            <div style={{ fontSize: '12px', color: '#A8A29E' }}>Hidden gems sent to your inbox</div>
-          </div>
-          <div style={{ color: '#F59E0B', fontSize: '18px' }}>→</div>
-        </button>
-      )}
-
       {/* Start Exploring */}
       {(selectedCity || useGps) && (
         <button
@@ -2153,6 +2170,19 @@ export default function App() {
             </>
           ) : (
             <>
+              {/* Hidden Gems banner */}
+              {selectedVibe === 'hidden' && !placesLoading && filteredPlaces.length > 0 && (
+                <div style={{ ...cardStyle, marginBottom: '12px', padding: '16px 18px', background: 'linear-gradient(135deg, rgba(168,85,247,0.08), rgba(139,92,246,0.04))', border: '1px solid rgba(168,85,247,0.15)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '20px' }}>💎</span>
+                    <span style={{ fontWeight: 600, fontSize: '15px', color: '#FFFBEB' }}>Hidden Gems</span>
+                  </div>
+                  <p style={{ fontSize: '12px', color: '#A8A29E', lineHeight: 1.5, margin: 0 }}>
+                    Off-the-beaten-path spots — parks, bookstores, spas, markets, and local favorites most tourists miss.
+                  </p>
+                </div>
+              )}
+
               {/* Loading */}
               {placesLoading && <><SkeletonCard /><SkeletonCard /><SkeletonCard /></>}
 
@@ -2177,6 +2207,50 @@ export default function App() {
                   </p>
                 </div>
               )}
+
+              {/* Hidden Gems Horizontal Section (when not on hidden vibe) */}
+              {!placesLoading && selectedVibe !== 'hidden' && (() => {
+                const gems = places.filter(p => p.rating >= 4.2 && p.reviewCount > 0 && p.reviewCount < 150 && !NIGHTLIFE_TYPES.includes(p.category));
+                if (gems.length === 0) return null;
+                return (
+                  <div style={{ marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <h3 style={{ fontSize: '15px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        💎 Hidden Gems
+                      </h3>
+                      <button onClick={() => setSelectedVibe('hidden')}
+                        style={{ background: 'none', border: 'none', color: '#F59E0B', fontSize: '12px', cursor: 'pointer' }}>
+                        See all →
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px', scrollbarWidth: 'none' }}>
+                      {gems.slice(0, 8).map(place => (
+                        <div key={place.placeId} onClick={() => setSelectedPlace(place)}
+                          style={{
+                            ...cardStyle, padding: 0, overflow: 'hidden', minWidth: '180px', maxWidth: '200px',
+                            flexShrink: 0, cursor: 'pointer',
+                          }}>
+                          {place.photoUrl && (
+                            <div style={{
+                              height: '90px', width: '100%',
+                              background: `linear-gradient(to bottom, transparent 40%, rgba(12,10,9,0.9)), url(${place.photoUrl})`,
+                              backgroundSize: 'cover', backgroundPosition: 'center',
+                            }} />
+                          )}
+                          <div style={{ padding: '10px 12px' }}>
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: '#FFFBEB', marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{place.name}</div>
+                            <div style={{ fontSize: '11px', color: '#78716C', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ color: '#F59E0B' }}>★</span> {place.rating.toFixed(1)}
+                              <span style={{ margin: '0 2px' }}>·</span>
+                              {place.categoryDisplay}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Place Cards */}
               {!placesLoading && filteredPlaces.map(place => (
@@ -2214,15 +2288,44 @@ export default function App() {
     const filteredEvents = events.filter(event => {
       if (!event.date) return true;
       const eventDate = new Date(event.date + 'T00:00:00');
-      // Within current month: always show
-      if (eventDate <= endOfMonth) return true;
-      // Ticketed events (has a URL): show up to 3 months out
-      if (event.url) {
+      // Date filter: current month + ticketed up to 3 months
+      if (eventDate > endOfMonth) {
+        if (!event.url) return false;
         const threeMonths = new Date(now.getFullYear(), now.getMonth() + 3, 0);
-        return eventDate <= threeMonths;
+        if (eventDate > threeMonths) return false;
       }
-      return false;
+      // Travel group event curation
+      if (travelGroup) {
+        const eventNameLower = (event.name || '').toLowerCase();
+        const eventCatLower = (event.category || '').toLowerCase();
+        const combined = eventNameLower + ' ' + eventCatLower;
+        switch (travelGroup) {
+          case 'girls':
+          case 'bachelorette':
+            // Boost concerts, performing arts, pop, comedy; deprioritize combat sports
+            if (/\b(mma|ufc|boxing|wrestling|monster truck)\b/.test(combined)) return false;
+            break;
+          case 'family':
+            // Exclude nightlife events; boost family/kids events
+            if (/\b(21\+|18\+|adults only|burlesque|strip)\b/.test(combined)) return false;
+            break;
+          case 'boys':
+          case 'friends':
+            // Include everything — sports, concerts, comedy
+            break;
+        }
+      }
+      return true;
     });
+
+    // Sort events: boost relevance based on travel group
+    if (travelGroup === 'family') {
+      filteredEvents.sort((a, b) => {
+        const aFamily = /\b(kids|children|family|disney|nickelodeon|paw patrol|sesame|lego)\b/i.test(a.name + ' ' + a.category) ? -1 : 0;
+        const bFamily = /\b(kids|children|family|disney|nickelodeon|paw patrol|sesame|lego)\b/i.test(b.name + ' ' + b.category) ? -1 : 0;
+        return aFamily - bFamily;
+      });
+    }
 
     return (
       <div>
@@ -2757,7 +2860,7 @@ export default function App() {
             </div>
 
             {/* Reserve / Book */}
-            {(isReservable(place) || isBookable(place)) && (place.website || place.googleMapsUrl) && (
+            {(isReservable(place) || isBookable(place)) && (
               <div style={{ marginBottom: '16px' }}>
                 <a href={getBookingUrl(place)} target="_blank" rel="noopener noreferrer"
                   style={{
@@ -2768,16 +2871,10 @@ export default function App() {
                   }}>
                   {isReservable(place) ? 'Reserve a Table' : 'Book Tickets'}
                 </a>
-                {place.website && place.googleMapsUrl && place.website !== getBookingUrl(place) && (
+                {place.googleMapsUrl && (
                   <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
                     style={{ display: 'block', textAlign: 'center', marginTop: '8px', color: '#A8A29E', fontSize: '12px', textDecoration: 'none' }}>
-                    or view on Google Maps
-                  </a>
-                )}
-                {!place.website && place.googleMapsUrl && (
-                  <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
-                    style={{ display: 'block', textAlign: 'center', marginTop: '8px', color: '#A8A29E', fontSize: '12px', textDecoration: 'none' }}>
-                    or view on Google Maps
+                    View on Google Maps
                   </a>
                 )}
               </div>
@@ -3466,39 +3563,7 @@ export default function App() {
       {/* Place Detail Modal */}
       {selectedPlace && <PlaceDetailModal place={selectedPlace} />}
 
-      {/* Email Signup Modal */}
-      {showEmailSignup && (
-        <div className="modal-backdrop"
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
-          onClick={() => setShowEmailSignup(false)}>
-          <div className="modal-sheet"
-            style={{ background: '#1C1917', borderRadius: '20px 20px 0 0', maxWidth: '430px', width: '100%', padding: '28px 24px 40px', border: '1px solid rgba(255,255,255,0.06)', borderBottom: 'none' }}
-            onClick={e => e.stopPropagation()}>
-            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-              <div style={{ fontSize: '32px', marginBottom: '8px' }}>✨</div>
-              <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '6px' }}>Get your city guide</h2>
-              <p style={{ color: '#A8A29E', fontSize: '14px' }}>We'll send curated picks and hidden gems straight to your inbox</p>
-            </div>
-            <input type="email" placeholder="your@email.com" value={emailInput}
-              onChange={e => setEmailInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleEmailSignup()}
-              style={{ width: '100%', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: '#0C0A09', color: '#FFFBEB', fontSize: '16px', marginBottom: '12px', outline: 'none' }} />
-            <button onClick={handleEmailSignup} disabled={emailSubmitting || !emailInput.includes('@')}
-              style={{
-                width: '100%', padding: '16px', borderRadius: '14px', border: 'none',
-                background: emailInput.includes('@') ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'rgba(255,255,255,0.1)',
-                color: emailInput.includes('@') ? '#0C0A09' : '#78716C',
-                fontSize: '16px', fontWeight: 600, cursor: emailInput.includes('@') ? 'pointer' : 'default',
-              }}>
-              {emailSubmitting ? 'Saving...' : 'Send me the guide'}
-            </button>
-            <button onClick={() => setShowEmailSignup(false)}
-              style={{ width: '100%', padding: '12px', marginTop: '8px', background: 'none', border: 'none', color: '#78716C', fontSize: '13px', cursor: 'pointer' }}>
-              Maybe later
-            </button>
-          </div>
-        </div>
-      )}
+      {/* (Email signup removed) */}
 
       {/* Safety Toolkit Modal */}
       {showSafety && (
