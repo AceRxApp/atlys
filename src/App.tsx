@@ -25,9 +25,25 @@ interface City {
   is_active?: boolean;
 }
 
+interface EventItem {
+  id: string;
+  name: string;
+  date: string;
+  time: string;
+  venue: string;
+  venueAddress: string;
+  imageUrl: string | null;
+  url: string;
+  category: string;
+  lat?: number;
+  lng?: number;
+}
+
 interface Stop {
   id: string;
-  place: Place;
+  place?: Place;
+  event?: EventItem;
+  type: 'place' | 'event';
   addedAt: Date;
 }
 
@@ -49,158 +65,165 @@ const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL as string) || '';
 // ============================================================================
 
 const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
-  // Original cities
-  'new york': { lat: 40.7128, lng: -73.9960 },
-  'los angeles': { lat: 34.0522, lng: -118.2437 },
-  'miami': { lat: 25.7617, lng: -80.1918 },
-  'atlanta': { lat: 33.749, lng: -84.388 },
-  'chicago': { lat: 41.8781, lng: -87.6298 },
-  'washington': { lat: 38.9072, lng: -77.0369 },
-  'new orleans': { lat: 29.9511, lng: -90.0715 },
-  'las vegas': { lat: 36.1699, lng: -115.1398 },
-  'san francisco': { lat: 37.7749, lng: -122.4194 },
-  'seattle': { lat: 47.6062, lng: -122.3321 },
-  'austin': { lat: 30.2672, lng: -97.7431 },
-  'nashville': { lat: 36.1627, lng: -86.7816 },
-  'toronto': { lat: 43.6532, lng: -79.3832 },
-  'vancouver': { lat: 49.2827, lng: -123.1207 },
-  'montreal': { lat: 45.5017, lng: -73.5673 },
-  'cancun': { lat: 21.1619, lng: -86.8515 },
-  'san juan': { lat: 18.4655, lng: -66.1057 },
-  'london': { lat: 51.5074, lng: -0.1278 },
-  'paris': { lat: 48.8566, lng: 2.3522 },
-  'barcelona': { lat: 41.3874, lng: 2.1686 },
-  'rome': { lat: 41.9028, lng: 12.4964 },
-  'lisbon': { lat: 38.7223, lng: -9.1393 },
-  'amsterdam': { lat: 52.3676, lng: 4.9041 },
-  'berlin': { lat: 52.5200, lng: 13.4050 },
-  'lagos': { lat: 6.5244, lng: 3.3792 },
+  'abu dhabi': { lat: 24.4539, lng: 54.3773 },
+  'abuja': { lat: 9.0579, lng: 7.4951 },
   'accra': { lat: 5.6037, lng: -0.1870 },
-  'cape town': { lat: -33.9249, lng: 18.4241 },
-  'nairobi': { lat: -1.2921, lng: 36.8219 },
-  'marrakech': { lat: 31.6295, lng: -7.9811 },
-  'dubai': { lat: 25.2048, lng: 55.2708 },
-  'tokyo': { lat: 35.6762, lng: 139.6503 },
-  'bangkok': { lat: 13.7563, lng: 100.5018 },
-  'singapore': { lat: 1.3521, lng: 103.8198 },
-  'seoul': { lat: 37.5665, lng: 126.9780 },
+  'addis ababa': { lat: 9.025, lng: 38.7469 },
+  'amman': { lat: 31.9454, lng: 35.9284 },
+  'amsterdam': { lat: 52.3676, lng: 4.9041 },
+  'aruba': { lat: 12.5211, lng: -69.9683 },
+  'athens': { lat: 37.9838, lng: 23.7275 },
+  'atlanta': { lat: 33.749, lng: -84.388 },
+  'auckland': { lat: -36.8485, lng: 174.7633 },
+  'austin': { lat: 30.2672, lng: -97.7431 },
   'bali': { lat: -8.3405, lng: 115.0920 },
-  'sydney': { lat: -33.8688, lng: 151.2093 },
-  'melbourne': { lat: -37.8136, lng: 144.9631 },
-  'rio de janeiro': { lat: -22.9068, lng: -43.1729 },
-  'buenos aires': { lat: -34.6037, lng: -58.3816 },
-  // North America
+  'bangkok': { lat: 13.7563, lng: 100.5018 },
+  'barcelona': { lat: 41.3874, lng: 2.1686 },
+  'beijing': { lat: 39.9042, lng: 116.4074 },
+  'beirut': { lat: 33.8938, lng: 35.5018 },
+  'belize city': { lat: 17.5046, lng: -88.1962 },
+  'berlin': { lat: 52.5200, lng: 13.4050 },
+  'bogota': { lat: 4.711, lng: -74.0721 },
   'boston': { lat: 42.3601, lng: -71.0589 },
-  'philadelphia': { lat: 39.9526, lng: -75.1652 },
-  'denver': { lat: 39.7392, lng: -104.9903 },
-  'portland': { lat: 45.5155, lng: -122.6789 },
-  'san diego': { lat: 32.7157, lng: -117.1611 },
-  'honolulu': { lat: 21.3069, lng: -157.8583 },
-  'detroit': { lat: 42.3314, lng: -83.0458 },
-  'minneapolis': { lat: 44.9778, lng: -93.265 },
-  'dallas': { lat: 32.7767, lng: -96.797 },
-  'houston': { lat: 29.7604, lng: -95.3698 },
-  'phoenix': { lat: 33.4484, lng: -112.074 },
-  'charlotte': { lat: 35.2271, lng: -80.8431 },
-  'tampa': { lat: 27.9506, lng: -82.4572 },
-  'orlando': { lat: 28.5383, lng: -81.3792 },
-  'savannah': { lat: 32.0809, lng: -81.0912 },
-  'charleston': { lat: 32.7765, lng: -79.9311 },
-  'memphis': { lat: 35.1495, lng: -90.049 },
-  'pittsburgh': { lat: 40.4406, lng: -79.9959 },
-  'san antonio': { lat: 29.4241, lng: -98.4936 },
-  'st. louis': { lat: 38.627, lng: -90.1994 },
-  'calgary': { lat: 51.0447, lng: -114.0719 },
-  'ottawa': { lat: 45.4215, lng: -75.6972 },
-  'quebec city': { lat: 46.8139, lng: -71.208 },
-  // Caribbean
-  'havana': { lat: 23.1136, lng: -82.3666 },
-  'kingston': { lat: 18.0179, lng: -76.8099 },
-  'nassau': { lat: 25.048, lng: -77.3554 },
-  'punta cana': { lat: 18.5601, lng: -68.3725 },
   'bridgetown': { lat: 13.1132, lng: -59.5988 },
-  // Europe
-  'madrid': { lat: 40.4168, lng: -3.7038 },
-  'prague': { lat: 50.0755, lng: 14.4378 },
-  'vienna': { lat: 48.2082, lng: 16.3738 },
+  'brisbane': { lat: -27.4698, lng: 153.0251 },
+  'brussels': { lat: 50.8503, lng: 4.3517 },
   'budapest': { lat: 47.4979, lng: 19.0402 },
+  'buenos aires': { lat: -34.6037, lng: -58.3816 },
+  'calgary': { lat: 51.0447, lng: -114.0719 },
+  'cancun': { lat: 21.1619, lng: -86.8515 },
+  'cape town': { lat: -33.9249, lng: 18.4241 },
+  'cartagena': { lat: 10.391, lng: -75.5364 },
+  'casablanca': { lat: 33.5731, lng: -7.5898 },
+  'charleston': { lat: 32.7765, lng: -79.9311 },
+  'charlotte': { lat: 35.2271, lng: -80.8431 },
+  'chiang mai': { lat: 18.7883, lng: 98.9853 },
+  'chicago': { lat: 41.8781, lng: -87.6298 },
+  'colombo': { lat: 6.9271, lng: 79.8612 },
+  'copenhagen': { lat: 55.6761, lng: 12.5683 },
+  'curacao': { lat: 12.1696, lng: -68.99 },
+  'cusco': { lat: -13.5319, lng: -71.9675 },
+  'dakar': { lat: 14.7167, lng: -17.4677 },
+  'dallas': { lat: 32.7767, lng: -96.797 },
+  'dar es salaam': { lat: -6.7924, lng: 39.2083 },
+  'delhi': { lat: 28.7041, lng: 77.1025 },
+  'denver': { lat: 39.7392, lng: -104.9903 },
+  'detroit': { lat: 42.3314, lng: -83.0458 },
+  'doha': { lat: 25.2854, lng: 51.531 },
+  'dubai': { lat: 25.2048, lng: 55.2708 },
   'dublin': { lat: 53.3498, lng: -6.2603 },
   'edinburgh': { lat: 55.9533, lng: -3.1883 },
-  'copenhagen': { lat: 55.6761, lng: 12.5683 },
-  'stockholm': { lat: 59.3293, lng: 18.0686 },
-  'oslo': { lat: 59.9139, lng: 10.7522 },
-  'helsinki': { lat: 60.1699, lng: 24.9384 },
-  'warsaw': { lat: 52.2297, lng: 21.0122 },
-  'krakow': { lat: 50.0647, lng: 19.945 },
-  'athens': { lat: 37.9838, lng: 23.7275 },
-  'santorini': { lat: 36.3932, lng: 25.4615 },
-  'istanbul': { lat: 41.0082, lng: 28.9784 },
-  'zurich': { lat: 47.3769, lng: 8.5417 },
-  'milan': { lat: 45.4642, lng: 9.19 },
-  'florence': { lat: 43.7696, lng: 11.2558 },
-  'venice': { lat: 45.4408, lng: 12.3155 },
-  'munich': { lat: 48.1351, lng: 11.582 },
-  'brussels': { lat: 50.8503, lng: 4.3517 },
-  'nice': { lat: 43.7102, lng: 7.262 },
-  'seville': { lat: 37.3891, lng: -5.9845 },
-  // Asia
-  'hong kong': { lat: 22.3193, lng: 114.1694 },
-  'shanghai': { lat: 31.2304, lng: 121.4737 },
-  'beijing': { lat: 39.9042, lng: 116.4074 },
-  'taipei': { lat: 25.033, lng: 121.5654 },
-  'osaka': { lat: 34.6937, lng: 135.5023 },
-  'kyoto': { lat: 35.0116, lng: 135.7681 },
-  'mumbai': { lat: 19.076, lng: 72.8777 },
-  'delhi': { lat: 28.7041, lng: 77.1025 },
-  'jaipur': { lat: 26.9124, lng: 75.7873 },
-  'hanoi': { lat: 21.0278, lng: 105.8342 },
-  'ho chi minh city': { lat: 10.8231, lng: 106.6297 },
-  'kuala lumpur': { lat: 3.139, lng: 101.6869 },
-  'manila': { lat: 14.5995, lng: 120.9842 },
-  'colombo': { lat: 6.9271, lng: 79.8612 },
-  'kathmandu': { lat: 27.7172, lng: 85.324 },
-  'phnom penh': { lat: 11.5564, lng: 104.9282 },
-  'chiang mai': { lat: 18.7883, lng: 98.9853 },
-  // Africa
-  'addis ababa': { lat: 9.025, lng: 38.7469 },
-  'dar es salaam': { lat: -6.7924, lng: 39.2083 },
-  'zanzibar': { lat: -6.1659, lng: 39.2026 },
-  'dakar': { lat: 14.7167, lng: -17.4677 },
-  'casablanca': { lat: 33.5731, lng: -7.5898 },
-  'johannesburg': { lat: -26.2041, lng: 28.0473 },
-  'luanda': { lat: -8.839, lng: 13.2894 },
-  'abuja': { lat: 9.0579, lng: 7.4951 },
-  'kigali': { lat: -1.9403, lng: 29.8739 },
-  'kampala': { lat: 0.3476, lng: 32.5825 },
-  // South America
-  'bogota': { lat: 4.711, lng: -74.0721 },
-  'medellin': { lat: 6.2442, lng: -75.5812 },
-  'cartagena': { lat: 10.391, lng: -75.5364 },
-  'lima': { lat: -12.0464, lng: -77.0428 },
-  'cusco': { lat: -13.5319, lng: -71.9675 },
-  'santiago': { lat: -33.4489, lng: -70.6693 },
-  'quito': { lat: -0.1807, lng: -78.4678 },
-  'montevideo': { lat: -34.9011, lng: -56.1645 },
-  'la paz': { lat: -16.4897, lng: -68.1193 },
-  'sao paulo': { lat: -23.5505, lng: -46.6333 },
-  // Middle East
-  'abu dhabi': { lat: 24.4539, lng: 54.3773 },
-  'doha': { lat: 25.2854, lng: 51.531 },
-  'riyadh': { lat: 24.7136, lng: 46.6753 },
-  'amman': { lat: 31.9454, lng: 35.9284 },
-  'beirut': { lat: 33.8938, lng: 35.5018 },
-  'muscat': { lat: 23.588, lng: 58.3829 },
-  // Oceania
-  'auckland': { lat: -36.8485, lng: 174.7633 },
-  'queenstown': { lat: -45.0312, lng: 168.6626 },
-  'perth': { lat: -31.9505, lng: 115.8605 },
-  'brisbane': { lat: -27.4698, lng: 153.0251 },
+  'essaouira': { lat: 31.5085, lng: -9.7595 },
   'fiji': { lat: -17.7134, lng: 178.065 },
-  // Central America
-  'panama city': { lat: 8.9824, lng: -79.5199 },
-  'san jose': { lat: 9.9281, lng: -84.0907 },
+  'florence': { lat: 43.7696, lng: 11.2558 },
+  'gold coast': { lat: -28.0167, lng: 153.4 },
   'guatemala city': { lat: 14.6349, lng: -90.5069 },
-  'belize city': { lat: 17.5046, lng: -88.1962 },
+  'hanoi': { lat: 21.0278, lng: 105.8342 },
+  'havana': { lat: 23.1136, lng: -82.3666 },
+  'helsinki': { lat: 60.1699, lng: 24.9384 },
+  'ho chi minh city': { lat: 10.8231, lng: 106.6297 },
+  'hong kong': { lat: 22.3193, lng: 114.1694 },
+  'honolulu': { lat: 21.3069, lng: -157.8583 },
+  'houston': { lat: 29.7604, lng: -95.3698 },
+  'istanbul': { lat: 41.0082, lng: 28.9784 },
+  'jaipur': { lat: 26.9124, lng: 75.7873 },
+  'jakarta': { lat: -6.2088, lng: 106.8456 },
+  'johannesburg': { lat: -26.2041, lng: 28.0473 },
+  'kampala': { lat: 0.3476, lng: 32.5825 },
+  'kathmandu': { lat: 27.7172, lng: 85.324 },
+  'kigali': { lat: -1.9403, lng: 29.8739 },
+  'kingston': { lat: 18.0179, lng: -76.8099 },
+  'krakow': { lat: 50.0647, lng: 19.945 },
+  'kuala lumpur': { lat: 3.139, lng: 101.6869 },
+  'kyoto': { lat: 35.0116, lng: 135.7681 },
+  'la paz': { lat: -16.4897, lng: -68.1193 },
+  'lagos': { lat: 6.5244, lng: 3.3792 },
+  'las vegas': { lat: 36.1699, lng: -115.1398 },
+  'lima': { lat: -12.0464, lng: -77.0428 },
+  'lisbon': { lat: 38.7223, lng: -9.1393 },
+  'london': { lat: 51.5074, lng: -0.1278 },
+  'los angeles': { lat: 34.0522, lng: -118.2437 },
+  'luanda': { lat: -8.839, lng: 13.2894 },
+  'madrid': { lat: 40.4168, lng: -3.7038 },
+  'manila': { lat: 14.5995, lng: 120.9842 },
+  'maputo': { lat: -25.9692, lng: 32.5732 },
+  'marrakech': { lat: 31.6295, lng: -7.9811 },
+  'mauritius': { lat: -20.3484, lng: 57.5522 },
+  'medellin': { lat: 6.2442, lng: -75.5812 },
+  'melbourne': { lat: -37.8136, lng: 144.9631 },
+  'memphis': { lat: 35.1495, lng: -90.049 },
+  'mexico city': { lat: 19.4326, lng: -99.1332 },
+  'miami': { lat: 25.7617, lng: -80.1918 },
+  'milan': { lat: 45.4642, lng: 9.19 },
+  'minneapolis': { lat: 44.9778, lng: -93.265 },
+  'montego bay': { lat: 18.4762, lng: -77.8939 },
+  'montevideo': { lat: -34.9011, lng: -56.1645 },
+  'montreal': { lat: 45.5017, lng: -73.5673 },
+  'mumbai': { lat: 19.076, lng: 72.8777 },
+  'munich': { lat: 48.1351, lng: 11.582 },
+  'muscat': { lat: 23.588, lng: 58.3829 },
+  'nairobi': { lat: -1.2921, lng: 36.8219 },
+  'nashville': { lat: 36.1627, lng: -86.7816 },
+  'nassau': { lat: 25.048, lng: -77.3554 },
+  'new orleans': { lat: 29.9511, lng: -90.0715 },
+  'new york': { lat: 40.7128, lng: -73.9960 },
+  'nice': { lat: 43.7102, lng: 7.262 },
+  'ocho rios': { lat: 18.4074, lng: -77.1003 },
+  'orlando': { lat: 28.5383, lng: -81.3792 },
+  'osaka': { lat: 34.6937, lng: 135.5023 },
+  'oslo': { lat: 59.9139, lng: 10.7522 },
+  'ottawa': { lat: 45.4215, lng: -75.6972 },
+  'panama city': { lat: 8.9824, lng: -79.5199 },
+  'paris': { lat: 48.8566, lng: 2.3522 },
+  'perth': { lat: -31.9505, lng: 115.8605 },
+  'philadelphia': { lat: 39.9526, lng: -75.1652 },
+  'phnom penh': { lat: 11.5564, lng: 104.9282 },
+  'phoenix': { lat: 33.4484, lng: -112.074 },
+  'pittsburgh': { lat: 40.4406, lng: -79.9959 },
+  'portland': { lat: 45.5155, lng: -122.6789 },
+  'porto': { lat: 41.1579, lng: -8.6291 },
+  'prague': { lat: 50.0755, lng: 14.4378 },
+  'punta cana': { lat: 18.5601, lng: -68.3725 },
+  'quebec city': { lat: 46.8139, lng: -71.208 },
+  'queenstown': { lat: -45.0312, lng: 168.6626 },
+  'quito': { lat: -0.1807, lng: -78.4678 },
+  'rio de janeiro': { lat: -22.9068, lng: -43.1729 },
+  'riyadh': { lat: 24.7136, lng: 46.6753 },
+  'rome': { lat: 41.9028, lng: 12.4964 },
+  'san antonio': { lat: 29.4241, lng: -98.4936 },
+  'san diego': { lat: 32.7157, lng: -117.1611 },
+  'san francisco': { lat: 37.7749, lng: -122.4194 },
+  'san jose': { lat: 9.9281, lng: -84.0907 },
+  'san juan': { lat: 18.4655, lng: -66.1057 },
+  'santiago': { lat: -33.4489, lng: -70.6693 },
+  'santorini': { lat: 36.3932, lng: 25.4615 },
+  'santo domingo': { lat: 18.4861, lng: -69.9312 },
+  'sao paulo': { lat: -23.5505, lng: -46.6333 },
+  'savannah': { lat: 32.0809, lng: -81.0912 },
+  'seattle': { lat: 47.6062, lng: -122.3321 },
+  'seoul': { lat: 37.5665, lng: 126.9780 },
+  'seville': { lat: 37.3891, lng: -5.9845 },
+  'shanghai': { lat: 31.2304, lng: 121.4737 },
+  'siem reap': { lat: 13.3633, lng: 103.8564 },
+  'singapore': { lat: 1.3521, lng: 103.8198 },
+  'st. lucia': { lat: 13.9094, lng: -60.9789 },
+  'st. louis': { lat: 38.627, lng: -90.1994 },
+  'stockholm': { lat: 59.3293, lng: 18.0686 },
+  'sydney': { lat: -33.8688, lng: 151.2093 },
+  'taipei': { lat: 25.033, lng: 121.5654 },
+  'tampa': { lat: 27.9506, lng: -82.4572 },
+  'tel aviv': { lat: 32.0853, lng: 34.7818 },
+  'tokyo': { lat: 35.6762, lng: 139.6503 },
+  'toronto': { lat: 43.6532, lng: -79.3832 },
+  'trinidad': { lat: 10.6918, lng: -61.2225 },
+  'tulum': { lat: 20.2114, lng: -87.4654 },
+  'vancouver': { lat: 49.2827, lng: -123.1207 },
+  'venice': { lat: 45.4408, lng: 12.3155 },
+  'vienna': { lat: 48.2082, lng: 16.3738 },
+  'warsaw': { lat: 52.2297, lng: 21.0122 },
+  'washington': { lat: 38.9072, lng: -77.0369 },
+  'zanzibar': { lat: -6.1659, lng: 39.2026 },
+  'zurich': { lat: 47.3769, lng: 8.5417 },
 };
 
 // ============================================================================
@@ -213,6 +236,12 @@ const RESERVABLE_TYPES = [
   'restaurant', 'steak_house', 'seafood_restaurant', 'pizza_restaurant',
   'sushi_restaurant', 'brunch_restaurant', 'breakfast_restaurant',
   'bar', 'cocktail_bar', 'wine_bar',
+];
+
+const BOOKABLE_TYPES = [
+  'museum', 'art_gallery', 'performing_arts_theater', 'aquarium', 'zoo',
+  'amusement_park', 'movie_theater', 'spa', 'bowling_alley', 'stadium',
+  'tourist_attraction',
 ];
 
 const EMERGENCY_BY_COUNTRY: Record<string, { police: string; emergency: string }> = {
@@ -504,7 +533,7 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed.expires > Date.now()) {
-          setDayPlan(parsed.stops.map((s: Stop) => ({ ...s, addedAt: new Date(s.addedAt) })));
+          setDayPlan(parsed.stops.map((s: Stop) => ({ ...s, type: s.type || 'place', addedAt: new Date(s.addedAt) })));
         } else {
           localStorage.removeItem(key);
           setDayPlan([]);
@@ -603,16 +632,24 @@ export default function App() {
   // --------------------------------------------------------------------------
 
   const addToPlan = (place: Place) => {
-    if (dayPlan.find(s => s.place.placeId === place.placeId)) return;
-    setDayPlan(prev => [...prev, { id: crypto.randomUUID(), place, addedAt: new Date() }]);
+    if (dayPlan.find(s => s.place?.placeId === place.placeId)) return;
+    setDayPlan(prev => [...prev, { id: crypto.randomUUID(), type: 'place', place, addedAt: new Date() }]);
     showToast(`Added ${place.name} to your plan`);
   };
+
+  const addEventToPlan = (event: EventItem) => {
+    if (dayPlan.find(s => s.event?.id === event.id)) return;
+    setDayPlan(prev => [...prev, { id: crypto.randomUUID(), type: 'event', event, addedAt: new Date() }]);
+    showToast(`Added ${event.name} to your plan`);
+  };
+
+  const isEventInPlan = (eventId: string) => dayPlan.some(s => s.event?.id === eventId);
 
   const removeFromPlan = (stopId: string) => {
     setDayPlan(prev => prev.filter(s => s.id !== stopId));
   };
 
-  const isInPlan = (placeId: string) => dayPlan.some(s => s.place.placeId === placeId);
+  const isInPlan = (placeId: string) => dayPlan.some(s => s.place?.placeId === placeId);
 
   const clearPlan = () => {
     setDayPlan([]);
@@ -627,14 +664,20 @@ export default function App() {
     setDayPlan(newPlan);
   };
 
+  const getStopName = (stop: Stop) => stop.type === 'event' ? stop.event!.name : stop.place!.name;
+  const getStopCategory = (stop: Stop) => stop.type === 'event' ? stop.event!.category : stop.place!.categoryDisplay;
+
   const getRouteUrl = () => {
     if (dayPlan.length === 0) return '';
-    const points = dayPlan.map(s => `${s.place.lat},${s.place.lng}`);
+    const points = dayPlan
+      .filter(s => s.type === 'place' ? (s.place!.lat && s.place!.lng) : (s.event?.lat && s.event?.lng))
+      .map(s => s.type === 'place' ? `${s.place!.lat},${s.place!.lng}` : `${s.event!.lat},${s.event!.lng}`);
+    if (points.length === 0) return '';
     return `https://www.google.com/maps/dir/${points.join('/')}`;
   };
 
   const sharePlan = async () => {
-    const text = dayPlan.map((s, i) => `${i + 1}. ${s.place.name} (${s.place.categoryDisplay})`).join('\n');
+    const text = dayPlan.map((s, i) => `${i + 1}. ${getStopName(s)} (${getStopCategory(s)})`).join('\n');
     const summary = `My ${cityLabel} Day Plan:\n${text}\n\nPlanned with NxStops`;
     if (navigator.share) {
       await navigator.share({ title: `${cityLabel} Day Plan`, text: summary });
@@ -678,6 +721,19 @@ export default function App() {
   };
 
   const isReservable = (place: Place): boolean => RESERVABLE_TYPES.includes(place.category);
+  const isBookable = (place: Place): boolean => BOOKABLE_TYPES.includes(place.category);
+
+  const getBookingUrl = (place: Place): string => {
+    // Prefer the place's own website for reservations/bookings
+    if (place.website) return place.website;
+    // Fall back to Google Maps which often has "Reserve" or "Book" links
+    return place.googleMapsUrl;
+  };
+
+  const getBookingLabel = (place: Place): string => {
+    if (RESERVABLE_TYPES.includes(place.category)) return 'Reserve';
+    return 'Book';
+  };
 
   // --------------------------------------------------------------------------
   // OTHER HANDLERS
@@ -837,7 +893,7 @@ export default function App() {
           {/* Action Row */}
           <div style={{ display: 'flex', gap: '8px' }} onClick={e => e.stopPropagation()}>
             <button
-              onClick={() => inPlan ? removeFromPlan(dayPlan.find(s => s.place.placeId === place.placeId)!.id) : addToPlan(place)}
+              onClick={() => inPlan ? removeFromPlan(dayPlan.find(s => s.place?.placeId === place.placeId)!.id) : addToPlan(place)}
               style={{
                 flex: 1, padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
                 cursor: 'pointer',
@@ -860,10 +916,10 @@ export default function App() {
                 <PhoneIcon />
               </a>
             )}
-            {isReservable(place) && place.googleMapsUrl && (
-              <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+            {(isReservable(place) || isBookable(place)) && (place.website || place.googleMapsUrl) && (
+              <a href={getBookingUrl(place)} target="_blank" rel="noopener noreferrer"
                 style={{ padding: '10px 12px', borderRadius: '10px', background: 'rgba(34,197,94,0.1)', color: '#34D399', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', fontSize: '11px', fontWeight: 600, border: '1px solid rgba(34,197,94,0.2)' }}>
-                Reserve
+                {getBookingLabel(place)}
               </a>
             )}
             <button onClick={() => sharePlace(place)}
@@ -894,52 +950,69 @@ export default function App() {
     return `${hour12}:${m.toString().padStart(2, '0')} ${isPM ? 'PM' : 'AM'}`;
   };
 
-  const EventCard = ({ event }: { event: { id: string; name: string; date: string; time: string; venue: string; venueAddress: string; imageUrl: string | null; url: string; category: string } }) => (
-    <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
-      {event.imageUrl && (
-        <div style={{
-          height: '140px', width: '100%', position: 'relative',
-          background: `linear-gradient(to bottom, transparent 50%, rgba(12,10,9,0.9)), url(${event.imageUrl})`,
-          backgroundSize: 'cover', backgroundPosition: 'center',
-        }}>
+  const EventCard = ({ event }: { event: EventItem }) => {
+    const inPlan = isEventInPlan(event.id);
+    return (
+      <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+        {event.imageUrl && (
           <div style={{
-            position: 'absolute', top: '10px', left: '10px',
-            padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 600,
-            background: 'rgba(168,85,247,0.2)', color: '#C084FC', backdropFilter: 'blur(8px)',
+            height: '140px', width: '100%', position: 'relative',
+            background: `linear-gradient(to bottom, transparent 50%, rgba(12,10,9,0.9)), url(${event.imageUrl})`,
+            backgroundSize: 'cover', backgroundPosition: 'center',
           }}>
-            {event.category}
+            <div style={{
+              position: 'absolute', top: '10px', left: '10px',
+              padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 600,
+              background: 'rgba(168,85,247,0.2)', color: '#C084FC', backdropFilter: 'blur(8px)',
+            }}>
+              {event.category}
+            </div>
+          </div>
+        )}
+        <div style={{ padding: '14px 16px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>{event.name}</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+            <span style={{ fontSize: '13px', color: '#F59E0B', fontWeight: 500 }}>
+              {formatEventDate(event.date)}
+            </span>
+            {event.time && (
+              <span style={{ fontSize: '12px', color: '#A8A29E' }}>
+                {formatEventTime(event.time)}
+              </span>
+            )}
+          </div>
+          <p style={{ fontSize: '12px', color: '#A8A29E', marginBottom: '10px' }}>
+            {event.venue}{event.venueAddress ? ` — ${event.venueAddress}` : ''}
+          </p>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={() => inPlan ? removeFromPlan(dayPlan.find(s => s.event?.id === event.id)!.id) : addEventToPlan(event)}
+              style={{
+                flex: 1, padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
+                cursor: 'pointer',
+                background: inPlan ? 'transparent' : 'linear-gradient(135deg, #8B5CF6, #7C3AED)',
+                color: inPlan ? '#C084FC' : '#FFFBEB',
+                border: inPlan ? '1.5px solid #8B5CF6' : 'none',
+              }}
+            >
+              {inPlan ? '✓ In Plan' : '+ Add to Plan'}
+            </button>
+            {event.url && (
+              <a href={event.url} target="_blank" rel="noopener noreferrer"
+                style={{
+                  flex: 1, padding: '10px', borderRadius: '10px',
+                  background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)',
+                  color: '#C084FC', fontSize: '13px', fontWeight: 600,
+                  textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box',
+                }}>
+                Get Tickets
+              </a>
+            )}
           </div>
         </div>
-      )}
-      <div style={{ padding: '14px 16px' }}>
-        <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>{event.name}</h3>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
-          <span style={{ fontSize: '13px', color: '#F59E0B', fontWeight: 500 }}>
-            {formatEventDate(event.date)}
-          </span>
-          {event.time && (
-            <span style={{ fontSize: '12px', color: '#A8A29E' }}>
-              {formatEventTime(event.time)}
-            </span>
-          )}
-        </div>
-        <p style={{ fontSize: '12px', color: '#A8A29E', marginBottom: '10px' }}>
-          {event.venue}{event.venueAddress ? ` — ${event.venueAddress}` : ''}
-        </p>
-        {event.url && (
-          <a href={event.url} target="_blank" rel="noopener noreferrer"
-            style={{
-              display: 'block', width: '100%', padding: '10px', borderRadius: '10px',
-              background: 'linear-gradient(135deg, #8B5CF6, #7C3AED)',
-              color: '#FFFBEB', fontSize: '13px', fontWeight: 600,
-              textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box',
-            }}>
-            Get Tickets
-          </a>
-        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   // ==========================================================================
   // HOME SCREEN
@@ -1433,7 +1506,7 @@ export default function App() {
       );
     }
 
-    const totalDistance = dayPlan.reduce((sum, s) => sum + (s.place.distance || 0), 0);
+    const totalDistance = dayPlan.reduce((sum, s) => sum + (s.place?.distance || 0), 0);
 
     return (
       <div>
@@ -1464,8 +1537,11 @@ export default function App() {
               <div style={{
                 position: 'absolute', left: '-32px', top: '16px',
                 width: '28px', height: '28px', borderRadius: '50%',
-                background: 'linear-gradient(135deg, #F59E0B, #D97706)',
-                color: '#0C0A09', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: stop.type === 'event'
+                  ? 'linear-gradient(135deg, #8B5CF6, #7C3AED)'
+                  : 'linear-gradient(135deg, #F59E0B, #D97706)',
+                color: stop.type === 'event' ? '#FFFBEB' : '#0C0A09',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: '12px', fontWeight: 700, zIndex: 1,
                 boxShadow: '0 0 0 4px #0C0A09',
               }}>
@@ -1475,36 +1551,60 @@ export default function App() {
               {/* Stop card */}
               <div style={{
                 ...cardStyle, marginBottom: 0, overflow: 'hidden',
-                border: '1px solid rgba(245,158,11,0.1)',
+                border: stop.type === 'event'
+                  ? '1px solid rgba(139,92,246,0.15)'
+                  : '1px solid rgba(245,158,11,0.1)',
               }}>
                 <div style={{ display: 'flex', gap: '12px' }}>
                   {/* Photo thumbnail */}
-                  {stop.place.photoUrl && (
+                  {stop.type === 'place' && stop.place?.photoUrl && (
                     <div style={{
                       width: '80px', height: '80px', borderRadius: '12px', flexShrink: 0,
                       background: `url(${stop.place.photoUrl})`,
                       backgroundSize: 'cover', backgroundPosition: 'center',
                     }} />
                   )}
+                  {stop.type === 'event' && stop.event?.imageUrl && (
+                    <div style={{
+                      width: '80px', height: '80px', borderRadius: '12px', flexShrink: 0,
+                      background: `url(${stop.event.imageUrl})`,
+                      backgroundSize: 'cover', backgroundPosition: 'center',
+                    }} />
+                  )}
 
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {stop.place.name}
+                      {getStopName(stop)}
                     </h3>
-                    <p style={{ fontSize: '12px', color: '#A8A29E', marginBottom: '4px' }}>
-                      {stop.place.categoryDisplay}
-                      {stop.place.distance != null && ` · ${formatDistance(stop.place.distance)}`}
-                    </p>
-                    {stop.place.rating > 0 && (
-                      <div style={{ fontSize: '12px' }}>
-                        <span style={{ color: '#F59E0B' }}>★ {stop.place.rating.toFixed(1)}</span>
-                        <span style={{ color: '#78716C' }}> ({stop.place.reviewCount})</span>
-                      </div>
+                    {stop.type === 'place' && stop.place && (
+                      <>
+                        <p style={{ fontSize: '12px', color: '#A8A29E', marginBottom: '4px' }}>
+                          {stop.place.categoryDisplay}
+                          {stop.place.distance != null && ` · ${formatDistance(stop.place.distance)}`}
+                        </p>
+                        {stop.place.rating > 0 && (
+                          <div style={{ fontSize: '12px' }}>
+                            <span style={{ color: '#F59E0B' }}>★ {stop.place.rating.toFixed(1)}</span>
+                            <span style={{ color: '#78716C' }}> ({stop.place.reviewCount})</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                    {stop.type === 'event' && stop.event && (
+                      <>
+                        <p style={{ fontSize: '12px', color: '#C084FC', marginBottom: '4px' }}>
+                          {formatEventDate(stop.event.date)}
+                          {stop.event.time && ` · ${formatEventTime(stop.event.time)}`}
+                        </p>
+                        <p style={{ fontSize: '12px', color: '#A8A29E' }}>
+                          {stop.event.venue}
+                        </p>
+                      </>
                     )}
 
                     {/* Mini actions */}
                     <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                      {stop.place.googleMapsUrl && (
+                      {stop.type === 'place' && stop.place?.googleMapsUrl && (
                         <a href={stop.place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
                           style={{
                             padding: '5px 10px', borderRadius: '8px', fontSize: '11px',
@@ -1514,7 +1614,7 @@ export default function App() {
                           <DirectionsIcon /> Go
                         </a>
                       )}
-                      {stop.place.phone && (
+                      {stop.type === 'place' && stop.place?.phone && (
                         <a href={`tel:${stop.place.phone}`}
                           style={{
                             padding: '5px 10px', borderRadius: '8px', fontSize: '11px',
@@ -1522,6 +1622,16 @@ export default function App() {
                             textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px',
                           }}>
                           <PhoneIcon /> Call
+                        </a>
+                      )}
+                      {stop.type === 'event' && stop.event?.url && (
+                        <a href={stop.event.url} target="_blank" rel="noopener noreferrer"
+                          style={{
+                            padding: '5px 10px', borderRadius: '8px', fontSize: '11px',
+                            background: 'rgba(139,92,246,0.1)', color: '#C084FC',
+                            textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px',
+                          }}>
+                          🎫 Tickets
                         </a>
                       )}
                     </div>
@@ -1726,22 +1836,28 @@ export default function App() {
               </button>
             </div>
 
-            {/* Reserve */}
-            {isReservable(place) && (
+            {/* Reserve / Book */}
+            {(isReservable(place) || isBookable(place)) && (place.website || place.googleMapsUrl) && (
               <div style={{ marginBottom: '16px' }}>
-                <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+                <a href={getBookingUrl(place)} target="_blank" rel="noopener noreferrer"
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                     width: '100%', padding: '14px', borderRadius: '12px', boxSizing: 'border-box',
                     background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)',
                     color: '#34D399', textDecoration: 'none', fontSize: '14px', fontWeight: 600,
                   }}>
-                  Reserve a Table
+                  {isReservable(place) ? 'Reserve a Table' : 'Book Tickets'}
                 </a>
-                {place.website && (
-                  <a href={place.website} target="_blank" rel="noopener noreferrer"
+                {place.website && place.googleMapsUrl && place.website !== getBookingUrl(place) && (
+                  <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
                     style={{ display: 'block', textAlign: 'center', marginTop: '8px', color: '#A8A29E', fontSize: '12px', textDecoration: 'none' }}>
-                    or visit their website
+                    or view on Google Maps
+                  </a>
+                )}
+                {!place.website && place.googleMapsUrl && (
+                  <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+                    style={{ display: 'block', textAlign: 'center', marginTop: '8px', color: '#A8A29E', fontSize: '12px', textDecoration: 'none' }}>
+                    or view on Google Maps
                   </a>
                 )}
               </div>
@@ -1807,7 +1923,7 @@ export default function App() {
             <button
               onClick={() => {
                 if (inPlan) {
-                  const stop = dayPlan.find(s => s.place.placeId === place.placeId);
+                  const stop = dayPlan.find(s => s.place?.placeId === place.placeId);
                   if (stop) removeFromPlan(stop.id);
                 } else {
                   addToPlan(place);

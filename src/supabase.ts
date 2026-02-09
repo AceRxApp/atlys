@@ -11,7 +11,6 @@ export async function fetchCities() {
     .from('cities')
     .select('*')
     .eq('is_active', true)
-    .order('region')
     .order('name');
   
   if (error) {
