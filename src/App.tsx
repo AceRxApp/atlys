@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
-import { fetchCities, saveEmailSignup, fetchEmailSignups, fetchAllCities, toggleCityActive, authSignUp, authSignIn, authSignOut, authGetSession, authOnStateChange, saveReview, fetchReviews, fetchPlaceTagCounts } from './supabase';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { fetchCities, saveEmailSignup, fetchEmailSignups, fetchAllCities, toggleCityActive, authSignUp, authSignIn, authSignOut, authGetSession, authOnStateChange, saveReview, fetchReviews, fetchPlaceTagCounts, createCrewTrip, loadCrewTrip, updateCrewTripDays, subscribeToCrewTrip, unsubscribeFromCrewTrip } from './supabase';
 import type { Review } from './supabase';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { searchNearby, textSearchPlaces, formatDistance, getHoursStatus } from './services/places';
 import type { Place } from './services/places';
 import { useLocation } from './hooks/useLocation';
@@ -747,8 +748,13 @@ export default function App() {
   const [onboardingStep, setOnboardingStep] = useState(0);
 
   // --- Crew Mode ---
-  const [crewMode, setCrewMode] = useState(false);
+  const [crewMode, setCrewMode] = useState(() => sessionStorage.getItem('nxstops_crew_mode') === 'true');
   const [crewCode, setCrewCode] = useState<string | null>(() => sessionStorage.getItem('nxstops_crew_code'));
+  const [crewSyncing, setCrewSyncing] = useState(false);
+  const [joinCrewInput, setJoinCrewInput] = useState('');
+  const [showJoinCrew, setShowJoinCrew] = useState(false);
+  const crewChannelRef = useRef<RealtimeChannel | null>(null);
+  const crewSyncLock = useRef(false); // Prevent sync loops
 
   // --- Saved / Bookmarks ---
   const [savedPlaces, setSavedPlaces] = useState<Place[]>(() => {
@@ -1005,6 +1011,45 @@ export default function App() {
     const i = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(i);
   }, []);
+
+  // Crew mode: subscribe to realtime updates
+  useEffect(() => {
+    if (!crewMode || !crewCode) {
+      if (crewChannelRef.current) {
+        unsubscribeFromCrewTrip(crewChannelRef.current);
+        crewChannelRef.current = null;
+      }
+      return;
+    }
+    const channel = subscribeToCrewTrip(crewCode, (remoteDays) => {
+      if (crewSyncLock.current) return; // Skip if we're the one who updated
+      crewSyncLock.current = true;
+      // Parse remote days back into Stop format with Date objects
+      const parsed: Record<number, Stop[]> = {};
+      for (const [day, stops] of Object.entries(remoteDays)) {
+        parsed[Number(day)] = (stops as Stop[]).map(s => ({
+          ...s,
+          addedAt: new Date(s.addedAt),
+        }));
+      }
+      setTripDays(parsed);
+      setTimeout(() => { crewSyncLock.current = false; }, 1000);
+    });
+    crewChannelRef.current = channel;
+    return () => {
+      unsubscribeFromCrewTrip(channel);
+      crewChannelRef.current = null;
+    };
+  }, [crewMode, crewCode]);
+
+  // Crew mode: sync local changes to Supabase
+  useEffect(() => {
+    if (!crewMode || !crewCode || crewSyncLock.current) return;
+    const timer = setTimeout(() => {
+      updateCrewTripDays(crewCode, tripDays);
+    }, 500); // Debounce 500ms
+    return () => clearTimeout(timer);
+  }, [tripDays, crewMode, crewCode]);
 
   // Fetch places
   const fetchPlaces = useCallback(async () => {
@@ -2449,7 +2494,7 @@ export default function App() {
   const PlanScreen = () => {
     const sortedDays = Object.keys(tripDays).map(Number).sort((a, b) => a - b);
 
-    if (totalStops === 0) {
+    if (totalStops === 0 && !crewMode) {
       return (
         <div style={{ textAlign: 'center', paddingTop: '60px' }}>
           <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.6 }}>🗺️</div>
@@ -2457,17 +2502,115 @@ export default function App() {
           <p style={{ color: '#A8A29E', fontSize: '14px', marginBottom: '24px', lineHeight: 1.5 }}>
             Explore places and tap &quot;+ Add&quot; to build your trip plan
           </p>
-          <button
-            onClick={() => setScreen('discover')}
-            style={{
-              background: 'linear-gradient(135deg, #F59E0B, #D97706)', color: '#0C0A09',
-              border: 'none', borderRadius: '14px', padding: '14px 28px',
-              fontSize: '15px', fontWeight: 600, cursor: 'pointer',
-              boxShadow: '0 4px 20px rgba(245,158,11,0.3)',
-            }}
-          >
-            Start Exploring →
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
+            <button
+              onClick={() => setScreen('discover')}
+              style={{
+                background: 'linear-gradient(135deg, #F59E0B, #D97706)', color: '#0C0A09',
+                border: 'none', borderRadius: '14px', padding: '14px 28px',
+                fontSize: '15px', fontWeight: 600, cursor: 'pointer',
+                boxShadow: '0 4px 20px rgba(245,158,11,0.3)',
+              }}
+            >
+              Start Exploring →
+            </button>
+            <button
+              onClick={() => setShowJoinCrew(true)}
+              style={{
+                background: 'none', border: '1px solid rgba(255,255,255,0.1)',
+                color: '#A8A29E', borderRadius: '14px', padding: '12px 24px',
+                fontSize: '14px', cursor: 'pointer',
+              }}
+            >
+              👥 Join a Crew
+            </button>
+          </div>
+          {/* Inline Join Crew */}
+          {showJoinCrew && (
+            <div style={{ ...cardStyle, marginTop: '20px', padding: '16px', textAlign: 'left' }}>
+              <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '8px', color: '#FFFBEB' }}>Enter Crew Code</div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="text"
+                  placeholder="e.g. X7K3NP"
+                  value={joinCrewInput}
+                  onChange={e => setJoinCrewInput(e.target.value.toUpperCase())}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && joinCrewInput.length >= 4) {
+                      // Inline join logic
+                      const doJoin = async () => {
+                        const code = joinCrewInput.trim().toUpperCase();
+                        setCrewSyncing(true);
+                        const trip = await loadCrewTrip(code);
+                        if (trip) {
+                          const parsed: Record<number, Stop[]> = {};
+                          for (const [day, stops] of Object.entries(trip.trip_days)) {
+                            parsed[Number(day)] = (stops as Stop[]).map(s => ({
+                              ...s, addedAt: new Date((s as Stop).addedAt),
+                            }));
+                          }
+                          setTripDays(parsed);
+                          setCrewMode(true);
+                          setCrewCode(code);
+                          sessionStorage.setItem('nxstops_crew_code', code);
+                          sessionStorage.setItem('nxstops_crew_mode', 'true');
+                          setShowJoinCrew(false);
+                          setJoinCrewInput('');
+                          showToast(`Joined crew ${code}!`);
+                        } else {
+                          showToast('Crew not found');
+                        }
+                        setCrewSyncing(false);
+                      };
+                      doJoin();
+                    }
+                  }}
+                  maxLength={6}
+                  style={{
+                    flex: 1, padding: '12px', borderRadius: '10px',
+                    border: '1px solid rgba(255,255,255,0.1)', background: '#0C0A09',
+                    color: '#FFFBEB', fontSize: '18px', fontWeight: 700,
+                    letterSpacing: '4px', textAlign: 'center', outline: 'none',
+                  }}
+                />
+                <button
+                  onClick={async () => {
+                    const code = joinCrewInput.trim().toUpperCase();
+                    if (code.length < 4) return;
+                    setCrewSyncing(true);
+                    const trip = await loadCrewTrip(code);
+                    if (trip) {
+                      const parsed: Record<number, Stop[]> = {};
+                      for (const [day, stops] of Object.entries(trip.trip_days)) {
+                        parsed[Number(day)] = (stops as Stop[]).map(s => ({
+                          ...s, addedAt: new Date((s as Stop).addedAt),
+                        }));
+                      }
+                      setTripDays(parsed);
+                      setCrewMode(true);
+                      setCrewCode(code);
+                      sessionStorage.setItem('nxstops_crew_code', code);
+                      sessionStorage.setItem('nxstops_crew_mode', 'true');
+                      setShowJoinCrew(false);
+                      setJoinCrewInput('');
+                      showToast(`Joined crew ${code}!`);
+                    } else {
+                      showToast('Crew not found');
+                    }
+                    setCrewSyncing(false);
+                  }}
+                  disabled={crewSyncing || joinCrewInput.length < 4}
+                  style={{
+                    padding: '12px 20px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                    background: joinCrewInput.length >= 4 ? '#F59E0B' : 'rgba(255,255,255,0.06)',
+                    color: joinCrewInput.length >= 4 ? '#0C0A09' : '#78716C',
+                    fontSize: '14px', fontWeight: 600,
+                  }}>
+                  {crewSyncing ? '...' : 'Join'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       );
     }
@@ -2479,17 +2622,55 @@ export default function App() {
       return code;
     };
 
-    const toggleCrewMode = () => {
-      if (crewMode) {
-        setCrewMode(false);
-        setCrewCode(null);
-        sessionStorage.removeItem('nxstops_crew_code');
-      } else {
-        const code = generateCrewCode();
+    const startCrewMode = async () => {
+      const code = generateCrewCode();
+      setCrewSyncing(true);
+      const created = await createCrewTrip(code, citySlug, cityLabel, tripDays);
+      if (created) {
         setCrewMode(true);
         setCrewCode(code);
         sessionStorage.setItem('nxstops_crew_code', code);
+        sessionStorage.setItem('nxstops_crew_mode', 'true');
+        showToast('Crew mode activated!');
+      } else {
+        showToast('Failed to start crew mode. Try again.');
       }
+      setCrewSyncing(false);
+    };
+
+    const stopCrewMode = () => {
+      setCrewMode(false);
+      setCrewCode(null);
+      sessionStorage.removeItem('nxstops_crew_code');
+      sessionStorage.removeItem('nxstops_crew_mode');
+    };
+
+    const joinCrew = async () => {
+      const code = joinCrewInput.trim().toUpperCase();
+      if (code.length < 4) { showToast('Enter a valid crew code'); return; }
+      setCrewSyncing(true);
+      const trip = await loadCrewTrip(code);
+      if (trip) {
+        // Load the shared plan
+        const parsed: Record<number, Stop[]> = {};
+        for (const [day, stops] of Object.entries(trip.trip_days)) {
+          parsed[Number(day)] = (stops as Stop[]).map(s => ({
+            ...s,
+            addedAt: new Date((s as Stop).addedAt),
+          }));
+        }
+        setTripDays(parsed);
+        setCrewMode(true);
+        setCrewCode(code);
+        sessionStorage.setItem('nxstops_crew_code', code);
+        sessionStorage.setItem('nxstops_crew_mode', 'true');
+        setShowJoinCrew(false);
+        setJoinCrewInput('');
+        showToast(`Joined crew ${code}!`);
+      } else {
+        showToast('Crew not found. Check the code.');
+      }
+      setCrewSyncing(false);
     };
 
     const shareCrewPlan = async () => {
@@ -2518,22 +2699,77 @@ export default function App() {
               Your Trip Plan
             </h1>
             {/* Crew Toggle */}
-            <button
-              onClick={toggleCrewMode}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '6px',
-                padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
-                border: crewMode ? '1px solid rgba(245,158,11,0.3)' : '1px solid rgba(255,255,255,0.1)',
-                background: crewMode ? 'rgba(245,158,11,0.12)' : 'transparent',
-                color: crewMode ? '#F59E0B' : '#78716C', cursor: 'pointer',
-              }}>
-              {crewMode ? '👥 Crew On' : '👤 Solo'}
-            </button>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              {!crewMode && (
+                <button onClick={() => setShowJoinCrew(true)}
+                  style={{
+                    padding: '6px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                    border: '1px solid rgba(255,255,255,0.1)', background: 'transparent',
+                    color: '#78716C', cursor: 'pointer',
+                  }}>
+                  Join Crew
+                </button>
+              )}
+              <button
+                onClick={crewMode ? stopCrewMode : startCrewMode}
+                disabled={crewSyncing}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+                  border: crewMode ? '1px solid rgba(245,158,11,0.3)' : '1px solid rgba(255,255,255,0.1)',
+                  background: crewMode ? 'rgba(245,158,11,0.12)' : 'transparent',
+                  color: crewMode ? '#F59E0B' : '#78716C', cursor: crewSyncing ? 'default' : 'pointer',
+                  opacity: crewSyncing ? 0.5 : 1,
+                }}>
+                {crewSyncing ? '...' : crewMode ? '👥 Crew On' : '👤 Solo'}
+              </button>
+            </div>
           </div>
           <p style={{ color: '#78716C', fontSize: '13px' }}>
             {cityLabel} · {totalStops} stop{totalStops !== 1 ? 's' : ''} · {dayCount} day{dayCount !== 1 ? 's' : ''}
           </p>
         </div>
+
+        {/* Join Crew Modal */}
+        {showJoinCrew && (
+          <div style={{
+            ...cardStyle, marginBottom: '12px', padding: '16px',
+            background: 'rgba(28,25,23,0.95)', border: '1px solid rgba(245,158,11,0.15)',
+          }}>
+            <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '10px', color: '#FFFBEB' }}>Join a Crew</div>
+            <p style={{ fontSize: '12px', color: '#A8A29E', marginBottom: '12px' }}>Enter the crew code shared with you</p>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                type="text"
+                placeholder="e.g. X7K3NP"
+                value={joinCrewInput}
+                onChange={e => setJoinCrewInput(e.target.value.toUpperCase())}
+                onKeyDown={e => e.key === 'Enter' && joinCrew()}
+                maxLength={6}
+                style={{
+                  flex: 1, padding: '12px 14px', borderRadius: '10px',
+                  border: '1px solid rgba(255,255,255,0.1)', background: '#0C0A09',
+                  color: '#FFFBEB', fontSize: '18px', fontWeight: 700,
+                  letterSpacing: '4px', textAlign: 'center', outline: 'none',
+                  textTransform: 'uppercase',
+                }}
+              />
+              <button onClick={joinCrew} disabled={crewSyncing || joinCrewInput.length < 4}
+                style={{
+                  padding: '12px 20px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                  background: joinCrewInput.length >= 4 ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'rgba(255,255,255,0.06)',
+                  color: joinCrewInput.length >= 4 ? '#0C0A09' : '#78716C',
+                  fontSize: '14px', fontWeight: 600,
+                }}>
+                {crewSyncing ? '...' : 'Join'}
+              </button>
+            </div>
+            <button onClick={() => { setShowJoinCrew(false); setJoinCrewInput(''); }}
+              style={{ width: '100%', padding: '8px', marginTop: '8px', background: 'none', border: 'none', color: '#78716C', fontSize: '12px', cursor: 'pointer' }}>
+              Cancel
+            </button>
+          </div>
+        )}
 
         {/* Crew Mode Banner */}
         {crewMode && crewCode && (
@@ -2557,7 +2793,7 @@ export default function App() {
               </button>
             </div>
             <p style={{ fontSize: '11px', color: '#A8A29E', marginTop: '8px', lineHeight: 1.4 }}>
-              Share this code with your crew so everyone can see the itinerary
+              Changes sync in real-time — everyone with this code sees the same plan
             </p>
           </div>
         )}

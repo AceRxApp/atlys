@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, RealtimeChannel } from '@supabase/supabase-js';
 import type { Session } from '@supabase/supabase-js';
 
 const SUPABASE_URL = 'https://hwtsyigwsucpefadznnp.supabase.co';
@@ -215,4 +215,103 @@ export async function fetchPlaceTagCounts(placeIds: string[]): Promise<Record<st
     result[row.place_id][row.tag] = (result[row.place_id][row.tag] || 0) + 1;
   }
   return result;
+}
+
+// ============================================================================
+// CREW MODE — SHARED TRIP PLANS
+// ============================================================================
+
+export interface CrewTrip {
+  id: string;
+  crew_code: string;
+  city_slug: string;
+  city_label: string;
+  trip_days: Record<string, unknown[]>;
+  created_by: string | null;
+  member_count: number;
+  updated_at: string;
+  created_at: string;
+}
+
+export async function createCrewTrip(
+  crewCode: string,
+  citySlug: string,
+  cityLabel: string,
+  tripDays: Record<number, unknown[]>
+): Promise<CrewTrip | null> {
+  const { data, error } = await supabase
+    .from('crew_trips')
+    .insert({
+      crew_code: crewCode,
+      city_slug: citySlug,
+      city_label: cityLabel,
+      trip_days: tripDays,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating crew trip:', error);
+    return null;
+  }
+  return data;
+}
+
+export async function loadCrewTrip(crewCode: string): Promise<CrewTrip | null> {
+  const { data, error } = await supabase
+    .from('crew_trips')
+    .select('*')
+    .eq('crew_code', crewCode)
+    .single();
+
+  if (error) {
+    console.error('Error loading crew trip:', error);
+    return null;
+  }
+  return data;
+}
+
+export async function updateCrewTripDays(
+  crewCode: string,
+  tripDays: Record<number, unknown[]>
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('crew_trips')
+    .update({ trip_days: tripDays, updated_at: new Date().toISOString() })
+    .eq('crew_code', crewCode);
+
+  if (error) {
+    console.error('Error updating crew trip:', error);
+    return false;
+  }
+  return true;
+}
+
+export function subscribeToCrewTrip(
+  crewCode: string,
+  onUpdate: (tripDays: Record<string, unknown[]>) => void
+): RealtimeChannel {
+  const channel = supabase
+    .channel(`crew_${crewCode}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'crew_trips',
+        filter: `crew_code=eq.${crewCode}`,
+      },
+      (payload) => {
+        if (payload.new && (payload.new as CrewTrip).trip_days) {
+          onUpdate((payload.new as CrewTrip).trip_days);
+        }
+      }
+    )
+    .subscribe();
+
+  return channel;
+}
+
+export function unsubscribeFromCrewTrip(channel: RealtimeChannel) {
+  supabase.removeChannel(channel);
 }
