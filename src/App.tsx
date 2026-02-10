@@ -742,6 +742,14 @@ export default function App() {
   const [isSearching, setIsSearching] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
+  // --- Onboarding ---
+  const [showOnboarding, setShowOnboarding] = useState(() => !localStorage.getItem('nxstops_onboarded'));
+  const [onboardingStep, setOnboardingStep] = useState(0);
+
+  // --- Crew Mode ---
+  const [crewMode, setCrewMode] = useState(false);
+  const [crewCode, setCrewCode] = useState<string | null>(() => sessionStorage.getItem('nxstops_crew_code'));
+
   // --- Saved / Bookmarks ---
   const [savedPlaces, setSavedPlaces] = useState<Place[]>(() => {
     try {
@@ -2279,8 +2287,19 @@ export default function App() {
   // EVENTS SCREEN
   // ==========================================================================
 
+  const EVENT_CATEGORIES = [
+    { id: 'all', label: 'All' },
+    { id: 'music', label: 'Music' },
+    { id: 'sports', label: 'Sports' },
+    { id: 'comedy', label: 'Comedy' },
+    { id: 'arts', label: 'Arts' },
+    { id: 'family', label: 'Family' },
+    { id: 'festivals', label: 'Festivals' },
+  ];
+
   const EventsScreen = () => {
     const [eventsViewMode, setEventsViewMode] = useState<'list' | 'map'>('list');
+    const [eventCategoryFilter, setEventCategoryFilter] = useState('all');
 
     // Filter: show events within current month, plus ticketed events further out
     const now = new Date();
@@ -2293,6 +2312,20 @@ export default function App() {
         if (!event.url) return false;
         const threeMonths = new Date(now.getFullYear(), now.getMonth() + 3, 0);
         if (eventDate > threeMonths) return false;
+      }
+      // Category filter
+      if (eventCategoryFilter !== 'all') {
+        const catLower = (event.category || '').toLowerCase();
+        const nameLower = (event.name || '').toLowerCase();
+        const combined = catLower + ' ' + nameLower;
+        switch (eventCategoryFilter) {
+          case 'music': if (!/\b(music|concert|live|band|dj|singer|tour|rap|hip.?hop|r&b|pop|rock|jazz|country|latin|reggae)\b/i.test(combined)) return false; break;
+          case 'sports': if (!/\b(sport|game|match|basketball|football|soccer|baseball|hockey|tennis|golf|boxing|mma|racing|nba|nfl|mlb|nhl)\b/i.test(combined)) return false; break;
+          case 'comedy': if (!/\b(comedy|comedian|stand.?up|improv|funny|laugh)\b/i.test(combined)) return false; break;
+          case 'arts': if (!/\b(art|theater|theatre|ballet|opera|dance|exhibit|museum|gallery|performing|symphony|orchestra)\b/i.test(combined)) return false; break;
+          case 'family': if (!/\b(family|kids|children|disney|paw patrol|sesame|lego|circus|magic|puppet|nickelodeon)\b/i.test(combined)) return false; break;
+          case 'festivals': if (!/\b(festival|fair|carnival|expo|convention|conference|parade|celebration)\b/i.test(combined)) return false; break;
+        }
       }
       // Travel group event curation
       if (travelGroup) {
@@ -2360,6 +2393,26 @@ export default function App() {
           </div>
         </div>
 
+        {/* Event Category Filters */}
+        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '8px', scrollbarWidth: 'none' }}>
+          {EVENT_CATEGORIES.map(cat => {
+            const isActive = eventCategoryFilter === cat.id;
+            return (
+              <button key={cat.id}
+                onClick={() => setEventCategoryFilter(isActive && cat.id !== 'all' ? 'all' : cat.id)}
+                style={{
+                  padding: '6px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: 500,
+                  border: isActive ? '1px solid rgba(168,85,247,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                  cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                  background: isActive ? 'rgba(168,85,247,0.12)' : 'transparent',
+                  color: isActive ? '#A855F7' : '#78716C',
+                }}>
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
+
         {/* Events Content */}
         {eventsLoading ? (
           <div style={{ textAlign: 'center', padding: '60px 0' }}>
@@ -2419,17 +2472,95 @@ export default function App() {
       );
     }
 
+    const generateCrewCode = () => {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let code = '';
+      for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+      return code;
+    };
+
+    const toggleCrewMode = () => {
+      if (crewMode) {
+        setCrewMode(false);
+        setCrewCode(null);
+        sessionStorage.removeItem('nxstops_crew_code');
+      } else {
+        const code = generateCrewCode();
+        setCrewMode(true);
+        setCrewCode(code);
+        sessionStorage.setItem('nxstops_crew_code', code);
+      }
+    };
+
+    const shareCrewPlan = async () => {
+      const allDays = Object.entries(tripDays).sort(([a], [b]) => Number(a) - Number(b));
+      const lines = allDays.map(([day, stops]) => {
+        if (stops.length === 0) return '';
+        const stopList = stops.map((s, i) => `  ${i + 1}. ${getStopName(s)} (${getStopCategory(s)})`).join('\n');
+        return `Day ${day}:\n${stopList}`;
+      }).filter(Boolean).join('\n\n');
+      const crewText = crewCode ? `\nCrew Code: ${crewCode}\n` : '';
+      const summary = `${cityLabel} Trip Plan\n${crewText}\n${lines}\n\nPlanned with NxStops`;
+      if (navigator.share) {
+        await navigator.share({ title: `${cityLabel} Trip Plan`, text: summary });
+      } else {
+        await navigator.clipboard.writeText(summary);
+        showToast('Plan copied — share with your crew!');
+      }
+    };
+
     return (
       <div>
         {/* Header */}
         <div style={{ marginBottom: '16px' }}>
-          <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '4px' }}>
-            Your Trip Plan
-          </h1>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '4px' }}>
+              Your Trip Plan
+            </h1>
+            {/* Crew Toggle */}
+            <button
+              onClick={toggleCrewMode}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+                border: crewMode ? '1px solid rgba(245,158,11,0.3)' : '1px solid rgba(255,255,255,0.1)',
+                background: crewMode ? 'rgba(245,158,11,0.12)' : 'transparent',
+                color: crewMode ? '#F59E0B' : '#78716C', cursor: 'pointer',
+              }}>
+              {crewMode ? '👥 Crew On' : '👤 Solo'}
+            </button>
+          </div>
           <p style={{ color: '#78716C', fontSize: '13px' }}>
             {cityLabel} · {totalStops} stop{totalStops !== 1 ? 's' : ''} · {dayCount} day{dayCount !== 1 ? 's' : ''}
           </p>
         </div>
+
+        {/* Crew Mode Banner */}
+        {crewMode && crewCode && (
+          <div style={{
+            ...cardStyle, marginBottom: '12px', padding: '14px 16px',
+            background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(217,119,6,0.04))',
+            border: '1px solid rgba(245,158,11,0.15)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Crew Code</div>
+                <div style={{ fontSize: '22px', fontWeight: 700, letterSpacing: '4px', color: '#F59E0B' }}>{crewCode}</div>
+              </div>
+              <button onClick={shareCrewPlan}
+                style={{
+                  padding: '10px 18px', borderRadius: '12px', border: 'none', cursor: 'pointer',
+                  background: 'linear-gradient(135deg, #F59E0B, #D97706)',
+                  color: '#0C0A09', fontSize: '13px', fontWeight: 600,
+                }}>
+                Share Plan
+              </button>
+            </div>
+            <p style={{ fontSize: '11px', color: '#A8A29E', marginTop: '8px', lineHeight: 1.4 }}>
+              Share this code with your crew so everyone can see the itinerary
+            </p>
+          </div>
+        )}
 
         {/* Trip Weather Forecast */}
         {weather && weather.forecast.length > 0 && dayCount > 0 && (
@@ -3284,6 +3415,73 @@ export default function App() {
             background: 'linear-gradient(90deg, rgba(245,158,11,0.3) 25%, #F59E0B 50%, rgba(245,158,11,0.3) 75%)',
             backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite',
           }} />
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================================================
+  // ONBOARDING SCREENS
+  // ==========================================================================
+
+  const ONBOARDING_SCREENS = [
+    { emoji: '🌍', title: 'Welcome to NxStops', subtitle: 'Discover what to do right now, wherever you are. Curated experiences for modern travelers.' },
+    { emoji: '👯', title: 'Your Trip, Your Vibe', subtitle: 'Girls trip, boys trip, family vacation — we curate places, events, and hidden gems based on who you\'re traveling with.' },
+    { emoji: '🗺️', title: 'Plan Together', subtitle: 'Build multi-day itineraries, get directions between stops, and share your plan with your crew.' },
+  ];
+
+  if (showOnboarding) {
+    const step = ONBOARDING_SCREENS[onboardingStep];
+    return (
+      <div style={{
+        fontFamily: "'DM Sans', system-ui, sans-serif",
+        background: '#0C0A09', minHeight: '100vh', color: '#FFFBEB',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        maxWidth: '430px', margin: '0 auto', padding: '40px 24px',
+      }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+          <div style={{ fontSize: '72px', marginBottom: '24px' }}>{step.emoji}</div>
+          <h1 style={{ fontSize: '26px', fontWeight: 700, marginBottom: '12px', lineHeight: 1.2 }}>{step.title}</h1>
+          <p style={{ fontSize: '15px', color: '#A8A29E', lineHeight: 1.6, maxWidth: '300px' }}>{step.subtitle}</p>
+        </div>
+
+        {/* Progress dots */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+          {ONBOARDING_SCREENS.map((_, i) => (
+            <div key={i} style={{
+              width: i === onboardingStep ? '24px' : '8px', height: '8px', borderRadius: '4px',
+              background: i === onboardingStep ? '#F59E0B' : 'rgba(255,255,255,0.15)',
+              transition: 'all 0.3s ease',
+            }} />
+          ))}
+        </div>
+
+        {/* Actions */}
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <button
+            onClick={() => {
+              if (onboardingStep < ONBOARDING_SCREENS.length - 1) {
+                setOnboardingStep(onboardingStep + 1);
+              } else {
+                localStorage.setItem('nxstops_onboarded', 'true');
+                setShowOnboarding(false);
+              }
+            }}
+            style={{
+              width: '100%', padding: '16px', borderRadius: '14px', border: 'none',
+              background: 'linear-gradient(135deg, #F59E0B, #D97706)',
+              color: '#0C0A09', fontSize: '16px', fontWeight: 600, cursor: 'pointer',
+              boxShadow: '0 4px 20px rgba(245,158,11,0.3)',
+            }}>
+            {onboardingStep < ONBOARDING_SCREENS.length - 1 ? 'Next' : 'Get Started'}
+          </button>
+          {onboardingStep < ONBOARDING_SCREENS.length - 1 && (
+            <button
+              onClick={() => { localStorage.setItem('nxstops_onboarded', 'true'); setShowOnboarding(false); }}
+              style={{ width: '100%', padding: '12px', background: 'none', border: 'none', color: '#78716C', fontSize: '13px', cursor: 'pointer' }}>
+              Skip
+            </button>
+          )}
         </div>
       </div>
     );
