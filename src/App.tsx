@@ -4093,7 +4093,7 @@ export default function App() {
   // LOADING SCREEN
   // ==========================================================================
 
-  if (authLoading || (loading && cities.length === 0)) {
+  if (loading && cities.length === 0) {
     return (
       <div style={{
         fontFamily: "'DM Sans', system-ui, sans-serif",
