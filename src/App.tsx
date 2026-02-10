@@ -1304,14 +1304,14 @@ export default function App() {
     showToast(`Moved to Day ${toDay}`);
   };
 
-  const getStopName = (stop: Stop) => stop.type === 'event' ? stop.event!.name : stop.place!.name;
-  const getStopCategory = (stop: Stop) => stop.type === 'event' ? stop.event!.category : stop.place!.categoryDisplay;
+  const getStopName = (stop: Stop) => stop.type === 'event' ? (stop.event?.name || 'Event') : (stop.place?.name || 'Place');
+  const getStopCategory = (stop: Stop) => stop.type === 'event' ? (stop.event?.category || 'Event') : (stop.place?.categoryDisplay || '');
 
   const getRouteUrl = () => {
     if (dayPlan.length === 0) return '';
     const points = dayPlan
-      .filter(s => s.type === 'place' ? (s.place!.lat && s.place!.lng) : (s.event?.lat && s.event?.lng))
-      .map(s => s.type === 'place' ? `${s.place!.lat},${s.place!.lng}` : `${s.event!.lat},${s.event!.lng}`);
+      .filter(s => s.type === 'place' ? (s.place?.lat && s.place?.lng) : (s.event?.lat && s.event?.lng))
+      .map(s => s.type === 'place' ? `${s.place?.lat},${s.place?.lng}` : `${s.event?.lat},${s.event?.lng}`);
     if (points.length === 0) return '';
     return `https://www.google.com/maps/dir/${points.join('/')}`;
   };
@@ -1611,7 +1611,7 @@ export default function App() {
           {/* Action Row */}
           <div style={{ display: 'flex', gap: '8px' }} onClick={e => e.stopPropagation()}>
             <button
-              onClick={() => inPlan ? removeFromPlan(Object.values(tripDays).flat().find(s => s.place?.placeId === place.placeId)!.id) : addToPlan(place)}
+              onClick={() => { if (inPlan) { const stop = Object.values(tripDays).flat().find(s => s.place?.placeId === place.placeId); if (stop) removeFromPlan(stop.id); } else { addToPlan(place); } }}
               style={{
                 flex: 1, padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
                 cursor: 'pointer',
@@ -1666,7 +1666,10 @@ export default function App() {
 
   const formatEventTime = (timeStr: string): string => {
     if (!timeStr) return '';
-    const [h, m] = timeStr.split(':').map(Number);
+    const parts = timeStr.split(':').map(Number);
+    const h = parts[0];
+    const m = parts[1] ?? 0;
+    if (isNaN(h)) return timeStr;
     const isPM = h >= 12;
     const hour12 = h % 12 || 12;
     return `${hour12}:${m.toString().padStart(2, '0')} ${isPM ? 'PM' : 'AM'}`;
@@ -1708,7 +1711,7 @@ export default function App() {
           </p>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
-              onClick={() => inPlan ? removeFromPlan(Object.values(tripDays).flat().find(s => s.event?.id === event.id)!.id) : addEventToPlan(event)}
+              onClick={() => { if (inPlan) { const stop = Object.values(tripDays).flat().find(s => s.event?.id === event.id); if (stop) removeFromPlan(stop.id); } else { addEventToPlan(event); } }}
               style={{
                 flex: 1, padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
                 cursor: 'pointer',
