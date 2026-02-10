@@ -266,7 +266,13 @@ export async function searchNearby(
   }
 
   const data = await response.json();
-  const places = (data.places || []).map((p: Record<string, unknown>) => transformPlace(p, lat, lng));
+  let places = (data.places || []).map((p: Record<string, unknown>) => transformPlace(p, lat, lng));
+
+  // Filter results to match the requested vibe types (Google can return places with secondary type matches)
+  if (vibes.length > 0) {
+    const allowedTypes = new Set(types);
+    places = places.filter((p: Place) => allowedTypes.has(p.category));
+  }
 
   // Sort by distance
   places.sort((a: Place, b: Place) => (a.distance ?? 999) - (b.distance ?? 999));

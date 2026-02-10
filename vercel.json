@@ -2,9 +2,19 @@
   "buildCommand": "vite build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "redirects": [
+    {
+      "source": "/:path(.*)",
+      "has": [{ "type": "host", "value": "vynbynave.vercel.app" }],
+      "destination": "https://nxstops-new.vercel.app/:path",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/api/events", "destination": "/api/events" },
     { "source": "/api/places", "destination": "/api/places" },
+    { "source": "/privacy", "destination": "/privacy.html" },
+    { "source": "/terms", "destination": "/terms.html" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }

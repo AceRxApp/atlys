@@ -1,5 +1,12 @@
 -- NxStops Crew Mode — Shared Trip Plans (Real-time Collaborative)
 -- Paste this into Supabase SQL Editor (Dashboard > SQL Editor > New Query > Run)
+--
+-- NOTE: If you already ran the old version, run these DROP commands first:
+--   DROP POLICY IF EXISTS "Authenticated users can create crew trips" ON crew_trips;
+--   DROP POLICY IF EXISTS "Authenticated users can update crew trips" ON crew_trips;
+--   DROP POLICY IF EXISTS "Creator can delete crew trips" ON crew_trips;
+--   DROP POLICY IF EXISTS "Anyone can view crew trips" ON crew_trips;
+-- Then run this entire script.
 
 -- ============================================================================
 -- CREW TRIPS TABLE
@@ -25,17 +32,17 @@ ALTER TABLE crew_trips ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Anyone can view crew trips" ON crew_trips
   FOR SELECT USING (true);
 
--- Authenticated users can create crew trips
-CREATE POLICY "Authenticated users can create crew trips" ON crew_trips
-  FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+-- Anyone can create crew trips (no auth required)
+CREATE POLICY "Anyone can create crew trips" ON crew_trips
+  FOR INSERT WITH CHECK (true);
 
--- Anyone authenticated can update crew trips (collaborative editing)
-CREATE POLICY "Authenticated users can update crew trips" ON crew_trips
-  FOR UPDATE USING (auth.uid() IS NOT NULL);
+-- Anyone can update crew trips (collaborative editing)
+CREATE POLICY "Anyone can update crew trips" ON crew_trips
+  FOR UPDATE USING (true);
 
--- Only creator can delete
-CREATE POLICY "Creator can delete crew trips" ON crew_trips
-  FOR DELETE USING (auth.uid() = created_by);
+-- Anyone can delete crew trips
+CREATE POLICY "Anyone can delete crew trips" ON crew_trips
+  FOR DELETE USING (true);
 
 -- Enable Realtime for crew_trips
 ALTER PUBLICATION supabase_realtime ADD TABLE crew_trips;

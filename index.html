@@ -12,18 +12,46 @@
     <meta property="og:type" content="website" />
     <meta property="og:title" content="NxStops — Discover Your Next Stop" />
     <meta property="og:description" content="Find what to do right now, wherever you are. Vibe-based travel for modern explorers." />
-    <meta property="og:image" content="https://vynbynave.vercel.app/icon-192.png" />
-    <meta property="og:url" content="https://vynbynave.vercel.app" />
+    <meta property="og:image" content="https://nxstops-new.vercel.app/icon-512.png" />
+    <meta property="og:url" content="https://nxstops-new.vercel.app" />
     <meta property="og:site_name" content="NxStops" />
     <!-- Twitter Card meta tags for social sharing -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="NxStops — Discover Your Next Stop" />
     <meta name="twitter:description" content="Find what to do right now, wherever you are. Vibe-based travel for modern explorers." />
-    <meta name="twitter:image" content="https://vynbynave.vercel.app/icon-192.png" />
+    <meta name="twitter:image" content="https://nxstops-new.vercel.app/icon-512.png" />
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "NxStops",
+      "description": "Discover what to do right now, wherever you are. Vibe-based travel for modern explorers.",
+      "url": "https://nxstops-new.vercel.app",
+      "applicationCategory": "TravelApplication",
+      "operatingSystem": "Web",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+    }
+    </script>
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <link rel="icon" type="image/png" href="/icon-192.png" />
     <title>NxStops</title>
+    <!-- Google Analytics — TODO: Replace G-XXXXXXXXXX with your GA4 Measurement ID -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-XXXXXXXXXX');
+    </script>
+    <!-- Theme FOUC prevention -->
+    <script>
+      (function() {
+        var theme = localStorage.getItem('nxstops_theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

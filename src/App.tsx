@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { fetchCities, saveEmailSignup, fetchEmailSignups, fetchAllCities, toggleCityActive, authSignUp, authSignIn, authSignOut, authGetSession, authOnStateChange, saveReview, fetchReviews, fetchPlaceTagCounts, createCrewTrip, loadCrewTrip, updateCrewTripDays, subscribeToCrewTrip, unsubscribeFromCrewTrip } from './supabase';
+import { fetchCities, fetchEmailSignups, fetchAllCities, toggleCityActive, authSignUp, authSignIn, authSignOut, authGetSession, authOnStateChange, saveReview, fetchReviews, fetchPlaceTagCounts, createCrewTrip, loadCrewTrip, updateCrewTripDays, subscribeToCrewTrip, unsubscribeFromCrewTrip } from './supabase';
 import type { Review } from './supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { searchNearby, textSearchPlaces, formatDistance, getHoursStatus } from './services/places';
@@ -38,8 +38,8 @@ interface EventItem {
   url: string;
   category: string;
   source?: string;
-  lat?: number;
-  lng?: number;
+  lat: number | null;
+  lng: number | null;
 }
 
 interface Stop {
@@ -240,9 +240,7 @@ const NIGHTLIFE_TYPES = ['bar', 'night_club', 'casino'];
 // Travel group type curation
 const GIRLY_TYPES = ['cafe', 'coffee_shop', 'bakery', 'brunch_restaurant', 'breakfast_restaurant', 'spa', 'ice_cream_shop', 'art_gallery', 'book_store', 'market', 'performing_arts_theater', 'restaurant'];
 const GIRLY_KEYWORDS = ['brunch', 'tea', 'dessert', 'botanical', 'garden', 'rooftop', 'cocktail', 'aesthetic', 'cute', 'vintage', 'floral', 'pink', 'boba', 'macarons', 'patisserie', 'wine'];
-const FAMILY_TYPES = ['museum', 'zoo', 'aquarium', 'amusement_park', 'park', 'national_park', 'dog_park', 'bowling_alley', 'movie_theater', 'restaurant', 'cafe', 'ice_cream_shop', 'bakery', 'tourist_attraction', 'community_center', 'library'];
 const BOYS_EXCLUDE_TYPES = ['spa', 'bakery', 'book_store'];
-const BOYS_PREFER_TYPES = ['bar', 'night_club', 'casino', 'steak_house', 'stadium', 'bowling_alley', 'gym', 'hiking_area', 'restaurant', 'seafood_restaurant'];
 
 
 // Weather code → description/emoji (WMO codes from Open-Meteo)
@@ -657,12 +655,6 @@ export default function App() {
   const [useGps, setUseGpsRaw] = useState(() => sessionStorage.getItem('nxstops_use_gps') === 'true');
   const [searchRadius, setSearchRadius] = useState(1500);
 
-  // --- Email signup ---
-  const [showEmailSignup, setShowEmailSignup] = useState(false);
-  const [emailInput, setEmailInput] = useState('');
-  const [emailSaved, setEmailSaved] = useState(() => localStorage.getItem('nxstops_email_saved') === 'true');
-  const [emailSubmitting, setEmailSubmitting] = useState(false);
-
   // --- Modals ---
   const [surprisePlace, setSurprisePlace] = useState<Place | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
@@ -688,11 +680,21 @@ export default function App() {
   const [adminTab, setAdminTab] = useState<'dashboard' | 'signups' | 'cities'>('dashboard');
 
   // --- Events ---
-  const [events, setEvents] = useState<{ id: string; name: string; date: string; time: string; venue: string; venueAddress: string; imageUrl: string | null; url: string; category: string; lat: number | null; lng: number | null }[]>([]);
+  const [events, setEvents] = useState<EventItem[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
 
   // --- Map ---
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  const [activeMapPin, setActiveMapPin] = useState<string | null>(null);
+  const [activeEventPin, setActiveEventPin] = useState<string | null>(null);
+
+  // --- Events View ---
+  const [eventsViewMode, setEventsViewMode] = useState<'list' | 'map'>('list');
+  const [eventCategoryFilter, setEventCategoryFilter] = useState('all');
+
+  // --- Place Detail Gallery ---
+  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  const galleryRef = useRef<HTMLDivElement>(null);
 
   // --- Toast ---
   const [toast, setToast] = useState<string | null>(null);
@@ -1064,6 +1066,7 @@ export default function App() {
   // Load reviews when selectedPlace changes
   useEffect(() => {
     if (!selectedPlace) { setPlaceReviews([]); setShowReviewForm(false); return; }
+    setActivePhotoIndex(0);
     fetchReviews(selectedPlace.placeId).then(setPlaceReviews);
   }, [selectedPlace]);
 
@@ -1444,17 +1447,6 @@ export default function App() {
       await navigator.clipboard.writeText(place.googleMapsUrl);
       showToast('Link copied');
     }
-  };
-
-  const handleEmailSignup = async () => {
-    if (!emailInput || !emailInput.includes('@')) return;
-    setEmailSubmitting(true);
-    await saveEmailSignup(emailInput, useGps ? (loc.city || undefined) : selectedCity?.name);
-    localStorage.setItem('nxstops_email_saved', 'true');
-    setEmailSaved(true);
-    setShowEmailSignup(false);
-    setEmailSubmitting(false);
-    showToast('You\'re signed up!');
   };
 
   const handleSurpriseMe = () => {
@@ -2008,7 +2000,6 @@ export default function App() {
   };
 
   const PlacesMapView = ({ places: mapPlaces }: { places: Place[] }) => {
-    const [activePin, setActivePin] = useState<string | null>(null);
     const center = getMapCenter();
     if (!MAPS_API_KEY) {
       return (
@@ -2034,17 +2025,17 @@ export default function App() {
               <Marker
                 key={place.placeId}
                 position={{ lat: place.lat!, lng: place.lng! }}
-                onClick={() => setActivePin(activePin === place.placeId ? null : place.placeId)}
+                onClick={() => setActiveMapPin(activeMapPin === place.placeId ? null : place.placeId)}
                 title={place.name}
               />
             ))}
-            {activePin && (() => {
-              const place = mapPlaces.find(p => p.placeId === activePin);
+            {activeMapPin && (() => {
+              const place = mapPlaces.find(p => p.placeId === activeMapPin);
               if (!place || !place.lat || !place.lng) return null;
               return (
                 <InfoWindow
                   position={{ lat: place.lat, lng: place.lng }}
-                  onCloseClick={() => setActivePin(null)}
+                  onCloseClick={() => setActiveMapPin(null)}
                 >
                   <div style={{ padding: '4px', minWidth: '160px', color: '#1C1917' }}>
                     <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '4px' }}>{place.name}</div>
@@ -2055,13 +2046,13 @@ export default function App() {
                     </div>
                     <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
                       <button
-                        onClick={() => { setSelectedPlace(place); setActivePin(null); }}
+                        onClick={() => { setSelectedPlace(place); setActiveMapPin(null); }}
                         style={{ flex: 1, padding: '6px', borderRadius: '6px', border: 'none', background: '#F59E0B', color: '#0C0A09', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
                       >
                         Details
                       </button>
                       <button
-                        onClick={() => { addToPlan(place); setActivePin(null); }}
+                        onClick={() => { addToPlan(place); setActiveMapPin(null); }}
                         style={{ flex: 1, padding: '6px', borderRadius: '6px', border: '1px solid #D6D3D1', background: 'white', color: '#1C1917', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
                       >
                         + Plan
@@ -2078,7 +2069,6 @@ export default function App() {
   };
 
   const EventsMapView = ({ eventsList }: { eventsList: typeof events }) => {
-    const [activeEventPin, setActiveEventPin] = useState<string | null>(null);
     const center = getMapCenter();
     const mappableEvents = eventsList.filter(e => e.lat && e.lng);
     if (mappableEvents.length === 0) {
@@ -2463,9 +2453,6 @@ export default function App() {
   ];
 
   const EventsScreen = () => {
-    const [eventsViewMode, setEventsViewMode] = useState<'list' | 'map'>('list');
-    const [eventCategoryFilter, setEventCategoryFilter] = useState('all');
-
     // Filter: show events within current month, plus ticketed events further out
     const now = new Date();
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -2802,10 +2789,12 @@ export default function App() {
         const stopList = stops.map((s, i) => `  ${i + 1}. ${getStopName(s)} (${getStopCategory(s)})`).join('\n');
         return `Day ${day}:\n${stopList}`;
       }).filter(Boolean).join('\n\n');
-      const crewText = crewCode ? `\nCrew Code: ${crewCode}\n` : '';
-      const summary = `${cityLabel} Trip Plan\n${crewText}\n${lines}\n\nPlanned with NxStops`;
+      const joinInstructions = crewCode
+        ? `\n🔗 Join our crew on NxStops!\n\n1. Open https://vynbynave.vercel.app\n2. Go to Plan tab → tap "Join Crew"\n3. Enter code: ${crewCode}\n`
+        : '';
+      const summary = `${cityLabel} Trip Plan${joinInstructions}\n${lines}\n\nPlanned with NxStops ✨`;
       if (navigator.share) {
-        await navigator.share({ title: `${cityLabel} Trip Plan`, text: summary });
+        await navigator.share({ title: `${cityLabel} Trip Plan`, text: summary, url: 'https://vynbynave.vercel.app' });
       } else {
         await navigator.clipboard.writeText(summary);
         showToast('Plan copied — share with your crew!');
@@ -2896,26 +2885,37 @@ export default function App() {
         {/* Crew Mode Banner */}
         {crewMode && crewCode && (
           <div style={{
-            ...cardStyle, marginBottom: '12px', padding: '14px 16px',
-            background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(217,119,6,0.04))',
-            border: '1px solid rgba(245,158,11,0.15)',
+            ...cardStyle, marginBottom: '12px', padding: '16px',
+            background: 'linear-gradient(135deg, rgba(245,158,11,0.1), rgba(217,119,6,0.05))',
+            border: '1px solid rgba(245,158,11,0.2)',
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Crew Code</div>
-                <div style={{ fontSize: '22px', fontWeight: 700, letterSpacing: '4px', color: '#F59E0B' }}>{crewCode}</div>
-              </div>
-              <button onClick={shareCrewPlan}
+            <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Share this code with your crew</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+              <div style={{
+                flex: 1, fontSize: '28px', fontWeight: 700, letterSpacing: '6px', color: '#F59E0B',
+                background: 'rgba(0,0,0,0.3)', borderRadius: '10px', padding: '10px 16px', textAlign: 'center',
+                fontFamily: 'monospace',
+              }}>{crewCode}</div>
+              <button onClick={() => { navigator.clipboard.writeText(crewCode); showToast('Code copied!'); }}
                 style={{
-                  padding: '10px 18px', borderRadius: '12px', border: 'none', cursor: 'pointer',
-                  background: 'linear-gradient(135deg, #F59E0B, #D97706)',
-                  color: '#0C0A09', fontSize: '13px', fontWeight: 600,
+                  padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(245,158,11,0.3)',
+                  background: 'rgba(245,158,11,0.1)', color: '#F59E0B', cursor: 'pointer',
+                  fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap',
                 }}>
-                Share Plan
+                Copy
               </button>
             </div>
-            <p style={{ fontSize: '11px', color: '#A8A29E', marginTop: '8px', lineHeight: 1.4 }}>
-              Changes sync in real-time — everyone with this code sees the same plan
+            <button onClick={shareCrewPlan}
+              style={{
+                width: '100%', padding: '12px', borderRadius: '12px', border: 'none', cursor: 'pointer',
+                background: 'linear-gradient(135deg, #F59E0B, #D97706)',
+                color: '#0C0A09', fontSize: '14px', fontWeight: 600,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+              }}>
+              📤 Share Plan with Crew
+            </button>
+            <p style={{ fontSize: '11px', color: '#A8A29E', marginTop: '8px', lineHeight: 1.4, textAlign: 'center' }}>
+              Your crew opens the app → Plan tab → &quot;Join Crew&quot; → enters the code above
             </p>
           </div>
         )}
@@ -2972,7 +2972,13 @@ export default function App() {
           <div style={{ ...cardStyle, textAlign: 'center', padding: '32px 20px' }}>
             <p style={{ color: '#A8A29E', fontSize: '14px' }}>No stops on Day {activeDay} yet. Explore to add some!</p>
           </div>
-        ) : (
+        ) : (<>
+          {dayPlan.length > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', padding: '6px 10px', borderRadius: '8px', background: 'rgba(245,158,11,0.06)' }}>
+              <span style={{ fontSize: '12px' }}>↕️</span>
+              <span style={{ fontSize: '11px', color: '#D97706', fontWeight: 500 }}>Tap the arrows to reorder your stops</span>
+            </div>
+          )}
           <div style={{ position: 'relative', paddingLeft: '32px' }}>
             {/* Vertical route line */}
             <div style={{
@@ -3105,24 +3111,42 @@ export default function App() {
                       </div>
 
                       {/* Right controls: reorder + remove */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center', justifyContent: 'center', minWidth: '44px' }}>
                         {index > 0 && (
                           <button onClick={() => movePlanStop(index, 'up')}
                             aria-label="Move up"
-                            style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', fontSize: '16px', padding: '8px', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            ▲
+                            style={{
+                              background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)',
+                              color: '#F59E0B', cursor: 'pointer', fontSize: '14px', fontWeight: 700,
+                              padding: '6px 10px', borderRadius: '8px',
+                              minHeight: '36px', minWidth: '44px',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px',
+                            }}>
+                            ↑
                           </button>
                         )}
                         <button onClick={() => removeFromPlan(stop.id)}
                           aria-label="Remove stop"
-                          style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', fontSize: '18px', padding: '8px', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          ×
+                          style={{
+                            background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)',
+                            color: '#F87171', cursor: 'pointer', fontSize: '12px', fontWeight: 600,
+                            padding: '6px 8px', borderRadius: '8px',
+                            minHeight: '32px', minWidth: '44px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>
+                          ✕
                         </button>
                         {index < dayPlan.length - 1 && (
                           <button onClick={() => movePlanStop(index, 'down')}
                             aria-label="Move down"
-                            style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', fontSize: '16px', padding: '8px', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            ▼
+                            style={{
+                              background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)',
+                              color: '#F59E0B', cursor: 'pointer', fontSize: '14px', fontWeight: 700,
+                              padding: '6px 10px', borderRadius: '8px',
+                              minHeight: '36px', minWidth: '44px',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px',
+                            }}>
+                            ↓
                           </button>
                         )}
                       </div>
@@ -3156,7 +3180,7 @@ export default function App() {
               </div>
             ))}
           </div>
-        )}
+        </>)}
 
         {/* Action Buttons */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
@@ -3212,8 +3236,6 @@ export default function App() {
   const PlaceDetailModal = ({ place }: { place: Place }) => {
     const hoursStatus = getHoursStatus(place.hours, place.openNow);
     const inPlan = isInPlan(place.placeId);
-    const [activePhotoIndex, setActivePhotoIndex] = useState(0);
-    const galleryRef = useRef<HTMLDivElement>(null);
 
     // Build photo URLs from photoNames (up to 10)
     const galleryPhotos = (place.photoNames || []).slice(0, 10).map(
@@ -3756,112 +3778,23 @@ export default function App() {
               </button>
             </div>
 
-            {!user ? (
-              /* Not signed in */
-              <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                <div style={{
-                  width: '80px', height: '80px', borderRadius: '50%', margin: '0 auto 20px',
-                  background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#78716C" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
-                  </svg>
-                </div>
-                <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '8px', color: '#FFFBEB' }}>
-                  Sign in to track your travels
-                </h3>
-                <p style={{ fontSize: '13px', color: '#78716C', marginBottom: '24px', lineHeight: 1.5 }}>
-                  Save places, plan trips, and keep your travel history all in one place.
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '280px', margin: '0 auto' }}>
-                  <input
-                    type="email"
-                    placeholder="Email"
-                    value={authEmail}
-                    onChange={e => setAuthEmail(e.target.value)}
-                    style={{
-                      width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)',
-                      background: 'rgba(255,255,255,0.04)', color: '#FFFBEB', fontSize: '14px', outline: 'none',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                  <input
-                    type="password"
-                    placeholder="Password"
-                    value={authPassword}
-                    onChange={e => setAuthPassword(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && (authScreen === 'signin' ? handleSignIn() : handleSignUp())}
-                    style={{
-                      width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)',
-                      background: 'rgba(255,255,255,0.04)', color: '#FFFBEB', fontSize: '14px', outline: 'none',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                  {authScreen === 'signup' && (
-                    <input
-                      type="text"
-                      placeholder="Name (optional)"
-                      value={authName}
-                      onChange={e => setAuthName(e.target.value)}
-                      style={{
-                        width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)',
-                        background: 'rgba(255,255,255,0.04)', color: '#FFFBEB', fontSize: '14px', outline: 'none',
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                  )}
-                  {authError && (
-                    <p style={{ color: '#F87171', fontSize: '12px', textAlign: 'center' }}>{authError}</p>
-                  )}
-                  <button
-                    onClick={authScreen === 'signin' ? handleSignIn : handleSignUp}
-                    disabled={authSubmitting || !authEmail.includes('@') || authPassword.length < 6}
-                    style={{
-                      width: '100%', padding: '14px', borderRadius: '12px', border: 'none',
-                      background: (authEmail.includes('@') && authPassword.length >= 6)
-                        ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'rgba(255,255,255,0.1)',
-                      color: (authEmail.includes('@') && authPassword.length >= 6) ? '#0C0A09' : '#78716C',
-                      fontSize: '15px', fontWeight: 600, cursor: 'pointer',
-                      opacity: authSubmitting ? 0.7 : 1,
-                    }}
-                  >
-                    {authSubmitting ? 'Loading...' : authScreen === 'signin' ? 'Sign In' : 'Sign Up'}
-                  </button>
-                  <button
-                    onClick={() => { setAuthScreen(authScreen === 'signin' ? 'signup' : 'signin'); setAuthError(null); }}
-                    style={{ background: 'none', border: 'none', color: '#A8A29E', fontSize: '12px', cursor: 'pointer', padding: '4px' }}
-                  >
-                    {authScreen === 'signin' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              /* Signed in */
-              <div>
+            <div>
                 {/* Avatar & Name */}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '24px' }}>
                   <div style={{
                     width: '80px', height: '80px', borderRadius: '50%', marginBottom: '12px',
                     border: '3px solid rgba(245,158,11,0.3)', overflow: 'hidden',
-                    background: avatarUrl
-                      ? `url(${avatarUrl}) center/cover no-repeat`
-                      : 'linear-gradient(135deg, rgba(245,158,11,0.2), rgba(217,119,6,0.2))',
+                    background: 'linear-gradient(135deg, rgba(245,158,11,0.2), rgba(217,119,6,0.2))',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
-                    {!avatarUrl && (
-                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                        <circle cx="12" cy="7" r="4" />
-                      </svg>
-                    )}
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
+                    </svg>
                   </div>
                   <div style={{ fontSize: '18px', fontWeight: 700, color: '#FFFBEB', marginBottom: '4px' }}>
                     {fullName}
                   </div>
-                  {user.email && (
-                    <div style={{ fontSize: '13px', color: '#78716C' }}>{user.email}</div>
-                  )}
                 </div>
 
                 {/* Stats Row */}
@@ -3998,20 +3931,7 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Sign Out Button */}
-                <button
-                  onClick={async () => { await handleSignOut(); setShowProfile(false); }}
-                  style={{
-                    width: '100%', padding: '14px', borderRadius: '12px',
-                    border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.06)',
-                    color: '#F87171', fontSize: '14px', fontWeight: 600, cursor: 'pointer',
-                    marginTop: '8px',
-                  }}
-                >
-                  Sign Out
-                </button>
               </div>
-            )}
           </div>
         </div>
       </div>
@@ -4268,75 +4188,7 @@ export default function App() {
     );
   }
 
-  // ==========================================================================
-  // AUTH SCREEN
-  // ==========================================================================
-
-  if (!user) {
-    return (
-      <div style={{
-        fontFamily: "'DM Sans', system-ui, sans-serif",
-        background: '#0C0A09', minHeight: '100vh', color: '#FFFBEB',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        maxWidth: '430px', margin: '0 auto', padding: '20px',
-      }}>
-        <style>{`@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}</style>
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div style={{
-            fontSize: '36px', fontWeight: 700, marginBottom: '4px',
-            background: 'linear-gradient(135deg, #F59E0B, #FBBF24)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-          }}>NxStops</div>
-          <div style={{ fontSize: '11px', color: '#78716C', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-            by Nav&eacute;
-          </div>
-        </div>
-
-        <div style={{ ...cardStyle, width: '100%', maxWidth: '360px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px', textAlign: 'center' }}>
-            {authScreen === 'signin' ? 'Welcome Back' : 'Create Account'}
-          </h2>
-
-          {authScreen === 'signup' && (
-            <input type="text" placeholder="Name (optional)" value={authName}
-              onChange={e => setAuthName(e.target.value)}
-              style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: '#0C0A09', color: '#FFFBEB', fontSize: '15px', marginBottom: '10px', outline: 'none', boxSizing: 'border-box' }} />
-          )}
-          <input type="email" placeholder="Email" value={authEmail}
-            onChange={e => setAuthEmail(e.target.value)}
-            style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: '#0C0A09', color: '#FFFBEB', fontSize: '15px', marginBottom: '10px', outline: 'none', boxSizing: 'border-box' }} />
-          <input type="password" placeholder="Password (min 6 characters)" value={authPassword}
-            onChange={e => setAuthPassword(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && (authScreen === 'signin' ? handleSignIn() : handleSignUp())}
-            style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: '#0C0A09', color: '#FFFBEB', fontSize: '15px', marginBottom: '16px', outline: 'none', boxSizing: 'border-box' }} />
-
-          {authError && (
-            <div style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(239,68,68,0.1)', color: '#F87171', fontSize: '13px', marginBottom: '12px' }}>
-              {authError}
-            </div>
-          )}
-
-          <button
-            onClick={authScreen === 'signin' ? handleSignIn : handleSignUp}
-            disabled={authSubmitting || !authEmail.includes('@') || authPassword.length < 6}
-            style={{
-              width: '100%', padding: '16px', borderRadius: '14px', border: 'none',
-              background: (authEmail.includes('@') && authPassword.length >= 6) ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'rgba(255,255,255,0.1)',
-              color: (authEmail.includes('@') && authPassword.length >= 6) ? '#0C0A09' : '#78716C',
-              fontSize: '16px', fontWeight: 600, cursor: 'pointer', opacity: authSubmitting ? 0.7 : 1,
-            }}
-          >
-            {authSubmitting ? 'Loading...' : authScreen === 'signin' ? 'Sign In' : 'Sign Up'}
-          </button>
-
-          <button onClick={() => { setAuthScreen(authScreen === 'signin' ? 'signup' : 'signin'); setAuthError(null); }}
-            style={{ width: '100%', padding: '12px', marginTop: '10px', background: 'none', border: 'none', color: '#A8A29E', fontSize: '13px', cursor: 'pointer' }}>
-            {authScreen === 'signin' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Auth screen removed — app is open to all users
 
   // ==========================================================================
   // MAIN RENDER
@@ -4647,7 +4499,7 @@ export default function App() {
 
               {/* Emergency Numbers */}
               {(() => {
-                const country = selectedCity?.country || (loc.city ? Object.keys(EMERGENCY_BY_COUNTRY).find(c => {
+                const country = selectedCity?.country || (loc.city ? Object.keys(EMERGENCY_BY_COUNTRY).find(_c => {
                   const cityNames = Object.keys(CITY_COORDS);
                   return cityNames.some(cn => cn.toLowerCase().includes(loc.city?.toLowerCase() || ''));
                 }) : undefined);

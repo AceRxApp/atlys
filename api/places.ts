@@ -7,12 +7,15 @@ const GOOGLE_API_KEY = process.env.GOOGLE_PLACES_API_KEY || '';
 
 const ALLOWED_ORIGINS = [
   'https://vynbynave.vercel.app',
+  'https://nxstops-new.vercel.app',
   'http://localhost:5173',
   'http://localhost:4173',
 ];
 
 function getCorsHeaders(origin?: string) {
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin || '') ? origin! : ALLOWED_ORIGINS[0];
+  const isAllowed = ALLOWED_ORIGINS.includes(origin || '') ||
+    (origin || '').endsWith('.vercel.app');
+  const allowedOrigin = isAllowed ? origin! : ALLOWED_ORIGINS[0];
   return {
     'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
