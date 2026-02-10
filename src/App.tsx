@@ -700,6 +700,9 @@ export default function App() {
   // --- Weather ---
   const [weather, setWeather] = useState<{ temp: number; high: number; low: number; code: number; description: string; emoji: string; forecast: { date: string; high: number; low: number; code: number; emoji: string; description: string; precipChance: number }[] } | null>(null);
 
+  // --- Offline ---
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
   // --- Persisted setters ---
   const setScreen = useCallback((s: Screen) => {
     setScreenRaw(s);
@@ -764,6 +767,17 @@ export default function App() {
     } catch { return []; }
   });
 
+  // --- Push Notifications ---
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
+    typeof Notification !== 'undefined' ? Notification.permission : 'default'
+  );
+  const [showNotificationPrompt, setShowNotificationPrompt] = useState(
+    () => sessionStorage.getItem('nxstops_notif_dismissed') !== 'true'
+  );
+
+  // --- Profile ---
+  const [showProfile, setShowProfile] = useState(false);
+
   const loc = useLocation();
 
   // Derived: active day plan (backwards compat)
@@ -791,6 +805,34 @@ export default function App() {
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
+  }, []);
+
+  // Request push notification permission and subscribe
+  const requestNotificationPermission = useCallback(async () => {
+    if (typeof Notification === 'undefined') return;
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      if (permission === 'granted') {
+        // Subscribe to push via the service worker
+        if ('serviceWorker' in navigator) {
+          const registration = await navigator.serviceWorker.ready;
+          const subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+          });
+          console.log('[NxStops] Push subscription:', JSON.stringify(subscription));
+        }
+        showToast('Notifications enabled!');
+      }
+    } catch (err) {
+      console.error('[NxStops] Notification permission error:', err);
+    }
+  }, [showToast]);
+
+  // Dismiss notification prompt
+  const dismissNotificationPrompt = useCallback(() => {
+    setShowNotificationPrompt(false);
+    sessionStorage.setItem('nxstops_notif_dismissed', 'true');
   }, []);
 
   const userName = user?.user_metadata?.full_name
@@ -858,6 +900,25 @@ export default function App() {
   // --------------------------------------------------------------------------
   // EFFECTS
   // --------------------------------------------------------------------------
+
+  // Online/offline detection
+  useEffect(() => {
+    const goOnline = () => setIsOffline(false);
+    const goOffline = () => setIsOffline(true);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => {
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+    };
+  }, []);
+
+  // Check notification permission on mount
+  useEffect(() => {
+    if (typeof Notification !== 'undefined') {
+      setNotificationPermission(Notification.permission);
+    }
+  }, []);
 
   // Auth session
   useEffect(() => {
@@ -2068,6 +2129,41 @@ export default function App() {
 
   const DiscoverScreen = () => (
     <div>
+      {/* Notification Permission Prompt */}
+      {showNotificationPrompt && notificationPermission === 'default' && selectedCity && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '10px',
+          padding: '12px 14px', marginBottom: '12px', borderRadius: '12px',
+          background: 'rgba(245,158,11,0.06)',
+          border: '1px solid rgba(245,158,11,0.2)',
+        }}>
+          <span style={{ fontSize: '20px', flexShrink: 0 }}>🔔</span>
+          <span style={{ flex: 1, fontSize: '13px', color: '#D6D3D1', lineHeight: 1.4 }}>
+            Stay in the loop — get notified about events near you
+          </span>
+          <button
+            onClick={async () => { await requestNotificationPermission(); dismissNotificationPrompt(); }}
+            style={{
+              padding: '6px 14px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+              background: 'linear-gradient(135deg, #F59E0B, #D97706)',
+              color: '#0C0A09', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0,
+            }}
+          >
+            Enable
+          </button>
+          <button
+            onClick={dismissNotificationPrompt}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: '#78716C', fontSize: '18px', padding: '0 2px', flexShrink: 0, lineHeight: 1,
+            }}
+            aria-label="Dismiss notification prompt"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
@@ -3087,6 +3183,21 @@ export default function App() {
   const PlaceDetailModal = ({ place }: { place: Place }) => {
     const hoursStatus = getHoursStatus(place.hours, place.openNow);
     const inPlan = isInPlan(place.placeId);
+    const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+    const galleryRef = useRef<HTMLDivElement>(null);
+
+    // Build photo URLs from photoNames (up to 10)
+    const galleryPhotos = (place.photoNames || []).slice(0, 10).map(
+      (name) => `/api/places?action=photo&name=${encodeURIComponent(name)}&maxWidth=800`
+    );
+    const hasMultiplePhotos = galleryPhotos.length > 1;
+
+    const handleGalleryScroll = () => {
+      const el = galleryRef.current;
+      if (!el) return;
+      const index = Math.round(el.scrollLeft / el.clientWidth);
+      setActivePhotoIndex(index);
+    };
 
     return (
       <div
@@ -3106,16 +3217,55 @@ export default function App() {
           }}
           onClick={e => e.stopPropagation()}
         >
-          {/* Hero Photo */}
-          {place.photoUrl && (
-            <div style={{
-              height: '250px', width: '100%', position: 'relative',
-              background: `linear-gradient(to bottom, transparent 40%, #1C1917), url(${place.photoUrl})`,
-              backgroundSize: 'cover', backgroundPosition: 'center',
-            }}>
+          {/* Photo Gallery / Hero */}
+          {galleryPhotos.length > 0 && (
+            <div style={{ position: 'relative', width: '100%' }}>
+              {/* Scrollable gallery container */}
+              <div
+                className="photo-gallery-scroll"
+                ref={galleryRef}
+                onScroll={handleGalleryScroll}
+                style={{
+                  display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory',
+                  width: '100%', height: '250px',
+                  scrollbarWidth: 'none',
+                  WebkitOverflowScrolling: 'touch',
+                  borderRadius: '24px 24px 0 0',
+                }}
+              >
+                {galleryPhotos.map((url, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      flex: '0 0 100%', width: '100%', height: '250px',
+                      scrollSnapAlign: 'start', position: 'relative',
+                    }}
+                  >
+                    <img
+                      src={url}
+                      alt={`${place.name} photo ${i + 1}`}
+                      loading={i === 0 ? 'eager' : 'lazy'}
+                      style={{
+                        width: '100%', height: '100%', objectFit: 'cover',
+                        display: 'block',
+                      }}
+                    />
+                    {/* Gradient overlay on the first photo for name readability */}
+                    {i === 0 && (
+                      <div style={{
+                        position: 'absolute', inset: 0,
+                        background: 'linear-gradient(to bottom, transparent 40%, #1C1917)',
+                        pointerEvents: 'none',
+                      }} />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Close button */}
               <button onClick={() => setSelectedPlace(null)}
                 style={{
-                  position: 'absolute', top: '16px', right: '16px',
+                  position: 'absolute', top: '16px', right: '16px', zIndex: 2,
                   background: 'rgba(0,0,0,0.5)', border: 'none',
                   borderRadius: '50%', width: '36px', height: '36px',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -3123,12 +3273,50 @@ export default function App() {
                 }}>
                 <CloseIcon />
               </button>
+
+              {/* Photo counter badge */}
+              {hasMultiplePhotos && (
+                <div style={{
+                  position: 'absolute', top: '16px', left: '16px', zIndex: 2,
+                  background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',
+                  borderRadius: '12px', padding: '4px 10px',
+                  fontSize: '12px', fontWeight: 500, color: '#FFFBEB',
+                }}>
+                  {activePhotoIndex + 1} / {galleryPhotos.length}
+                </div>
+              )}
+
+              {/* Dot indicators */}
+              {hasMultiplePhotos && (
+                <div style={{
+                  position: 'absolute', bottom: '12px', left: '50%',
+                  transform: 'translateX(-50%)', zIndex: 2,
+                  display: 'flex', gap: '6px', alignItems: 'center',
+                }}>
+                  {galleryPhotos.map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        galleryRef.current?.scrollTo({ left: i * (galleryRef.current?.clientWidth || 0), behavior: 'smooth' });
+                      }}
+                      style={{
+                        width: i === activePhotoIndex ? '18px' : '7px',
+                        height: '7px',
+                        borderRadius: '4px',
+                        background: i === activePhotoIndex ? '#F59E0B' : 'rgba(255,255,255,0.5)',
+                        border: 'none', padding: 0, cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
           {/* Content */}
           <div style={{ padding: '20px 20px 120px' }}>
-            {!place.photoUrl && (
+            {galleryPhotos.length === 0 && (
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
                 <button onClick={() => setSelectedPlace(null)}
                   style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', padding: '4px' }}>
@@ -3475,6 +3663,312 @@ export default function App() {
   };
 
   // ==========================================================================
+  // PROFILE SCREEN
+  // ==========================================================================
+
+  const ProfileScreen = () => {
+    const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
+    const fullName = (user?.user_metadata?.full_name as string) || user?.email || 'Traveler';
+    const profileTotalStops = Object.values(tripDays).reduce((sum, stops) => sum + stops.length, 0);
+    const profileDayCount = Object.keys(tripDays).length;
+
+    return (
+      <div
+        className="modal-backdrop"
+        style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 1000,
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+        }}
+        onClick={() => setShowProfile(false)}
+      >
+        <div
+          className="modal-sheet"
+          style={{
+            background: '#1C1917', borderRadius: '24px 24px 0 0',
+            maxWidth: '430px', width: '100%', maxHeight: '92vh', overflow: 'auto',
+            border: '1px solid rgba(255,255,255,0.06)', borderBottom: 'none',
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div style={{ padding: '24px 20px 40px' }}>
+            {/* Header with close button */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: 700 }}>Profile</h2>
+              <button
+                onClick={() => setShowProfile(false)}
+                style={{
+                  background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '50%',
+                  width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', color: '#A8A29E', fontSize: '18px',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {!user ? (
+              /* Not signed in */
+              <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                <div style={{
+                  width: '80px', height: '80px', borderRadius: '50%', margin: '0 auto 20px',
+                  background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#78716C" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                </div>
+                <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '8px', color: '#FFFBEB' }}>
+                  Sign in to track your travels
+                </h3>
+                <p style={{ fontSize: '13px', color: '#78716C', marginBottom: '24px', lineHeight: 1.5 }}>
+                  Save places, plan trips, and keep your travel history all in one place.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '280px', margin: '0 auto' }}>
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    value={authEmail}
+                    onChange={e => setAuthEmail(e.target.value)}
+                    style={{
+                      width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)',
+                      background: 'rgba(255,255,255,0.04)', color: '#FFFBEB', fontSize: '14px', outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  <input
+                    type="password"
+                    placeholder="Password"
+                    value={authPassword}
+                    onChange={e => setAuthPassword(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && (authScreen === 'signin' ? handleSignIn() : handleSignUp())}
+                    style={{
+                      width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)',
+                      background: 'rgba(255,255,255,0.04)', color: '#FFFBEB', fontSize: '14px', outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  {authScreen === 'signup' && (
+                    <input
+                      type="text"
+                      placeholder="Name (optional)"
+                      value={authName}
+                      onChange={e => setAuthName(e.target.value)}
+                      style={{
+                        width: '100%', padding: '14px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)',
+                        background: 'rgba(255,255,255,0.04)', color: '#FFFBEB', fontSize: '14px', outline: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  )}
+                  {authError && (
+                    <p style={{ color: '#F87171', fontSize: '12px', textAlign: 'center' }}>{authError}</p>
+                  )}
+                  <button
+                    onClick={authScreen === 'signin' ? handleSignIn : handleSignUp}
+                    disabled={authSubmitting || !authEmail.includes('@') || authPassword.length < 6}
+                    style={{
+                      width: '100%', padding: '14px', borderRadius: '12px', border: 'none',
+                      background: (authEmail.includes('@') && authPassword.length >= 6)
+                        ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'rgba(255,255,255,0.1)',
+                      color: (authEmail.includes('@') && authPassword.length >= 6) ? '#0C0A09' : '#78716C',
+                      fontSize: '15px', fontWeight: 600, cursor: 'pointer',
+                      opacity: authSubmitting ? 0.7 : 1,
+                    }}
+                  >
+                    {authSubmitting ? 'Loading...' : authScreen === 'signin' ? 'Sign In' : 'Sign Up'}
+                  </button>
+                  <button
+                    onClick={() => { setAuthScreen(authScreen === 'signin' ? 'signup' : 'signin'); setAuthError(null); }}
+                    style={{ background: 'none', border: 'none', color: '#A8A29E', fontSize: '12px', cursor: 'pointer', padding: '4px' }}
+                  >
+                    {authScreen === 'signin' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Signed in */
+              <div>
+                {/* Avatar & Name */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '24px' }}>
+                  <div style={{
+                    width: '80px', height: '80px', borderRadius: '50%', marginBottom: '12px',
+                    border: '3px solid rgba(245,158,11,0.3)', overflow: 'hidden',
+                    background: avatarUrl
+                      ? `url(${avatarUrl}) center/cover no-repeat`
+                      : 'linear-gradient(135deg, rgba(245,158,11,0.2), rgba(217,119,6,0.2))',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {!avatarUrl && (
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '18px', fontWeight: 700, color: '#FFFBEB', marginBottom: '4px' }}>
+                    {fullName}
+                  </div>
+                  {user.email && (
+                    <div style={{ fontSize: '13px', color: '#78716C' }}>{user.email}</div>
+                  )}
+                </div>
+
+                {/* Stats Row */}
+                <div style={{
+                  display: 'flex', justifyContent: 'center', gap: '0',
+                  background: 'rgba(255,255,255,0.03)', borderRadius: '16px',
+                  border: '1px solid rgba(255,255,255,0.06)', marginBottom: '24px', overflow: 'hidden',
+                }}>
+                  {[
+                    { value: savedPlaces.length, label: 'Saved' },
+                    { value: profileTotalStops, label: 'Planned' },
+                    { value: profileDayCount, label: 'Days' },
+                  ].map((stat, i) => (
+                    <div key={stat.label} style={{
+                      flex: 1, textAlign: 'center', padding: '16px 12px',
+                      borderRight: i < 2 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                    }}>
+                      <div style={{
+                        fontSize: '22px', fontWeight: 700,
+                        background: 'linear-gradient(135deg, #F59E0B, #FBBF24)',
+                        WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                      }}>
+                        {stat.value}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '4px' }}>
+                        {stat.label}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Saved Places Section */}
+                {savedPlaces.length > 0 && (
+                  <div style={{ marginBottom: '24px' }}>
+                    <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
+                      Saved Places
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {savedPlaces.map(place => (
+                        <button
+                          key={place.placeId}
+                          onClick={() => { setSelectedPlace(place); setShowProfile(false); }}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '12px', width: '100%',
+                            padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)',
+                            background: 'rgba(255,255,255,0.03)', cursor: 'pointer', textAlign: 'left',
+                          }}
+                        >
+                          <div style={{
+                            width: '44px', height: '44px', borderRadius: '10px', flexShrink: 0, overflow: 'hidden',
+                            background: place.photoUrl
+                              ? `url(${place.photoUrl}) center/cover no-repeat`
+                              : 'rgba(245,158,11,0.1)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>
+                            {!place.photoUrl && <span style={{ fontSize: '18px' }}>📍</span>}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '14px', fontWeight: 600, color: '#FFFBEB', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {place.name}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                              {place.rating > 0 && (
+                                <span style={{ fontSize: '11px', color: '#F59E0B' }}>★ {place.rating.toFixed(1)}</span>
+                              )}
+                              {place.address && (
+                                <span style={{ fontSize: '11px', color: '#78716C', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {place.address.split(',')[0]}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <span style={{ color: '#78716C', fontSize: '14px', flexShrink: 0 }}>›</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* My Trips Section */}
+                {profileTotalStops > 0 && (
+                  <div style={{ marginBottom: '24px' }}>
+                    <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
+                      My Trips
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {Object.entries(tripDays).map(([day, stops]) => (
+                        <div
+                          key={day}
+                          style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '12px 14px', borderRadius: '12px',
+                            background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{
+                              width: '36px', height: '36px', borderRadius: '10px',
+                              background: 'rgba(245,158,11,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: '14px', fontWeight: 700, color: '#F59E0B',
+                            }}>
+                              {day}
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '14px', fontWeight: 600, color: '#FFFBEB' }}>Day {day}</div>
+                              <div style={{ fontSize: '11px', color: '#78716C' }}>
+                                {stops.length} {stops.length === 1 ? 'stop' : 'stops'}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            {stops.slice(0, 3).map((stop, i) => (
+                              <div key={i} style={{
+                                width: '24px', height: '24px', borderRadius: '6px', overflow: 'hidden',
+                                background: (stop.place?.photoUrl)
+                                  ? `url(${stop.place.photoUrl}) center/cover no-repeat`
+                                  : 'rgba(245,158,11,0.15)',
+                                border: '1px solid rgba(255,255,255,0.06)',
+                              }} />
+                            ))}
+                            {stops.length > 3 && (
+                              <div style={{
+                                width: '24px', height: '24px', borderRadius: '6px',
+                                background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: '9px', color: '#78716C', fontWeight: 600,
+                              }}>
+                                +{stops.length - 3}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Sign Out Button */}
+                <button
+                  onClick={async () => { await handleSignOut(); setShowProfile(false); }}
+                  style={{
+                    width: '100%', padding: '14px', borderRadius: '12px',
+                    border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.06)',
+                    color: '#F87171', fontSize: '14px', fontWeight: 600, cursor: 'pointer',
+                    marginTop: '8px',
+                  }}
+                >
+                  Sign Out
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ==========================================================================
   // ADMIN PANEL
   // ==========================================================================
 
@@ -3811,9 +4305,25 @@ export default function App() {
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         @keyframes toastIn { from { opacity: 0; transform: translateY(16px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes offlineBannerIn { from { opacity: 0; transform: translateY(-100%); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes offlineBannerOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-100%); } }
         .modal-sheet { animation: slideUp 0.3s ease-out; }
         .modal-backdrop { animation: fadeIn 0.2s ease-out; }
+        .photo-gallery-scroll::-webkit-scrollbar { display: none; }
       `}</style>
+
+      {/* Offline banner */}
+      {isOffline && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0,
+          background: '#78716C', color: '#FFFFFF',
+          fontSize: '12px', textAlign: 'center', padding: '6px',
+          zIndex: 9999,
+          animation: 'offlineBannerIn 0.3s ease-out',
+        }}>
+          You're offline — showing cached data
+        </div>
+      )}
 
       {/* Header */}
       <header style={{
@@ -3850,9 +4360,21 @@ export default function App() {
               <GearIcon />
             </button>
           )}
-          <button onClick={handleSignOut}
-            style={{ background: 'none', border: 'none', color: '#78716C', fontSize: '10px', cursor: 'pointer', padding: '4px 6px' }}>
-            Out
+          <button onClick={() => setShowProfile(true)}
+            style={{
+              width: '32px', height: '32px', borderRadius: '50%', border: '2px solid rgba(245,158,11,0.3)',
+              background: user?.user_metadata?.avatar_url
+                ? `url(${user.user_metadata.avatar_url}) center/cover no-repeat`
+                : 'rgba(255,255,255,0.08)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '16px', padding: 0, color: '#A8A29E', flexShrink: 0,
+            }}>
+            {!user?.user_metadata?.avatar_url && (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A8A29E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            )}
           </button>
         </div>
       </header>
@@ -4122,6 +4644,9 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Profile Screen */}
+      {showProfile && <ProfileScreen />}
 
       {/* Admin Panel */}
       {showAdmin && <AdminPanel />}
