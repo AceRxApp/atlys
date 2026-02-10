@@ -7,11 +7,37 @@ const TICKETMASTER_API_KEY = process.env.TICKETMASTER_API_KEY || '';
 const SEATGEEK_CLIENT_ID = process.env.SEATGEEK_CLIENT_ID || '';
 const PREDICTHQ_TOKEN = process.env.PREDICTHQ_TOKEN || '';
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
+const ALLOWED_ORIGINS = [
+  'https://vynbynave.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:4173',
+];
+
+function getCorsHeaders(origin?: string) {
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin || '') ? origin! : ALLOWED_ORIGINS[0];
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Vary': 'Origin',
+  };
+}
+
+const rateLimit = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_MAX = 60; // requests per window
+const RATE_LIMIT_WINDOW = 60_000; // 1 minute
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimit.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimit.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    return true;
+  }
+  if (entry.count >= RATE_LIMIT_MAX) return false;
+  entry.count++;
+  return true;
+}
 
 interface NormalizedEvent {
   id: string;
@@ -29,13 +55,23 @@ interface NormalizedEvent {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const corsHeaders = getCorsHeaders(req.headers.origin as string);
+
   if (req.method === 'OPTIONS') {
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      res.setHeader(key, value);
+    });
     return res.status(200).json({});
   }
 
-  Object.entries(CORS_HEADERS).forEach(([key, value]) => {
+  Object.entries(corsHeaders).forEach(([key, value]) => {
     res.setHeader(key, value);
   });
+
+  const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
+  if (!checkRateLimit(clientIp)) {
+    return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+  }
 
   const { lat, lng, radius = '50', category, page = '0' } = req.query;
 
@@ -45,6 +81,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const latNum = parseFloat(lat as string);
   const lngNum = parseFloat(lng as string);
+  const radiusNum = parseFloat(radius as string);
+
+  if (isNaN(latNum) || latNum < -90 || latNum > 90) {
+    return res.status(400).json({ error: 'lat must be between -90 and 90' });
+  }
+  if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
+    return res.status(400).json({ error: 'lng must be between -180 and 180' });
+  }
+  if (isNaN(radiusNum) || radiusNum < 0 || radiusNum > 200) {
+    return res.status(400).json({ error: 'radius must be between 0 and 200 miles' });
+  }
 
   // Fetch from all configured sources in parallel
   const fetchers: Promise<NormalizedEvent[]>[] = [];

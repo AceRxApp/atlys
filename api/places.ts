@@ -5,21 +5,57 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_PLACES_API_KEY || '';
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
+const ALLOWED_ORIGINS = [
+  'https://vynbynave.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:4173',
+];
+
+function getCorsHeaders(origin?: string) {
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin || '') ? origin! : ALLOWED_ORIGINS[0];
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Vary': 'Origin',
+  };
+}
+
+const rateLimit = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_MAX = 60; // requests per window
+const RATE_LIMIT_WINDOW = 60_000; // 1 minute
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimit.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimit.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    return true;
+  }
+  if (entry.count >= RATE_LIMIT_MAX) return false;
+  entry.count++;
+  return true;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const corsHeaders = getCorsHeaders(req.headers.origin as string);
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      res.setHeader(key, value);
+    });
     return res.status(200).json({});
   }
 
-  Object.entries(CORS_HEADERS).forEach(([key, value]) => {
+  Object.entries(corsHeaders).forEach(([key, value]) => {
     res.setHeader(key, value);
   });
+
+  const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
+  if (!checkRateLimit(clientIp)) {
+    return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+  }
 
   const { action } = req.query;
 
@@ -54,6 +90,20 @@ async function handleNearbySearch(req: VercelRequest, res: VercelResponse) {
 
   if (!lat || !lng) {
     return res.status(400).json({ error: 'lat and lng are required' });
+  }
+
+  const latNum = parseFloat(lat as string);
+  const lngNum = parseFloat(lng as string);
+  const radiusNum = parseFloat(radius as string);
+
+  if (isNaN(latNum) || latNum < -90 || latNum > 90) {
+    return res.status(400).json({ error: 'lat must be between -90 and 90' });
+  }
+  if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
+    return res.status(400).json({ error: 'lng must be between -180 and 180' });
+  }
+  if (isNaN(radiusNum) || radiusNum < 0 || radiusNum > 50000) {
+    return res.status(400).json({ error: 'radius must be between 0 and 50000' });
   }
 
   // Use the Places API (New) — Nearby Search
@@ -104,7 +154,7 @@ async function handleNearbySearch(req: VercelRequest, res: VercelResponse) {
   if (!response.ok) {
     const errorText = await response.text();
     console.error('Google Places API error:', errorText);
-    return res.status(response.status).json({ error: 'Google Places API error', details: errorText });
+    return res.status(response.status).json({ error: 'Google Places API error' });
   }
 
   const data = await response.json();
@@ -121,16 +171,33 @@ async function handleTextSearch(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'query is required' });
   }
 
+  if ((query as string).length > 200) {
+    return res.status(400).json({ error: 'query must be 200 characters or less' });
+  }
+
+  const radiusNum = parseFloat(radius as string);
+  if (isNaN(radiusNum) || radiusNum < 0 || radiusNum > 50000) {
+    return res.status(400).json({ error: 'radius must be between 0 and 50000' });
+  }
+
   const body: Record<string, unknown> = {
     textQuery: query as string,
     maxResultCount: 20,
   };
 
   if (lat && lng) {
+    const latNum = parseFloat(lat as string);
+    const lngNum = parseFloat(lng as string);
+    if (isNaN(latNum) || latNum < -90 || latNum > 90) {
+      return res.status(400).json({ error: 'lat must be between -90 and 90' });
+    }
+    if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
+      return res.status(400).json({ error: 'lng must be between -180 and 180' });
+    }
     body.locationBias = {
       circle: {
-        center: { latitude: parseFloat(lat as string), longitude: parseFloat(lng as string) },
-        radius: parseFloat(radius as string),
+        center: { latitude: latNum, longitude: lngNum },
+        radius: radiusNum,
       },
     };
   }
@@ -165,7 +232,7 @@ async function handleTextSearch(req: VercelRequest, res: VercelResponse) {
   if (!response.ok) {
     const errorText = await response.text();
     console.error('Google Text Search API error:', errorText);
-    return res.status(response.status).json({ error: 'Text search error', details: errorText });
+    return res.status(response.status).json({ error: 'Text search error' });
   }
 
   const data = await response.json();
@@ -211,7 +278,7 @@ async function handlePlaceDetails(req: VercelRequest, res: VercelResponse) {
 
   if (!response.ok) {
     const errorText = await response.text();
-    return res.status(response.status).json({ error: 'Google Places API error', details: errorText });
+    return res.status(response.status).json({ error: 'Google Places API error' });
   }
 
   const data = await response.json();
@@ -233,7 +300,12 @@ async function handlePlacePhoto(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Invalid photo name format' });
   }
 
-  const photoUrl = `https://places.googleapis.com/v1/${name}/media?maxWidthPx=${maxWidth}&key=${GOOGLE_API_KEY}`;
+  const maxWidthNum = parseInt(maxWidth as string, 10);
+  if (isNaN(maxWidthNum) || maxWidthNum < 100 || maxWidthNum > 1600) {
+    return res.status(400).json({ error: 'maxWidth must be between 100 and 1600' });
+  }
+
+  const photoUrl = `https://places.googleapis.com/v1/${name}/media?maxWidthPx=${maxWidthNum}&key=${GOOGLE_API_KEY}`;
 
   const response = await fetch(photoUrl);
 
@@ -258,6 +330,10 @@ async function handleAutocomplete(req: VercelRequest, res: VercelResponse) {
 
   if (!input) {
     return res.status(400).json({ error: 'input is required' });
+  }
+
+  if ((input as string).length > 100) {
+    return res.status(400).json({ error: 'input must be 100 characters or less' });
   }
 
   const body: Record<string, unknown> = {
@@ -285,7 +361,7 @@ async function handleAutocomplete(req: VercelRequest, res: VercelResponse) {
 
   if (!response.ok) {
     const errorText = await response.text();
-    return res.status(response.status).json({ error: 'Autocomplete error', details: errorText });
+    return res.status(response.status).json({ error: 'Autocomplete error' });
   }
 
   const data = await response.json();

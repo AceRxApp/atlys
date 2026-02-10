@@ -1527,8 +1527,12 @@ export default function App() {
 
     return (
       <div
+        role="button"
+        tabIndex={0}
+        aria-label={`View details for ${place.name}`}
         style={{ ...cardStyle, padding: 0, overflow: 'hidden', opacity: place.openNow ? 1 : 0.6, cursor: 'pointer' }}
         onClick={() => setSelectedPlace(place)}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPlace(place); } }}
       >
         {/* Photo */}
         {place.photoUrl && (
@@ -1613,8 +1617,8 @@ export default function App() {
             <button
               onClick={() => { if (inPlan) { const stop = Object.values(tripDays).flat().find(s => s.place?.placeId === place.placeId); if (stop) removeFromPlan(stop.id); } else { addToPlan(place); } }}
               style={{
-                flex: 1, padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
-                cursor: 'pointer',
+                flex: 1, padding: '12px 16px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
+                cursor: 'pointer', minHeight: '44px',
                 background: inPlan ? 'transparent' : 'linear-gradient(135deg, #F59E0B, #D97706)',
                 color: inPlan ? '#F59E0B' : '#0C0A09',
                 border: inPlan ? '1.5px solid #F59E0B' : 'none',
@@ -1624,28 +1628,32 @@ export default function App() {
             </button>
             {place.googleMapsUrl && (
               <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
-                style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', color: '#A8A29E', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+                aria-label="Get directions"
+                style={{ padding: '12px 16px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', color: '#A8A29E', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', minHeight: '44px', minWidth: '44px' }}>
                 <DirectionsIcon />
               </a>
             )}
             {place.phone && (
               <a href={`tel:${place.phone}`}
-                style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', color: '#A8A29E', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+                aria-label="Call"
+                style={{ padding: '12px 16px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', color: '#A8A29E', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', minHeight: '44px', minWidth: '44px' }}>
                 <PhoneIcon />
               </a>
             )}
             {(isReservable(place) || isBookable(place)) && (place.website || place.googleMapsUrl) && (
               <a href={getBookingUrl(place)} target="_blank" rel="noopener noreferrer"
-                style={{ padding: '10px 12px', borderRadius: '10px', background: 'rgba(34,197,94,0.1)', color: '#34D399', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', fontSize: '11px', fontWeight: 600, border: '1px solid rgba(34,197,94,0.2)' }}>
+                style={{ padding: '12px 16px', borderRadius: '10px', background: 'rgba(34,197,94,0.1)', color: '#34D399', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', fontSize: '11px', fontWeight: 600, border: '1px solid rgba(34,197,94,0.2)', minHeight: '44px' }}>
                 {getBookingLabel(place)}
               </a>
             )}
             <button onClick={() => toggleSaved(place)}
-              style={{ padding: '10px 14px', borderRadius: '10px', background: isSaved(place.placeId) ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.06)', color: isSaved(place.placeId) ? '#F59E0B' : '#A8A29E', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>
+              aria-label={isSaved(place.placeId) ? 'Remove from saved' : 'Save place'}
+              style={{ padding: '12px 16px', borderRadius: '10px', background: isSaved(place.placeId) ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.06)', color: isSaved(place.placeId) ? '#F59E0B' : '#A8A29E', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', minHeight: '44px', minWidth: '44px' }}>
               {isSaved(place.placeId) ? '♥' : '♡'}
             </button>
             <button onClick={() => sharePlace(place)}
-              style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', color: '#A8A29E', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              aria-label="Share"
+              style={{ padding: '12px 16px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', color: '#A8A29E', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '44px', minWidth: '44px' }}>
               <ShareIcon />
             </button>
           </div>
@@ -1713,8 +1721,8 @@ export default function App() {
             <button
               onClick={() => { if (inPlan) { const stop = Object.values(tripDays).flat().find(s => s.event?.id === event.id); if (stop) removeFromPlan(stop.id); } else { addEventToPlan(event); } }}
               style={{
-                flex: 1, padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
-                cursor: 'pointer',
+                flex: 1, padding: '12px 16px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
+                cursor: 'pointer', minHeight: '44px',
                 background: inPlan ? 'transparent' : 'linear-gradient(135deg, #8B5CF6, #7C3AED)',
                 color: inPlan ? '#C084FC' : '#FFFBEB',
                 border: inPlan ? '1.5px solid #8B5CF6' : 'none',
@@ -1942,6 +1950,10 @@ export default function App() {
           <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px', scrollbarWidth: 'none' }}>
             {savedPlaces.map(place => (
               <div key={place.placeId} onClick={() => setSelectedPlace(place)}
+                role="button"
+                tabIndex={0}
+                aria-label={`View details for ${place.name}`}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPlace(place); } }}
                 style={{
                   ...cardStyle, padding: 0, overflow: 'hidden', minWidth: '200px', maxWidth: '220px',
                   flexShrink: 0, cursor: 'pointer',
@@ -2158,7 +2170,8 @@ export default function App() {
             onClick={dismissNotificationPrompt}
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
-              color: '#78716C', fontSize: '18px', padding: '0 2px', flexShrink: 0, lineHeight: 1,
+              color: '#78716C', fontSize: '18px', padding: '8px', flexShrink: 0, lineHeight: 1,
+              minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
             aria-label="Dismiss notification prompt"
           >
@@ -2177,19 +2190,21 @@ export default function App() {
         </div>
         <div style={{ display: 'flex', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
           <button onClick={() => setViewMode('list')}
+            aria-label="List view"
             style={{
-              padding: '6px 14px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer',
+              padding: '10px 14px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer',
               background: viewMode === 'list' ? 'rgba(245,158,11,0.15)' : 'transparent',
-              color: viewMode === 'list' ? '#F59E0B' : '#78716C',
+              color: viewMode === 'list' ? '#F59E0B' : '#78716C', minHeight: '44px',
             }}>
             List
           </button>
           <button onClick={() => setViewMode('map')}
+            aria-label="Map view"
             style={{
-              padding: '6px 14px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer',
+              padding: '10px 14px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer',
               borderLeft: '1px solid rgba(255,255,255,0.1)',
               background: viewMode === 'map' ? 'rgba(245,158,11,0.15)' : 'transparent',
-              color: viewMode === 'map' ? '#F59E0B' : '#78716C',
+              color: viewMode === 'map' ? '#F59E0B' : '#78716C', minHeight: '44px',
             }}>
             Map
           </button>
@@ -2211,10 +2226,12 @@ export default function App() {
           }}
         />
         <button onClick={handleSearch} disabled={isSearching || !searchQuery.trim()}
+          aria-label="Search"
           style={{
             padding: '12px 18px', borderRadius: '12px', border: 'none', cursor: 'pointer',
             background: searchQuery.trim() ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'rgba(255,255,255,0.06)',
             color: searchQuery.trim() ? '#0C0A09' : '#78716C', fontSize: '14px', fontWeight: 600,
+            minHeight: '44px', minWidth: '44px',
           }}>
           {isSearching ? '...' : '🔍'}
         </button>
@@ -2378,6 +2395,10 @@ export default function App() {
                     <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px', scrollbarWidth: 'none' }}>
                       {gems.slice(0, 8).map(place => (
                         <div key={place.placeId} onClick={() => setSelectedPlace(place)}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`View details for ${place.name}`}
+                          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPlace(place); } }}
                           style={{
                             ...cardStyle, padding: 0, overflow: 'hidden', minWidth: '180px', maxWidth: '200px',
                             flexShrink: 0, cursor: 'pointer',
@@ -2518,19 +2539,21 @@ export default function App() {
           </div>
           <div style={{ display: 'flex', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
             <button onClick={() => setEventsViewMode('list')}
+              aria-label="List view"
               style={{
-                padding: '6px 14px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer',
+                padding: '10px 14px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer',
                 background: eventsViewMode === 'list' ? 'rgba(168,85,247,0.15)' : 'transparent',
-                color: eventsViewMode === 'list' ? '#A855F7' : '#78716C',
+                color: eventsViewMode === 'list' ? '#A855F7' : '#78716C', minHeight: '44px',
               }}>
               List
             </button>
             <button onClick={() => setEventsViewMode('map')}
+              aria-label="Map view"
               style={{
-                padding: '6px 14px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer',
+                padding: '10px 14px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer',
                 borderLeft: '1px solid rgba(255,255,255,0.1)',
                 background: eventsViewMode === 'map' ? 'rgba(168,85,247,0.15)' : 'transparent',
-                color: eventsViewMode === 'map' ? '#A855F7' : '#78716C',
+                color: eventsViewMode === 'map' ? '#A855F7' : '#78716C', minHeight: '44px',
               }}>
               Map
             </button>
@@ -3082,20 +3105,23 @@ export default function App() {
                       </div>
 
                       {/* Right controls: reorder + remove */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center', justifyContent: 'center' }}>
                         {index > 0 && (
                           <button onClick={() => movePlanStop(index, 'up')}
-                            style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', fontSize: '16px', padding: '2px 6px' }}>
+                            aria-label="Move up"
+                            style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', fontSize: '16px', padding: '8px', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             ▲
                           </button>
                         )}
                         <button onClick={() => removeFromPlan(stop.id)}
-                          style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', fontSize: '18px', padding: '2px 6px' }}>
+                          aria-label="Remove stop"
+                          style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', fontSize: '18px', padding: '8px', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           ×
                         </button>
                         {index < dayPlan.length - 1 && (
                           <button onClick={() => movePlanStop(index, 'down')}
-                            style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', fontSize: '16px', padding: '2px 6px' }}>
+                            aria-label="Move down"
+                            style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', fontSize: '16px', padding: '8px', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             ▼
                           </button>
                         )}
@@ -3205,6 +3231,8 @@ export default function App() {
     return (
       <div
         className="modal-backdrop"
+        role="dialog"
+        aria-label={`Details for ${place.name}`}
         style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 100,
           display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
@@ -3267,10 +3295,11 @@ export default function App() {
 
               {/* Close button */}
               <button onClick={() => setSelectedPlace(null)}
+                aria-label="Close"
                 style={{
                   position: 'absolute', top: '16px', right: '16px', zIndex: 2,
                   background: 'rgba(0,0,0,0.5)', border: 'none',
-                  borderRadius: '50%', width: '36px', height: '36px',
+                  borderRadius: '50%', width: '44px', height: '44px',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: 'pointer', color: '#FFFBEB', backdropFilter: 'blur(8px)',
                 }}>
@@ -3299,18 +3328,29 @@ export default function App() {
                   {galleryPhotos.map((_, i) => (
                     <button
                       key={i}
+                      aria-label={`Go to photo ${i + 1}`}
                       onClick={() => {
                         galleryRef.current?.scrollTo({ left: i * (galleryRef.current?.clientWidth || 0), behavior: 'smooth' });
                       }}
                       style={{
-                        width: i === activePhotoIndex ? '18px' : '7px',
-                        height: '7px',
-                        borderRadius: '4px',
-                        background: i === activePhotoIndex ? '#F59E0B' : 'rgba(255,255,255,0.5)',
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: '50%',
+                        background: 'transparent',
                         border: 'none', padding: 0, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
                         transition: 'all 0.3s ease',
                       }}
-                    />
+                    >
+                      <span style={{
+                        width: i === activePhotoIndex ? '18px' : '10px',
+                        height: '10px',
+                        borderRadius: '5px',
+                        background: i === activePhotoIndex ? '#F59E0B' : 'rgba(255,255,255,0.5)',
+                        display: 'block',
+                        transition: 'all 0.3s ease',
+                      }} />
+                    </button>
                   ))}
                 </div>
               )}
@@ -3322,7 +3362,8 @@ export default function App() {
             {galleryPhotos.length === 0 && (
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
                 <button onClick={() => setSelectedPlace(null)}
-                  style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', padding: '4px' }}>
+                  aria-label="Close"
+                  style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', padding: '10px', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <CloseIcon />
                 </button>
               </div>
@@ -3397,9 +3438,10 @@ export default function App() {
                 </a>
               )}
               <button onClick={() => toggleSaved(place)}
+                aria-label={isSaved(place.placeId) ? 'Remove from saved' : 'Save place'}
                 style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
-                  padding: '12px 8px', borderRadius: '12px',
+                  padding: '12px 8px', borderRadius: '12px', minHeight: '44px',
                   background: isSaved(place.placeId) ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.05)',
                   color: isSaved(place.placeId) ? '#F59E0B' : '#A8A29E', border: 'none', cursor: 'pointer', fontSize: '11px',
                 }}>
@@ -3407,10 +3449,11 @@ export default function App() {
                 {isSaved(place.placeId) ? 'Saved' : 'Save'}
               </button>
               <button onClick={() => sharePlace(place)}
+                aria-label="Share place"
                 style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
                   padding: '12px 8px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)',
-                  color: '#A8A29E', border: 'none', cursor: 'pointer', fontSize: '11px',
+                  color: '#A8A29E', border: 'none', cursor: 'pointer', fontSize: '11px', minHeight: '44px',
                 }}>
                 <ShareIcon />
                 Share
@@ -3537,7 +3580,8 @@ export default function App() {
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                     {[1, 2, 3, 4, 5].map(star => (
                       <button key={star} onClick={() => setReviewRating(star)}
-                        style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', padding: '2px', color: star <= reviewRating ? '#F59E0B' : '#3a3632' }}>
+                        aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
+                        style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', padding: '8px', color: star <= reviewRating ? '#F59E0B' : '#3a3632', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         ★
                       </button>
                     ))}
@@ -3678,6 +3722,8 @@ export default function App() {
     return (
       <div
         className="modal-backdrop"
+        role="dialog"
+        aria-label="Profile"
         style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 1000,
           display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
@@ -3699,9 +3745,10 @@ export default function App() {
               <h2 style={{ fontSize: '20px', fontWeight: 700 }}>Profile</h2>
               <button
                 onClick={() => setShowProfile(false)}
+                aria-label="Close profile"
                 style={{
                   background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '50%',
-                  width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: 'pointer', color: '#A8A29E', fontSize: '18px',
                 }}
               >
@@ -3989,7 +4036,8 @@ export default function App() {
           <p style={{ color: '#78716C', fontSize: '11px' }}>NxStops by Nav&eacute;</p>
         </div>
         <button onClick={() => setShowAdmin(false)}
-          style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', padding: '8px' }}>
+          aria-label="Close admin panel"
+          style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', padding: '10px', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <CloseIcon />
         </button>
       </div>
@@ -4313,6 +4361,10 @@ export default function App() {
         .modal-sheet { animation: slideUp 0.3s ease-out; }
         .modal-backdrop { animation: fadeIn 0.2s ease-out; }
         .photo-gallery-scroll::-webkit-scrollbar { display: none; }
+        *:focus-visible { outline: 2px solid #F59E0B; outline-offset: 2px; }
+        button:focus-visible { outline: 2px solid #F59E0B; outline-offset: 2px; }
+        a:focus-visible { outline: 2px solid #F59E0B; outline-offset: 2px; }
+        input:focus-visible { outline: 2px solid #F59E0B; outline-offset: 2px; }
       `}</style>
 
       {/* Offline banner */}
@@ -4354,18 +4406,21 @@ export default function App() {
             </div>
           </div>
           <button onClick={() => setShowSafety(true)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px', borderRadius: '10px' }}>
+            aria-label="Travel toolkit"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '10px', borderRadius: '10px', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <ShieldIcon />
           </button>
           {user?.email === ADMIN_EMAIL && (
             <button onClick={openAdmin}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px', borderRadius: '10px' }}>
+              aria-label="Admin settings"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '10px', borderRadius: '10px', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <GearIcon />
             </button>
           )}
           <button onClick={() => setShowProfile(true)}
+            aria-label="Open profile"
             style={{
-              width: '32px', height: '32px', borderRadius: '50%', border: '2px solid rgba(245,158,11,0.3)',
+              width: '44px', height: '44px', borderRadius: '50%', border: '2px solid rgba(245,158,11,0.3)',
               background: user?.user_metadata?.avatar_url
                 ? `url(${user.user_metadata.avatar_url}) center/cover no-repeat`
                 : 'rgba(255,255,255,0.08)',
@@ -4391,7 +4446,7 @@ export default function App() {
       </main>
 
       {/* Bottom Navigation */}
-      <nav style={{
+      <nav aria-label="Main navigation" style={{
         position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
         width: '100%', maxWidth: '430px',
         background: 'rgba(12,10,9,0.95)', backdropFilter: 'blur(24px)',
@@ -4410,13 +4465,15 @@ export default function App() {
           return (
             <button
               key={tab.id}
+              aria-label={tab.label}
+              aria-current={isActive ? 'page' : undefined}
               style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
                 background: 'none', border: 'none',
                 color: isActive ? '#FFFBEB' : canNavigate ? '#78716C' : '#3a3632',
                 fontSize: '10px', fontWeight: 500, cursor: canNavigate ? 'pointer' : 'default',
                 padding: '8px 20px', borderRadius: '12px', position: 'relative',
-                opacity: canNavigate ? 1 : 0.4,
+                opacity: canNavigate ? 1 : 0.4, minHeight: '48px',
               }}
               onClick={() => canNavigate && setScreen(tab.id)}
             >
@@ -4456,6 +4513,7 @@ export default function App() {
       {screen === 'discover' && places.length > 0 && !surprisePlace && !selectedPlace && (
         <button
           onClick={handleSurpriseMe}
+          aria-label="Surprise me with a random place"
           style={{
             position: 'fixed', bottom: '90px', right: 'calc(50% - 195px)',
             width: '52px', height: '52px', borderRadius: '50%',
@@ -4473,6 +4531,8 @@ export default function App() {
       {/* Surprise Me Modal */}
       {surprisePlace && (
         <div className="modal-backdrop"
+          role="dialog"
+          aria-label="Surprise place recommendation"
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
           onClick={() => setSurprisePlace(null)}>
           <div className="modal-sheet"
@@ -4527,6 +4587,8 @@ export default function App() {
       {/* Safety Toolkit Modal */}
       {showSafety && (
         <div className="modal-backdrop"
+          role="dialog"
+          aria-label="Travel toolkit"
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
           onClick={() => setShowSafety(false)}>
           <div className="modal-sheet"
@@ -4540,7 +4602,8 @@ export default function App() {
                   <p style={{ color: '#78716C', fontSize: '12px' }}>Stay connected & informed</p>
                 </div>
                 <button onClick={() => setShowSafety(false)}
-                  style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', padding: '4px' }}>
+                  aria-label="Close travel toolkit"
+                  style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', padding: '10px', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <CloseIcon />
                 </button>
               </div>

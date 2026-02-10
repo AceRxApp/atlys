@@ -1,6 +1,7 @@
 const CACHE_NAME = 'nxstops-v2';
 const API_CACHE_NAME = 'nxstops-api-v1';
 const API_CACHE_MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours in ms
+const API_CACHE_MAX_ENTRIES = 50;
 const API_ROUTES = ['/api/places', '/api/events'];
 const STATIC_ASSETS = [
   '/',
@@ -26,6 +27,17 @@ self.addEventListener('activate', (event) => {
   );
   self.clients.claim();
 });
+
+// Helper: trim cache to max entries (LRU-style, remove oldest)
+async function trimCache(cacheName, maxEntries) {
+  const cache = await caches.open(cacheName);
+  const keys = await cache.keys();
+  if (keys.length > maxEntries) {
+    for (let i = 0; i < keys.length - maxEntries; i++) {
+      await cache.delete(keys[i]);
+    }
+  }
+}
 
 // Helper: fetch with timeout
 function fetchWithTimeout(request, timeoutMs) {
@@ -64,7 +76,7 @@ function stampResponse(response) {
       statusText: response.statusText,
       headers: headers,
     });
-  });
+  }).catch(() => response);
 }
 
 // Fetch — network-first with cache fallback
@@ -80,7 +92,10 @@ self.addEventListener('fetch', (event) => {
           if (response.ok) {
             const cloneForCache = response.clone();
             stampResponse(cloneForCache).then((stamped) => {
-              caches.open(API_CACHE_NAME).then((cache) => cache.put(event.request, stamped));
+              caches.open(API_CACHE_NAME).then((cache) => {
+                cache.put(event.request, stamped);
+                trimCache(API_CACHE_NAME, API_CACHE_MAX_ENTRIES);
+              });
             });
           }
           return response;
@@ -118,13 +133,20 @@ self.addEventListener('fetch', (event) => {
 
 // Push notification handler
 self.addEventListener('push', (event) => {
-  const data = event.data ? event.data.json() : {};
-  const title = data.title || 'NxStops';
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (e) {
+    data = {};
+  }
+  const title = (typeof data.title === 'string' && data.title.length < 200) ? data.title : 'NxStops';
+  const body = (typeof data.body === 'string' && data.body.length < 500) ? data.body : 'Check out what\'s happening nearby!';
+  const url = (typeof data.url === 'string' && data.url.startsWith('/')) ? data.url : '/';
   const options = {
-    body: data.body || 'Check out what\'s happening nearby!',
+    body: body,
     icon: '/icon-192.png',
     badge: '/icon-192.png',
-    data: data.url || '/',
+    data: url,
     vibrate: [100, 50, 100],
   };
   event.waitUntil(self.registration.showNotification(title, options));
