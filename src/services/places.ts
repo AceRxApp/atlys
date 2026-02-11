@@ -81,9 +81,14 @@ function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number): 
   return R * c;
 }
 
-export function formatDistance(km: number): string {
+export function formatDistance(km: number, useMiles = false): string {
   if (km < 0.2) return '1 min walk';
   if (km < 1) return `${Math.round(km * 1000 / 80)} min walk`;
+  if (useMiles) {
+    const miles = km * 0.621371;
+    if (miles < 0.5) return `${miles.toFixed(1)} mi`;
+    return `${Math.round(miles * 10) / 10} mi`;
+  }
   if (km < 2) return `${km.toFixed(1)} km`;
   return `${Math.round(km)} km`;
 }

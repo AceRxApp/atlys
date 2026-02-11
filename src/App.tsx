@@ -872,6 +872,9 @@ export default function App() {
     return indicators;
   };
 
+  // Use miles for USA cities, km for everywhere else
+  const useMiles = selectedCity?.country === 'USA' || selectedCity?.country === 'United States';
+
   // Distance reference
   const getDistanceReference = (): string => {
     if (useGps && loc.hasLocation) return 'from you';
@@ -893,10 +896,14 @@ export default function App() {
     const a = Math.sin(dLat / 2) ** 2 + Math.cos((fromLat * Math.PI) / 180) * Math.cos((toLat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
     const km = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const mapsUrl = `https://www.google.com/maps/dir/${fromLat},${fromLng}/${toLat},${toLng}`;
-    if (km < 0.5) return { emoji: '🚶', text: '~5 min walk', distance: `${Math.round(km * 1000)}m`, mapsUrl };
-    if (km < 1.5) return { emoji: '🚶🚕', text: `${Math.round(km * 12)} min walk or quick ride`, distance: `${km.toFixed(1)} km`, mapsUrl };
-    if (km < 5) return { emoji: '🚇🚕', text: 'Transit or ride recommended', distance: `${km.toFixed(1)} km`, mapsUrl };
-    return { emoji: '🚗🚕', text: 'Drive or ride needed', distance: `${Math.round(km)} km`, mapsUrl };
+    const distStr = (d: number) => {
+      if (useMiles) { const mi = d * 0.621371; return mi < 0.5 ? `${mi.toFixed(1)} mi` : `${Math.round(mi * 10) / 10} mi`; }
+      return d < 2 ? `${d.toFixed(1)} km` : `${Math.round(d)} km`;
+    };
+    if (km < 0.5) return { emoji: '🚶', text: '~5 min walk', distance: useMiles ? `${Math.round(km * 3281)}ft` : `${Math.round(km * 1000)}m`, mapsUrl };
+    if (km < 1.5) return { emoji: '🚶🚕', text: `${Math.round(km * 12)} min walk or quick ride`, distance: distStr(km), mapsUrl };
+    if (km < 5) return { emoji: '🚇🚕', text: 'Transit or ride recommended', distance: distStr(km), mapsUrl };
+    return { emoji: '🚗🚕', text: 'Drive or ride needed', distance: distStr(km), mapsUrl };
   };
 
   // --------------------------------------------------------------------------
@@ -1585,7 +1592,7 @@ export default function App() {
                 padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 500,
                 background: 'rgba(0,0,0,0.5)', color: '#FFFBEB', backdropFilter: 'blur(8px)',
               }}>
-                {formatDistance(place.distance)} {getDistanceReference()}
+                {formatDistance(place.distance, useMiles)} {getDistanceReference()}
               </div>
             )}
           </div>
@@ -1610,7 +1617,7 @@ export default function App() {
             )}
             <PriceDots level={place.priceLevel} />
             {!place.photoUrl && place.distance != null && (
-              <span style={{ fontSize: '11px', color: '#A8A29E' }}>{formatDistance(place.distance)} {getDistanceReference()}</span>
+              <span style={{ fontSize: '11px', color: '#A8A29E' }}>{formatDistance(place.distance, useMiles)} {getDistanceReference()}</span>
             )}
             {!place.photoUrl && (
               <span style={{ fontSize: '11px', color: place.openNow ? '#34D399' : '#F87171' }}>{hoursStatus.text}</span>
@@ -2080,7 +2087,7 @@ export default function App() {
                     <div style={{ fontSize: '12px', color: '#57534E', marginBottom: '4px' }}>
                       {place.categoryDisplay}
                       {place.rating > 0 && ` · ★ ${place.rating.toFixed(1)}`}
-                      {place.distance != null && ` · ${formatDistance(place.distance)}`}
+                      {place.distance != null && ` · ${formatDistance(place.distance, useMiles)}`}
                     </div>
                     <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
                       <button
@@ -3088,7 +3095,7 @@ export default function App() {
                           <>
                             <p style={{ fontSize: '12px', color: '#A8A29E', marginBottom: '4px' }}>
                               {stop.place.categoryDisplay}
-                              {stop.place.distance != null && ` · ${formatDistance(stop.place.distance)} ${getDistanceReference()}`}
+                              {stop.place.distance != null && ` · ${formatDistance(stop.place.distance, useMiles)} ${getDistanceReference()}`}
                             </p>
                             {stop.place.rating > 0 && (
                               <div style={{ fontSize: '12px' }}>
@@ -3323,23 +3330,24 @@ export default function App() {
           {/* Photo Gallery / Hero */}
           {galleryPhotos.length > 0 && (
             <div style={{ position: 'relative', width: '100%', height: '250px', borderRadius: '24px 24px 0 0', overflow: 'hidden', background: '#292524' }}>
-              {/* All photos stacked — crossfade via opacity */}
-              {galleryPhotos.map((url, i) => (
-                <img
-                  key={i}
-                  src={url}
-                  alt={`${place.name} photo ${i + 1}`}
-                  loading={i === 0 ? 'eager' : 'lazy'}
-                  style={{
-                    position: i === 0 ? 'relative' : 'absolute',
-                    top: 0, left: 0,
-                    width: '100%', height: '100%', objectFit: 'cover',
-                    display: 'block',
-                    opacity: i === activePhotoIndex ? 1 : 0,
-                    transition: 'opacity 0.3s ease',
-                  }}
-                />
-              ))}
+              {/* Sliding photo strip */}
+              <div style={{
+                display: 'flex', width: `${galleryPhotos.length * 100}%`, height: '100%',
+                transform: `translateX(-${activePhotoIndex * (100 / galleryPhotos.length)}%)`,
+                transition: 'transform 0.35s ease-out',
+              }}>
+                {galleryPhotos.map((url, i) => (
+                  <img
+                    key={i}
+                    src={url}
+                    alt={`${place.name} photo ${i + 1}`}
+                    style={{
+                      width: `${100 / galleryPhotos.length}%`, height: '100%',
+                      objectFit: 'cover', display: 'block', flexShrink: 0,
+                    }}
+                  />
+                ))}
+              </div>
 
               {/* Gradient overlay */}
               <div style={{
@@ -3609,7 +3617,7 @@ export default function App() {
             {place.distance != null && (
               <div style={{ marginBottom: '16px' }}>
                 <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Distance</div>
-                <p style={{ color: '#FFFBEB', fontSize: '14px' }}>{formatDistance(place.distance)} {getDistanceReference()}</p>
+                <p style={{ color: '#FFFBEB', fontSize: '14px' }}>{formatDistance(place.distance, useMiles)} {getDistanceReference()}</p>
               </div>
             )}
 
@@ -4462,7 +4470,7 @@ export default function App() {
               <div style={{ fontSize: '14px', color: '#F59E0B', marginBottom: '4px', fontWeight: 500 }}>Surprise!</div>
               <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '6px' }}>{surprisePlace.name}</h2>
               <p style={{ color: '#A8A29E', fontSize: '13px', marginBottom: '4px' }}>
-                {surprisePlace.categoryDisplay}{surprisePlace.distance != null && ` · ${formatDistance(surprisePlace.distance)}`}
+                {surprisePlace.categoryDisplay}{surprisePlace.distance != null && ` · ${formatDistance(surprisePlace.distance, useMiles)}`}
               </p>
               {surprisePlace.rating > 0 && (
                 <p style={{ color: '#F59E0B', fontSize: '14px', marginBottom: '16px' }}>
