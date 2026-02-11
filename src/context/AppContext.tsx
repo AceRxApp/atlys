@@ -1,0 +1,257 @@
+import { createContext, useContext } from 'react';
+import type { City, EventItem, Stop, AdminSignup, Vibe, QuickFilter, TravelGroup, CommunityTag } from '../types';
+import type { Place } from '../services/places';
+import type { Review } from '../supabase';
+import type { User } from '@supabase/supabase-js';
+
+// ============================================================================
+// APP CONTEXT TYPE
+// ============================================================================
+
+export interface AppContextType {
+  // --- Core ---
+  screen: string; // derived from route path
+  setScreen: (s: string) => void; // navigates via router
+  cities: City[];
+  selectedCity: City | null;
+  setSelectedCity: (city: City | null) => void;
+  places: Place[];
+  setPlaces: (places: Place[]) => void;
+  filteredPlaces: Place[];
+  placesLoading: boolean;
+  useGps: boolean;
+  setUseGps: (v: boolean) => void;
+  searchRadius: number;
+  setSearchRadius: React.Dispatch<React.SetStateAction<number>>;
+
+  // --- Location ---
+  loc: {
+    lat: number | null;
+    lng: number | null;
+    city: string | null;
+    loading: boolean;
+    error: string | null;
+    permissionDenied: boolean;
+    requestLocation: () => void;
+    hasLocation: boolean;
+  };
+
+  // --- Trip ---
+  tripDays: Record<number, Stop[]>;
+  setTripDays: React.Dispatch<React.SetStateAction<Record<number, Stop[]>>>;
+  activeDay: number;
+  setActiveDay: (day: number) => void;
+  dayPlan: Stop[];
+  totalStops: number;
+  dayCount: number;
+  setActiveDayStops: (updater: Stop[] | ((prev: Stop[]) => Stop[])) => void;
+
+  // --- Trip handlers ---
+  addToPlan: (place: Place) => void;
+  removeFromPlan: (stopId: string) => void;
+  isInPlan: (placeId: string) => boolean;
+  clearPlan: () => void;
+  movePlanStop: (index: number, direction: 'up' | 'down') => void;
+  addDay: () => void;
+  removeDay: (day: number) => void;
+  moveStopToDay: (stopId: string, fromDay: number, toDay: number) => void;
+  getRouteUrl: () => string;
+  sharePlan: () => Promise<void>;
+  addEventToPlan: (event: EventItem) => void;
+  isEventInPlan: (eventId: string) => boolean;
+
+  // --- Events ---
+  events: EventItem[];
+  eventsLoading: boolean;
+  eventsViewMode: 'list' | 'map';
+  setEventsViewMode: (mode: 'list' | 'map') => void;
+  eventCategoryFilter: string;
+  setEventCategoryFilter: (filter: string) => void;
+
+  // --- UI ---
+  selectedVibe: Vibe | null;
+  setSelectedVibe: (vibe: Vibe | null) => void;
+  quickFilters: QuickFilter[];
+  setQuickFilters: React.Dispatch<React.SetStateAction<QuickFilter[]>>;
+  viewMode: 'list' | 'map';
+  setViewMode: (mode: 'list' | 'map') => void;
+  activeMapPin: string | null;
+  setActiveMapPin: (id: string | null) => void;
+  activeEventPin: string | null;
+  setActiveEventPin: (id: string | null) => void;
+
+  // --- Place Detail ---
+  selectedPlace: Place | null;
+  setSelectedPlace: (place: Place | null) => void;
+  activePhotoIndex: number;
+  setActivePhotoIndex: (index: number) => void;
+  placeReviews: Review[];
+  showReviewForm: boolean;
+  setShowReviewForm: (show: boolean) => void;
+  reviewRating: number;
+  setReviewRating: (rating: number) => void;
+  reviewText: string;
+  setReviewText: (text: string) => void;
+  reviewTags: CommunityTag[];
+  setReviewTags: React.Dispatch<React.SetStateAction<CommunityTag[]>>;
+  reviewSubmitting: boolean;
+  handleSubmitReview: () => Promise<void>;
+
+  // --- Auth ---
+  user: User | null;
+  authLoading: boolean;
+
+  // --- Search ---
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+  searchResults: Place[];
+  isSearching: boolean;
+  showSearch: boolean;
+  setShowSearch: (show: boolean) => void;
+  handleSearch: () => Promise<void>;
+
+  // --- City info ---
+  cityLabel: string;
+  citySlug: string;
+  useMiles: boolean;
+  weather: {
+    temp: number;
+    high: number;
+    low: number;
+    code: number;
+    description: string;
+    emoji: string;
+    forecast: {
+      date: string;
+      high: number;
+      low: number;
+      code: number;
+      emoji: string;
+      description: string;
+      precipChance: number;
+    }[];
+  } | null;
+
+  // --- Helpers ---
+  showToast: (msg: string) => void;
+  getSafetyIndicators: (place: Place) => string[];
+  getDistanceReference: () => string;
+  getTransportInfo: (fromStop: Stop, toStop: Stop) => {
+    emoji: string;
+    text: string;
+    distance: string;
+    mapsUrl: string;
+  } | null;
+  isReservable: (place: Place) => boolean;
+  isBookable: (place: Place) => boolean;
+  getBookingUrl: (place: Place) => string;
+  getBookingLabel: (place: Place) => string;
+  getGreeting: () => string;
+  getTimeSuggestion: () => string;
+  currentTime: Date;
+
+  // --- Community ---
+  communityFilters: CommunityTag[];
+  setCommunityFilters: React.Dispatch<React.SetStateAction<CommunityTag[]>>;
+  placeTagsCache: Record<string, Record<string, number>>;
+  travelGroup: TravelGroup | null;
+  setTravelGroup: (group: TravelGroup | null) => void;
+
+  // --- Saved ---
+  savedPlaces: Place[];
+  toggleSaved: (place: Place) => void;
+  isSaved: (placeId: string) => boolean;
+
+  // --- Crew ---
+  crewMode: boolean;
+  crewCode: string | null;
+  crewSyncing: boolean;
+  joinCrewInput: string;
+  setJoinCrewInput: (input: string) => void;
+  showJoinCrew: boolean;
+  setShowJoinCrew: (show: boolean) => void;
+  startCrewMode: () => Promise<void>;
+  stopCrewMode: () => void;
+  joinCrew: () => Promise<void>;
+  shareCrewPlan: () => Promise<void>;
+
+  // --- Modals ---
+  surprisePlace: Place | null;
+  setSurprisePlace: (place: Place | null) => void;
+  showSafety: boolean;
+  setShowSafety: (show: boolean) => void;
+  showProfile: boolean;
+  setShowProfile: (show: boolean) => void;
+  showAdmin: boolean;
+  setShowAdmin: (show: boolean) => void;
+  showCulture: boolean;
+  setShowCulture: (show: boolean) => void;
+
+  // --- Notifications ---
+  showNotificationPrompt: boolean;
+  notificationPermission: NotificationPermission;
+  requestNotificationPermission: () => Promise<void>;
+  dismissNotificationPrompt: () => void;
+
+  // --- Admin ---
+  adminSignups: AdminSignup[];
+  adminCities: City[];
+  adminLoading: boolean;
+  adminTab: 'dashboard' | 'signups' | 'cities';
+  setAdminTab: (tab: 'dashboard' | 'signups' | 'cities') => void;
+  openAdmin: () => Promise<void>;
+  handleToggleCity: (cityId: string, isActive: boolean) => Promise<void>;
+
+  // --- Misc ---
+  loading: boolean;
+  isOffline: boolean;
+  sharePlace: (place: Place) => Promise<void>;
+  handleSurpriseMe: () => void;
+  formatEventDate: (dateStr: string) => string;
+  formatEventTime: (timeStr: string) => string;
+  getMapCenter: () => { lat: number; lng: number };
+  MAPS_API_KEY: string;
+
+  // --- Onboarding ---
+  showOnboarding: boolean;
+  onboardingStep: number;
+  setOnboardingStep: (step: number) => void;
+  setShowOnboarding: (show: boolean) => void;
+
+  // --- Auth handlers ---
+  handleSignIn: () => Promise<void>;
+  handleSignUp: () => Promise<void>;
+  handleSignOut: () => Promise<void>;
+  authScreen: 'signin' | 'signup';
+  setAuthScreen: (screen: 'signin' | 'signup') => void;
+  authEmail: string;
+  setAuthEmail: (email: string) => void;
+  authPassword: string;
+  setAuthPassword: (password: string) => void;
+  authName: string;
+  setAuthName: (name: string) => void;
+  authError: string | null;
+  authSubmitting: boolean;
+
+  // --- Fetch triggers ---
+  fetchPlaces: () => Promise<void>;
+  fetchEventsData: () => Promise<void>;
+}
+
+// ============================================================================
+// CREATE CONTEXT
+// ============================================================================
+
+export const AppContext = createContext<AppContextType | null>(null);
+
+// ============================================================================
+// useApp HOOK
+// ============================================================================
+
+export function useApp(): AppContextType {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error('useApp must be used within an AppContext.Provider');
+  }
+  return context;
+}

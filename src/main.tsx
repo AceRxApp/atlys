@@ -1,5 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './index.css'
 import { initSentry, Sentry } from './utils/sentry'
@@ -28,7 +29,9 @@ function ErrorFallback({ error }: { error: Error }) {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <Sentry.ErrorBoundary fallback={({ error }) => <ErrorFallback error={error as Error} />}>
-      <App />
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
     </Sentry.ErrorBoundary>
   </React.StrictMode>,
 )

@@ -1,5 +1,141 @@
--- Paste this into Supabase SQL Editor (Dashboard > SQL Editor > New Query > Run)
--- It will skip cities that already exist
+-- ============================================================================
+-- NxStops — Complete Database Setup
+-- Paste this ENTIRE script into Supabase SQL Editor and click Run
+-- Safe to re-run: uses IF NOT EXISTS and skips duplicates
+-- ============================================================================
+
+
+-- ============================================================================
+-- 1. REVIEWS TABLE
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS reviews (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  place_id TEXT NOT NULL,
+  city_slug TEXT NOT NULL,
+  rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  review_text TEXT,
+  tags TEXT[] DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_reviews_place_id ON reviews(place_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_user_id ON reviews(user_id);
+
+ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "Anyone can view reviews" ON reviews
+    FOR SELECT USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Authenticated users can create reviews" ON reviews
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Users can update own reviews" ON reviews
+    FOR UPDATE USING (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Users can delete own reviews" ON reviews
+    FOR DELETE USING (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+
+-- ============================================================================
+-- 2. PLACE TAGS TABLE (community-sourced ownership/attribute tags)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS place_tags (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  place_id TEXT NOT NULL,
+  city_slug TEXT NOT NULL,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  tag TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(place_id, user_id, tag)
+);
+
+CREATE INDEX IF NOT EXISTS idx_place_tags_place_id ON place_tags(place_id);
+CREATE INDEX IF NOT EXISTS idx_place_tags_tag ON place_tags(tag);
+
+ALTER TABLE place_tags ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "Anyone can view tags" ON place_tags
+    FOR SELECT USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Authenticated users can add tags" ON place_tags
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+
+-- ============================================================================
+-- 3. CREW TRIPS TABLE (collaborative trip planning)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS crew_trips (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  crew_code TEXT UNIQUE NOT NULL,
+  city_slug TEXT NOT NULL,
+  city_label TEXT NOT NULL,
+  trip_days JSONB NOT NULL DEFAULT '{"1": []}',
+  created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  member_count INTEGER DEFAULT 1,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_crew_trips_code ON crew_trips(crew_code);
+
+ALTER TABLE crew_trips ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "Anyone can view crew trips" ON crew_trips
+    FOR SELECT USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Anyone can create crew trips" ON crew_trips
+    FOR INSERT WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Anyone can update crew trips" ON crew_trips
+    FOR UPDATE USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Anyone can delete crew trips" ON crew_trips
+    FOR DELETE USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Enable Realtime for crew_trips (ignore error if already added)
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE crew_trips;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+
+-- ============================================================================
+-- 4. SEED ALL CITIES (skips cities that already exist)
+-- ============================================================================
 
 INSERT INTO cities (name, country, region, slug, timezone, is_active)
 SELECT name, country, region, slug, timezone, true
