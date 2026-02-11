@@ -3294,17 +3294,10 @@ export default function App() {
     );
     const hasMultiplePhotos = galleryPhotos.length > 1;
 
-    const handleGalleryScroll = () => {
-      const el = galleryRef.current;
-      if (!el) return;
-      const index = Math.round(el.scrollLeft / el.clientWidth);
-      setActivePhotoIndex(index);
+    const goToPhoto = (dir: 'prev' | 'next') => {
+      if (dir === 'prev' && activePhotoIndex > 0) setActivePhotoIndex(activePhotoIndex - 1);
+      if (dir === 'next' && activePhotoIndex < galleryPhotos.length - 1) setActivePhotoIndex(activePhotoIndex + 1);
     };
-
-    // Reset gallery scroll position on mount
-    if (galleryRef.current) {
-      galleryRef.current.scrollLeft = 0;
-    }
 
     return (
       <div
@@ -3329,109 +3322,110 @@ export default function App() {
         >
           {/* Photo Gallery / Hero */}
           {galleryPhotos.length > 0 && (
-            <div style={{ position: 'relative', width: '100%' }}>
-              {/* Scrollable gallery container */}
-              <div
-                className="photo-gallery-scroll"
-                ref={galleryRef}
-                onScroll={handleGalleryScroll}
+            <div style={{ position: 'relative', width: '100%', height: '250px', borderRadius: '24px 24px 0 0', overflow: 'hidden', background: '#292524' }}>
+              {/* Current photo */}
+              <img
+                src={galleryPhotos[activePhotoIndex]}
+                alt={`${place.name} photo ${activePhotoIndex + 1}`}
                 style={{
-                  display: 'flex', overflowX: 'scroll', scrollSnapType: 'x mandatory',
-                  width: '100%', height: '250px',
-                  scrollbarWidth: 'none',
-                  WebkitOverflowScrolling: 'touch',
-                  borderRadius: '24px 24px 0 0',
-                  touchAction: 'pan-x',
-                  overscrollBehaviorX: 'contain',
+                  width: '100%', height: '100%', objectFit: 'cover',
+                  display: 'block',
                 }}
-              >
-                {galleryPhotos.map((url, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      flex: '0 0 100%', width: '100%', height: '250px',
-                      scrollSnapAlign: 'start', position: 'relative',
-                    }}
-                  >
-                    <img
-                      src={url}
-                      alt={`${place.name} photo ${i + 1}`}
-                      loading={i === 0 ? 'eager' : 'lazy'}
+              />
+
+              {/* Gradient overlay */}
+              <div style={{
+                position: 'absolute', inset: 0,
+                background: 'linear-gradient(to bottom, transparent 50%, #1C1917)',
+                pointerEvents: 'none',
+              }} />
+
+              {/* Tap zones for prev/next */}
+              {hasMultiplePhotos && (
+                <>
+                  {activePhotoIndex > 0 && (
+                    <button onClick={() => goToPhoto('prev')}
+                      aria-label="Previous photo"
                       style={{
-                        width: '100%', height: '100%', objectFit: 'cover',
-                        display: 'block', background: '#292524',
-                      }}
-                    />
-                    {/* Gradient overlay on the first photo for name readability */}
-                    {i === 0 && (
-                      <div style={{
-                        position: 'absolute', inset: 0,
-                        background: 'linear-gradient(to bottom, transparent 40%, #1C1917)',
-                        pointerEvents: 'none',
+                        position: 'absolute', left: 0, top: 0, width: '40%', height: '100%',
+                        background: 'transparent', border: 'none', cursor: 'pointer', zIndex: 1,
                       }} />
-                    )}
-                  </div>
-                ))}
-              </div>
+                  )}
+                  {activePhotoIndex < galleryPhotos.length - 1 && (
+                    <button onClick={() => goToPhoto('next')}
+                      aria-label="Next photo"
+                      style={{
+                        position: 'absolute', right: 0, top: 0, width: '40%', height: '100%',
+                        background: 'transparent', border: 'none', cursor: 'pointer', zIndex: 1,
+                      }} />
+                  )}
+                </>
+              )}
+
+              {/* Prev/Next arrow buttons */}
+              {hasMultiplePhotos && activePhotoIndex > 0 && (
+                <button onClick={() => goToPhoto('prev')}
+                  aria-label="Previous photo"
+                  style={{
+                    position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', zIndex: 2,
+                    background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', border: 'none',
+                    borderRadius: '50%', width: '36px', height: '36px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', color: '#FFFBEB', fontSize: '16px', fontWeight: 700,
+                  }}>
+                  ‹
+                </button>
+              )}
+              {hasMultiplePhotos && activePhotoIndex < galleryPhotos.length - 1 && (
+                <button onClick={() => goToPhoto('next')}
+                  aria-label="Next photo"
+                  style={{
+                    position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', zIndex: 2,
+                    background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', border: 'none',
+                    borderRadius: '50%', width: '36px', height: '36px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', color: '#FFFBEB', fontSize: '16px', fontWeight: 700,
+                  }}>
+                  ›
+                </button>
+              )}
 
               {/* Close button */}
               <button onClick={() => setSelectedPlace(null)}
                 aria-label="Close"
                 style={{
-                  position: 'absolute', top: '16px', right: '16px', zIndex: 2,
+                  position: 'absolute', top: '12px', right: '12px', zIndex: 3,
                   background: 'rgba(0,0,0,0.5)', border: 'none',
-                  borderRadius: '50%', width: '44px', height: '44px',
+                  borderRadius: '50%', width: '36px', height: '36px',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: 'pointer', color: '#FFFBEB', backdropFilter: 'blur(8px)',
                 }}>
                 <CloseIcon />
               </button>
 
-              {/* Photo counter badge */}
+              {/* Photo counter + dots */}
               {hasMultiplePhotos && (
                 <div style={{
-                  position: 'absolute', top: '16px', left: '16px', zIndex: 2,
-                  background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',
-                  borderRadius: '12px', padding: '4px 10px',
-                  fontSize: '12px', fontWeight: 500, color: '#FFFBEB',
-                }}>
-                  {activePhotoIndex + 1} / {galleryPhotos.length}
-                </div>
-              )}
-
-              {/* Dot indicators */}
-              {hasMultiplePhotos && (
-                <div style={{
-                  position: 'absolute', bottom: '12px', left: '50%',
+                  position: 'absolute', bottom: '10px', left: '50%',
                   transform: 'translateX(-50%)', zIndex: 2,
-                  display: 'flex', gap: '6px', alignItems: 'center',
+                  display: 'flex', gap: '5px', alignItems: 'center',
+                  background: 'rgba(0,0,0,0.4)', borderRadius: '12px', padding: '4px 10px',
+                  backdropFilter: 'blur(8px)',
                 }}>
                   {galleryPhotos.map((_, i) => (
                     <button
                       key={i}
                       aria-label={`Go to photo ${i + 1}`}
-                      onClick={() => {
-                        galleryRef.current?.scrollTo({ left: i * (galleryRef.current?.clientWidth || 0), behavior: 'smooth' });
-                      }}
+                      onClick={() => setActivePhotoIndex(i)}
                       style={{
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '50%',
-                        background: 'transparent',
-                        border: 'none', padding: 0, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'all 0.2s ease',
-                      }}
-                    >
-                      <span style={{
                         width: i === activePhotoIndex ? '14px' : '8px',
                         height: '8px',
                         borderRadius: '4px',
-                        background: i === activePhotoIndex ? '#F59E0B' : 'rgba(255,255,255,0.5)',
-                        display: 'block',
+                        background: i === activePhotoIndex ? '#F59E0B' : 'rgba(255,255,255,0.4)',
+                        border: 'none', padding: 0, cursor: 'pointer',
                         transition: 'all 0.2s ease',
-                      }} />
-                    </button>
+                      }}
+                    />
                   ))}
                 </div>
               )}
