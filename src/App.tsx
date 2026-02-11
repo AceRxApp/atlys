@@ -3322,7 +3322,8 @@ export default function App() {
           style={{
             background: '#1C1917', borderRadius: '24px 24px 0 0',
             maxWidth: '430px', width: '100%', maxHeight: '90vh',
-            overflow: 'auto', border: '1px solid rgba(255,255,255,0.06)', borderBottom: 'none',
+            overflowY: 'auto', overflowX: 'hidden',
+            border: '1px solid rgba(255,255,255,0.06)', borderBottom: 'none',
           }}
           onClick={e => e.stopPropagation()}
         >
@@ -3335,11 +3336,13 @@ export default function App() {
                 ref={galleryRef}
                 onScroll={handleGalleryScroll}
                 style={{
-                  display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory',
+                  display: 'flex', overflowX: 'scroll', scrollSnapType: 'x mandatory',
                   width: '100%', height: '250px',
                   scrollbarWidth: 'none',
                   WebkitOverflowScrolling: 'touch',
                   borderRadius: '24px 24px 0 0',
+                  touchAction: 'pan-x',
+                  overscrollBehaviorX: 'contain',
                 }}
               >
                 {galleryPhotos.map((url, i) => (
