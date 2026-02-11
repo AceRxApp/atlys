@@ -103,6 +103,7 @@ export default function EventsScreen() {
     cityLabel,
     events,
     eventsLoading,
+    eventsError,
     eventsViewMode,
     setEventsViewMode,
     eventCategoryFilter,
@@ -116,6 +117,7 @@ export default function EventsScreen() {
     activeEventPin,
     MAPS_API_KEY,
     getMapCenter,
+    fetchEventsData,
   } = useApp();
   const { theme } = useTheme();
 
@@ -232,9 +234,21 @@ export default function EventsScreen() {
           <div style={{ width: '36px', height: '36px', border: `3px solid ${theme.purpleTint.border20}`, borderTopColor: theme.events.active, borderRadius: '50%', margin: '0 auto 16px', animation: 'spin 0.8s linear infinite' }} />
           <p style={{ color: theme.text.tertiary, fontSize: '14px' }}>Finding events nearby...</p>
         </div>
+      ) : eventsError ? (
+        <div style={{ textAlign: 'center', paddingTop: '60px' }}>
+          <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.6 }}>&#x26A0;&#xFE0F;</div>
+          <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>Couldn't load events</h2>
+          <p style={{ color: theme.text.secondary, fontSize: '14px', lineHeight: 1.5, marginBottom: '16px' }}>
+            Check your connection and try again.
+          </p>
+          <button onClick={fetchEventsData}
+            style={{ background: 'none', border: `1px solid ${theme.events.active}`, color: theme.events.active, borderRadius: '10px', padding: '10px 20px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            Tap to Retry
+          </button>
+        </div>
       ) : filteredEvents.length === 0 ? (
         <div style={{ textAlign: 'center', paddingTop: '60px' }}>
-          <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.6 }}>🎫</div>
+          <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.6 }}>&#x1F3AB;</div>
           <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>No events found</h2>
           <p style={{ color: theme.text.secondary, fontSize: '14px', lineHeight: 1.5 }}>
             {!useGps && !selectedCity

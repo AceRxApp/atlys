@@ -19,6 +19,7 @@ export interface AppContextType {
   setPlaces: (places: Place[]) => void;
   filteredPlaces: Place[];
   placesLoading: boolean;
+  placesError: boolean;
   useGps: boolean;
   setUseGps: (v: boolean) => void;
   searchRadius: number;
@@ -63,6 +64,7 @@ export interface AppContextType {
   // --- Events ---
   events: EventItem[];
   eventsLoading: boolean;
+  eventsError: boolean;
   eventsViewMode: 'list' | 'map';
   setEventsViewMode: (mode: 'list' | 'map') => void;
   eventCategoryFilter: string;

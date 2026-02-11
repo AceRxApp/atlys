@@ -34,6 +34,7 @@ const AboutScreen = lazy(() => import('./screens/AboutScreen'));
 const PrivacyScreen = lazy(() => import('./screens/PrivacyScreen'));
 const TermsScreen = lazy(() => import('./screens/TermsScreen'));
 const ContactScreen = lazy(() => import('./screens/ContactScreen'));
+const CityScreen = lazy(() => import('./screens/CityScreen'));
 
 const MAPS_API_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || '';
 
@@ -54,7 +55,7 @@ export default function App() {
     return (['home', 'discover', 'events', 'plan'].includes(path) ? path : 'home') as Screen;
   })();
 
-  const isInfoPage = ['/about', '/privacy', '/terms', '/contact'].includes(routerLocation.pathname);
+  const isInfoPage = ['/about', '/privacy', '/terms', '/contact'].includes(routerLocation.pathname) || routerLocation.pathname.startsWith('/cities/');
 
   const setScreen = useCallback((s: string) => {
     navigate(s === 'home' ? '/' : `/${s}`);
@@ -70,6 +71,7 @@ export default function App() {
   const [activeDay, setActiveDay] = useState(1);
   const [loading, setLoading] = useState(true);
   const [placesLoading, setPlacesLoading] = useState(false);
+  const [placesError, setPlacesError] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [useGps, setUseGpsRaw] = useState(() => sessionStorage.getItem('nxstops_use_gps') === 'true');
   const [searchRadius, setSearchRadius] = useState(1500);
@@ -101,6 +103,7 @@ export default function App() {
   // --- Events ---
   const [events, setEvents] = useState<EventItem[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventsError, setEventsError] = useState(false);
   const [eventsViewMode, setEventsViewMode] = useState<'list' | 'map'>('list');
   const [eventCategoryFilter, setEventCategoryFilter] = useState('all');
 
@@ -559,9 +562,15 @@ export default function App() {
     }
     if (!lat || !lng) return;
     setPlacesLoading(true);
-    const vibes = selectedVibe ? [selectedVibe] : [];
-    const results = await searchNearby(lat, lng, vibes, searchRadius);
-    setPlaces(results);
+    setPlacesError(false);
+    try {
+      const vibes = selectedVibe ? [selectedVibe] : [];
+      const results = await searchNearby(lat, lng, vibes, searchRadius);
+      setPlaces(results);
+      if (results.length === 0 && !selectedVibe) setPlacesError(true);
+    } catch {
+      setPlacesError(true);
+    }
     setPlacesLoading(false);
   }, [useGps, loc.lat, loc.lng, selectedCity, selectedVibe, searchRadius]);
 
@@ -579,14 +588,19 @@ export default function App() {
     }
     if (!lat || !lng) return;
     setEventsLoading(true);
+    setEventsError(false);
     try {
       const params = new URLSearchParams({ lat: lat.toString(), lng: lng.toString(), radius: '25' });
       const response = await fetch(`/api/events?${params}`);
       if (response.ok) {
         const data = await response.json();
         setEvents(data.events || []);
+      } else {
+        setEventsError(true);
       }
-    } catch { /* events API may not be configured yet */ }
+    } catch {
+      setEventsError(true);
+    }
     setEventsLoading(false);
   }, [useGps, loc.lat, loc.lng, selectedCity]);
 
@@ -1007,12 +1021,12 @@ export default function App() {
 
   const contextValue = {
     screen, setScreen, cities, selectedCity, setSelectedCity, places, setPlaces,
-    filteredPlaces, placesLoading, useGps, setUseGps, searchRadius, setSearchRadius,
+    filteredPlaces, placesLoading, placesError, useGps, setUseGps, searchRadius, setSearchRadius,
     loc,
     tripDays, setTripDays, activeDay, setActiveDay, dayPlan, totalStops, dayCount, setActiveDayStops,
     addToPlan, removeFromPlan, isInPlan, clearPlan, movePlanStop, addDay, removeDay, moveStopToDay,
     getRouteUrl, sharePlan, addEventToPlan, isEventInPlan,
-    events, eventsLoading, eventsViewMode, setEventsViewMode, eventCategoryFilter, setEventCategoryFilter,
+    events, eventsLoading, eventsError, eventsViewMode, setEventsViewMode, eventCategoryFilter, setEventCategoryFilter,
     selectedVibe, setSelectedVibe, quickFilters, setQuickFilters, viewMode, setViewMode,
     activeMapPin, setActiveMapPin, activeEventPin, setActiveEventPin,
     selectedPlace, setSelectedPlace, activePhotoIndex, setActivePhotoIndex,
@@ -1141,6 +1155,9 @@ export default function App() {
           button:focus-visible { outline: 2px solid #F59E0B; outline-offset: 2px; }
           a:focus-visible { outline: 2px solid #F59E0B; outline-offset: 2px; }
           input:focus-visible { outline: 2px solid #F59E0B; outline-offset: 2px; }
+          @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+          }
         `}</style>
 
         {/* Offline banner */}
@@ -1224,6 +1241,7 @@ export default function App() {
               <Route path="/privacy" element={<PrivacyScreen />} />
               <Route path="/terms" element={<TermsScreen />} />
               <Route path="/contact" element={<ContactScreen />} />
+              <Route path="/cities/:slug" element={<CityScreen />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>

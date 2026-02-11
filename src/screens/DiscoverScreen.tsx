@@ -125,6 +125,7 @@ export default function DiscoverScreen() {
     communityFilters,
     setCommunityFilters,
     placesLoading,
+    placesError,
     places,
     setSelectedPlace,
     setActiveMapPin,
@@ -135,6 +136,7 @@ export default function DiscoverScreen() {
     useMiles,
     MAPS_API_KEY,
     getMapCenter,
+    fetchPlaces,
   } = useApp();
 
   const { theme } = useTheme();
@@ -410,13 +412,28 @@ export default function DiscoverScreen() {
                 </div>
               )}
 
-              {/* Empty: no results at all */}
+              {/* Empty / Error state */}
               {!placesLoading && places.length === 0 && (
                 <div style={{ ...cardStyle, textAlign: 'center', padding: '32px 20px' }}>
-                  <div style={{ fontSize: '32px', marginBottom: '8px' }}>📍</div>
-                  <p style={{ color: theme.text.secondary, fontSize: '14px' }}>
-                    {(useGps || selectedCity) ? 'Loading places...' : 'Select a city or enable location first.'}
-                  </p>
+                  {placesError ? (
+                    <>
+                      <div style={{ fontSize: '32px', marginBottom: '8px' }}>&#x26A0;&#xFE0F;</div>
+                      <p style={{ color: theme.text.secondary, fontSize: '14px', marginBottom: '12px' }}>
+                        Couldn't load places. Check your connection and try again.
+                      </p>
+                      <button onClick={fetchPlaces}
+                        style={{ background: 'none', border: `1px solid ${theme.accent.amber}`, color: theme.accent.amber, borderRadius: '10px', padding: '10px 20px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                        Tap to Retry
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: '32px', marginBottom: '8px' }}>&#x1F4CD;</div>
+                      <p style={{ color: theme.text.secondary, fontSize: '14px' }}>
+                        {(useGps || selectedCity) ? 'No places found nearby.' : 'Select a city or enable location first.'}
+                      </p>
+                    </>
+                  )}
                 </div>
               )}
 
