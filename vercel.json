@@ -6,15 +6,19 @@
     {
       "source": "/:path(.*)",
       "has": [{ "type": "host", "value": "vynbynave.vercel.app" }],
-      "destination": "https://nxstops-new.vercel.app/:path",
+      "destination": "https://nxstops.com/:path",
+      "permanent": true
+    },
+    {
+      "source": "/:path(.*)",
+      "has": [{ "type": "host", "value": "nxstops-new.vercel.app" }],
+      "destination": "https://nxstops.com/:path",
       "permanent": true
     }
   ],
   "rewrites": [
     { "source": "/api/events", "destination": "/api/events" },
     { "source": "/api/places", "destination": "/api/places" },
-    { "source": "/privacy", "destination": "/privacy.html" },
-    { "source": "/terms", "destination": "/terms.html" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }

@@ -990,11 +990,11 @@ export default function App() {
       return `Day ${day}:\n${stopList}`;
     }).filter(Boolean).join('\n\n');
     const joinInstructions = crewCode
-      ? `\n\u{1F517} Join our crew on NxStops!\n\n1. Open https://vynbynave.vercel.app\n2. Go to Plan tab \u{2192} tap "Join Crew"\n3. Enter code: ${crewCode}\n`
+      ? `\n\u{1F517} Join our crew on NxStops!\n\n1. Open https://nxstops.com\n2. Go to Plan tab \u{2192} tap "Join Crew"\n3. Enter code: ${crewCode}\n`
       : '';
     const summary = `${cityLabel} Trip Plan${joinInstructions}\n${lines}\n\nPlanned with NxStops \u{2728}`;
     if (navigator.share) {
-      await navigator.share({ title: `${cityLabel} Trip Plan`, text: summary, url: 'https://vynbynave.vercel.app' });
+      await navigator.share({ title: `${cityLabel} Trip Plan`, text: summary, url: 'https://nxstops.com' });
     } else {
       await navigator.clipboard.writeText(summary);
       showToast('Plan copied \u{2014} share with your crew!');
