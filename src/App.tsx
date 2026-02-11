@@ -2387,6 +2387,38 @@ export default function App() {
             </>
           ) : (
             <>
+              {/* Places to Stay — Booking Links */}
+              {selectedVibe === 'stay' && !placesLoading && cityLabel && (
+                <div style={{ ...cardStyle, marginBottom: '12px', padding: '16px 18px', background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(251,191,36,0.04))', border: '1px solid rgba(245,158,11,0.15)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '20px' }}>🛏️</span>
+                    <span style={{ fontWeight: 600, fontSize: '15px', color: '#FFFBEB' }}>Find Places to Stay</span>
+                  </div>
+                  <p style={{ fontSize: '12px', color: '#A8A29E', lineHeight: 1.5, margin: '0 0 12px 0' }}>
+                    Browse hotels, apartments & unique stays in {cityLabel}
+                  </p>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {[
+                      { label: 'Airbnb', emoji: '🏡', url: `https://www.airbnb.com/s/${encodeURIComponent(cityLabel)}/homes` },
+                      { label: 'Booking.com', emoji: '🏨', url: `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(cityLabel)}` },
+                      { label: 'Hotels.com', emoji: '⭐', url: `https://www.hotels.com/search.do?q-destination=${encodeURIComponent(cityLabel)}` },
+                    ].map(site => (
+                      <a key={site.label} href={site.url} target="_blank" rel="noopener noreferrer"
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '6px',
+                          padding: '10px 16px', borderRadius: '12px',
+                          background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                          color: '#FFFBEB', fontSize: '13px', fontWeight: 500,
+                          textDecoration: 'none', cursor: 'pointer',
+                          transition: 'background 0.2s',
+                        }}>
+                        <span>{site.emoji}</span> {site.label}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Hidden Gems banner */}
               {selectedVibe === 'hidden' && !placesLoading && filteredPlaces.length > 0 && (
                 <div style={{ ...cardStyle, marginBottom: '12px', padding: '16px 18px', background: 'linear-gradient(135deg, rgba(168,85,247,0.08), rgba(139,92,246,0.04))', border: '1px solid rgba(168,85,247,0.15)' }}>
