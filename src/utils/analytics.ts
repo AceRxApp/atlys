@@ -1,5 +1,5 @@
 // Google Analytics wrapper
-// TODO: Replace G-XXXXXXXXXX with your GA4 Measurement ID from https://analytics.google.com
+// GA4 Measurement ID: G-LNFFL06W4Z
 
 declare global {
   interface Window {
