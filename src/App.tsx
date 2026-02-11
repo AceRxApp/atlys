@@ -3301,6 +3301,11 @@ export default function App() {
       setActivePhotoIndex(index);
     };
 
+    // Reset gallery scroll position on mount
+    if (galleryRef.current) {
+      galleryRef.current.scrollLeft = 0;
+    }
+
     return (
       <div
         className="modal-backdrop"
@@ -3351,7 +3356,7 @@ export default function App() {
                       loading={i === 0 ? 'eager' : 'lazy'}
                       style={{
                         width: '100%', height: '100%', objectFit: 'cover',
-                        display: 'block',
+                        display: 'block', background: '#292524',
                       }}
                     />
                     {/* Gradient overlay on the first photo for name readability */}
@@ -3406,22 +3411,22 @@ export default function App() {
                         galleryRef.current?.scrollTo({ left: i * (galleryRef.current?.clientWidth || 0), behavior: 'smooth' });
                       }}
                       style={{
-                        width: '44px',
-                        height: '44px',
+                        width: '24px',
+                        height: '24px',
                         borderRadius: '50%',
                         background: 'transparent',
                         border: 'none', padding: 0, cursor: 'pointer',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'all 0.3s ease',
+                        transition: 'all 0.2s ease',
                       }}
                     >
                       <span style={{
-                        width: i === activePhotoIndex ? '18px' : '10px',
-                        height: '10px',
-                        borderRadius: '5px',
+                        width: i === activePhotoIndex ? '14px' : '8px',
+                        height: '8px',
+                        borderRadius: '4px',
                         background: i === activePhotoIndex ? '#F59E0B' : 'rgba(255,255,255,0.5)',
                         display: 'block',
-                        transition: 'all 0.3s ease',
+                        transition: 'all 0.2s ease',
                       }} />
                     </button>
                   ))}
@@ -4483,7 +4488,7 @@ export default function App() {
       )}
 
       {/* Place Detail Modal */}
-      {selectedPlace && <PlaceDetailModal place={selectedPlace} />}
+      {selectedPlace && <PlaceDetailModal key={selectedPlace.placeId} place={selectedPlace} />}
 
       {/* (Email signup removed) */}
 
