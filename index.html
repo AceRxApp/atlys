@@ -12,14 +12,16 @@
     <meta property="og:type" content="website" />
     <meta property="og:title" content="NxStops — Discover Your Next Stop" />
     <meta property="og:description" content="Find what to do right now, wherever you are. Vibe-based travel for modern explorers." />
-    <meta property="og:image" content="https://nxstops.com/icon-512.png" />
+    <meta property="og:image" content="https://nxstops.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta property="og:url" content="https://nxstops.com" />
     <meta property="og:site_name" content="NxStops" />
     <!-- Twitter Card meta tags for social sharing -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="NxStops — Discover Your Next Stop" />
     <meta name="twitter:description" content="Find what to do right now, wherever you are. Vibe-based travel for modern explorers." />
-    <meta name="twitter:image" content="https://nxstops.com/icon-512.png" />
+    <meta name="twitter:image" content="https://nxstops.com/og-image.png" />
     <!-- Structured Data -->
     <script type="application/ld+json">
     {
@@ -35,6 +37,7 @@
     </script>
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <link rel="icon" type="image/png" href="/icon-192.png" />
     <title>NxStops</title>
     <!-- Google Analytics (GA4) -->
@@ -48,14 +51,18 @@
     <!-- Theme FOUC prevention — set correct bg before React boots -->
     <script>
       (function() {
+        var saved = null;
+        try { saved = localStorage.getItem('nxstops_theme'); } catch(e) {}
         var h = new Date().getHours();
-        var dark = h >= 19 || h < 6;
-        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-        document.documentElement.style.setProperty('--bg-body', dark ? '#0C0A09' : '#FAFAF9');
-        document.documentElement.style.setProperty('--text-primary', dark ? '#FFFBEB' : '#1C1917');
-        document.documentElement.style.setProperty('--scrollbar-track', dark ? '#1C1917' : '#F5F5F4');
-        document.documentElement.style.setProperty('--scrollbar-thumb', dark ? '#78716C' : '#D6D3D1');
-        document.documentElement.style.setProperty('--scrollbar-thumb-hover', '#A8A29E');
+        var mode = saved || (h >= 6 && h < 18 ? 'light' : h < 20 ? 'sunset' : 'dark');
+        var dark = mode !== 'light';
+        var sunset = mode === 'sunset';
+        document.documentElement.setAttribute('data-theme', mode);
+        document.documentElement.style.setProperty('--bg-body', sunset ? '#1A120D' : dark ? '#0C0A09' : '#FAFAF9');
+        document.documentElement.style.setProperty('--text-primary', sunset ? '#FFF5E6' : dark ? '#FFFBEB' : '#1C1917');
+        document.documentElement.style.setProperty('--scrollbar-track', sunset ? '#2A1E16' : dark ? '#1C1917' : '#F5F5F4');
+        document.documentElement.style.setProperty('--scrollbar-thumb', sunset ? '#8B7355' : dark ? '#78716C' : '#D6D3D1');
+        document.documentElement.style.setProperty('--scrollbar-thumb-hover', sunset ? '#C4A882' : '#A8A29E');
       })();
     </script>
   </head>

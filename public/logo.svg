@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="amber" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FBBF24"/>
+      <stop offset="50%" stop-color="#F59E0B"/>
+      <stop offset="100%" stop-color="#D97706"/>
+    </linearGradient>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#131110"/>
+      <stop offset="100%" stop-color="#0C0A09"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- Subtle inner border -->
+  <rect x="2" y="2" width="508" height="508" rx="110" fill="none" stroke="rgba(251,191,36,0.06)" stroke-width="1"/>
+
+  <!-- Subtle amber glow behind pin -->
+  <ellipse cx="256" cy="210" rx="100" ry="110" fill="rgba(245,158,11,0.04)"/>
+
+  <!-- Pin mark -->
+  <path d="M256 428 C228 355 144 272 144 188 C144 126 194 76 256 76 C318 76 368 126 368 188 C368 272 284 355 256 428Z"
+        fill="url(#amber)" filter="url(#glow)"/>
+
+  <!-- Inner circle cutout -->
+  <circle cx="256" cy="188" r="46" fill="#0C0A09"/>
+
+  <!-- Inner circle subtle ring -->
+  <circle cx="256" cy="188" r="46" fill="none" stroke="rgba(251,191,36,0.15)" stroke-width="1"/>
+
+  <!-- Center dot -->
+  <circle cx="256" cy="188" r="11" fill="url(#amber)"/>
+</svg>
