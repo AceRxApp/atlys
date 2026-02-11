@@ -1220,10 +1220,48 @@ export default function App() {
     }
     // Community tag filters
     if (communityFilters.length > 0) {
+      // Check community-submitted tags first
       const tags = placeTagsCache[place.placeId];
-      if (!tags) return false;
-      const hasMatch = communityFilters.some(f => (tags[f] || 0) >= 2);
-      if (!hasMatch) return false;
+      if (tags) {
+        const hasMatch = communityFilters.some(f => (tags[f] || 0) >= 1);
+        if (!hasMatch) return false;
+      } else {
+        // No community tags yet — use smart defaults based on place data
+        const cat = place.category;
+        const nameLower = place.name.toLowerCase();
+        const catDisplay = place.categoryDisplay.toLowerCase();
+        for (const filter of communityFilters) {
+          let matches = false;
+          switch (filter) {
+            case 'kid-friendly':
+              matches = ['park', 'playground', 'museum', 'zoo', 'aquarium', 'amusement_park', 'bowling_alley', 'movie_theater', 'ice_cream_shop', 'pizza_restaurant', 'library'].includes(cat)
+                || /\b(kid|child|family|play|fun|arcade|trampoline|zoo|aquarium|disney|museum)\b/i.test(nameLower + ' ' + catDisplay);
+              break;
+            case 'baby-friendly':
+              matches = ['park', 'cafe', 'coffee_shop', 'restaurant', 'shopping_mall', 'library', 'museum'].includes(cat)
+                || /\b(family|cafe|coffee|park|garden|library)\b/i.test(nameLower + ' ' + catDisplay);
+              break;
+            case 'wheelchair-accessible':
+              // Most commercial establishments are accessible — exclude hiking trails, rooftops, etc.
+              matches = !(/\b(trail|hike|climb|rooftop|boat|kayak|surf)\b/i.test(nameLower + ' ' + catDisplay));
+              break;
+            case 'solo-friendly':
+              matches = place.rating >= 4.0 && place.reviewCount >= 50
+                && ['cafe', 'coffee_shop', 'restaurant', 'bar', 'park', 'museum', 'library', 'bookstore', 'art_gallery'].includes(cat);
+              break;
+            case 'lgbtq-friendly':
+              // Can't determine from data — show well-reviewed, welcoming-vibe places
+              matches = place.rating >= 4.0 && ['cafe', 'coffee_shop', 'bar', 'restaurant', 'art_gallery', 'bookstore', 'park', 'museum', 'night_club', 'spa'].includes(cat);
+              break;
+            default:
+              // Identity-owned tags (black-owned, women-owned, etc.) — can't determine from Google data
+              // Show all places so the filter doesn't hide everything
+              matches = true;
+              break;
+          }
+          if (!matches) return false;
+        }
+      }
     }
     return true;
   });
@@ -2307,6 +2345,19 @@ export default function App() {
         })}
       </div>
       </>)}
+
+      {/* Community filter active banner */}
+      {communityFilters.length > 0 && !showSearch && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', padding: '10px 14px',
+          borderRadius: '10px', background: 'rgba(212,165,116,0.08)', border: '1px solid rgba(212,165,116,0.15)',
+        }}>
+          <span style={{ fontSize: '14px' }}>✨</span>
+          <span style={{ fontSize: '12px', color: '#D4A574', lineHeight: 1.4 }}>
+            Showing results based on smart matching. Tap a place → leave a review to improve community tags!
+          </span>
+        </div>
+      )}
 
       {/* Map View */}
       {viewMode === 'map' ? (
