@@ -8,6 +8,8 @@ const SEATGEEK_CLIENT_ID = process.env.SEATGEEK_CLIENT_ID || '';
 const PREDICTHQ_TOKEN = process.env.PREDICTHQ_TOKEN || '';
 
 const ALLOWED_ORIGINS = [
+  'https://nxstops.com',
+  'https://www.nxstops.com',
   'https://vynbynave.vercel.app',
   'https://nxstops-new.vercel.app',
   'http://localhost:5173',

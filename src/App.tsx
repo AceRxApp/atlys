@@ -18,6 +18,7 @@ import { AppContext } from './context/AppContext';
 import { useTheme } from './context/ThemeContext';
 import { HomeIcon, DiscoverIcon, EventsIcon, PlanIcon, ShieldIcon, GearIcon, CloseIcon } from './components/icons';
 import { SkeletonCard } from './components/ui';
+import Footer from './components/Footer';
 
 type Screen = 'home' | 'discover' | 'events' | 'plan';
 
@@ -29,6 +30,10 @@ const PlanScreen = lazy(() => import('./screens/PlanScreen'));
 const PlaceDetailModal = lazy(() => import('./components/PlaceDetailModal'));
 const ProfileScreen = lazy(() => import('./screens/ProfileScreen'));
 const AdminPanel = lazy(() => import('./screens/AdminPanel'));
+const AboutScreen = lazy(() => import('./screens/AboutScreen'));
+const PrivacyScreen = lazy(() => import('./screens/PrivacyScreen'));
+const TermsScreen = lazy(() => import('./screens/TermsScreen'));
+const ContactScreen = lazy(() => import('./screens/ContactScreen'));
 
 const MAPS_API_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || '';
 
@@ -48,6 +53,8 @@ export default function App() {
     const path = routerLocation.pathname.slice(1) || 'home';
     return (['home', 'discover', 'events', 'plan'].includes(path) ? path : 'home') as Screen;
   })();
+
+  const isInfoPage = ['/about', '/privacy', '/terms', '/contact'].includes(routerLocation.pathname);
 
   const setScreen = useCallback((s: string) => {
     navigate(s === 'home' ? '/' : `/${s}`);
@@ -1068,14 +1075,7 @@ export default function App() {
   // ONBOARDING
   // ==========================================================================
 
-  const ONBOARDING_SCREENS = [
-    { emoji: '\u{1F30D}', title: 'Welcome to NxStops', subtitle: 'Discover what to do right now, wherever you are. Curated experiences for modern travelers.' },
-    { emoji: '\u{1F46F}', title: 'Your Trip, Your Vibe', subtitle: 'Girls trip, boys trip, family vacation \u{2014} we curate places, events, and hidden gems based on who you\'re traveling with.' },
-    { emoji: '\u{1F5FA}\u{FE0F}', title: 'Plan Together', subtitle: 'Build multi-day itineraries, get directions between stops, and share your plan with your crew.' },
-  ];
-
   if (showOnboarding) {
-    const step = ONBOARDING_SCREENS[onboardingStep];
     return (
       <div style={{
         fontFamily: "'DM Sans', system-ui, sans-serif",
@@ -1084,44 +1084,31 @@ export default function App() {
         maxWidth: '430px', margin: '0 auto', padding: '40px 24px',
       }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-          <div style={{ fontSize: '72px', marginBottom: '24px' }}>{step.emoji}</div>
-          <h1 style={{ fontSize: '26px', fontWeight: 700, marginBottom: '12px', lineHeight: 1.2 }}>{step.title}</h1>
-          <p style={{ fontSize: '15px', color: theme.text.secondary, lineHeight: 1.6, maxWidth: '300px' }}>{step.subtitle}</p>
+          <div style={{
+            fontSize: '36px', fontWeight: 700, marginBottom: '4px',
+            background: theme.accent.amberTextGradient,
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          }}>
+            NxStops
+          </div>
+          <div style={{ fontSize: '11px', color: theme.text.tertiary, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '32px' }}>
+            by Nav&eacute;
+          </div>
+          <p style={{ fontSize: '17px', color: theme.text.secondary, lineHeight: 1.6, maxWidth: '300px', marginBottom: '8px' }}>
+            Discover places, plan trips, and explore cities — wherever you are.
+          </p>
         </div>
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
-          {ONBOARDING_SCREENS.map((_, i) => (
-            <div key={i} style={{
-              width: i === onboardingStep ? '24px' : '8px', height: '8px', borderRadius: '4px',
-              background: i === onboardingStep ? theme.accent.amber : theme.border.dashed,
-              transition: 'all 0.3s ease',
-            }} />
-          ))}
-        </div>
-        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div style={{ width: '100%' }}>
           <button
-            onClick={() => {
-              if (onboardingStep < ONBOARDING_SCREENS.length - 1) {
-                setOnboardingStep(onboardingStep + 1);
-              } else {
-                localStorage.setItem('nxstops_onboarded', 'true');
-                setShowOnboarding(false);
-              }
-            }}
+            onClick={() => { localStorage.setItem('nxstops_onboarded', 'true'); setShowOnboarding(false); }}
             style={{
               width: '100%', padding: '16px', borderRadius: '14px', border: 'none',
               background: theme.accent.amberGradient,
               color: theme.text.onAccent, fontSize: '16px', fontWeight: 600, cursor: 'pointer',
               boxShadow: `0 4px 20px ${theme.amberTint.shadow}`,
             }}>
-            {onboardingStep < ONBOARDING_SCREENS.length - 1 ? 'Next' : 'Get Started'}
+            Get Started
           </button>
-          {onboardingStep < ONBOARDING_SCREENS.length - 1 && (
-            <button
-              onClick={() => { localStorage.setItem('nxstops_onboarded', 'true'); setShowOnboarding(false); }}
-              style={{ width: '100%', padding: '12px', background: 'none', border: 'none', color: theme.text.tertiary, fontSize: '13px', cursor: 'pointer' }}>
-              Skip
-            </button>
-          )}
         </div>
       </div>
     );
@@ -1169,6 +1156,7 @@ export default function App() {
         )}
 
         {/* Header */}
+        {!isInfoPage && (
         <header style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div style={{
@@ -1222,22 +1210,28 @@ export default function App() {
             </button>
           </div>
         </header>
+        )}
 
         {/* Content — routed screens */}
-        <main style={{ padding: '0 20px 100px' }}>
+        <main style={{ padding: isInfoPage ? '0' : '0 20px 100px' }}>
           <Suspense fallback={<><SkeletonCard /><SkeletonCard /><SkeletonCard /></>}>
             <Routes>
               <Route path="/" element={<HomeScreen />} />
               <Route path="/discover" element={<DiscoverScreen />} />
               <Route path="/events" element={<EventsScreen />} />
               <Route path="/plan" element={<PlanScreen />} />
+              <Route path="/about" element={<AboutScreen />} />
+              <Route path="/privacy" element={<PrivacyScreen />} />
+              <Route path="/terms" element={<TermsScreen />} />
+              <Route path="/contact" element={<ContactScreen />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>
+          {!isInfoPage && <Footer />}
         </main>
 
         {/* Bottom Navigation */}
-        <nav aria-label="Main navigation" style={{
+        {!isInfoPage && <nav aria-label="Main navigation" style={{
           position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
           width: '100%', maxWidth: '430px',
           background: theme.bg.nav, backdropFilter: 'blur(24px)',
@@ -1298,10 +1292,10 @@ export default function App() {
               </button>
             );
           })}
-        </nav>
+        </nav>}
 
         {/* Surprise Me Floating Button */}
-        {screen === 'discover' && places.length > 0 && !surprisePlace && !selectedPlace && (
+        {!isInfoPage && screen === 'discover' && places.length > 0 && !surprisePlace && !selectedPlace && (
           <button
             onClick={handleSurpriseMe}
             aria-label="Surprise me with a random place"

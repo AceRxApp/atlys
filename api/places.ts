@@ -6,6 +6,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 const GOOGLE_API_KEY = process.env.GOOGLE_PLACES_API_KEY || '';
 
 const ALLOWED_ORIGINS = [
+  'https://nxstops.com',
+  'https://www.nxstops.com',
   'https://vynbynave.vercel.app',
   'https://nxstops-new.vercel.app',
   'http://localhost:5173',
