@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { Routes, Route, useLocation as useRouterLocation, useNavigate, Navigate } from 'react-router-dom';
+import { track } from '@vercel/analytics';
 import { fetchCities, fetchEmailSignups, fetchAllCities, toggleCityActive, authSignUp, authSignIn, authSignOut, authGetSession, authOnStateChange, saveReview, fetchReviews, fetchPlaceTagCounts, createCrewTrip, loadCrewTrip, updateCrewTripDays, subscribeToCrewTrip, unsubscribeFromCrewTrip } from './supabase';
 import type { Review } from './supabase';
 import type { RealtimeChannel, User } from '@supabase/supabase-js';
@@ -190,8 +191,12 @@ export default function App() {
   // Persisted setters
   const setSelectedCity = useCallback((city: City | null) => {
     setSelectedCityRaw(city);
-    if (city) sessionStorage.setItem('nxstops_selected_city', JSON.stringify(city));
-    else sessionStorage.removeItem('nxstops_selected_city');
+    if (city) {
+      sessionStorage.setItem('nxstops_selected_city', JSON.stringify(city));
+      track('city_selected', { city: city.name, country: city.country });
+    } else {
+      sessionStorage.removeItem('nxstops_selected_city');
+    }
   }, []);
 
   const setUseGps = useCallback((v: boolean) => {
@@ -679,6 +684,7 @@ export default function App() {
     if (allStops.find(s => s.place?.placeId === place.placeId)) return;
     setActiveDayStops(prev => [...prev, { id: crypto.randomUUID(), type: 'place', place, addedAt: new Date() }]);
     showToast(`Added ${place.name} to Day ${activeDay}`);
+    track('add_to_plan', { place: place.name, category: place.categoryDisplay || '', day: String(activeDay) });
   };
 
   const addEventToPlan = (event: EventItem) => {
@@ -686,6 +692,7 @@ export default function App() {
     if (allStops.find(s => s.event?.id === event.id)) return;
     setActiveDayStops(prev => [...prev, { id: crypto.randomUUID(), type: 'event', event, addedAt: new Date() }]);
     showToast(`Added ${event.name} to Day ${activeDay}`);
+    track('add_event_to_plan', { event: event.name, day: String(activeDay) });
   };
 
   const isEventInPlan = (eventId: string) => Object.values(tripDays).flat().some(s => s.event?.id === eventId);
@@ -764,6 +771,8 @@ export default function App() {
       return `Day ${day}:\n${stopList}`;
     }).filter(Boolean).join('\n\n');
     const summary = `My ${cityLabel} Trip Plan:\n\n${lines}\n\nPlanned with NxStops`;
+    const totalStops = Object.values(tripDays).flat().length;
+    track('share_plan', { city: cityLabel, days: String(Object.keys(tripDays).length), stops: String(totalStops) });
     if (navigator.share) {
       await navigator.share({ title: `${cityLabel} Trip Plan`, text: summary });
     } else {
@@ -810,6 +819,7 @@ export default function App() {
     }
     if (!lat || !lng) return;
     setIsSearching(true);
+    track('search', { query: searchQuery.trim() });
     const results = await textSearchPlaces(searchQuery.trim(), lat, lng);
     setSearchResults(results);
     setIsSearching(false);
@@ -825,9 +835,11 @@ export default function App() {
     if (isSaved(place.placeId)) {
       setSavedPlaces(prev => prev.filter(p => p.placeId !== place.placeId));
       showToast('Removed from saved');
+      track('unsave_place', { place: place.name });
     } else {
       setSavedPlaces(prev => [...prev, place]);
       showToast('Saved for later');
+      track('save_place', { place: place.name, category: place.categoryDisplay || '' });
     }
   };
 
@@ -921,6 +933,7 @@ export default function App() {
       sessionStorage.setItem('nxstops_crew_code', code);
       sessionStorage.setItem('nxstops_crew_mode', 'true');
       showToast('Crew mode activated!');
+      track('start_crew', { city: cityLabel, code });
     } else {
       showToast('Failed to start crew mode. Try again.');
     }
@@ -955,6 +968,7 @@ export default function App() {
       setShowJoinCrew(false);
       setJoinCrewInput('');
       showToast(`Joined crew ${code}!`);
+      track('join_crew', { code });
     } else {
       showToast('Crew not found. Check the code.');
     }

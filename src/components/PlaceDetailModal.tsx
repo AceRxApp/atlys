@@ -1,3 +1,4 @@
+import { track } from '@vercel/analytics';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { getCardStyle } from '../styles/shared';
@@ -307,6 +308,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
           {(isReservable(place) || isBookable(place)) && (
             <div style={{ marginBottom: '16px' }}>
               <a href={getBookingUrl(place)} target="_blank" rel="noopener noreferrer"
+                onClick={() => track('booking_click', { place: place.name, category: place.categoryDisplay || '', type: isReservable(place) ? 'reserve' : 'book' })}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                   width: '100%', padding: '14px', borderRadius: '12px', boxSizing: 'border-box',
