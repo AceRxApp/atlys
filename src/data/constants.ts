@@ -46,6 +46,7 @@ export const VIBES: { id: Vibe; emoji: string; label: string }[] = [
   { id: 'stay', emoji: '🏨', label: 'Places to Stay' },
   { id: 'todo', emoji: '🎭', label: 'Things to Do' },
   { id: 'hidden', emoji: '💎', label: 'Hidden Gems' },
+  { id: 'locals', emoji: '🌻', label: 'Locals' },
 ];
 
 export const QUICK_FILTERS: { id: QuickFilter; label: string }[] = [

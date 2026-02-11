@@ -397,6 +397,19 @@ export default function DiscoverScreen() {
                 </div>
               )}
 
+              {/* Locals banner */}
+              {selectedVibe === 'locals' && !placesLoading && filteredPlaces.length > 0 && (
+                <div style={{ ...cardStyle, marginBottom: '12px', padding: '16px 18px', background: `linear-gradient(135deg, ${theme.greenTint.bg}, rgba(34,197,94,0.04))`, border: `1px solid ${theme.greenTint.border}` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '20px' }}>🌻</span>
+                    <span style={{ fontWeight: 600, fontSize: '15px', color: theme.text.primary }}>Locals</span>
+                  </div>
+                  <p style={{ fontSize: '12px', color: theme.text.secondary, lineHeight: 1.5, margin: 0 }}>
+                    Neighborhood favorites — bakeries, flower shops, bookstores, markets, and the charming spots locals love.
+                  </p>
+                </div>
+              )}
+
               {/* Loading */}
               {placesLoading && <><SkeletonCard /><SkeletonCard /><SkeletonCard /></>}
 

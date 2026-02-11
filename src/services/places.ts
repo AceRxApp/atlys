@@ -55,6 +55,11 @@ export const VIBE_TYPE_MAP: Record<string, string[]> = {
     'park', 'book_store', 'spa', 'national_park', 'market',
     'hiking_area', 'gym', 'dog_park', 'campground',
   ],
+  locals: [
+    'bakery', 'florist', 'book_store', 'art_gallery', 'market',
+    'grocery_store', 'gift_shop', 'clothing_store', 'pet_store',
+    'beauty_salon',
+  ],
 };
 
 // Reverse map: Google type → vibe tag
