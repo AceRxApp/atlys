@@ -3323,15 +3323,23 @@ export default function App() {
           {/* Photo Gallery / Hero */}
           {galleryPhotos.length > 0 && (
             <div style={{ position: 'relative', width: '100%', height: '250px', borderRadius: '24px 24px 0 0', overflow: 'hidden', background: '#292524' }}>
-              {/* Current photo */}
-              <img
-                src={galleryPhotos[activePhotoIndex]}
-                alt={`${place.name} photo ${activePhotoIndex + 1}`}
-                style={{
-                  width: '100%', height: '100%', objectFit: 'cover',
-                  display: 'block',
-                }}
-              />
+              {/* All photos stacked — crossfade via opacity */}
+              {galleryPhotos.map((url, i) => (
+                <img
+                  key={i}
+                  src={url}
+                  alt={`${place.name} photo ${i + 1}`}
+                  loading={i === 0 ? 'eager' : 'lazy'}
+                  style={{
+                    position: i === 0 ? 'relative' : 'absolute',
+                    top: 0, left: 0,
+                    width: '100%', height: '100%', objectFit: 'cover',
+                    display: 'block',
+                    opacity: i === activePhotoIndex ? 1 : 0,
+                    transition: 'opacity 0.3s ease',
+                  }}
+                />
+              ))}
 
               {/* Gradient overlay */}
               <div style={{
