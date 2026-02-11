@@ -1,4 +1,5 @@
 import { useApp } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 import EventCard from '../components/EventCard';
 import { APIProvider, Map, Marker, InfoWindow } from '@vis.gl/react-google-maps';
 import type { EventItem } from '../types';
@@ -30,6 +31,7 @@ function EventsMapView({ eventsList }: { eventsList: EventItem[] }) {
     MAPS_API_KEY,
     getMapCenter,
   } = useApp();
+  const { theme } = useTheme();
 
   const center = getMapCenter();
   const mappableEvents = eventsList.filter(e => e.lat && e.lng);
@@ -38,13 +40,13 @@ function EventsMapView({ eventsList }: { eventsList: EventItem[] }) {
     return (
       <div style={{ textAlign: 'center', padding: '60px 20px' }}>
         <div style={{ fontSize: '40px', marginBottom: '12px' }}>🗺️</div>
-        <p style={{ color: '#A8A29E', fontSize: '14px' }}>No event locations available to map</p>
+        <p style={{ color: theme.text.secondary, fontSize: '14px' }}>No event locations available to map</p>
       </div>
     );
   }
 
   return (
-    <div style={{ height: 'calc(100vh - 280px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
+    <div style={{ height: 'calc(100vh - 280px)', borderRadius: '16px', overflow: 'hidden', border: `1px solid ${theme.border.subtle}` }}>
       <APIProvider apiKey={MAPS_API_KEY}>
         <Map
           defaultCenter={center}
@@ -52,7 +54,7 @@ function EventsMapView({ eventsList }: { eventsList: EventItem[] }) {
           gestureHandling="greedy"
           disableDefaultUI={true}
           style={{ width: '100%', height: '100%' }}
-          colorScheme="DARK"
+          colorScheme={theme.mapColorScheme}
         >
           {mappableEvents.map(event => (
             <Marker
@@ -115,6 +117,7 @@ export default function EventsScreen() {
     MAPS_API_KEY,
     getMapCenter,
   } = useApp();
+  const { theme } = useTheme();
 
   // Filter: show events within current month, plus ticketed events further out
   const now = new Date();
@@ -122,13 +125,11 @@ export default function EventsScreen() {
   const filteredEvents = events.filter(event => {
     if (!event.date) return true;
     const eventDate = new Date(event.date + 'T00:00:00');
-    // Date filter: current month + ticketed up to 3 months
     if (eventDate > endOfMonth) {
       if (!event.url) return false;
       const threeMonths = new Date(now.getFullYear(), now.getMonth() + 3, 0);
       if (eventDate > threeMonths) return false;
     }
-    // Category filter
     if (eventCategoryFilter !== 'all') {
       const catLower = (event.category || '').toLowerCase();
       const nameLower = (event.name || '').toLowerCase();
@@ -142,7 +143,6 @@ export default function EventsScreen() {
         case 'festivals': if (!/\b(festival|fair|carnival|expo|convention|conference|parade|celebration)\b/i.test(combined)) return false; break;
       }
     }
-    // Travel group event curation
     if (travelGroup) {
       const eventNameLower = (event.name || '').toLowerCase();
       const eventCatLower = (event.category || '').toLowerCase();
@@ -150,23 +150,19 @@ export default function EventsScreen() {
       switch (travelGroup) {
         case 'girls':
         case 'bachelorette':
-          // Boost concerts, performing arts, pop, comedy; deprioritize combat sports
           if (/\b(mma|ufc|boxing|wrestling|monster truck)\b/.test(combined)) return false;
           break;
         case 'family':
-          // Exclude nightlife events; boost family/kids events
           if (/\b(21\+|18\+|adults only|burlesque|strip)\b/.test(combined)) return false;
           break;
         case 'boys':
         case 'friends':
-          // Include everything — sports, concerts, comedy
           break;
       }
     }
     return true;
   });
 
-  // Sort events: boost relevance based on travel group
   if (travelGroup === 'family') {
     filteredEvents.sort((a, b) => {
       const aFamily = /\b(kids|children|family|disney|nickelodeon|paw patrol|sesame|lego)\b/i.test(a.name + ' ' + a.category) ? -1 : 0;
@@ -183,17 +179,17 @@ export default function EventsScreen() {
           <h1 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '2px' }}>
             Events {cityLabel ? `in ${cityLabel}` : ''} 🎫
           </h1>
-          <p style={{ color: '#78716C', fontSize: '13px' }}>
+          <p style={{ color: theme.text.tertiary, fontSize: '13px' }}>
             {eventsLoading ? 'Finding events...' : `${filteredEvents.length} upcoming events`}
           </p>
         </div>
-        <div style={{ display: 'flex', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', borderRadius: '10px', overflow: 'hidden', border: `1px solid ${theme.border.strong}`, flexShrink: 0 }}>
           <button onClick={() => setEventsViewMode('list')}
             aria-label="List view"
             style={{
               padding: '10px 14px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer',
-              background: eventsViewMode === 'list' ? 'rgba(168,85,247,0.15)' : 'transparent',
-              color: eventsViewMode === 'list' ? '#A855F7' : '#78716C', minHeight: '44px',
+              background: eventsViewMode === 'list' ? theme.purpleTint.bg15 : 'transparent',
+              color: eventsViewMode === 'list' ? theme.events.active : theme.text.tertiary, minHeight: '44px',
             }}>
             List
           </button>
@@ -201,9 +197,9 @@ export default function EventsScreen() {
             aria-label="Map view"
             style={{
               padding: '10px 14px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer',
-              borderLeft: '1px solid rgba(255,255,255,0.1)',
-              background: eventsViewMode === 'map' ? 'rgba(168,85,247,0.15)' : 'transparent',
-              color: eventsViewMode === 'map' ? '#A855F7' : '#78716C', minHeight: '44px',
+              borderLeft: `1px solid ${theme.border.strong}`,
+              background: eventsViewMode === 'map' ? theme.purpleTint.bg15 : 'transparent',
+              color: eventsViewMode === 'map' ? theme.events.active : theme.text.tertiary, minHeight: '44px',
             }}>
             Map
           </button>
@@ -219,10 +215,10 @@ export default function EventsScreen() {
               onClick={() => setEventCategoryFilter(isActive && cat.id !== 'all' ? 'all' : cat.id)}
               style={{
                 padding: '6px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: 500,
-                border: isActive ? '1px solid rgba(168,85,247,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                border: isActive ? `1px solid ${theme.purpleTint.border30}` : `1px solid ${theme.border.medium}`,
                 cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                background: isActive ? 'rgba(168,85,247,0.12)' : 'transparent',
-                color: isActive ? '#A855F7' : '#78716C',
+                background: isActive ? theme.purpleTint.bg12 : 'transparent',
+                color: isActive ? theme.events.active : theme.text.tertiary,
               }}>
               {cat.label}
             </button>
@@ -233,14 +229,14 @@ export default function EventsScreen() {
       {/* Events Content */}
       {eventsLoading ? (
         <div style={{ textAlign: 'center', padding: '60px 0' }}>
-          <div style={{ width: '36px', height: '36px', border: '3px solid rgba(168,85,247,0.2)', borderTopColor: '#A855F7', borderRadius: '50%', margin: '0 auto 16px', animation: 'spin 0.8s linear infinite' }} />
-          <p style={{ color: '#78716C', fontSize: '14px' }}>Finding events nearby...</p>
+          <div style={{ width: '36px', height: '36px', border: `3px solid ${theme.purpleTint.border20}`, borderTopColor: theme.events.active, borderRadius: '50%', margin: '0 auto 16px', animation: 'spin 0.8s linear infinite' }} />
+          <p style={{ color: theme.text.tertiary, fontSize: '14px' }}>Finding events nearby...</p>
         </div>
       ) : filteredEvents.length === 0 ? (
         <div style={{ textAlign: 'center', paddingTop: '60px' }}>
           <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.6 }}>🎫</div>
           <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>No events found</h2>
-          <p style={{ color: '#A8A29E', fontSize: '14px', lineHeight: 1.5 }}>
+          <p style={{ color: theme.text.secondary, fontSize: '14px', lineHeight: 1.5 }}>
             {!useGps && !selectedCity
               ? 'Select a city or use GPS to discover events nearby'
               : 'No upcoming events found in this area. Check back soon!'}

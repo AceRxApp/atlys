@@ -1,5 +1,6 @@
 import { useApp } from '../context/AppContext';
-import { cardStyle } from '../styles/shared';
+import { useTheme } from '../context/ThemeContext';
+import { getCardStyle } from '../styles/shared';
 import { DirectionsIcon, PhoneIcon, ShareIcon } from '../components/icons';
 import { formatDistance } from '../services/places';
 import type { Stop } from '../types';
@@ -52,24 +53,27 @@ export default function PlanScreen() {
     user,
   } = useApp();
 
+  const { theme } = useTheme();
+  const cardStyle = getCardStyle(theme);
+
   const sortedDays = Object.keys(tripDays).map(Number).sort((a, b) => a - b);
 
   if (totalStops === 0 && !crewMode) {
     return (
       <div style={{ textAlign: 'center', paddingTop: '60px' }}>
-        <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.6 }}>🗺️</div>
+        <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.6 }}>&#x1f5fa;&#xfe0f;</div>
         <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '8px' }}>No stops yet</h2>
-        <p style={{ color: '#A8A29E', fontSize: '14px', marginBottom: '24px', lineHeight: 1.5 }}>
+        <p style={{ color: theme.text.secondary, fontSize: '14px', marginBottom: '24px', lineHeight: 1.5 }}>
           Explore places and tap &quot;+ Add&quot; to build your trip plan
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
           <button
             onClick={() => setScreen('discover')}
             style={{
-              background: 'linear-gradient(135deg, #F59E0B, #D97706)', color: '#0C0A09',
+              background: theme.accent.amberGradient, color: theme.text.onAccent,
               border: 'none', borderRadius: '14px', padding: '14px 28px',
               fontSize: '15px', fontWeight: 600, cursor: 'pointer',
-              boxShadow: '0 4px 20px rgba(245,158,11,0.3)',
+              boxShadow: `0 4px 20px ${theme.amberTint.shadow}`,
             }}
           >
             Start Exploring →
@@ -77,18 +81,18 @@ export default function PlanScreen() {
           <button
             onClick={() => setShowJoinCrew(true)}
             style={{
-              background: 'none', border: '1px solid rgba(255,255,255,0.1)',
-              color: '#A8A29E', borderRadius: '14px', padding: '12px 24px',
+              background: 'none', border: `1px solid ${theme.border.strong}`,
+              color: theme.text.secondary, borderRadius: '14px', padding: '12px 24px',
               fontSize: '14px', cursor: 'pointer',
             }}
           >
-            👥 Join a Crew
+            &#x1f465; Join a Crew
           </button>
         </div>
         {/* Inline Join Crew */}
         {showJoinCrew && (
           <div style={{ ...cardStyle, marginTop: '20px', padding: '16px', textAlign: 'left' }}>
-            <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '8px', color: '#FFFBEB' }}>Enter Crew Code</div>
+            <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '8px', color: theme.text.primary }}>Enter Crew Code</div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <input
                 type="text"
@@ -103,8 +107,8 @@ export default function PlanScreen() {
                 maxLength={6}
                 style={{
                   flex: 1, padding: '12px', borderRadius: '10px',
-                  border: '1px solid rgba(255,255,255,0.1)', background: '#0C0A09',
-                  color: '#FFFBEB', fontSize: '18px', fontWeight: 700,
+                  border: `1px solid ${theme.border.strong}`, background: theme.bg.input,
+                  color: theme.text.primary, fontSize: '18px', fontWeight: 700,
                   letterSpacing: '4px', textAlign: 'center', outline: 'none',
                 }}
               />
@@ -113,8 +117,8 @@ export default function PlanScreen() {
                 disabled={crewSyncing || joinCrewInput.length < 4}
                 style={{
                   padding: '12px 20px', borderRadius: '10px', border: 'none', cursor: 'pointer',
-                  background: joinCrewInput.length >= 4 ? '#F59E0B' : 'rgba(255,255,255,0.06)',
-                  color: joinCrewInput.length >= 4 ? '#0C0A09' : '#78716C',
+                  background: joinCrewInput.length >= 4 ? theme.accent.amber : theme.border.subtle,
+                  color: joinCrewInput.length >= 4 ? theme.text.onAccent : theme.text.tertiary,
                   fontSize: '14px', fontWeight: 600,
                 }}>
                 {crewSyncing ? '...' : 'Join'}
@@ -140,8 +144,8 @@ export default function PlanScreen() {
               <button onClick={() => setShowJoinCrew(true)}
                 style={{
                   padding: '6px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                  border: '1px solid rgba(255,255,255,0.1)', background: 'transparent',
-                  color: '#78716C', cursor: 'pointer',
+                  border: `1px solid ${theme.border.strong}`, background: 'transparent',
+                  color: theme.text.tertiary, cursor: 'pointer',
                 }}>
                 Join Crew
               </button>
@@ -152,16 +156,16 @@ export default function PlanScreen() {
               style={{
                 display: 'flex', alignItems: 'center', gap: '6px',
                 padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
-                border: crewMode ? '1px solid rgba(245,158,11,0.3)' : '1px solid rgba(255,255,255,0.1)',
-                background: crewMode ? 'rgba(245,158,11,0.12)' : 'transparent',
-                color: crewMode ? '#F59E0B' : '#78716C', cursor: crewSyncing ? 'default' : 'pointer',
+                border: crewMode ? `1px solid ${theme.amberTint.border30}` : `1px solid ${theme.border.strong}`,
+                background: crewMode ? theme.amberTint.bg15 : 'transparent',
+                color: crewMode ? theme.accent.amber : theme.text.tertiary, cursor: crewSyncing ? 'default' : 'pointer',
                 opacity: crewSyncing ? 0.5 : 1,
               }}>
-              {crewSyncing ? '...' : crewMode ? '👥 Crew On' : '👤 Solo'}
+              {crewSyncing ? '...' : crewMode ? '&#x1f465; Crew On' : '&#x1f464; Solo'}
             </button>
           </div>
         </div>
-        <p style={{ color: '#78716C', fontSize: '13px' }}>
+        <p style={{ color: theme.text.tertiary, fontSize: '13px' }}>
           {cityLabel} · {totalStops} stop{totalStops !== 1 ? 's' : ''} · {dayCount} day{dayCount !== 1 ? 's' : ''}
         </p>
       </div>
@@ -170,10 +174,10 @@ export default function PlanScreen() {
       {showJoinCrew && (
         <div style={{
           ...cardStyle, marginBottom: '12px', padding: '16px',
-          background: 'rgba(28,25,23,0.95)', border: '1px solid rgba(245,158,11,0.15)',
+          background: theme.bg.toast, border: `1px solid ${theme.amberTint.border15}`,
         }}>
-          <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '10px', color: '#FFFBEB' }}>Join a Crew</div>
-          <p style={{ fontSize: '12px', color: '#A8A29E', marginBottom: '12px' }}>Enter the crew code shared with you</p>
+          <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '10px', color: theme.text.primary }}>Join a Crew</div>
+          <p style={{ fontSize: '12px', color: theme.text.secondary, marginBottom: '12px' }}>Enter the crew code shared with you</p>
           <div style={{ display: 'flex', gap: '8px' }}>
             <input
               type="text"
@@ -184,8 +188,8 @@ export default function PlanScreen() {
               maxLength={6}
               style={{
                 flex: 1, padding: '12px 14px', borderRadius: '10px',
-                border: '1px solid rgba(255,255,255,0.1)', background: '#0C0A09',
-                color: '#FFFBEB', fontSize: '18px', fontWeight: 700,
+                border: `1px solid ${theme.border.strong}`, background: theme.bg.input,
+                color: theme.text.primary, fontSize: '18px', fontWeight: 700,
                 letterSpacing: '4px', textAlign: 'center', outline: 'none',
                 textTransform: 'uppercase',
               }}
@@ -193,15 +197,15 @@ export default function PlanScreen() {
             <button onClick={joinCrew} disabled={crewSyncing || joinCrewInput.length < 4}
               style={{
                 padding: '12px 20px', borderRadius: '10px', border: 'none', cursor: 'pointer',
-                background: joinCrewInput.length >= 4 ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'rgba(255,255,255,0.06)',
-                color: joinCrewInput.length >= 4 ? '#0C0A09' : '#78716C',
+                background: joinCrewInput.length >= 4 ? theme.accent.amberGradient : theme.border.subtle,
+                color: joinCrewInput.length >= 4 ? theme.text.onAccent : theme.text.tertiary,
                 fontSize: '14px', fontWeight: 600,
               }}>
               {crewSyncing ? '...' : 'Join'}
             </button>
           </div>
           <button onClick={() => { setShowJoinCrew(false); setJoinCrewInput(''); }}
-            style={{ width: '100%', padding: '8px', marginTop: '8px', background: 'none', border: 'none', color: '#78716C', fontSize: '12px', cursor: 'pointer' }}>
+            style={{ width: '100%', padding: '8px', marginTop: '8px', background: 'none', border: 'none', color: theme.text.tertiary, fontSize: '12px', cursor: 'pointer' }}>
             Cancel
           </button>
         </div>
@@ -211,20 +215,20 @@ export default function PlanScreen() {
       {crewMode && crewCode && (
         <div style={{
           ...cardStyle, marginBottom: '12px', padding: '16px',
-          background: 'linear-gradient(135deg, rgba(245,158,11,0.1), rgba(217,119,6,0.05))',
-          border: '1px solid rgba(245,158,11,0.2)',
+          background: `linear-gradient(135deg, ${theme.amberTint.bg10}, ${theme.amberTint.bg06})`,
+          border: `1px solid ${theme.amberTint.border20}`,
         }}>
-          <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Share this code with your crew</div>
+          <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Share this code with your crew</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
             <div style={{
-              flex: 1, fontSize: '28px', fontWeight: 700, letterSpacing: '6px', color: '#F59E0B',
-              background: 'rgba(0,0,0,0.3)', borderRadius: '10px', padding: '10px 16px', textAlign: 'center',
+              flex: 1, fontSize: '28px', fontWeight: 700, letterSpacing: '6px', color: theme.accent.amber,
+              background: theme.bg.photoCounter, borderRadius: '10px', padding: '10px 16px', textAlign: 'center',
               fontFamily: 'monospace',
             }}>{crewCode}</div>
             <button onClick={() => { navigator.clipboard.writeText(crewCode); showToast('Code copied!'); }}
               style={{
-                padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(245,158,11,0.3)',
-                background: 'rgba(245,158,11,0.1)', color: '#F59E0B', cursor: 'pointer',
+                padding: '12px 14px', borderRadius: '10px', border: `1px solid ${theme.amberTint.border30}`,
+                background: theme.amberTint.bg10, color: theme.accent.amber, cursor: 'pointer',
                 fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap',
               }}>
               Copy
@@ -233,13 +237,13 @@ export default function PlanScreen() {
           <button onClick={shareCrewPlan}
             style={{
               width: '100%', padding: '12px', borderRadius: '12px', border: 'none', cursor: 'pointer',
-              background: 'linear-gradient(135deg, #F59E0B, #D97706)',
-              color: '#0C0A09', fontSize: '14px', fontWeight: 600,
+              background: theme.accent.amberGradient,
+              color: theme.text.onAccent, fontSize: '14px', fontWeight: 600,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
             }}>
-            📤 Share Plan with Crew
+            &#x1f4e4; Share Plan with Crew
           </button>
-          <p style={{ fontSize: '11px', color: '#A8A29E', marginTop: '8px', lineHeight: 1.4, textAlign: 'center' }}>
+          <p style={{ fontSize: '11px', color: theme.text.secondary, marginTop: '8px', lineHeight: 1.4, textAlign: 'center' }}>
             Your crew opens the app → Plan tab → &quot;Join Crew&quot; → enters the code above
           </p>
         </div>
@@ -247,17 +251,17 @@ export default function PlanScreen() {
 
       {/* Trip Weather Forecast */}
       {weather && weather.forecast.length > 0 && dayCount > 0 && (
-        <div style={{ ...cardStyle, marginBottom: '12px', padding: '12px', background: 'linear-gradient(135deg, rgba(59,130,246,0.06), rgba(147,197,253,0.03))', border: '1px solid rgba(59,130,246,0.1)' }}>
-          <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Pack for your trip</div>
+        <div style={{ ...cardStyle, marginBottom: '12px', padding: '12px', background: `linear-gradient(135deg, ${theme.blueTint.bg}, ${theme.bg.subtle})`, border: `1px solid ${theme.blueTint.border}` }}>
+          <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Pack for your trip</div>
           <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', scrollbarWidth: 'none' }}>
             {weather.forecast.slice(0, dayCount).map((day, i) => (
-              <div key={day.date} style={{ textAlign: 'center', minWidth: '60px', flexShrink: 0, padding: '6px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)' }}>
-                <div style={{ fontSize: '10px', color: '#78716C', marginBottom: '2px' }}>Day {i + 1}</div>
+              <div key={day.date} style={{ textAlign: 'center', minWidth: '60px', flexShrink: 0, padding: '6px', borderRadius: '10px', background: theme.bg.subtle }}>
+                <div style={{ fontSize: '10px', color: theme.text.tertiary, marginBottom: '2px' }}>Day {i + 1}</div>
                 <div style={{ fontSize: '20px', marginBottom: '2px' }}>{day.emoji}</div>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: '#FFFBEB' }}>{day.high}°</div>
-                <div style={{ fontSize: '10px', color: '#78716C' }}>{day.low}°</div>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: theme.text.primary }}>{day.high}°</div>
+                <div style={{ fontSize: '10px', color: theme.text.tertiary }}>{day.low}°</div>
                 {day.precipChance > 30 && (
-                  <div style={{ fontSize: '9px', color: '#93C5FD', marginTop: '2px' }}>💧 {day.precipChance}%</div>
+                  <div style={{ fontSize: '9px', color: theme.status.blue, marginTop: '2px' }}>&#x1f4a7; {day.precipChance}%</div>
                 )}
               </div>
             ))}
@@ -275,8 +279,8 @@ export default function PlanScreen() {
               style={{
                 padding: '8px 16px', borderRadius: '12px', fontSize: '13px', fontWeight: 600,
                 border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                background: isActive ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'rgba(255,255,255,0.06)',
-                color: isActive ? '#0C0A09' : '#A8A29E',
+                background: isActive ? theme.accent.amberGradient : theme.bg.subtleStrong,
+                color: isActive ? theme.text.onAccent : theme.text.secondary,
               }}>
               Day {day} ({stops.length})
             </button>
@@ -285,8 +289,8 @@ export default function PlanScreen() {
         <button onClick={addDay}
           style={{
             padding: '8px 16px', borderRadius: '12px', fontSize: '13px', fontWeight: 600,
-            border: '1px dashed rgba(255,255,255,0.15)', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-            background: 'transparent', color: '#78716C',
+            border: `1px dashed ${theme.border.dashed}`, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+            background: 'transparent', color: theme.text.tertiary,
           }}>
           + Day
         </button>
@@ -295,13 +299,13 @@ export default function PlanScreen() {
       {/* Active day stops */}
       {dayPlan.length === 0 ? (
         <div style={{ ...cardStyle, textAlign: 'center', padding: '32px 20px' }}>
-          <p style={{ color: '#A8A29E', fontSize: '14px' }}>No stops on Day {activeDay} yet. Explore to add some!</p>
+          <p style={{ color: theme.text.secondary, fontSize: '14px' }}>No stops on Day {activeDay} yet. Explore to add some!</p>
         </div>
       ) : (<>
         {dayPlan.length > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', padding: '6px 10px', borderRadius: '8px', background: 'rgba(245,158,11,0.06)' }}>
-            <span style={{ fontSize: '12px' }}>↕️</span>
-            <span style={{ fontSize: '11px', color: '#D97706', fontWeight: 500 }}>Tap the arrows to reorder your stops</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', padding: '6px 10px', borderRadius: '8px', background: theme.amberTint.bg06 }}>
+            <span style={{ fontSize: '12px' }}>&#x2195;&#xfe0f;</span>
+            <span style={{ fontSize: '11px', color: theme.accent.amberDark, fontWeight: 500 }}>Tap the arrows to reorder your stops</span>
           </div>
         )}
         <div style={{ position: 'relative', paddingLeft: '32px' }}>
@@ -309,7 +313,7 @@ export default function PlanScreen() {
           <div style={{
             position: 'absolute', left: '14px', top: '16px',
             bottom: '16px', width: '2px',
-            background: 'linear-gradient(to bottom, #F59E0B, rgba(245,158,11,0.1))',
+            background: `linear-gradient(to bottom, ${theme.accent.amber}, ${theme.amberTint.bg10})`,
             borderRadius: '1px',
           }} />
 
@@ -321,12 +325,12 @@ export default function PlanScreen() {
                   position: 'absolute', left: '-32px', top: '16px',
                   width: '28px', height: '28px', borderRadius: '50%',
                   background: stop.type === 'event'
-                    ? 'linear-gradient(135deg, #8B5CF6, #7C3AED)'
-                    : 'linear-gradient(135deg, #F59E0B, #D97706)',
-                  color: stop.type === 'event' ? '#FFFBEB' : '#0C0A09',
+                    ? `linear-gradient(135deg, ${theme.events.gradientStart}, ${theme.events.gradientEnd})`
+                    : theme.accent.amberGradient,
+                  color: stop.type === 'event' ? theme.text.primary : theme.text.onAccent,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: '12px', fontWeight: 700, zIndex: 1,
-                  boxShadow: '0 0 0 4px #0C0A09',
+                  boxShadow: `0 0 0 4px ${theme.bg.body}`,
                 }}>
                   {index + 1}
                 </div>
@@ -335,8 +339,8 @@ export default function PlanScreen() {
                 <div style={{
                   ...cardStyle, marginBottom: 0, overflow: 'hidden',
                   border: stop.type === 'event'
-                    ? '1px solid rgba(139,92,246,0.15)'
-                    : '1px solid rgba(245,158,11,0.1)',
+                    ? `1px solid ${theme.purpleTint.border15}`
+                    : `1px solid ${theme.amberTint.bg10}`,
                 }}>
                   <div style={{ display: 'flex', gap: '12px' }}>
                     {stop.type === 'place' && stop.place?.photoUrl && (
@@ -360,25 +364,25 @@ export default function PlanScreen() {
                       </h3>
                       {stop.type === 'place' && stop.place && (
                         <>
-                          <p style={{ fontSize: '12px', color: '#A8A29E', marginBottom: '4px' }}>
+                          <p style={{ fontSize: '12px', color: theme.text.secondary, marginBottom: '4px' }}>
                             {stop.place.categoryDisplay}
                             {stop.place.distance != null && ` · ${formatDistance(stop.place.distance, useMiles)} ${getDistanceReference()}`}
                           </p>
                           {stop.place.rating > 0 && (
                             <div style={{ fontSize: '12px' }}>
-                              <span style={{ color: '#F59E0B' }}>★ {stop.place.rating.toFixed(1)}</span>
-                              <span style={{ color: '#78716C' }}> ({stop.place.reviewCount})</span>
+                              <span style={{ color: theme.accent.amber }}>★ {stop.place.rating.toFixed(1)}</span>
+                              <span style={{ color: theme.text.tertiary }}> ({stop.place.reviewCount})</span>
                             </div>
                           )}
                         </>
                       )}
                       {stop.type === 'event' && stop.event && (
                         <>
-                          <p style={{ fontSize: '12px', color: '#C084FC', marginBottom: '4px' }}>
+                          <p style={{ fontSize: '12px', color: theme.events.text, marginBottom: '4px' }}>
                             {formatEventDate(stop.event.date)}
                             {stop.event.time && ` · ${formatEventTime(stop.event.time)}`}
                           </p>
-                          <p style={{ fontSize: '12px', color: '#A8A29E' }}>
+                          <p style={{ fontSize: '12px', color: theme.text.secondary }}>
                             {stop.event.venue}
                           </p>
                         </>
@@ -390,7 +394,7 @@ export default function PlanScreen() {
                           <a href={stop.place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
                             style={{
                               padding: '5px 10px', borderRadius: '8px', fontSize: '11px',
-                              background: 'rgba(245,158,11,0.1)', color: '#F59E0B',
+                              background: theme.amberTint.bg10, color: theme.accent.amber,
                               textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px',
                             }}>
                             <DirectionsIcon /> Go
@@ -400,7 +404,7 @@ export default function PlanScreen() {
                           <a href={`tel:${stop.place.phone}`}
                             style={{
                               padding: '5px 10px', borderRadius: '8px', fontSize: '11px',
-                              background: 'rgba(255,255,255,0.05)', color: '#A8A29E',
+                              background: theme.bg.subtleMedium, color: theme.text.secondary,
                               textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px',
                             }}>
                             <PhoneIcon /> Call
@@ -410,10 +414,10 @@ export default function PlanScreen() {
                           <a href={stop.event.url} target="_blank" rel="noopener noreferrer"
                             style={{
                               padding: '5px 10px', borderRadius: '8px', fontSize: '11px',
-                              background: 'rgba(139,92,246,0.1)', color: '#C084FC',
+                              background: theme.purpleTint.bg08, color: theme.events.text,
                               textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px',
                             }}>
-                            🎫 Tickets
+                            &#x1f3ab; Tickets
                           </a>
                         )}
                         {/* Move to different day */}
@@ -423,8 +427,8 @@ export default function PlanScreen() {
                             onChange={e => { if (e.target.value) moveStopToDay(stop.id, activeDay, Number(e.target.value)); }}
                             style={{
                               padding: '5px 8px', borderRadius: '8px', fontSize: '11px',
-                              background: 'rgba(255,255,255,0.05)', color: '#78716C',
-                              border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
+                              background: theme.bg.subtleMedium, color: theme.text.tertiary,
+                              border: `1px solid ${theme.border.medium}`, cursor: 'pointer',
                             }}>
                             <option value="">Move to...</option>
                             {sortedDays.filter(d => d !== activeDay).map(d => (
@@ -441,8 +445,8 @@ export default function PlanScreen() {
                         <button onClick={() => movePlanStop(index, 'up')}
                           aria-label="Move up"
                           style={{
-                            background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)',
-                            color: '#F59E0B', cursor: 'pointer', fontSize: '14px', fontWeight: 700,
+                            background: theme.amberTint.bg10, border: `1px solid ${theme.amberTint.border20}`,
+                            color: theme.accent.amber, cursor: 'pointer', fontSize: '14px', fontWeight: 700,
                             padding: '6px 10px', borderRadius: '8px',
                             minHeight: '36px', minWidth: '44px',
                             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px',
@@ -453,8 +457,8 @@ export default function PlanScreen() {
                       <button onClick={() => removeFromPlan(stop.id)}
                         aria-label="Remove stop"
                         style={{
-                          background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)',
-                          color: '#F87171', cursor: 'pointer', fontSize: '12px', fontWeight: 600,
+                          background: theme.redTint.bg, border: `1px solid ${theme.redTint.border}`,
+                          color: theme.status.red, cursor: 'pointer', fontSize: '12px', fontWeight: 600,
                           padding: '6px 8px', borderRadius: '8px',
                           minHeight: '32px', minWidth: '44px',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -465,8 +469,8 @@ export default function PlanScreen() {
                         <button onClick={() => movePlanStop(index, 'down')}
                           aria-label="Move down"
                           style={{
-                            background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)',
-                            color: '#F59E0B', cursor: 'pointer', fontSize: '14px', fontWeight: 700,
+                            background: theme.amberTint.bg10, border: `1px solid ${theme.amberTint.border20}`,
+                            color: theme.accent.amber, cursor: 'pointer', fontSize: '14px', fontWeight: 700,
                             padding: '6px 10px', borderRadius: '8px',
                             minHeight: '36px', minWidth: '44px',
                             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px',
@@ -487,16 +491,16 @@ export default function PlanScreen() {
                   <div style={{
                     marginLeft: '0', marginBottom: '4px', padding: '8px 12px',
                     display: 'flex', alignItems: 'center', gap: '10px',
-                    background: 'rgba(255,255,255,0.02)', borderRadius: '10px',
-                    border: '1px dashed rgba(255,255,255,0.06)',
+                    background: theme.bg.subtle, borderRadius: '10px',
+                    border: `1px dashed ${theme.border.subtle}`,
                   }}>
                     <span style={{ fontSize: '16px' }}>{transport.emoji}</span>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '12px', color: '#A8A29E' }}>{transport.text}</div>
-                      <div style={{ fontSize: '11px', color: '#57534E' }}>{transport.distance}</div>
+                      <div style={{ fontSize: '12px', color: theme.text.secondary }}>{transport.text}</div>
+                      <div style={{ fontSize: '11px', color: theme.text.muted }}>{transport.distance}</div>
                     </div>
                     <a href={transport.mapsUrl} target="_blank" rel="noopener noreferrer"
-                      style={{ fontSize: '11px', color: '#F59E0B', textDecoration: 'none' }}>
+                      style={{ fontSize: '11px', color: theme.accent.amber, textDecoration: 'none' }}>
                       Directions
                     </a>
                   </div>
@@ -513,10 +517,10 @@ export default function PlanScreen() {
           <a href={getRouteUrl()} target="_blank" rel="noopener noreferrer"
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-              background: 'linear-gradient(135deg, #F59E0B, #D97706)', color: '#0C0A09',
+              background: theme.accent.amberGradient, color: theme.text.onAccent,
               border: 'none', borderRadius: '14px', padding: '14px',
               fontSize: '15px', fontWeight: 600, textDecoration: 'none',
-              boxShadow: '0 4px 20px rgba(245,158,11,0.3)',
+              boxShadow: `0 4px 20px ${theme.amberTint.shadow}`,
             }}>
             <DirectionsIcon /> Get Day {activeDay} Route
           </a>
@@ -525,8 +529,8 @@ export default function PlanScreen() {
         <button onClick={sharePlan}
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-            background: 'rgba(255,255,255,0.06)', color: '#FFFBEB',
-            border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px',
+            background: theme.bg.subtleStrong, color: theme.text.primary,
+            border: `1px solid ${theme.border.medium}`, borderRadius: '14px',
             padding: '14px', fontSize: '15px', fontWeight: 500, cursor: 'pointer',
           }}>
           <ShareIcon /> Share Trip
@@ -535,7 +539,7 @@ export default function PlanScreen() {
         {dayCount > 1 && (
           <button onClick={() => removeDay(activeDay)}
             style={{
-              background: 'none', border: '1px solid rgba(239,68,68,0.2)', color: '#F87171',
+              background: 'none', border: `1px solid ${theme.redTint.borderStrong}`, color: theme.status.red,
               fontSize: '13px', cursor: 'pointer', padding: '10px', borderRadius: '10px',
             }}>
             Delete Day {activeDay}
@@ -544,7 +548,7 @@ export default function PlanScreen() {
 
         <button onClick={clearPlan}
           style={{
-            background: 'none', border: 'none', color: '#78716C',
+            background: 'none', border: 'none', color: theme.text.tertiary,
             fontSize: '13px', cursor: 'pointer', padding: '10px',
           }}>
           Clear all stops

@@ -1,5 +1,6 @@
 import { useApp } from '../context/AppContext';
-import { cardStyle } from '../styles/shared';
+import { useTheme } from '../context/ThemeContext';
+import { getCardStyle } from '../styles/shared';
 import { LocationIcon } from '../components/icons';
 import { TRAVEL_GROUPS, CITY_CULTURE } from '../data';
 import type { CityContext } from '../data';
@@ -25,6 +26,8 @@ export default function HomeScreen() {
     toggleSaved,
     cityLabel,
   } = useApp();
+  const { theme } = useTheme();
+  const cardStyle = getCardStyle(theme);
 
   return (
     <div>
@@ -33,26 +36,26 @@ export default function HomeScreen() {
         <h1 style={{ fontSize: '26px', fontWeight: 700, marginBottom: '4px' }}>
           {getGreeting()} ✨
         </h1>
-        <p style={{ color: '#A8A29E', fontSize: '14px' }}>{getTimeSuggestion()}</p>
+        <p style={{ color: theme.text.secondary, fontSize: '14px' }}>{getTimeSuggestion()}</p>
       </div>
 
       {/* Weather Card */}
       {weather && (selectedCity || useGps) && (
         <div style={{
           ...cardStyle, display: 'flex', alignItems: 'center', gap: '14px',
-          background: 'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(147,197,253,0.04))',
-          border: '1px solid rgba(59,130,246,0.12)',
+          background: `linear-gradient(135deg, ${theme.blueTint.bg}, rgba(147,197,253,0.04))`,
+          border: `1px solid ${theme.blueTint.border}`,
         }}>
           <span style={{ fontSize: '36px' }}>{weather.emoji}</span>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '22px', fontWeight: 700, color: '#FFFBEB' }}>
+            <div style={{ fontSize: '22px', fontWeight: 700, color: theme.text.primary }}>
               {weather.temp}°F
             </div>
-            <div style={{ fontSize: '12px', color: '#93C5FD' }}>{weather.description}</div>
+            <div style={{ fontSize: '12px', color: theme.status.blue }}>{weather.description}</div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '13px', color: '#A8A29E' }}>H: {weather.high}° L: {weather.low}°</div>
-            <div style={{ fontSize: '11px', color: '#78716C' }}>{cityLabel}</div>
+            <div style={{ fontSize: '13px', color: theme.text.secondary }}>H: {weather.high}° L: {weather.low}°</div>
+            <div style={{ fontSize: '11px', color: theme.text.tertiary }}>{cityLabel}</div>
           </div>
         </div>
       )}
@@ -64,44 +67,44 @@ export default function HomeScreen() {
           style={{
             ...cardStyle, width: '100%', cursor: 'pointer', textAlign: 'left',
             display: 'flex', alignItems: 'center', gap: '14px',
-            border: useGps ? '2px solid #F59E0B' : '1px solid rgba(255,255,255,0.06)',
-            background: useGps ? 'rgba(245,158,11,0.08)' : 'rgba(28,25,23,0.8)',
+            border: useGps ? `2px solid ${theme.accent.amber}` : `1px solid ${theme.border.subtle}`,
+            background: useGps ? theme.amberTint.bg10 : theme.bg.surfaceAlpha,
           }}
         >
           <div style={{
             width: '44px', height: '44px', borderRadius: '12px',
-            background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+            background: theme.accent.amberGradient,
             display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}>
             <LocationIcon />
           </div>
           <div>
-            <div style={{ fontWeight: 600, fontSize: '15px', color: '#FFFBEB' }}>{loc.city || 'Near You'}</div>
-            <div style={{ fontSize: '12px', color: '#A8A29E' }}>Use your current location</div>
+            <div style={{ fontWeight: 600, fontSize: '15px', color: theme.text.primary }}>{loc.city || 'Near You'}</div>
+            <div style={{ fontSize: '12px', color: theme.text.secondary }}>Use your current location</div>
           </div>
-          <div style={{ marginLeft: 'auto', color: '#F59E0B', fontSize: '20px' }}>→</div>
+          <div style={{ marginLeft: 'auto', color: theme.accent.amber, fontSize: '20px' }}>→</div>
         </button>
       )}
 
       {/* Divider */}
       {loc.hasLocation && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '16px 0' }}>
-          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
-          <span style={{ fontSize: '12px', color: '#78716C' }}>or pick a city</span>
-          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+          <div style={{ flex: 1, height: '1px', background: theme.border.subtle }} />
+          <span style={{ fontSize: '12px', color: theme.text.tertiary }}>or pick a city</span>
+          <div style={{ flex: 1, height: '1px', background: theme.border.subtle }} />
         </div>
       )}
 
       {/* City Selector */}
       <div style={cardStyle}>
-        <label style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '10px' }}>
+        <label style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '10px' }}>
           Select Your City
         </label>
         <select
           style={{
             width: '100%', padding: '14px', borderRadius: '12px',
-            border: '1px solid rgba(255,255,255,0.1)', background: '#0C0A09',
-            color: '#FFFBEB', fontSize: '15px', cursor: 'pointer',
+            border: `1px solid ${theme.border.strong}`, background: theme.bg.input,
+            color: theme.text.primary, fontSize: '15px', cursor: 'pointer',
           }}
           value={selectedCity?.id || ''}
           onChange={(e) => {
@@ -124,12 +127,12 @@ export default function HomeScreen() {
             height: '140px',
             background: selectedCity.banner_url
               ? `linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.7)), url(${selectedCity.banner_url})`
-              : 'linear-gradient(135deg, #1C1917 0%, #292524 100%)',
+              : `linear-gradient(135deg, ${theme.bg.surface} 0%, ${theme.bg.elevated} 100%)`,
             backgroundSize: 'cover', backgroundPosition: 'center',
             display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '16px',
           }}>
             <h2 style={{ fontSize: '22px', fontWeight: 700 }}>{selectedCity.name}</h2>
-            <p style={{ color: '#d4d0cc', fontSize: '13px' }}>{selectedCity.country}</p>
+            <p style={{ color: theme.text.body, fontSize: '13px' }}>{selectedCity.country}</p>
           </div>
         </div>
       )}
@@ -137,7 +140,7 @@ export default function HomeScreen() {
       {/* Travel Group Selector */}
       {(selectedCity || useGps) && (
         <div style={{ ...cardStyle, marginTop: '8px' }}>
-          <label style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '10px' }}>
+          <label style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '10px' }}>
             Who&apos;s traveling?
           </label>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -147,9 +150,9 @@ export default function HomeScreen() {
                 <button key={g.id} onClick={() => setTravelGroup(active ? null : g.id)}
                   style={{
                     padding: '8px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: 500,
-                    border: active ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.08)',
-                    cursor: 'pointer', background: active ? 'rgba(245,158,11,0.12)' : 'transparent',
-                    color: active ? '#F59E0B' : '#A8A29E',
+                    border: active ? `1px solid ${theme.amberTint.border40}` : `1px solid ${theme.border.medium}`,
+                    cursor: 'pointer', background: active ? theme.amberTint.bg15 : 'transparent',
+                    color: active ? theme.accent.amber : theme.text.secondary,
                   }}>
                   {g.emoji} {g.label}
                 </button>
@@ -171,10 +174,10 @@ export default function HomeScreen() {
               style={{
                 width: '100%', background: 'none', border: 'none', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: 0, color: '#FFFBEB',
+                padding: 0, color: theme.text.primary,
               }}>
               <span style={{ fontSize: '14px', fontWeight: 600 }}>Cultural Tips</span>
-              <span style={{ color: '#78716C', fontSize: '16px', transform: showCulture ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▼</span>
+              <span style={{ color: theme.text.tertiary, fontSize: '16px', transform: showCulture ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▼</span>
             </button>
             {showCulture && (
               <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -188,8 +191,8 @@ export default function HomeScreen() {
                   <div key={row.label} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                     <span style={{ fontSize: '16px', flexShrink: 0, width: '24px', textAlign: 'center' }}>{row.emoji}</span>
                     <div>
-                      <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>{row.label}</div>
-                      <div style={{ fontSize: '13px', color: '#d4d0cc', lineHeight: 1.4 }}>{row.value}</div>
+                      <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>{row.label}</div>
+                      <div style={{ fontSize: '13px', color: theme.text.body, lineHeight: 1.4 }}>{row.value}</div>
                     </div>
                   </div>
                 ))}
@@ -203,11 +206,11 @@ export default function HomeScreen() {
       {(selectedCity || useGps) && (
         <button
           style={{
-            background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
-            color: '#0C0A09', border: 'none', borderRadius: '14px',
+            background: theme.accent.amberGradient,
+            color: theme.text.onAccent, border: 'none', borderRadius: '14px',
             padding: '16px', fontSize: '16px', fontWeight: 600,
             cursor: 'pointer', width: '100%', marginTop: '12px',
-            boxShadow: '0 4px 20px rgba(245,158,11,0.3)',
+            boxShadow: `0 4px 20px ${theme.amberTint.shadow}`,
           }}
           onClick={() => setScreen('discover')}
         >
@@ -220,7 +223,7 @@ export default function HomeScreen() {
         <div style={{ marginTop: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 600 }}>Saved for Later</h2>
-            <span style={{ fontSize: '12px', color: '#78716C' }}>{savedPlaces.length} places</span>
+            <span style={{ fontSize: '12px', color: theme.text.tertiary }}>{savedPlaces.length} places</span>
           </div>
           <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px', scrollbarWidth: 'none' }}>
             {savedPlaces.map(place => (
@@ -236,7 +239,7 @@ export default function HomeScreen() {
                 {place.photoUrl && (
                   <div style={{
                     height: '100px', width: '100%',
-                    background: `linear-gradient(to bottom, transparent 50%, rgba(12,10,9,0.9)), url(${place.photoUrl})`,
+                    background: `linear-gradient(to bottom, transparent 50%, ${theme.bg.imageOverlay}), url(${place.photoUrl})`,
                     backgroundSize: 'cover', backgroundPosition: 'center',
                   }} />
                 )}
@@ -246,17 +249,17 @@ export default function HomeScreen() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     {place.rating > 0 && (
-                      <span style={{ fontSize: '11px', color: '#F59E0B' }}>★ {place.rating.toFixed(1)}</span>
+                      <span style={{ fontSize: '11px', color: theme.accent.amber }}>★ {place.rating.toFixed(1)}</span>
                     )}
                     {place.categoryDisplay && (
-                      <span style={{ fontSize: '11px', color: '#78716C' }}>{place.categoryDisplay}</span>
+                      <span style={{ fontSize: '11px', color: theme.text.tertiary }}>{place.categoryDisplay}</span>
                     )}
                   </div>
                   <button onClick={e => { e.stopPropagation(); toggleSaved(place); }}
                     style={{
                       marginTop: '8px', width: '100%', padding: '6px', borderRadius: '8px',
-                      border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.06)',
-                      color: '#F87171', fontSize: '11px', cursor: 'pointer',
+                      border: `1px solid ${theme.redTint.border}`, background: theme.redTint.bg,
+                      color: theme.status.red, fontSize: '11px', cursor: 'pointer',
                     }}>
                     Remove
                   </button>

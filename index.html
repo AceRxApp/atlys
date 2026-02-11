@@ -45,11 +45,17 @@
       gtag('js', new Date());
       gtag('config', 'G-XXXXXXXXXX');
     </script>
-    <!-- Theme FOUC prevention -->
+    <!-- Theme FOUC prevention — set correct bg before React boots -->
     <script>
       (function() {
-        var theme = localStorage.getItem('nxstops_theme') || 'dark';
-        document.documentElement.setAttribute('data-theme', theme);
+        var h = new Date().getHours();
+        var dark = h >= 19 || h < 6;
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        document.documentElement.style.setProperty('--bg-body', dark ? '#0C0A09' : '#FAFAF9');
+        document.documentElement.style.setProperty('--text-primary', dark ? '#FFFBEB' : '#1C1917');
+        document.documentElement.style.setProperty('--scrollbar-track', dark ? '#1C1917' : '#F5F5F4');
+        document.documentElement.style.setProperty('--scrollbar-thumb', dark ? '#78716C' : '#D6D3D1');
+        document.documentElement.style.setProperty('--scrollbar-thumb-hover', '#A8A29E');
       })();
     </script>
   </head>

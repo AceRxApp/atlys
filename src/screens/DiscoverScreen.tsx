@@ -1,5 +1,6 @@
 import { useApp } from '../context/AppContext';
-import { cardStyle } from '../styles/shared';
+import { useTheme } from '../context/ThemeContext';
+import { getCardStyle } from '../styles/shared';
 import { VIBES, QUICK_FILTERS, COMMUNITY_TAGS, NIGHTLIFE_TYPES } from '../data';
 import { formatDistance } from '../services/places';
 import { SkeletonCard } from '../components/ui';
@@ -22,20 +23,22 @@ function PlacesMapView({ places: mapPlaces }: { places: Place[] }) {
     getMapCenter,
   } = useApp();
 
+  const { theme } = useTheme();
+
   const center = getMapCenter();
 
   if (!MAPS_API_KEY) {
     return (
-      <div style={{ ...cardStyle, textAlign: 'center', padding: '40px 20px' }}>
+      <div style={{ textAlign: 'center', padding: '40px 20px' }}>
         <div style={{ fontSize: '32px', marginBottom: '8px' }}>🗺️</div>
-        <p style={{ color: '#A8A29E', fontSize: '14px', marginBottom: '8px' }}>Map view requires Google Maps API key</p>
-        <p style={{ color: '#57534E', fontSize: '12px' }}>Set VITE_GOOGLE_MAPS_API_KEY in your environment variables and enable Maps JavaScript API in Google Cloud Console.</p>
+        <p style={{ color: theme.text.secondary, fontSize: '14px', marginBottom: '8px' }}>Map view requires Google Maps API key</p>
+        <p style={{ color: theme.text.muted, fontSize: '12px' }}>Set VITE_GOOGLE_MAPS_API_KEY in your environment variables and enable Maps JavaScript API in Google Cloud Console.</p>
       </div>
     );
   }
 
   return (
-    <div style={{ height: 'calc(100vh - 280px)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
+    <div style={{ height: 'calc(100vh - 280px)', borderRadius: '16px', overflow: 'hidden', border: `1px solid ${theme.border.subtle}` }}>
       <APIProvider apiKey={MAPS_API_KEY}>
         <Map
           defaultCenter={center}
@@ -43,7 +46,7 @@ function PlacesMapView({ places: mapPlaces }: { places: Place[] }) {
           gestureHandling="greedy"
           disableDefaultUI={true}
           style={{ width: '100%', height: '100%' }}
-          colorScheme="DARK"
+          colorScheme={theme.mapColorScheme}
         >
           {mapPlaces.filter(p => p.lat && p.lng).map(place => (
             <Marker
@@ -134,6 +137,9 @@ export default function DiscoverScreen() {
     getMapCenter,
   } = useApp();
 
+  const { theme } = useTheme();
+  const cardStyle = getCardStyle(theme);
+
   return (
     <div>
       {/* Notification Permission Prompt */}
@@ -141,19 +147,19 @@ export default function DiscoverScreen() {
         <div style={{
           display: 'flex', alignItems: 'center', gap: '10px',
           padding: '12px 14px', marginBottom: '12px', borderRadius: '12px',
-          background: 'rgba(245,158,11,0.06)',
-          border: '1px solid rgba(245,158,11,0.2)',
+          background: theme.amberTint.bg06,
+          border: `1px solid ${theme.amberTint.border20}`,
         }}>
           <span style={{ fontSize: '20px', flexShrink: 0 }}>🔔</span>
-          <span style={{ flex: 1, fontSize: '13px', color: '#D6D3D1', lineHeight: 1.4 }}>
+          <span style={{ flex: 1, fontSize: '13px', color: theme.text.light, lineHeight: 1.4 }}>
             Stay in the loop — get notified about events near you
           </span>
           <button
             onClick={async () => { await requestNotificationPermission(); dismissNotificationPrompt(); }}
             style={{
               padding: '6px 14px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-              background: 'linear-gradient(135deg, #F59E0B, #D97706)',
-              color: '#0C0A09', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0,
+              background: theme.accent.amberGradient,
+              color: theme.text.onAccent, fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0,
             }}
           >
             Enable
@@ -162,7 +168,7 @@ export default function DiscoverScreen() {
             onClick={dismissNotificationPrompt}
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
-              color: '#78716C', fontSize: '18px', padding: '8px', flexShrink: 0, lineHeight: 1,
+              color: theme.text.tertiary, fontSize: '18px', padding: '8px', flexShrink: 0, lineHeight: 1,
               minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
             aria-label="Dismiss notification prompt"
@@ -178,15 +184,15 @@ export default function DiscoverScreen() {
           <h1 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '2px' }}>
             {cityLabel} 📍
           </h1>
-          <p style={{ color: '#78716C', fontSize: '13px' }}>{filteredPlaces.length} places nearby</p>
+          <p style={{ color: theme.text.tertiary, fontSize: '13px' }}>{filteredPlaces.length} places nearby</p>
         </div>
-        <div style={{ display: 'flex', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', borderRadius: '10px', overflow: 'hidden', border: `1px solid ${theme.border.strong}`, flexShrink: 0 }}>
           <button onClick={() => setViewMode('list')}
             aria-label="List view"
             style={{
               padding: '10px 14px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer',
-              background: viewMode === 'list' ? 'rgba(245,158,11,0.15)' : 'transparent',
-              color: viewMode === 'list' ? '#F59E0B' : '#78716C', minHeight: '44px',
+              background: viewMode === 'list' ? theme.amberTint.border15 : 'transparent',
+              color: viewMode === 'list' ? theme.accent.amber : theme.text.tertiary, minHeight: '44px',
             }}>
             List
           </button>
@@ -194,9 +200,9 @@ export default function DiscoverScreen() {
             aria-label="Map view"
             style={{
               padding: '10px 14px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer',
-              borderLeft: '1px solid rgba(255,255,255,0.1)',
-              background: viewMode === 'map' ? 'rgba(245,158,11,0.15)' : 'transparent',
-              color: viewMode === 'map' ? '#F59E0B' : '#78716C', minHeight: '44px',
+              borderLeft: `1px solid ${theme.border.strong}`,
+              background: viewMode === 'map' ? theme.amberTint.border15 : 'transparent',
+              color: viewMode === 'map' ? theme.accent.amber : theme.text.tertiary, minHeight: '44px',
             }}>
             Map
           </button>
@@ -213,16 +219,16 @@ export default function DiscoverScreen() {
           onKeyDown={e => e.key === 'Enter' && handleSearch()}
           style={{
             flex: 1, padding: '12px 16px', borderRadius: '12px',
-            border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)',
-            color: '#FFFBEB', fontSize: '14px', outline: 'none',
+            border: `1px solid ${theme.border.strong}`, background: theme.bg.subtle,
+            color: theme.text.primary, fontSize: '14px', outline: 'none',
           }}
         />
         <button onClick={handleSearch} disabled={isSearching || !searchQuery.trim()}
           aria-label="Search"
           style={{
             padding: '12px 18px', borderRadius: '12px', border: 'none', cursor: 'pointer',
-            background: searchQuery.trim() ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'rgba(255,255,255,0.06)',
-            color: searchQuery.trim() ? '#0C0A09' : '#78716C', fontSize: '14px', fontWeight: 600,
+            background: searchQuery.trim() ? theme.accent.amberGradient : theme.bg.subtleStrong,
+            color: searchQuery.trim() ? theme.text.onAccent : theme.text.tertiary, fontSize: '14px', fontWeight: 600,
             minHeight: '44px', minWidth: '44px',
           }}>
           {isSearching ? '...' : '🔍'}
@@ -231,12 +237,12 @@ export default function DiscoverScreen() {
 
       {/* Search Results Banner */}
       {showSearch && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', padding: '10px 14px', borderRadius: '10px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.15)' }}>
-          <span style={{ fontSize: '13px', color: '#F59E0B', fontWeight: 500 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', padding: '10px 14px', borderRadius: '10px', background: theme.amberTint.bg10, border: `1px solid ${theme.amberTint.border15}` }}>
+          <span style={{ fontSize: '13px', color: theme.accent.amber, fontWeight: 500 }}>
             {searchResults.length} results for "{searchQuery}"
           </span>
           <button onClick={() => { setShowSearch(false); setSearchQuery(''); }}
-            style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', fontSize: '13px' }}>
+            style={{ background: 'none', border: 'none', color: theme.text.tertiary, cursor: 'pointer', fontSize: '13px' }}>
             Clear
           </button>
         </div>
@@ -257,8 +263,8 @@ export default function DiscoverScreen() {
               style={{
                 padding: '8px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: 500,
                 border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                background: active ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'rgba(255,255,255,0.05)',
-                color: active ? '#0C0A09' : '#A8A29E',
+                background: active ? theme.accent.amberGradient : theme.bg.subtleMedium,
+                color: active ? theme.text.onAccent : theme.text.secondary,
               }}
             >
               {vibe.emoji} {vibe.label}
@@ -277,10 +283,10 @@ export default function DiscoverScreen() {
               onClick={() => setQuickFilters(active ? quickFilters.filter(f => f !== filter.id) : [...quickFilters, filter.id])}
               style={{
                 padding: '6px 12px', borderRadius: '16px', fontSize: '11px', fontWeight: 500,
-                border: active ? '1px solid rgba(245,158,11,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                border: active ? `1px solid ${theme.amberTint.border30}` : `1px solid ${theme.border.medium}`,
                 cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                background: active ? 'rgba(245,158,11,0.12)' : 'transparent',
-                color: active ? '#F59E0B' : '#78716C',
+                background: active ? theme.amberTint.bg15 : 'transparent',
+                color: active ? theme.accent.amber : theme.text.tertiary,
               }}
             >
               {filter.label}
@@ -298,10 +304,10 @@ export default function DiscoverScreen() {
               onClick={() => setCommunityFilters(active ? communityFilters.filter(f => f !== tag.id) : [...communityFilters, tag.id])}
               style={{
                 padding: '6px 12px', borderRadius: '16px', fontSize: '11px', fontWeight: 500,
-                border: active ? '1px solid rgba(212,165,116,0.4)' : '1px solid rgba(255,255,255,0.06)',
+                border: active ? `1px solid ${theme.communityTint.border40}` : `1px solid ${theme.border.subtle}`,
                 cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                background: active ? 'rgba(212,165,116,0.12)' : 'transparent',
-                color: active ? '#D4A574' : '#57534E',
+                background: active ? theme.communityTint.bg12 : 'transparent',
+                color: active ? theme.community.text : theme.text.muted,
               }}>
               {tag.emoji} {tag.label}
             </button>
@@ -314,10 +320,10 @@ export default function DiscoverScreen() {
       {communityFilters.length > 0 && !showSearch && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', padding: '10px 14px',
-          borderRadius: '10px', background: 'rgba(212,165,116,0.08)', border: '1px solid rgba(212,165,116,0.15)',
+          borderRadius: '10px', background: theme.communityTint.bg, border: `1px solid ${theme.communityTint.border}`,
         }}>
           <span style={{ fontSize: '14px' }}>✨</span>
-          <span style={{ fontSize: '12px', color: '#D4A574', lineHeight: 1.4 }}>
+          <span style={{ fontSize: '12px', color: theme.community.text, lineHeight: 1.4 }}>
             Showing results based on smart matching. Tap a place → leave a review to improve community tags!
           </span>
         </div>
@@ -335,7 +341,7 @@ export default function DiscoverScreen() {
               {!isSearching && searchResults.length === 0 && (
                 <div style={{ ...cardStyle, textAlign: 'center', padding: '32px 20px' }}>
                   <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔍</div>
-                  <p style={{ color: '#A8A29E', fontSize: '14px' }}>No results found. Try a different search.</p>
+                  <p style={{ color: theme.text.secondary, fontSize: '14px' }}>No results found. Try a different search.</p>
                 </div>
               )}
               {!isSearching && searchResults.map(place => (
@@ -346,12 +352,12 @@ export default function DiscoverScreen() {
             <>
               {/* Places to Stay — Booking Links */}
               {selectedVibe === 'stay' && !placesLoading && cityLabel && (
-                <div style={{ ...cardStyle, marginBottom: '12px', padding: '16px 18px', background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(251,191,36,0.04))', border: '1px solid rgba(245,158,11,0.15)' }}>
+                <div style={{ ...cardStyle, marginBottom: '12px', padding: '16px 18px', background: `linear-gradient(135deg, ${theme.amberTint.bg10}, rgba(251,191,36,0.04))`, border: `1px solid ${theme.amberTint.border15}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                     <span style={{ fontSize: '20px' }}>🛏️</span>
-                    <span style={{ fontWeight: 600, fontSize: '15px', color: '#FFFBEB' }}>Find Places to Stay</span>
+                    <span style={{ fontWeight: 600, fontSize: '15px', color: theme.text.primary }}>Find Places to Stay</span>
                   </div>
-                  <p style={{ fontSize: '12px', color: '#A8A29E', lineHeight: 1.5, margin: '0 0 12px 0' }}>
+                  <p style={{ fontSize: '12px', color: theme.text.secondary, lineHeight: 1.5, margin: '0 0 12px 0' }}>
                     Browse hotels, apartments & unique stays in {cityLabel}
                   </p>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -364,8 +370,8 @@ export default function DiscoverScreen() {
                         style={{
                           display: 'flex', alignItems: 'center', gap: '6px',
                           padding: '10px 16px', borderRadius: '12px',
-                          background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                          color: '#FFFBEB', fontSize: '13px', fontWeight: 500,
+                          background: theme.bg.subtleStrong, border: `1px solid ${theme.border.strong}`,
+                          color: theme.text.primary, fontSize: '13px', fontWeight: 500,
                           textDecoration: 'none', cursor: 'pointer',
                           transition: 'background 0.2s',
                         }}>
@@ -378,12 +384,12 @@ export default function DiscoverScreen() {
 
               {/* Hidden Gems banner */}
               {selectedVibe === 'hidden' && !placesLoading && filteredPlaces.length > 0 && (
-                <div style={{ ...cardStyle, marginBottom: '12px', padding: '16px 18px', background: 'linear-gradient(135deg, rgba(168,85,247,0.08), rgba(139,92,246,0.04))', border: '1px solid rgba(168,85,247,0.15)' }}>
+                <div style={{ ...cardStyle, marginBottom: '12px', padding: '16px 18px', background: `linear-gradient(135deg, ${theme.purpleTint.bg08}, rgba(139,92,246,0.04))`, border: `1px solid ${theme.purpleTint.border15}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
                     <span style={{ fontSize: '20px' }}>💎</span>
-                    <span style={{ fontWeight: 600, fontSize: '15px', color: '#FFFBEB' }}>Hidden Gems</span>
+                    <span style={{ fontWeight: 600, fontSize: '15px', color: theme.text.primary }}>Hidden Gems</span>
                   </div>
-                  <p style={{ fontSize: '12px', color: '#A8A29E', lineHeight: 1.5, margin: 0 }}>
+                  <p style={{ fontSize: '12px', color: theme.text.secondary, lineHeight: 1.5, margin: 0 }}>
                     Off-the-beaten-path spots — parks, bookstores, spas, markets, and local favorites most tourists miss.
                   </p>
                 </div>
@@ -396,9 +402,9 @@ export default function DiscoverScreen() {
               {!placesLoading && filteredPlaces.length === 0 && places.length > 0 && (
                 <div style={{ ...cardStyle, textAlign: 'center', padding: '32px 20px' }}>
                   <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔍</div>
-                  <p style={{ color: '#A8A29E', fontSize: '14px', marginBottom: '12px' }}>Nothing matching. Try removing some filters.</p>
+                  <p style={{ color: theme.text.secondary, fontSize: '14px', marginBottom: '12px' }}>Nothing matching. Try removing some filters.</p>
                   <button onClick={() => setQuickFilters([])}
-                    style={{ background: 'none', border: '1px solid #F59E0B', color: '#F59E0B', borderRadius: '10px', padding: '10px 20px', fontSize: '13px', cursor: 'pointer' }}>
+                    style={{ background: 'none', border: `1px solid ${theme.accent.amber}`, color: theme.accent.amber, borderRadius: '10px', padding: '10px 20px', fontSize: '13px', cursor: 'pointer' }}>
                     Clear Filters
                   </button>
                 </div>
@@ -408,7 +414,7 @@ export default function DiscoverScreen() {
               {!placesLoading && places.length === 0 && (
                 <div style={{ ...cardStyle, textAlign: 'center', padding: '32px 20px' }}>
                   <div style={{ fontSize: '32px', marginBottom: '8px' }}>📍</div>
-                  <p style={{ color: '#A8A29E', fontSize: '14px' }}>
+                  <p style={{ color: theme.text.secondary, fontSize: '14px' }}>
                     {(useGps || selectedCity) ? 'Loading places...' : 'Select a city or enable location first.'}
                   </p>
                 </div>
@@ -425,7 +431,7 @@ export default function DiscoverScreen() {
                         💎 Hidden Gems
                       </h3>
                       <button onClick={() => setSelectedVibe('hidden')}
-                        style={{ background: 'none', border: 'none', color: '#F59E0B', fontSize: '12px', cursor: 'pointer' }}>
+                        style={{ background: 'none', border: 'none', color: theme.accent.amber, fontSize: '12px', cursor: 'pointer' }}>
                         See all →
                       </button>
                     </div>
@@ -443,14 +449,14 @@ export default function DiscoverScreen() {
                           {place.photoUrl && (
                             <div style={{
                               height: '90px', width: '100%',
-                              background: `linear-gradient(to bottom, transparent 40%, rgba(12,10,9,0.9)), url(${place.photoUrl})`,
+                              background: `linear-gradient(to bottom, transparent 40%, ${theme.bg.imageOverlay}), url(${place.photoUrl})`,
                               backgroundSize: 'cover', backgroundPosition: 'center',
                             }} />
                           )}
                           <div style={{ padding: '10px 12px' }}>
-                            <div style={{ fontSize: '13px', fontWeight: 600, color: '#FFFBEB', marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{place.name}</div>
-                            <div style={{ fontSize: '11px', color: '#78716C', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <span style={{ color: '#F59E0B' }}>★</span> {place.rating.toFixed(1)}
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: theme.text.primary, marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{place.name}</div>
+                            <div style={{ fontSize: '11px', color: theme.text.tertiary, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ color: theme.accent.amber }}>★</span> {place.rating.toFixed(1)}
                               <span style={{ margin: '0 2px' }}>·</span>
                               {place.categoryDisplay}
                             </div>
@@ -472,8 +478,8 @@ export default function DiscoverScreen() {
                 <button onClick={() => setSearchRadius(prev => prev + 1500)}
                   style={{
                     width: '100%', padding: '14px', borderRadius: '12px', marginTop: '4px',
-                    background: 'none', border: '1px solid rgba(255,255,255,0.08)',
-                    color: '#A8A29E', fontSize: '13px', cursor: 'pointer',
+                    background: 'none', border: `1px solid ${theme.border.medium}`,
+                    color: theme.text.secondary, fontSize: '13px', cursor: 'pointer',
                   }}>
                   Search wider area →
                 </button>

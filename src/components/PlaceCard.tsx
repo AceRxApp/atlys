@@ -1,8 +1,9 @@
 import { useApp } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 import { Place, formatDistance, getHoursStatus } from '../services/places';
 import { PriceDots, StarRating } from './ui';
 import { DirectionsIcon, PhoneIcon, ShareIcon } from './icons';
-import { cardStyle } from '../styles/shared';
+import { getCardStyle } from '../styles/shared';
 import { COMMUNITY_TAGS } from '../data';
 
 export default function PlaceCard({ place }: { place: Place }) {
@@ -24,6 +25,8 @@ export default function PlaceCard({ place }: { place: Place }) {
     useMiles,
     placeTagsCache,
   } = useApp();
+  const { theme } = useTheme();
+  const cardStyle = getCardStyle(theme);
 
   const inPlan = isInPlan(place.placeId);
   const hoursStatus = getHoursStatus(place.hours, place.openNow);
@@ -44,12 +47,12 @@ export default function PlaceCard({ place }: { place: Place }) {
           overflow: 'hidden',
         }}>
           <img src={place.photoUrl} alt={place.name} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 60%, rgba(12,10,9,0.9))' }} />
+          <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(to bottom, transparent 60%, ${theme.bg.imageOverlay})` }} />
           <div style={{
             position: 'absolute', top: '10px', left: '10px',
             padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 600,
             background: place.openNow ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
-            color: place.openNow ? '#34D399' : '#F87171', backdropFilter: 'blur(8px)',
+            color: place.openNow ? theme.status.green : theme.status.red, backdropFilter: 'blur(8px)',
           }}>
             {hoursStatus.text}
           </div>
@@ -57,7 +60,7 @@ export default function PlaceCard({ place }: { place: Place }) {
             <div style={{
               position: 'absolute', top: '10px', right: '10px',
               padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 500,
-              background: 'rgba(0,0,0,0.5)', color: '#FFFBEB', backdropFilter: 'blur(8px)',
+              background: theme.bg.photoButton, color: theme.text.primary, backdropFilter: 'blur(8px)',
             }}>
               {formatDistance(place.distance, useMiles)} {getDistanceReference()}
             </div>
@@ -73,21 +76,21 @@ export default function PlaceCard({ place }: { place: Place }) {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
           {place.categoryDisplay && (
-            <span style={{ padding: '3px 8px', background: 'rgba(245,158,11,0.12)', color: '#F59E0B', borderRadius: '6px', fontSize: '11px', fontWeight: 500 }}>
+            <span style={{ padding: '3px 8px', background: theme.amberTint.bg15, color: theme.accent.amber, borderRadius: '6px', fontSize: '11px', fontWeight: 500 }}>
               {place.categoryDisplay}
             </span>
           )}
           {place.reviewCount >= 200 && (
-            <span style={{ padding: '3px 8px', background: 'rgba(34,197,94,0.1)', color: '#34D399', borderRadius: '6px', fontSize: '10px', fontWeight: 600 }}>
+            <span style={{ padding: '3px 8px', background: theme.greenTint.bg, color: theme.status.green, borderRadius: '6px', fontSize: '10px', fontWeight: 600 }}>
               Popular
             </span>
           )}
           <PriceDots level={place.priceLevel} />
           {!place.photoUrl && place.distance != null && (
-            <span style={{ fontSize: '11px', color: '#A8A29E' }}>{formatDistance(place.distance, useMiles)} {getDistanceReference()}</span>
+            <span style={{ fontSize: '11px', color: theme.text.secondary }}>{formatDistance(place.distance, useMiles)} {getDistanceReference()}</span>
           )}
           {!place.photoUrl && (
-            <span style={{ fontSize: '11px', color: place.openNow ? '#34D399' : '#F87171' }}>{hoursStatus.text}</span>
+            <span style={{ fontSize: '11px', color: place.openNow ? theme.status.green : theme.status.red }}>{hoursStatus.text}</span>
           )}
         </div>
 
@@ -95,7 +98,7 @@ export default function PlaceCard({ place }: { place: Place }) {
         {getSafetyIndicators(place).length > 0 && (
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '6px' }}>
             {getSafetyIndicators(place).map(ind => (
-              <span key={ind} style={{ fontSize: '10px', color: '#78716C', padding: '2px 6px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
+              <span key={ind} style={{ fontSize: '10px', color: theme.text.tertiary, padding: '2px 6px', background: theme.bg.subtle, borderRadius: '4px' }}>
                 {ind}
               </span>
             ))}
@@ -108,7 +111,7 @@ export default function PlaceCard({ place }: { place: Place }) {
             {Object.entries(placeTagsCache[place.placeId]).filter(([, count]) => count >= 3).map(([tag]) => {
               const tagInfo = COMMUNITY_TAGS.find(t => t.id === tag);
               return tagInfo ? (
-                <span key={tag} style={{ fontSize: '10px', color: '#D4A574', padding: '2px 6px', background: 'rgba(212,165,116,0.08)', borderRadius: '4px' }}>
+                <span key={tag} style={{ fontSize: '10px', color: theme.community.text, padding: '2px 6px', background: theme.communityTint.bg, borderRadius: '4px' }}>
                   {tagInfo.emoji} {tagInfo.label}
                 </span>
               ) : null;
@@ -123,9 +126,9 @@ export default function PlaceCard({ place }: { place: Place }) {
             style={{
               flex: 1, padding: '12px 16px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
               cursor: 'pointer', minHeight: '44px',
-              background: inPlan ? 'transparent' : 'linear-gradient(135deg, #F59E0B, #D97706)',
-              color: inPlan ? '#F59E0B' : '#0C0A09',
-              border: inPlan ? '1.5px solid #F59E0B' : 'none',
+              background: inPlan ? 'transparent' : theme.accent.amberGradient,
+              color: inPlan ? theme.accent.amber : theme.text.onAccent,
+              border: inPlan ? `1.5px solid ${theme.accent.amber}` : 'none',
             }}
           >
             {inPlan ? '✓ Saved' : '+ Add'}
@@ -133,31 +136,31 @@ export default function PlaceCard({ place }: { place: Place }) {
           {place.googleMapsUrl && (
             <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
               aria-label="Get directions"
-              style={{ padding: '12px 16px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', color: '#A8A29E', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', minHeight: '44px', minWidth: '44px' }}>
+              style={{ padding: '12px 16px', borderRadius: '10px', background: theme.bg.subtleStrong, color: theme.text.secondary, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', minHeight: '44px', minWidth: '44px' }}>
               <DirectionsIcon />
             </a>
           )}
           {place.phone && (
             <a href={`tel:${place.phone}`}
               aria-label="Call"
-              style={{ padding: '12px 16px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', color: '#A8A29E', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', minHeight: '44px', minWidth: '44px' }}>
+              style={{ padding: '12px 16px', borderRadius: '10px', background: theme.bg.subtleStrong, color: theme.text.secondary, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', minHeight: '44px', minWidth: '44px' }}>
               <PhoneIcon />
             </a>
           )}
           {(isReservable(place) || isBookable(place)) && (place.website || place.googleMapsUrl) && (
             <a href={getBookingUrl(place)} target="_blank" rel="noopener noreferrer"
-              style={{ padding: '12px 16px', borderRadius: '10px', background: 'rgba(34,197,94,0.1)', color: '#34D399', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', fontSize: '11px', fontWeight: 600, border: '1px solid rgba(34,197,94,0.2)', minHeight: '44px' }}>
+              style={{ padding: '12px 16px', borderRadius: '10px', background: theme.greenTint.bg, color: theme.status.green, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', fontSize: '11px', fontWeight: 600, border: `1px solid ${theme.greenTint.border}`, minHeight: '44px' }}>
               {getBookingLabel(place)}
             </a>
           )}
           <button onClick={() => toggleSaved(place)}
             aria-label={isSaved(place.placeId) ? 'Remove from saved' : 'Save place'}
-            style={{ padding: '12px 16px', borderRadius: '10px', background: isSaved(place.placeId) ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.06)', color: isSaved(place.placeId) ? '#F59E0B' : '#A8A29E', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', minHeight: '44px', minWidth: '44px' }}>
+            style={{ padding: '12px 16px', borderRadius: '10px', background: isSaved(place.placeId) ? theme.amberTint.bg15 : theme.bg.subtleStrong, color: isSaved(place.placeId) ? theme.accent.amber : theme.text.secondary, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', minHeight: '44px', minWidth: '44px' }}>
             {isSaved(place.placeId) ? '♥' : '♡'}
           </button>
           <button onClick={() => sharePlace(place)}
             aria-label="Share"
-            style={{ padding: '12px 16px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', color: '#A8A29E', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '44px', minWidth: '44px' }}>
+            style={{ padding: '12px 16px', borderRadius: '10px', background: theme.bg.subtleStrong, color: theme.text.secondary, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '44px', minWidth: '44px' }}>
             <ShareIcon />
           </button>
         </div>

@@ -1,5 +1,6 @@
 import { useApp } from '../context/AppContext';
-import { cardStyle } from '../styles/shared';
+import { useTheme } from '../context/ThemeContext';
+import { getCardStyle } from '../styles/shared';
 import { CloseIcon, DirectionsIcon, PhoneIcon, WebsiteIcon, ShareIcon } from './icons';
 import { PriceDots, StarRating } from './ui';
 import { formatDistance, getHoursStatus } from '../services/places';
@@ -38,6 +39,8 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
     handleSubmitReview,
     user,
   } = useApp();
+  const { theme } = useTheme();
+  const cardStyle = getCardStyle(theme);
 
   const hoursStatus = getHoursStatus(place.hours, place.openNow);
   const inPlan = isInPlan(place.placeId);
@@ -59,7 +62,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
       role="dialog"
       aria-label={`Details for ${place.name}`}
       style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 100,
+        position: 'fixed', inset: 0, background: theme.bg.modalOverlay, zIndex: 100,
         display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
       }}
       onClick={() => setSelectedPlace(null)}
@@ -67,16 +70,16 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
       <div
         className="modal-sheet"
         style={{
-          background: '#1C1917', borderRadius: '24px 24px 0 0',
+          background: theme.bg.surface, borderRadius: '24px 24px 0 0',
           maxWidth: '430px', width: '100%', maxHeight: '90vh',
           overflowY: 'auto', overflowX: 'hidden',
-          border: '1px solid rgba(255,255,255,0.06)', borderBottom: 'none',
+          border: `1px solid ${theme.border.subtle}`, borderBottom: 'none',
         }}
         onClick={e => e.stopPropagation()}
       >
         {/* Photo Gallery / Hero */}
         {galleryPhotos.length > 0 && (
-          <div style={{ position: 'relative', width: '100%', height: '250px', borderRadius: '24px 24px 0 0', overflow: 'hidden', background: '#292524' }}>
+          <div style={{ position: 'relative', width: '100%', height: '250px', borderRadius: '24px 24px 0 0', overflow: 'hidden', background: theme.bg.elevated }}>
             {/* Sliding photo strip */}
             <div style={{
               display: 'flex', width: `${galleryPhotos.length * 100}%`, height: '100%',
@@ -101,7 +104,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
             {/* Gradient overlay */}
             <div style={{
               position: 'absolute', inset: 0,
-              background: 'linear-gradient(to bottom, transparent 50%, #1C1917)',
+              background: `linear-gradient(to bottom, transparent 50%, ${theme.bg.surface})`,
               pointerEvents: 'none',
             }} />
 
@@ -133,10 +136,10 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                 aria-label="Previous photo"
                 style={{
                   position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', zIndex: 2,
-                  background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', border: 'none',
+                  background: theme.bg.photoButton, backdropFilter: 'blur(8px)', border: 'none',
                   borderRadius: '50%', width: '36px', height: '36px',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', color: '#FFFBEB', fontSize: '16px', fontWeight: 700,
+                  cursor: 'pointer', color: theme.text.primary, fontSize: '16px', fontWeight: 700,
                 }}>
                 ‹
               </button>
@@ -146,10 +149,10 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                 aria-label="Next photo"
                 style={{
                   position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', zIndex: 2,
-                  background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', border: 'none',
+                  background: theme.bg.photoButton, backdropFilter: 'blur(8px)', border: 'none',
                   borderRadius: '50%', width: '36px', height: '36px',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', color: '#FFFBEB', fontSize: '16px', fontWeight: 700,
+                  cursor: 'pointer', color: theme.text.primary, fontSize: '16px', fontWeight: 700,
                 }}>
                 ›
               </button>
@@ -160,10 +163,10 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
               aria-label="Close"
               style={{
                 position: 'absolute', top: '12px', right: '12px', zIndex: 3,
-                background: 'rgba(0,0,0,0.5)', border: 'none',
+                background: theme.bg.photoButton, border: 'none',
                 borderRadius: '50%', width: '36px', height: '36px',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', color: '#FFFBEB', backdropFilter: 'blur(8px)',
+                cursor: 'pointer', color: theme.text.primary, backdropFilter: 'blur(8px)',
               }}>
               <CloseIcon />
             </button>
@@ -174,7 +177,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                 position: 'absolute', bottom: '10px', left: '50%',
                 transform: 'translateX(-50%)', zIndex: 2,
                 display: 'flex', gap: '5px', alignItems: 'center',
-                background: 'rgba(0,0,0,0.4)', borderRadius: '12px', padding: '4px 10px',
+                background: theme.bg.photoCounter, borderRadius: '12px', padding: '4px 10px',
                 backdropFilter: 'blur(8px)',
               }}>
                 {galleryPhotos.map((_, i) => (
@@ -186,7 +189,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                       width: i === activePhotoIndex ? '14px' : '8px',
                       height: '8px',
                       borderRadius: '4px',
-                      background: i === activePhotoIndex ? '#F59E0B' : 'rgba(255,255,255,0.4)',
+                      background: i === activePhotoIndex ? theme.accent.amber : 'rgba(255,255,255,0.4)',
                       border: 'none', padding: 0, cursor: 'pointer',
                       transition: 'all 0.2s ease',
                     }}
@@ -203,7 +206,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
               <button onClick={() => setSelectedPlace(null)}
                 aria-label="Close"
-                style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', padding: '10px', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                style={{ background: 'none', border: 'none', color: theme.text.tertiary, cursor: 'pointer', padding: '10px', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <CloseIcon />
               </button>
             </div>
@@ -215,7 +218,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
           {/* Meta row */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '12px' }}>
             {place.categoryDisplay && (
-              <span style={{ padding: '4px 10px', background: 'rgba(245,158,11,0.12)', color: '#F59E0B', borderRadius: '8px', fontSize: '12px', fontWeight: 500 }}>
+              <span style={{ padding: '4px 10px', background: theme.amberTint.bg15, color: theme.accent.amber, borderRadius: '8px', fontSize: '12px', fontWeight: 500 }}>
                 {place.categoryDisplay}
               </span>
             )}
@@ -227,18 +230,18 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: '6px',
             padding: '8px 14px', borderRadius: '10px', marginBottom: '16px',
-            background: place.openNow ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
-            border: `1px solid ${place.openNow ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
+            background: place.openNow ? theme.greenTint.bg : theme.redTint.bg,
+            border: `1px solid ${place.openNow ? theme.greenTint.border : theme.redTint.border}`,
           }}>
             <div style={{
               width: '8px', height: '8px', borderRadius: '50%',
-              background: place.openNow ? '#34D399' : '#F87171',
+              background: place.openNow ? theme.status.green : theme.status.red,
             }} />
-            <span style={{ fontSize: '13px', fontWeight: 500, color: place.openNow ? '#34D399' : '#F87171' }}>
+            <span style={{ fontSize: '13px', fontWeight: 500, color: place.openNow ? theme.status.green : theme.status.red }}>
               {hoursStatus.text}
             </span>
             {hoursStatus.urgent && (
-              <span style={{ fontSize: '11px', color: '#F87171', fontWeight: 600 }}>Hurry!</span>
+              <span style={{ fontSize: '11px', color: theme.status.red, fontWeight: 600 }}>Hurry!</span>
             )}
           </div>
 
@@ -248,8 +251,8 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
               <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
                 style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
-                  padding: '12px 8px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)',
-                  color: '#A8A29E', textDecoration: 'none', fontSize: '11px',
+                  padding: '12px 8px', borderRadius: '12px', background: theme.bg.subtleMedium,
+                  color: theme.text.secondary, textDecoration: 'none', fontSize: '11px',
                 }}>
                 <DirectionsIcon />
                 Directions
@@ -259,8 +262,8 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
               <a href={`tel:${place.phone}`}
                 style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
-                  padding: '12px 8px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)',
-                  color: '#A8A29E', textDecoration: 'none', fontSize: '11px',
+                  padding: '12px 8px', borderRadius: '12px', background: theme.bg.subtleMedium,
+                  color: theme.text.secondary, textDecoration: 'none', fontSize: '11px',
                 }}>
                 <PhoneIcon />
                 Call
@@ -270,8 +273,8 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
               <a href={place.website} target="_blank" rel="noopener noreferrer"
                 style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
-                  padding: '12px 8px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)',
-                  color: '#A8A29E', textDecoration: 'none', fontSize: '11px',
+                  padding: '12px 8px', borderRadius: '12px', background: theme.bg.subtleMedium,
+                  color: theme.text.secondary, textDecoration: 'none', fontSize: '11px',
                 }}>
                 <WebsiteIcon />
                 Website
@@ -282,8 +285,8 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
               style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
                 padding: '12px 8px', borderRadius: '12px', minHeight: '44px',
-                background: isSaved(place.placeId) ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.05)',
-                color: isSaved(place.placeId) ? '#F59E0B' : '#A8A29E', border: 'none', cursor: 'pointer', fontSize: '11px',
+                background: isSaved(place.placeId) ? theme.amberTint.bg15 : theme.bg.subtleMedium,
+                color: isSaved(place.placeId) ? theme.accent.amber : theme.text.secondary, border: 'none', cursor: 'pointer', fontSize: '11px',
               }}>
               <span style={{ fontSize: '16px' }}>{isSaved(place.placeId) ? '♥' : '♡'}</span>
               {isSaved(place.placeId) ? 'Saved' : 'Save'}
@@ -292,8 +295,8 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
               aria-label="Share place"
               style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
-                padding: '12px 8px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)',
-                color: '#A8A29E', border: 'none', cursor: 'pointer', fontSize: '11px', minHeight: '44px',
+                padding: '12px 8px', borderRadius: '12px', background: theme.bg.subtleMedium,
+                color: theme.text.secondary, border: 'none', cursor: 'pointer', fontSize: '11px', minHeight: '44px',
               }}>
               <ShareIcon />
               Share
@@ -307,14 +310,14 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                   width: '100%', padding: '14px', borderRadius: '12px', boxSizing: 'border-box',
-                  background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)',
-                  color: '#34D399', textDecoration: 'none', fontSize: '14px', fontWeight: 600,
+                  background: theme.greenTint.bg, border: `1px solid ${theme.greenTint.border}`,
+                  color: theme.status.green, textDecoration: 'none', fontSize: '14px', fontWeight: 600,
                 }}>
                 {isReservable(place) ? 'Reserve a Table' : 'Book Tickets'}
               </a>
               {place.googleMapsUrl && (
                 <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
-                  style={{ display: 'block', textAlign: 'center', marginTop: '8px', color: '#A8A29E', fontSize: '12px', textDecoration: 'none' }}>
+                  style={{ display: 'block', textAlign: 'center', marginTop: '8px', color: theme.text.secondary, fontSize: '12px', textDecoration: 'none' }}>
                   View on Google Maps
                 </a>
               )}
@@ -324,9 +327,9 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
           {/* Address */}
           {place.address && (
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Address</div>
+              <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Address</div>
               <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
-                style={{ color: '#FFFBEB', fontSize: '14px', textDecoration: 'none', lineHeight: 1.4 }}>
+                style={{ color: theme.text.primary, fontSize: '14px', textDecoration: 'none', lineHeight: 1.4 }}>
                 {place.address}
               </a>
             </div>
@@ -335,15 +338,15 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
           {/* Editorial Summary */}
           {place.editorialSummary && (
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>About</div>
-              <p style={{ color: '#d4d0cc', fontSize: '14px', lineHeight: 1.5 }}>{place.editorialSummary}</p>
+              <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>About</div>
+              <p style={{ color: theme.text.body, fontSize: '14px', lineHeight: 1.5 }}>{place.editorialSummary}</p>
             </div>
           )}
 
           {/* Hours */}
           {place.hours.length > 0 && (
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Hours</div>
+              <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Hours</div>
               {place.hours.map((h, i) => {
                 const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                 const today = days[new Date().getDay()];
@@ -351,11 +354,11 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                 return (
                   <div key={i} style={{
                     fontSize: '13px', padding: '4px 0',
-                    color: isToday ? '#FFFBEB' : '#78716C',
+                    color: isToday ? theme.text.primary : theme.text.tertiary,
                     fontWeight: isToday ? 600 : 400,
                   }}>
                     {h}
-                    {isToday && <span style={{ color: '#F59E0B', marginLeft: '8px', fontSize: '11px' }}>Today</span>}
+                    {isToday && <span style={{ color: theme.accent.amber, marginLeft: '8px', fontSize: '11px' }}>Today</span>}
                   </div>
                 );
               })}
@@ -365,18 +368,18 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
           {/* Distance */}
           {place.distance != null && (
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Distance</div>
-              <p style={{ color: '#FFFBEB', fontSize: '14px' }}>{formatDistance(place.distance, useMiles)} {getDistanceReference()}</p>
+              <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Distance</div>
+              <p style={{ color: theme.text.primary, fontSize: '14px' }}>{formatDistance(place.distance, useMiles)} {getDistanceReference()}</p>
             </div>
           )}
 
           {/* Good to Know (Safety) */}
           {getSafetyIndicators(place).length > 0 && (
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Good to know</div>
+              <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Good to know</div>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 {getSafetyIndicators(place).map(ind => (
-                  <span key={ind} style={{ fontSize: '12px', color: '#A8A29E', padding: '4px 10px', background: 'rgba(255,255,255,0.04)', borderRadius: '8px' }}>
+                  <span key={ind} style={{ fontSize: '12px', color: theme.text.secondary, padding: '4px 10px', background: theme.bg.subtle, borderRadius: '8px' }}>
                     {ind}
                   </span>
                 ))}
@@ -387,12 +390,12 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
           {/* Community Tags */}
           {placeTagsCache[place.placeId] && Object.keys(placeTagsCache[place.placeId]).length > 0 && (
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Community Tags</div>
+              <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Community Tags</div>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 {Object.entries(placeTagsCache[place.placeId]).map(([tag, count]) => {
                   const tagInfo = COMMUNITY_TAGS.find(t => t.id === tag);
                   return tagInfo ? (
-                    <span key={tag} style={{ fontSize: '12px', color: '#D4A574', padding: '4px 10px', background: 'rgba(212,165,116,0.08)', borderRadius: '8px' }}>
+                    <span key={tag} style={{ fontSize: '12px', color: theme.community.text, padding: '4px 10px', background: theme.communityTint.bg, borderRadius: '8px' }}>
                       {tagInfo.emoji} {tagInfo.label} ({count})
                     </span>
                   ) : null;
@@ -404,10 +407,10 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
           {/* Reviews Section */}
           <div style={{ marginBottom: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Community Reviews</div>
+              <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Community Reviews</div>
               {user && !showReviewForm && (
                 <button onClick={() => setShowReviewForm(true)}
-                  style={{ background: 'none', border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B', borderRadius: '8px', padding: '5px 12px', fontSize: '11px', cursor: 'pointer' }}>
+                  style={{ background: 'none', border: `1px solid ${theme.amberTint.border30}`, color: theme.accent.amber, borderRadius: '8px', padding: '5px 12px', fontSize: '11px', cursor: 'pointer' }}>
                   Leave a Review
                 </button>
               )}
@@ -415,13 +418,13 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
 
             {/* Review Form */}
             {showReviewForm && user && (
-              <div style={{ ...cardStyle, marginBottom: '12px', border: '1px solid rgba(245,158,11,0.15)' }}>
+              <div style={{ ...cardStyle, marginBottom: '12px', border: `1px solid ${theme.amberTint.border15}` }}>
                 {/* Star Rating */}
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                   {[1, 2, 3, 4, 5].map(star => (
                     <button key={star} onClick={() => setReviewRating(star)}
                       aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
-                      style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', padding: '8px', color: star <= reviewRating ? '#F59E0B' : '#3a3632', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', padding: '8px', color: star <= reviewRating ? theme.accent.amber : theme.text.disabled, minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       ★
                     </button>
                   ))}
@@ -433,15 +436,15 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                   value={reviewText}
                   onChange={e => setReviewText(e.target.value)}
                   style={{
-                    width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)',
-                    background: '#0C0A09', color: '#FFFBEB', fontSize: '14px', resize: 'vertical',
+                    width: '100%', padding: '12px', borderRadius: '10px', border: `1px solid ${theme.border.strong}`,
+                    background: theme.bg.input, color: theme.text.primary, fontSize: '14px', resize: 'vertical',
                     minHeight: '60px', boxSizing: 'border-box', outline: 'none',
                   }}
                 />
 
                 {/* Community Tags */}
                 <div style={{ marginTop: '10px', marginBottom: '10px' }}>
-                  <div style={{ fontSize: '11px', color: '#78716C', marginBottom: '6px' }}>Tag this place:</div>
+                  <div style={{ fontSize: '11px', color: theme.text.tertiary, marginBottom: '6px' }}>Tag this place:</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                     {COMMUNITY_TAGS.map(tag => {
                       const selected = reviewTags.includes(tag.id);
@@ -450,9 +453,9 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                           onClick={() => setReviewTags(selected ? reviewTags.filter(t => t !== tag.id) : [...reviewTags, tag.id])}
                           style={{
                             padding: '4px 10px', borderRadius: '12px', fontSize: '11px',
-                            border: selected ? '1px solid rgba(212,165,116,0.4)' : '1px solid rgba(255,255,255,0.08)',
-                            background: selected ? 'rgba(212,165,116,0.12)' : 'transparent',
-                            color: selected ? '#D4A574' : '#78716C', cursor: 'pointer',
+                            border: selected ? `1px solid ${theme.communityTint.border40}` : `1px solid ${theme.border.medium}`,
+                            background: selected ? theme.communityTint.bg12 : 'transparent',
+                            color: selected ? theme.community.text : theme.text.tertiary, cursor: 'pointer',
                           }}>
                           {tag.emoji} {tag.label}
                         </button>
@@ -467,14 +470,14 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                     disabled={reviewRating === 0 || reviewSubmitting}
                     style={{
                       flex: 1, padding: '10px', borderRadius: '10px', border: 'none',
-                      background: reviewRating > 0 ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'rgba(255,255,255,0.1)',
-                      color: reviewRating > 0 ? '#0C0A09' : '#78716C',
+                      background: reviewRating > 0 ? theme.accent.amberGradient : theme.bg.subtleStrong,
+                      color: reviewRating > 0 ? theme.text.onAccent : theme.text.tertiary,
                       fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: reviewSubmitting ? 0.6 : 1,
                     }}>
                     {reviewSubmitting ? 'Submitting...' : 'Submit Review'}
                   </button>
                   <button onClick={() => { setShowReviewForm(false); setReviewRating(0); setReviewText(''); setReviewTags([]); }}
-                    style={{ padding: '10px 16px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)', background: 'none', color: '#78716C', fontSize: '13px', cursor: 'pointer' }}>
+                    style={{ padding: '10px 16px', borderRadius: '10px', border: `1px solid ${theme.border.medium}`, background: 'none', color: theme.text.tertiary, fontSize: '13px', cursor: 'pointer' }}>
                     Cancel
                   </button>
                 </div>
@@ -486,22 +489,22 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
               placeReviews.slice(0, 5).map(review => (
                 <div key={review.id} style={{ ...cardStyle, marginBottom: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                    <span style={{ color: '#F59E0B', fontSize: '13px' }}>
+                    <span style={{ color: theme.accent.amber, fontSize: '13px' }}>
                       {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
                     </span>
-                    <span style={{ color: '#57534E', fontSize: '11px' }}>
+                    <span style={{ color: theme.text.muted, fontSize: '11px' }}>
                       {new Date(review.created_at).toLocaleDateString()}
                     </span>
                   </div>
                   {review.review_text && (
-                    <p style={{ color: '#d4d0cc', fontSize: '13px', lineHeight: 1.4, marginBottom: '6px' }}>{review.review_text}</p>
+                    <p style={{ color: theme.text.body, fontSize: '13px', lineHeight: 1.4, marginBottom: '6px' }}>{review.review_text}</p>
                   )}
                   {review.tags && review.tags.length > 0 && (
                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                       {review.tags.map(tag => {
                         const tagInfo = COMMUNITY_TAGS.find(t => t.id === tag);
                         return tagInfo ? (
-                          <span key={tag} style={{ fontSize: '10px', color: '#D4A574', padding: '2px 6px', background: 'rgba(212,165,116,0.08)', borderRadius: '4px' }}>
+                          <span key={tag} style={{ fontSize: '10px', color: theme.community.text, padding: '2px 6px', background: theme.communityTint.bg, borderRadius: '4px' }}>
                             {tagInfo.emoji} {tagInfo.label}
                           </span>
                         ) : null;
@@ -511,7 +514,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                 </div>
               ))
             ) : (
-              <p style={{ color: '#57534E', fontSize: '13px' }}>No reviews yet. Be the first!</p>
+              <p style={{ color: theme.text.muted, fontSize: '13px' }}>No reviews yet. Be the first!</p>
             )}
           </div>
         </div>
@@ -520,8 +523,8 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
         <div style={{
           position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
           maxWidth: '430px', width: '100%', padding: '16px 20px 32px',
-          background: 'linear-gradient(to top, #1C1917, rgba(28,25,23,0.95))',
-          borderTop: '1px solid rgba(255,255,255,0.06)',
+          background: `linear-gradient(to top, ${theme.bg.surface}, ${theme.bg.surfaceAlpha})`,
+          borderTop: `1px solid ${theme.border.subtle}`,
         }}>
           <button
             onClick={() => {
@@ -535,10 +538,10 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
             style={{
               width: '100%', padding: '16px', borderRadius: '14px',
               fontSize: '16px', fontWeight: 600, cursor: 'pointer',
-              background: inPlan ? 'transparent' : 'linear-gradient(135deg, #F59E0B, #D97706)',
-              color: inPlan ? '#F59E0B' : '#0C0A09',
-              border: inPlan ? '2px solid #F59E0B' : 'none',
-              boxShadow: inPlan ? 'none' : '0 4px 20px rgba(245,158,11,0.3)',
+              background: inPlan ? 'transparent' : theme.accent.amberGradient,
+              color: inPlan ? theme.accent.amber : theme.text.onAccent,
+              border: inPlan ? `2px solid ${theme.accent.amber}` : 'none',
+              boxShadow: inPlan ? 'none' : `0 4px 20px ${theme.amberTint.shadow}`,
             }}
           >
             {inPlan ? '✓ In Your Plan — Remove' : '+ Add to Plan'}

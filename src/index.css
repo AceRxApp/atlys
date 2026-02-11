@@ -12,8 +12,8 @@
 
 html, body {
   font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
-  background: #0C0A09;
-  color: #FFFBEB;
+  background: var(--bg-body, #0C0A09);
+  color: var(--text-primary, #FFFBEB);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -29,22 +29,21 @@ html, body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #1C1917;
+  background: var(--scrollbar-track, #1C1917);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #78716C;
+  background: var(--scrollbar-thumb, #78716C);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #A8A29E;
+  background: var(--scrollbar-thumb-hover, #A8A29E);
 }
 
 /* Selection styling */
 ::selection {
-  background: rgba(245, 158, 11, 0.3);
-  color: #FFFBEB;
+  background: var(--selection-bg, rgba(245, 158, 11, 0.3));
 }
 
 /* Focus styling */

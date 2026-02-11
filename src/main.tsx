@@ -2,24 +2,31 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
+import { ThemeProvider } from './context/ThemeContext'
 import './index.css'
 import { initSentry, Sentry } from './utils/sentry'
+import { getThemeForTime } from './styles/theme'
 
 // Initialize error tracking before rendering
 initSentry();
 
 function ErrorFallback({ error }: { error: Error }) {
+  const isDark = getThemeForTime() === 'dark';
+  const bg = isDark ? '#0C0A09' : '#FAFAF9';
+  const fg = isDark ? '#FAFAF9' : '#1C1917';
+  const muted = isDark ? '#A8A29E' : '#57534E';
+  const borderColor = isDark ? '#292524' : 'rgba(0,0,0,0.1)';
   return (
-    <div style={{ minHeight: '100vh', background: '#0C0A09', color: '#FAFAF9', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: bg, color: fg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
       <div style={{ fontSize: '48px', marginBottom: '16px' }}>😵</div>
       <h1 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>Something went wrong</h1>
-      <p style={{ fontSize: '14px', color: '#A8A29E', marginBottom: '24px', textAlign: 'center', maxWidth: '300px' }}>
+      <p style={{ fontSize: '14px', color: muted, marginBottom: '24px', textAlign: 'center', maxWidth: '300px' }}>
         {error?.message || 'An unexpected error occurred'}
       </p>
       <button onClick={() => window.location.reload()} style={{ padding: '12px 32px', borderRadius: '12px', background: 'linear-gradient(135deg, #F59E0B, #D97706)', color: '#0C0A09', fontWeight: 700, fontSize: '15px', border: 'none', cursor: 'pointer', marginBottom: '12px' }}>
         Reload App
       </button>
-      <button onClick={() => { localStorage.clear(); sessionStorage.clear(); window.location.reload(); }} style={{ padding: '10px 24px', borderRadius: '10px', background: 'transparent', color: '#78716C', fontSize: '13px', border: '1px solid #292524', cursor: 'pointer' }}>
+      <button onClick={() => { localStorage.clear(); sessionStorage.clear(); window.location.reload(); }} style={{ padding: '10px 24px', borderRadius: '10px', background: 'transparent', color: '#78716C', fontSize: '13px', border: `1px solid ${borderColor}`, cursor: 'pointer' }}>
         Clear Data & Reload
       </button>
     </div>
@@ -29,9 +36,11 @@ function ErrorFallback({ error }: { error: Error }) {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <Sentry.ErrorBoundary fallback={({ error }) => <ErrorFallback error={error as Error} />}>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
+      <ThemeProvider>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </ThemeProvider>
     </Sentry.ErrorBoundary>
   </React.StrictMode>,
 )

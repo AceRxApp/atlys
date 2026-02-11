@@ -12,8 +12,9 @@ import {
   NIGHTLIFE_TYPES, GIRLY_TYPES, GIRLY_KEYWORDS, BOYS_EXCLUDE_TYPES,
   RESERVABLE_TYPES, BOOKABLE_TYPES, ADMIN_EMAIL,
 } from './data';
-import { cardStyle } from './styles/shared';
+import { getCardStyle } from './styles/shared';
 import { AppContext } from './context/AppContext';
+import { useTheme } from './context/ThemeContext';
 import { HomeIcon, DiscoverIcon, EventsIcon, PlanIcon, ShieldIcon, GearIcon, CloseIcon } from './components/icons';
 import { SkeletonCard } from './components/ui';
 
@@ -35,6 +36,9 @@ const MAPS_API_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || '';
 // ============================================================================
 
 export default function App() {
+  const { theme } = useTheme();
+  const cardStyle = getCardStyle(theme);
+
   // --- Router integration ---
   const routerLocation = useRouterLocation();
   const navigate = useNavigate();
@@ -1022,23 +1026,23 @@ export default function App() {
     return (
       <div style={{
         fontFamily: "'DM Sans', system-ui, sans-serif",
-        background: '#0C0A09', minHeight: '100vh', color: '#FFFBEB',
+        background: theme.bg.body, minHeight: '100vh', color: theme.text.primary,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{
             fontSize: '36px', fontWeight: 700, marginBottom: '4px',
-            background: 'linear-gradient(135deg, #F59E0B, #FBBF24)',
+            background: theme.accent.amberTextGradient,
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
           }}>
             NxStops
           </div>
-          <div style={{ fontSize: '11px', color: '#78716C', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '24px' }}>
+          <div style={{ fontSize: '11px', color: theme.text.tertiary, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '24px' }}>
             by Nav&eacute;
           </div>
           <div style={{
             width: '40px', height: '3px', borderRadius: '2px', margin: '0 auto',
-            background: 'linear-gradient(90deg, rgba(245,158,11,0.3) 25%, #F59E0B 50%, rgba(245,158,11,0.3) 75%)',
+            background: `linear-gradient(90deg, ${theme.amberTint.border30} 25%, ${theme.accent.amber} 50%, ${theme.amberTint.border30} 75%)`,
             backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite',
           }} />
         </div>
@@ -1061,20 +1065,20 @@ export default function App() {
     return (
       <div style={{
         fontFamily: "'DM Sans', system-ui, sans-serif",
-        background: '#0C0A09', minHeight: '100vh', color: '#FFFBEB',
+        background: theme.bg.body, minHeight: '100vh', color: theme.text.primary,
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         maxWidth: '430px', margin: '0 auto', padding: '40px 24px',
       }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
           <div style={{ fontSize: '72px', marginBottom: '24px' }}>{step.emoji}</div>
           <h1 style={{ fontSize: '26px', fontWeight: 700, marginBottom: '12px', lineHeight: 1.2 }}>{step.title}</h1>
-          <p style={{ fontSize: '15px', color: '#A8A29E', lineHeight: 1.6, maxWidth: '300px' }}>{step.subtitle}</p>
+          <p style={{ fontSize: '15px', color: theme.text.secondary, lineHeight: 1.6, maxWidth: '300px' }}>{step.subtitle}</p>
         </div>
         <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
           {ONBOARDING_SCREENS.map((_, i) => (
             <div key={i} style={{
               width: i === onboardingStep ? '24px' : '8px', height: '8px', borderRadius: '4px',
-              background: i === onboardingStep ? '#F59E0B' : 'rgba(255,255,255,0.15)',
+              background: i === onboardingStep ? theme.accent.amber : theme.border.dashed,
               transition: 'all 0.3s ease',
             }} />
           ))}
@@ -1091,16 +1095,16 @@ export default function App() {
             }}
             style={{
               width: '100%', padding: '16px', borderRadius: '14px', border: 'none',
-              background: 'linear-gradient(135deg, #F59E0B, #D97706)',
-              color: '#0C0A09', fontSize: '16px', fontWeight: 600, cursor: 'pointer',
-              boxShadow: '0 4px 20px rgba(245,158,11,0.3)',
+              background: theme.accent.amberGradient,
+              color: theme.text.onAccent, fontSize: '16px', fontWeight: 600, cursor: 'pointer',
+              boxShadow: `0 4px 20px ${theme.amberTint.shadow}`,
             }}>
             {onboardingStep < ONBOARDING_SCREENS.length - 1 ? 'Next' : 'Get Started'}
           </button>
           {onboardingStep < ONBOARDING_SCREENS.length - 1 && (
             <button
               onClick={() => { localStorage.setItem('nxstops_onboarded', 'true'); setShowOnboarding(false); }}
-              style={{ width: '100%', padding: '12px', background: 'none', border: 'none', color: '#78716C', fontSize: '13px', cursor: 'pointer' }}>
+              style={{ width: '100%', padding: '12px', background: 'none', border: 'none', color: theme.text.tertiary, fontSize: '13px', cursor: 'pointer' }}>
               Skip
             </button>
           )}
@@ -1117,8 +1121,8 @@ export default function App() {
     <AppContext.Provider value={contextValue}>
       <div style={{
         fontFamily: "'DM Sans', system-ui, sans-serif",
-        background: 'linear-gradient(180deg, #0C0A09 0%, #1C1917 100%)',
-        minHeight: '100vh', color: '#FFFBEB',
+        background: theme.bg.bodyGradient,
+        minHeight: '100vh', color: theme.text.primary,
         maxWidth: '430px', margin: '0 auto', position: 'relative', overflow: 'hidden',
       }}>
         {/* Animations */}
@@ -1155,21 +1159,21 @@ export default function App() {
           <div>
             <div style={{
               fontSize: '22px', fontWeight: 700,
-              background: 'linear-gradient(135deg, #F59E0B, #FBBF24)',
+              background: theme.accent.amberTextGradient,
               WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
             }}>
               NxStops
             </div>
-            <div style={{ fontSize: '10px', color: '#78716C', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+            <div style={{ fontSize: '10px', color: theme.text.tertiary, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
               by Nav&eacute;
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '14px', color: '#FFFBEB' }}>
+              <div style={{ fontSize: '14px', color: theme.text.primary }}>
                 {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </div>
-              <div style={{ fontSize: '10px', color: '#78716C' }}>
+              <div style={{ fontSize: '10px', color: theme.text.tertiary }}>
                 {currentTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
               </div>
             </div>
@@ -1188,12 +1192,12 @@ export default function App() {
             <button onClick={() => setShowProfile(true)}
               aria-label="Open profile"
               style={{
-                width: '44px', height: '44px', borderRadius: '50%', border: '2px solid rgba(245,158,11,0.3)',
+                width: '44px', height: '44px', borderRadius: '50%', border: `2px solid ${theme.amberTint.border30}`,
                 background: user?.user_metadata?.avatar_url
                   ? `url(${user.user_metadata.avatar_url}) center/cover no-repeat`
-                  : 'rgba(255,255,255,0.08)',
+                  : theme.bg.subtleButton,
                 cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '16px', padding: 0, color: '#A8A29E', flexShrink: 0,
+                fontSize: '16px', padding: 0, color: theme.text.secondary, flexShrink: 0,
               }}>
               {!user?.user_metadata?.avatar_url && (
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A8A29E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1222,8 +1226,8 @@ export default function App() {
         <nav aria-label="Main navigation" style={{
           position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
           width: '100%', maxWidth: '430px',
-          background: 'rgba(12,10,9,0.95)', backdropFilter: 'blur(24px)',
-          borderTop: '1px solid rgba(255,255,255,0.06)',
+          background: theme.bg.nav, backdropFilter: 'blur(24px)',
+          borderTop: `1px solid ${theme.border.nav}`,
           display: 'flex', justifyContent: 'space-around',
           padding: '8px 0 28px',
         }}>
@@ -1243,7 +1247,7 @@ export default function App() {
                 style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
                   background: 'none', border: 'none',
-                  color: isActive ? '#FFFBEB' : canNavigate ? '#78716C' : '#3a3632',
+                  color: isActive ? theme.text.primary : canNavigate ? theme.text.tertiary : theme.text.disabled,
                   fontSize: '10px', fontWeight: 500, cursor: canNavigate ? 'pointer' : 'default',
                   padding: '8px 20px', borderRadius: '12px', position: 'relative',
                   opacity: canNavigate ? 1 : 0.4, minHeight: '48px',
@@ -1306,22 +1310,22 @@ export default function App() {
           <div className="modal-backdrop"
             role="dialog"
             aria-label="Surprise place recommendation"
-            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+            style={{ position: 'fixed', inset: 0, background: theme.bg.modalOverlay, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
             onClick={() => setSurprisePlace(null)}>
             <div className="modal-sheet"
-              style={{ background: '#1C1917', borderRadius: '20px', maxWidth: '380px', width: '100%', overflow: 'hidden', border: '1px solid rgba(245,158,11,0.2)' }}
+              style={{ background: theme.bg.surface, borderRadius: '20px', maxWidth: '380px', width: '100%', overflow: 'hidden', border: `1px solid ${theme.amberTint.border20}` }}
               onClick={e => e.stopPropagation()}>
               {surprisePlace.photoUrl && (
                 <div style={{
                   height: '180px', width: '100%',
-                  background: `linear-gradient(to bottom, transparent 50%, #1C1917), url(${surprisePlace.photoUrl})`,
+                  background: `linear-gradient(to bottom, transparent 50%, ${theme.bg.surface}), url(${surprisePlace.photoUrl})`,
                   backgroundSize: 'cover', backgroundPosition: 'center',
                 }} />
               )}
               <div style={{ padding: '20px', textAlign: 'center' }}>
-                <div style={{ fontSize: '14px', color: '#F59E0B', marginBottom: '4px', fontWeight: 500 }}>Surprise!</div>
+                <div style={{ fontSize: '14px', color: theme.accent.amber, marginBottom: '4px', fontWeight: 500 }}>Surprise!</div>
                 <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '6px' }}>{surprisePlace.name}</h2>
-                <p style={{ color: '#A8A29E', fontSize: '13px', marginBottom: '4px' }}>
+                <p style={{ color: theme.text.secondary, fontSize: '13px', marginBottom: '4px' }}>
                   {surprisePlace.categoryDisplay}{surprisePlace.distance != null && ` \u{00B7} ${formatDistance(surprisePlace.distance, useMiles)}`}
                 </p>
                 {surprisePlace.rating > 0 && (
@@ -1337,14 +1341,14 @@ export default function App() {
                   </button>
                   {surprisePlace.googleMapsUrl && (
                     <a href={surprisePlace.googleMapsUrl} target="_blank" rel="noopener noreferrer"
-                      style={{ flex: 1, padding: '12px', borderRadius: '12px', background: 'rgba(255,255,255,0.08)', color: '#FFFBEB', fontSize: '14px', fontWeight: 600, textDecoration: 'none', textAlign: 'center' }}>
+                      style={{ flex: 1, padding: '12px', borderRadius: '12px', background: theme.bg.subtleButton, color: theme.text.primary, fontSize: '14px', fontWeight: 600, textDecoration: 'none', textAlign: 'center' }}>
                       Directions
                     </a>
                   )}
                 </div>
                 <button
                   onClick={() => { setSurprisePlace(null); handleSurpriseMe(); }}
-                  style={{ width: '100%', padding: '12px', borderRadius: '12px', marginTop: '8px', background: 'none', border: '1px solid rgba(255,255,255,0.1)', color: '#A8A29E', fontSize: '13px', cursor: 'pointer' }}>
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px', marginTop: '8px', background: 'none', border: `1px solid ${theme.border.strong}`, color: theme.text.secondary, fontSize: '13px', cursor: 'pointer' }}>
                   {'\u{1F3B2}'} Try another
                 </button>
               </div>
@@ -1364,20 +1368,20 @@ export default function App() {
           <div className="modal-backdrop"
             role="dialog"
             aria-label="Travel toolkit"
-            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+            style={{ position: 'fixed', inset: 0, background: theme.bg.modalOverlay, zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
             onClick={() => setShowSafety(false)}>
             <div className="modal-sheet"
-              style={{ background: '#1C1917', borderRadius: '24px 24px 0 0', maxWidth: '430px', width: '100%', maxHeight: '85vh', overflow: 'auto', border: '1px solid rgba(255,255,255,0.06)', borderBottom: 'none' }}
+              style={{ background: theme.bg.surface, borderRadius: '24px 24px 0 0', maxWidth: '430px', width: '100%', maxHeight: '85vh', overflow: 'auto', border: `1px solid ${theme.border.subtle}`, borderBottom: 'none' }}
               onClick={e => e.stopPropagation()}>
               <div style={{ padding: '24px 20px 40px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <div>
                     <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '2px' }}>Travel Toolkit</h2>
-                    <p style={{ color: '#78716C', fontSize: '12px' }}>Stay connected & informed</p>
+                    <p style={{ color: theme.text.tertiary, fontSize: '12px' }}>Stay connected & informed</p>
                   </div>
                   <button onClick={() => setShowSafety(false)}
                     aria-label="Close travel toolkit"
-                    style={{ background: 'none', border: 'none', color: '#78716C', cursor: 'pointer', padding: '10px', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    style={{ background: 'none', border: 'none', color: theme.text.tertiary, cursor: 'pointer', padding: '10px', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <CloseIcon />
                   </button>
                 </div>
@@ -1413,8 +1417,8 @@ export default function App() {
                     {'\u{1F4CD}'}
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: '15px', color: '#FFFBEB' }}>Share My Location</div>
-                    <div style={{ fontSize: '12px', color: '#A8A29E' }}>Send your GPS pin to someone you trust</div>
+                    <div style={{ fontWeight: 600, fontSize: '15px', color: theme.text.primary }}>Share My Location</div>
+                    <div style={{ fontSize: '12px', color: theme.text.secondary }}>Send your GPS pin to someone you trust</div>
                   </div>
                   <div style={{ color: '#34D399', fontSize: '18px' }}>{'\u{2192}'}</div>
                 </button>
@@ -1430,7 +1434,7 @@ export default function App() {
 
                   return (
                     <div style={{ ...cardStyle, marginTop: '4px' }}>
-                      <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
+                      <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
                         Emergency Numbers{displayCountry ? ` \u{2014} ${displayCountry}` : ''}
                       </div>
                       {nums ? (
@@ -1438,10 +1442,10 @@ export default function App() {
                           <a href={`tel:${nums.emergency}`}
                             style={{
                               flex: 1, padding: '14px', borderRadius: '12px', textAlign: 'center',
-                              background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.15)',
-                              color: '#F87171', textDecoration: 'none', fontWeight: 600, fontSize: '16px',
+                              background: theme.redTint.bg, border: `1px solid ${theme.redTint.border}`,
+                              color: theme.status.red, textDecoration: 'none', fontWeight: 600, fontSize: '16px',
                             }}>
-                            <div style={{ fontSize: '11px', color: '#A8A29E', fontWeight: 400, marginBottom: '4px' }}>Emergency</div>
+                            <div style={{ fontSize: '11px', color: theme.text.secondary, fontWeight: 400, marginBottom: '4px' }}>Emergency</div>
                             {nums.emergency}
                           </a>
                           <a href={`tel:${nums.police}`}
@@ -1450,12 +1454,12 @@ export default function App() {
                               background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.15)',
                               color: '#93C5FD', textDecoration: 'none', fontWeight: 600, fontSize: '16px',
                             }}>
-                            <div style={{ fontSize: '11px', color: '#A8A29E', fontWeight: 400, marginBottom: '4px' }}>Police</div>
+                            <div style={{ fontSize: '11px', color: theme.text.secondary, fontWeight: 400, marginBottom: '4px' }}>Police</div>
                             {nums.police}
                           </a>
                         </div>
                       ) : (
-                        <p style={{ color: '#A8A29E', fontSize: '13px' }}>Select a city to see local emergency numbers</p>
+                        <p style={{ color: theme.text.secondary, fontSize: '13px' }}>Select a city to see local emergency numbers</p>
                       )}
                     </div>
                   );
@@ -1463,7 +1467,7 @@ export default function App() {
 
                 {/* Travel Tips */}
                 <div style={{ ...cardStyle, marginTop: '4px' }}>
-                  <div style={{ fontSize: '11px', color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
+                  <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
                     Quick Tips
                   </div>
                   {[
@@ -1474,9 +1478,9 @@ export default function App() {
                     { icon: '\u{1F319}', tip: 'Stick to well-lit, busy streets at night' },
                     { icon: '\u{1F465}', tip: 'Look for places with lots of reviews \u{2014} popular spots are usually welcoming' },
                   ].map((item, i) => (
-                    <div key={i} style={{ display: 'flex', gap: '10px', padding: '8px 0', borderBottom: i < 5 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                    <div key={i} style={{ display: 'flex', gap: '10px', padding: '8px 0', borderBottom: i < 5 ? `1px solid ${theme.bg.subtleMedium}` : 'none' }}>
                       <span style={{ fontSize: '16px', flexShrink: 0 }}>{item.icon}</span>
-                      <span style={{ fontSize: '13px', color: '#d4d0cc', lineHeight: 1.4 }}>{item.tip}</span>
+                      <span style={{ fontSize: '13px', color: theme.text.body, lineHeight: 1.4 }}>{item.tip}</span>
                     </div>
                   ))}
                 </div>
@@ -1503,11 +1507,11 @@ export default function App() {
         {toast && (
           <div style={{
             position: 'fixed', bottom: '100px', left: '50%', transform: 'translateX(-50%)',
-            background: 'rgba(28,25,23,0.95)', backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(245,158,11,0.2)', borderRadius: '12px',
-            padding: '12px 20px', fontSize: '14px', fontWeight: 500, color: '#FFFBEB',
+            background: theme.bg.toast, backdropFilter: 'blur(20px)',
+            border: `1px solid ${theme.amberTint.border20}`, borderRadius: '12px',
+            padding: '12px 20px', fontSize: '14px', fontWeight: 500, color: theme.text.primary,
             zIndex: 300, animation: 'toastIn 0.3s ease-out',
-            boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
           }}>
             {toast}
           </div>
