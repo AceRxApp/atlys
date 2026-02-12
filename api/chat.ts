@@ -1,10 +1,10 @@
 // Vercel Serverless API Route — AI Travel Assistant Chat
-// Proxies chat requests to Google Gemini API (server-side, keeps keys safe)
+// Proxies chat requests to Groq API (server-side, keeps keys safe)
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 const ALLOWED_ORIGINS = [
   'https://nxstops.com',
@@ -73,29 +73,21 @@ interface ChatMessage {
   content: string;
 }
 
-// Convert frontend messages to Gemini format
-function toGeminiContents(messages: ChatMessage[]) {
-  return messages
-    .filter((m) => m.role !== 'system')
-    .map((m) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
-    }));
-}
-
-// Call Gemini with automatic retry on 429
-async function callGemini(body: object, maxRetries = 2): Promise<Response> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+// Call Groq with automatic retry on 429
+async function callGroq(body: object, maxRetries = 2): Promise<Response> {
+  const url = 'https://api.groq.com/openai/v1/chat/completions';
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+      },
       body: JSON.stringify(body),
     });
 
     if (response.status === 429 && attempt < maxRetries) {
-      // Wait before retrying: 2s, then 4s
       const delay = (attempt + 1) * 2000;
       console.log(`[NxStops Chat] Rate limited, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
       await new Promise(resolve => setTimeout(resolve, delay));
@@ -105,7 +97,6 @@ async function callGemini(body: object, maxRetries = 2): Promise<Response> {
     return response;
   }
 
-  // Should never reach here, but TypeScript needs it
   throw new Error('Max retries exceeded');
 }
 
@@ -121,8 +112,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(429).json({ error: 'Too many requests. Please wait a moment.' });
   }
 
-  if (!GEMINI_API_KEY) {
-    return res.status(500).json({ error: 'AI chat is not configured yet. Add GEMINI_API_KEY to your environment variables.' });
+  if (!GROQ_API_KEY) {
+    return res.status(500).json({ error: 'AI chat is not configured yet. Add GROQ_API_KEY to your environment variables.' });
   }
 
   try {
@@ -141,35 +132,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       systemContent += `\n\nThe user is currently exploring ${city} in the NxStops app. Tailor your suggestions to this city when relevant.`;
     }
 
-    const geminiBody = {
-      system_instruction: {
-        parts: [{ text: systemContent }],
-      },
-      contents: toGeminiContents(recentMessages),
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 300,
-      },
+    const groqBody = {
+      model: GROQ_MODEL,
+      messages: [
+        { role: 'system', content: systemContent },
+        ...recentMessages.map(m => ({ role: m.role, content: m.content })),
+      ],
+      temperature: 0.7,
+      max_tokens: 300,
     };
 
-    const response = await callGemini(geminiBody);
+    const response = await callGroq(groqBody);
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error(`[NxStops Chat] Gemini ${response.status}:`, errText);
+      console.error(`[NxStops Chat] Groq ${response.status}:`, errText);
 
-      // Parse Gemini error for better messages
       let detail = '';
       try {
         const errJson = JSON.parse(errText);
         detail = errJson?.error?.message || '';
       } catch { /* not JSON */ }
 
-      if (response.status === 400) {
-        return res.status(502).json({ error: `AI format error: ${detail || 'Check server logs.'}` });
-      }
-      if (response.status === 403) {
-        return res.status(502).json({ error: detail || 'Gemini API key is invalid or the Generative Language API is not enabled.' });
+      if (response.status === 401) {
+        return res.status(502).json({ error: 'Groq API key is invalid. Check your GROQ_API_KEY environment variable.' });
       }
       if (response.status === 429) {
         return res.status(429).json({ error: detail || 'AI rate limit reached. Try again in a minute.' });
@@ -179,7 +165,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const data = await response.json();
     const reply =
-      data.candidates?.[0]?.content?.parts?.[0]?.text ||
+      data.choices?.[0]?.message?.content ||
       "Sorry, I couldn't generate a response. Try again!";
 
     return res.status(200).json({ reply });
