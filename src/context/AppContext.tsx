@@ -57,6 +57,7 @@ export interface AppContextType {
   removeDay: (day: number) => void;
   moveStopToDay: (stopId: string, fromDay: number, toDay: number) => void;
   getRouteUrl: () => string;
+  getFullTripRouteUrl: () => string;
   sharePlan: () => Promise<void>;
   addEventToPlan: (event: EventItem) => void;
   isEventInPlan: (eventId: string) => boolean;

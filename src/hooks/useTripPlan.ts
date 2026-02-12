@@ -284,6 +284,19 @@ export function useTripPlan(deps: {
     return `https://www.google.com/maps/dir/${points.join('/')}`;
   };
 
+  const getFullTripRouteUrl = () => {
+    const allStops = Object.entries(tripDays)
+      .sort(([a], [b]) => Number(a) - Number(b))
+      .flatMap(([, stops]) => stops);
+    if (allStops.length < 2) return '';
+    const points = allStops
+      .filter(s => s.type === 'place' ? (s.place?.lat && s.place?.lng) : (s.event?.lat && s.event?.lng))
+      .map(s => s.type === 'place' ? `${s.place?.lat},${s.place?.lng}` : `${s.event?.lat},${s.event?.lng}`)
+      .slice(0, 25);
+    if (points.length < 2) return '';
+    return `https://www.google.com/maps/dir/${points.join('/')}`;
+  };
+
   const sharePlan = async () => {
     const allDays = Object.entries(tripDays).sort(([a], [b]) => Number(a) - Number(b));
     const lines = allDays.map(([day, stops]) => {
@@ -460,7 +473,7 @@ export function useTripPlan(deps: {
     dayPlan, totalStops, dayCount, setActiveDayStops,
     addToPlan, addEventToPlan, removeFromPlan, isInPlan, isEventInPlan,
     clearPlan, movePlanStop, addDay, removeDay, moveStopToDay, pivotStop,
-    getRouteUrl, sharePlan, getTransportInfo, getDaySummary,
+    getRouteUrl, getFullTripRouteUrl, sharePlan, getTransportInfo, getDaySummary,
     dayBudgets, setDayBudget, activeDayBudget,
     estimatedSpend, budgetRemaining, budgetPercentUsed, isOverBudget,
     crewMode, crewCode, crewSyncing, joinCrewInput, setJoinCrewInput,

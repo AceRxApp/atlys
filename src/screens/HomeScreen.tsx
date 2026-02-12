@@ -5,6 +5,7 @@ import { getCardStyle } from '../styles/shared';
 import { LocationIcon } from '../components/icons';
 import { TRAVEL_GROUPS, CITY_CULTURE } from '../data';
 import type { CityContext } from '../data';
+import CurrencyWidget from '../components/CurrencyWidget';
 
 // ============================================================================
 // City Search Autocomplete
@@ -297,6 +298,15 @@ export default function HomeScreen() {
             <div style={{ fontSize: '11px', color: theme.text.tertiary }}>{cityLabel}</div>
           </div>
         </div>
+      )}
+
+      {/* Currency Converter */}
+      {(selectedCity || (useGps && loc.city)) && (
+        <CurrencyWidget
+          cityName={(selectedCity?.name || loc.city || '').toLowerCase()}
+          theme={theme}
+          cardStyle={cardStyle}
+        />
       )}
 
       {/* GPS Card */}

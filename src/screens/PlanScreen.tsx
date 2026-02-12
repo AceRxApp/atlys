@@ -9,6 +9,7 @@ import type { Place } from '../services/places';
 import { generatePackingList } from '../utils/packingList';
 import { findPivotAlternatives } from '../utils/surpriseFilter';
 import { PRICE_LEVEL_ESTIMATE, BURN_RATE_PRESETS } from '../data/constants';
+import BookingLinks from '../components/BookingLinks';
 import type { PackingItem } from '../data/packingItems';
 import type { Stop } from '../types';
 
@@ -134,6 +135,7 @@ export default function PlanScreen() {
     movePlanStop,
     removeFromPlan,
     getRouteUrl,
+    getFullTripRouteUrl,
     sharePlan,
     clearPlan,
     setScreen,
@@ -939,6 +941,11 @@ export default function PlanScreen() {
         </div>
       )}
 
+      {/* Book Your Trip */}
+      {cityLabel && totalStops > 0 && (
+        <BookingLinks cityName={cityLabel} theme={theme} cardStyle={cardStyle} />
+      )}
+
       {/* Pivot Modal */}
       {pivotStopId && pivotAlternatives.length > 0 && (
         <div style={{
@@ -1099,6 +1106,18 @@ export default function PlanScreen() {
               boxShadow: `0 4px 20px ${theme.amberTint.shadow}`,
             }}>
             <DirectionsIcon /> Get Day {activeDay} Route
+          </a>
+        )}
+
+        {dayCount > 1 && totalStops >= 2 && getFullTripRouteUrl() && (
+          <a href={getFullTripRouteUrl()} target="_blank" rel="noopener noreferrer"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+              background: theme.bg.subtleStrong, color: theme.text.primary,
+              border: `1px solid ${theme.border.medium}`, borderRadius: '14px',
+              padding: '14px', fontSize: '14px', fontWeight: 500, textDecoration: 'none',
+            }}>
+            <DirectionsIcon /> Full Trip Route ({totalStops} stops)
           </a>
         )}
 
