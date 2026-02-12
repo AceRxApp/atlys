@@ -137,6 +137,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!response.ok) {
       const errText = await response.text();
       console.error('[NxStops Chat] Gemini error:', response.status, errText);
+      // Surface specific error to help diagnose
+      if (response.status === 400) {
+        return res.status(502).json({ error: 'AI request format error. Check server logs.' });
+      }
+      if (response.status === 403) {
+        return res.status(502).json({ error: 'Gemini API key is invalid or the Generative Language API is not enabled in Google Cloud.' });
+      }
+      if (response.status === 429) {
+        return res.status(429).json({ error: 'AI rate limit reached. Try again in a moment.' });
+      }
       return res.status(502).json({ error: 'AI service temporarily unavailable' });
     }
 
