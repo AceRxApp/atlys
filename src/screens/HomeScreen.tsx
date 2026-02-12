@@ -102,7 +102,7 @@ function CitySearch({ cities, selectedCity, loading, onSelect, theme, cardStyle 
   }, [highlightIndex]);
 
   return (
-    <div ref={containerRef} style={{ ...cardStyle, position: 'relative', zIndex: open ? 10 : 'auto' }}>
+    <div ref={containerRef} style={{ ...cardStyle, position: 'relative', zIndex: open ? 999 : 'auto' }}>
       <label style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '10px' }}>
         Search Your City
       </label>
@@ -342,7 +342,7 @@ export default function HomeScreen() {
 
       {/* City Banner */}
       {selectedCity && (
-        <div style={{ ...cardStyle, padding: 0, overflow: 'hidden', marginTop: '4px' }}>
+        <div style={{ ...cardStyle, padding: 0, overflow: 'hidden', marginTop: '4px', position: 'relative', zIndex: 1 }}>
           <div style={{ height: '140px', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '16px' }}>
             {selectedCity.banner_url ? (
               <>
@@ -386,7 +386,7 @@ export default function HomeScreen() {
 
       {/* Travel Group Selector */}
       {(selectedCity || useGps) && (
-        <div style={{ ...cardStyle, marginTop: '8px' }}>
+        <div style={{ ...cardStyle, marginTop: '8px', position: 'relative', zIndex: 1 }}>
           <label style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '10px' }}>
             Who&apos;s traveling?
           </label>
