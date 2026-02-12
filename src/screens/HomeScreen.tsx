@@ -102,7 +102,7 @@ function CitySearch({ cities, selectedCity, loading, onSelect, theme, cardStyle 
   }, [highlightIndex]);
 
   return (
-    <div ref={containerRef} style={{ ...cardStyle, position: 'relative' }}>
+    <div ref={containerRef} style={{ ...cardStyle, position: 'relative', zIndex: open ? 10 : 'auto' }}>
       <label style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '10px' }}>
         Search Your City
       </label>
