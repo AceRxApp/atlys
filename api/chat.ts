@@ -4,6 +4,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+const GEMINI_MODEL = 'gemini-1.5-flash';
 
 const ALLOWED_ORIGINS = [
   'https://nxstops.com',
@@ -26,7 +27,7 @@ function getCorsHeaders(origin?: string) {
 }
 
 const rateLimit = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_MAX = 20; // requests per window
+const RATE_LIMIT_MAX = 10; // requests per window
 const RATE_LIMIT_WINDOW = 60_000; // 1 minute
 
 function checkRateLimit(ip: string): boolean {
@@ -72,7 +73,7 @@ interface ChatMessage {
   content: string;
 }
 
-// Convert OpenAI-style messages to Gemini format
+// Convert frontend messages to Gemini format
 function toGeminiContents(messages: ChatMessage[]) {
   return messages
     .filter((m) => m.role !== 'system')
@@ -80,6 +81,32 @@ function toGeminiContents(messages: ChatMessage[]) {
       role: m.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: m.content }],
     }));
+}
+
+// Call Gemini with automatic retry on 429
+async function callGemini(body: object, maxRetries = 2): Promise<Response> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (response.status === 429 && attempt < maxRetries) {
+      // Wait before retrying: 2s, then 4s
+      const delay = (attempt + 1) * 2000;
+      console.log(`[NxStops Chat] Rate limited, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      continue;
+    }
+
+    return response;
+  }
+
+  // Should never reach here, but TypeScript needs it
+  throw new Error('Max retries exceeded');
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -125,29 +152,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     };
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(geminiBody),
-      },
-    );
+    const response = await callGemini(geminiBody);
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error('[NxStops Chat] Gemini error:', response.status, errText);
-      // Surface specific error to help diagnose
+      console.error(`[NxStops Chat] Gemini ${response.status}:`, errText);
+
+      // Parse Gemini error for better messages
+      let detail = '';
+      try {
+        const errJson = JSON.parse(errText);
+        detail = errJson?.error?.message || '';
+      } catch { /* not JSON */ }
+
       if (response.status === 400) {
-        return res.status(502).json({ error: 'AI request format error. Check server logs.' });
+        return res.status(502).json({ error: `AI format error: ${detail || 'Check server logs.'}` });
       }
       if (response.status === 403) {
-        return res.status(502).json({ error: 'Gemini API key is invalid or the Generative Language API is not enabled in Google Cloud.' });
+        return res.status(502).json({ error: detail || 'Gemini API key is invalid or the Generative Language API is not enabled.' });
       }
       if (response.status === 429) {
-        return res.status(429).json({ error: 'AI rate limit reached. Try again in a moment.' });
+        return res.status(429).json({ error: detail || 'AI rate limit reached. Try again in a minute.' });
       }
-      return res.status(502).json({ error: 'AI service temporarily unavailable' });
+      return res.status(502).json({ error: detail || 'AI service temporarily unavailable.' });
     }
 
     const data = await response.json();
