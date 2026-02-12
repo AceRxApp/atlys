@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import { track } from '@vercel/analytics';
 import { getThemeForTime, getThemeTokens } from '../styles/theme';
 import type { ThemeTokens, ThemeMode, ThemePreference } from '../styles/theme';
 
@@ -28,6 +29,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setThemePreference = useCallback((pref: ThemePreference) => {
     setThemePreferenceRaw(pref);
+    track('theme_changed', { preference: pref });
     try {
       if (pref === 'auto') localStorage.removeItem('nxstops_theme');
       else localStorage.setItem('nxstops_theme', pref);

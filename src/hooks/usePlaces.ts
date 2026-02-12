@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { track } from '@vercel/analytics';
 import { searchNearby, textSearchPlaces } from '../services/places';
 import type { Place } from '../services/places';
-import { saveReview, fetchReviews, fetchPlaceTagCounts } from '../supabase';
+import { saveReview, fetchReviews, fetchPlaceTagCounts, fetchSavedPlaces, upsertSavedPlaces, deleteSavedPlace } from '../supabase';
 import type { Review } from '../supabase';
 import type { User } from '@supabase/supabase-js';
-import type { City, Vibe, QuickFilter, TravelGroup, CommunityTag } from '../types';
+import type { City, Vibe, QuickFilter, TravelGroup, CommunityTag, BudgetTier } from '../types';
+import { filterSurprisePlaces } from '../utils/surpriseFilter';
 import {
   CITY_COORDS, NIGHTLIFE_TYPES, GIRLY_TYPES, GIRLY_KEYWORDS, BOYS_EXCLUDE_TYPES,
   RESERVABLE_TYPES, BOOKABLE_TYPES,
@@ -36,7 +37,11 @@ export function usePlaces(deps: {
   const [places, setPlaces] = useState<Place[]>([]);
   const [placesLoading, setPlacesLoading] = useState(false);
   const [placesError, setPlacesError] = useState(false);
-  const [selectedVibe, setSelectedVibe] = useState<Vibe | null>(null);
+  const [selectedVibe, setSelectedVibeRaw] = useState<Vibe | null>(null);
+  const setSelectedVibe = useCallback((vibe: Vibe | null) => {
+    setSelectedVibeRaw(vibe);
+    if (vibe) track('vibe_selected', { vibe });
+  }, []);
   const [quickFilters, setQuickFilters] = useState<QuickFilter[]>(['open']);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [activeMapPin, setActiveMapPin] = useState<string | null>(null);
@@ -62,6 +67,9 @@ export function usePlaces(deps: {
   const [isSearching, setIsSearching] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
+  // --- Abort controller for race condition prevention ---
+  const fetchAbortRef = useRef<AbortController | null>(null);
+
   // --- Reviews ---
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewRating, setReviewRating] = useState(0);
@@ -74,7 +82,7 @@ export function usePlaces(deps: {
   // Effects
   // --------------------------------------------------------------------------
 
-  // Fetch places
+  // Fetch places (with AbortController to prevent race conditions)
   const fetchPlaces = useCallback(async () => {
     let lat: number | undefined, lng: number | undefined;
     if (useGps && loc.lat && loc.lng) { lat = loc.lat; lng = loc.lng; }
@@ -83,17 +91,29 @@ export function usePlaces(deps: {
       if (c) { lat = c.lat; lng = c.lng; }
     }
     if (!lat || !lng) return;
+
+    // Cancel any in-flight request
+    if (fetchAbortRef.current) fetchAbortRef.current.abort();
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
+
     setPlacesLoading(true);
     setPlacesError(false);
     try {
       const vibes = selectedVibe ? [selectedVibe] : [];
       const results = await searchNearby(lat, lng, vibes, searchRadius);
-      setPlaces(results);
-      if (results.length === 0 && !selectedVibe) setPlacesError(true);
+      // Only update state if this request wasn't cancelled
+      if (!controller.signal.aborted) {
+        setPlaces(results);
+        if (results.length === 0 && !selectedVibe) setPlacesError(true);
+        setPlacesLoading(false);
+      }
     } catch {
-      setPlacesError(true);
+      if (!controller.signal.aborted) {
+        setPlacesError(true);
+        setPlacesLoading(false);
+      }
     }
-    setPlacesLoading(false);
   }, [useGps, loc.lat, loc.lng, selectedCity, selectedVibe, searchRadius]);
 
   useEffect(() => {
@@ -113,10 +133,32 @@ export function usePlaces(deps: {
     fetchReviews(selectedPlace.placeId).then(setPlaceReviews);
   }, [selectedPlace]);
 
-  // Persist saved places
+  // Persist saved places to localStorage
   useEffect(() => {
     localStorage.setItem('nxstops_saved_places', JSON.stringify(savedPlaces));
   }, [savedPlaces]);
+
+  // Cloud sync: pull saved places when user logs in
+  const hasSynced = useRef(false);
+  useEffect(() => {
+    if (!user || hasSynced.current) return;
+    hasSynced.current = true;
+    fetchSavedPlaces().then(cloudPlaces => {
+      if (cloudPlaces.length === 0 && savedPlaces.length > 0) {
+        // Push local to cloud on first login
+        upsertSavedPlaces(savedPlaces.map(p => ({ placeId: p.placeId, data: p as unknown as Record<string, unknown> })));
+      } else if (cloudPlaces.length > 0) {
+        // Merge: cloud wins for conflicts, add local-only places
+        const cloudMap = new Map(cloudPlaces.map(cp => [cp.place_id, cp.place_data as unknown as Place]));
+        const localOnly = savedPlaces.filter(p => !cloudMap.has(p.placeId));
+        const merged = [...cloudMap.values(), ...localOnly];
+        setSavedPlaces(merged);
+        if (localOnly.length > 0) {
+          upsertSavedPlaces(localOnly.map(p => ({ placeId: p.placeId, data: p as unknown as Record<string, unknown> })));
+        }
+      }
+    }).catch(() => { /* silently fail — local still works */ });
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist travel group
   useEffect(() => {
@@ -128,7 +170,7 @@ export function usePlaces(deps: {
   // Filtered places
   // --------------------------------------------------------------------------
 
-  const filteredPlaces = places.filter(place => {
+  const filteredPlaces = useMemo(() => places.filter(place => {
     for (const f of quickFilters) {
       switch (f) {
         case 'open': if (!place.openNow) return false; break;
@@ -210,7 +252,7 @@ export function usePlaces(deps: {
       }
     }
     return true;
-  });
+  }), [places, quickFilters, travelGroup, communityFilters, placeTagsCache]);
 
   // --------------------------------------------------------------------------
   // Handlers
@@ -239,10 +281,12 @@ export function usePlaces(deps: {
       setSavedPlaces(prev => prev.filter(p => p.placeId !== place.placeId));
       showToast('Removed from saved');
       track('unsave_place', { place: place.name });
+      if (user) deleteSavedPlace(place.placeId);
     } else {
       setSavedPlaces(prev => [...prev, place]);
       showToast('Saved for later');
       track('save_place', { place: place.name, category: place.categoryDisplay || '' });
+      if (user) upsertSavedPlaces([{ placeId: place.placeId, data: place as unknown as Record<string, unknown> }]);
     }
   };
 
@@ -261,24 +305,25 @@ export function usePlaces(deps: {
       const ids = places.map(p => p.placeId);
       if (ids.length > 0) fetchPlaceTagCounts(ids).then(setPlaceTagsCache);
     } else {
-      showToast('Failed to submit review');
+      showToast('Failed to submit review — please try again');
     }
     setReviewSubmitting(false);
   };
 
   const sharePlace = async (place: Place) => {
+    const deepLink = `${window.location.origin}/place/${encodeURIComponent(place.placeId)}`;
     if (navigator.share) {
-      await navigator.share({ title: place.name, text: `Check out ${place.name} on NxStops`, url: place.googleMapsUrl });
-    } else if (place.googleMapsUrl) {
-      await navigator.clipboard.writeText(place.googleMapsUrl);
+      await navigator.share({ title: place.name, text: `Check out ${place.name} on NxStops`, url: deepLink });
+    } else {
+      await navigator.clipboard.writeText(deepLink);
       showToast('Link copied');
     }
   };
 
-  const handleSurpriseMe = () => {
-    const open = places.filter(p => p.openNow);
-    if (open.length === 0) { showToast('No open places found'); return; }
-    return open[Math.floor(Math.random() * open.length)];
+  const handleSurpriseMe = (budgetTier: BudgetTier = 'any'): Place[] => {
+    const results = filterSurprisePlaces(places, budgetTier, selectedVibe);
+    if (results.length === 0) { showToast('No matching open places found'); }
+    return results;
   };
 
   // Helpers
@@ -286,13 +331,19 @@ export function usePlaces(deps: {
   const isBookable = (place: Place): boolean => BOOKABLE_TYPES.includes(place.category);
 
   const getBookingUrl = (place: Place): string => {
+    // For restaurants, link to OpenTable search
+    if (RESERVABLE_TYPES.includes(place.category)) {
+      const term = encodeURIComponent(place.name);
+      const city = place.address ? encodeURIComponent(place.address.split(',').slice(-2).join(',').trim()) : '';
+      return `https://www.opentable.com/s?term=${term}&covers=2${city ? `&queryUnderstandingType=location&rawQuery=${term}+${city}` : ''}`;
+    }
     if (place.website) return place.website;
-    const q = encodeURIComponent(`${place.name} ${place.address ? place.address.split(',')[0] : ''} reservation`);
+    const q = encodeURIComponent(`${place.name} ${place.address ? place.address.split(',')[0] : ''} tickets`);
     return `https://www.google.com/search?q=${q}`;
   };
 
   const getBookingLabel = (place: Place): string => {
-    if (RESERVABLE_TYPES.includes(place.category)) return 'Reserve';
+    if (RESERVABLE_TYPES.includes(place.category)) return 'OpenTable';
     return 'Book';
   };
 

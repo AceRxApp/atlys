@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { City, EventItem, Stop, AdminSignup, Vibe, QuickFilter, TravelGroup, CommunityTag } from '../types';
+import type { City, EventItem, Stop, AdminSignup, Vibe, QuickFilter, TravelGroup, CommunityTag, BudgetTier } from '../types';
 import type { Place } from '../services/places';
 import type { Review } from '../supabase';
 import type { User } from '@supabase/supabase-js';
@@ -60,6 +60,16 @@ export interface AppContextType {
   sharePlan: () => Promise<void>;
   addEventToPlan: (event: EventItem) => void;
   isEventInPlan: (eventId: string) => boolean;
+  pivotStop: (oldStopId: string, newPlace: Place) => void;
+
+  // --- Budget ---
+  dayBudgets: Record<number, number>;
+  setDayBudget: (day: number, amount: number) => void;
+  activeDayBudget: number;
+  estimatedSpend: number;
+  budgetRemaining: number;
+  budgetPercentUsed: number;
+  isOverBudget: boolean;
 
   // --- Events ---
   events: EventItem[];
@@ -135,14 +145,25 @@ export interface AppContextType {
   } | null;
 
   // --- Helpers ---
-  showToast: (msg: string) => void;
+  showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   getSafetyIndicators: (place: Place) => string[];
   getDistanceReference: () => string;
   getTransportInfo: (fromStop: Stop, toStop: Stop) => {
     emoji: string;
     text: string;
     distance: string;
+    walkMinutes: number;
+    driveMinutes: number;
+    km: number;
+    walkMapsUrl: string;
+    driveMapsUrl: string;
     mapsUrl: string;
+  } | null;
+  getDaySummary: () => {
+    totalKm: number;
+    totalWalkMin: number;
+    totalDriveMin: number;
+    distance: string;
   } | null;
   isReservable: (place: Place) => boolean;
   isBookable: (place: Place) => boolean;
@@ -208,7 +229,11 @@ export interface AppContextType {
   loading: boolean;
   isOffline: boolean;
   sharePlace: (place: Place) => Promise<void>;
-  handleSurpriseMe: () => void;
+  handleSurpriseMe: (budgetTier?: BudgetTier) => void;
+  surprisePlaces: Place[];
+  setSurprisePlaces: (places: Place[]) => void;
+  showBudgetPicker: boolean;
+  setShowBudgetPicker: (show: boolean) => void;
   formatEventDate: (dateStr: string) => string;
   formatEventTime: (timeStr: string) => string;
   getMapCenter: () => { lat: number; lng: number };
@@ -220,12 +245,17 @@ export interface AppContextType {
   setOnboardingStep: (step: number) => void;
   setShowOnboarding: (show: boolean) => void;
 
+  // --- Auth gate ---
+  requireAuth: () => boolean;
+
   // --- Auth handlers ---
   handleSignIn: () => Promise<void>;
   handleSignUp: () => Promise<void>;
   handleSignOut: () => Promise<void>;
-  authScreen: 'signin' | 'signup';
-  setAuthScreen: (screen: 'signin' | 'signup') => void;
+  handleResetPassword: () => Promise<void>;
+  handleResendVerification: () => Promise<void>;
+  authScreen: 'signin' | 'signup' | 'reset' | 'verify';
+  setAuthScreen: (screen: 'signin' | 'signup' | 'reset' | 'verify') => void;
   authEmail: string;
   setAuthEmail: (email: string) => void;
   authPassword: string;
@@ -234,6 +264,8 @@ export interface AppContextType {
   setAuthName: (name: string) => void;
   authError: string | null;
   authSubmitting: boolean;
+  acceptedTerms: boolean;
+  setAcceptedTerms: (accepted: boolean) => void;
 
   // --- Fetch triggers ---
   fetchPlaces: () => Promise<void>;

@@ -133,7 +133,7 @@ export default function ContactScreen() {
             maxWidth: '360px',
             margin: '8px auto 0',
           }}>
-            A travel companion for discovering places, planning trips, and exploring cities. Built by Eleve Creative Haus.
+            A travel companion for discovering places, planning trips, and exploring cities. Built by NxStops.
           </p>
         </div>
 

@@ -87,3 +87,13 @@ button {
 button, a, select {
   -webkit-tap-highlight-color: rgba(245, 158, 11, 0.2);
 }
+
+/* Page transitions */
+.page-enter {
+  animation: pageIn 0.25s ease-out both;
+}
+
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}

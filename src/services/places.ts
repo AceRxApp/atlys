@@ -1,6 +1,8 @@
 // Google Places API Service
 // Communicates with our Vercel API route to keep keys server-side
 
+import { fetchRetry } from '../utils/fetchRetry';
+
 const API_BASE = '/api/places';
 
 // ============================================================================
@@ -52,8 +54,10 @@ export const VIBE_TYPE_MAP: Record<string, string[]> = {
     'aquarium', 'zoo', 'movie_theater', 'bowling_alley', 'stadium',
   ],
   hidden: [
-    'park', 'book_store', 'spa', 'national_park', 'market',
-    'hiking_area', 'gym', 'dog_park', 'campground',
+    'cafe', 'restaurant', 'bar', 'bakery', 'book_store', 'spa',
+    'market', 'art_gallery', 'park', 'hiking_area', 'national_park',
+    'wine_bar', 'coffee_shop', 'ice_cream_shop', 'brunch_restaurant',
+    'performing_arts_theater', 'historical_landmark',
   ],
   locals: [
     'bakery', 'florist', 'book_store', 'art_gallery', 'market',
@@ -235,6 +239,54 @@ function formatType(type: string | undefined): string {
 }
 
 // ============================================================================
+// CHAIN / FRANCHISE FILTER (for Hidden Gems)
+// ============================================================================
+
+const CHAIN_KEYWORDS = [
+  'mcdonald', 'burger king', 'wendy', 'taco bell', 'kfc', 'chick-fil-a',
+  'popeyes', 'subway', 'five guys', 'chipotle', 'panda express', 'sonic',
+  'arby', 'jack in the box', 'whataburger', 'carl\'s jr', 'hardee',
+  'dunkin', 'starbucks', 'tim hortons', 'krispy kreme',
+  'domino', 'pizza hut', 'papa john', 'little caesars',
+  'applebee', 'chili\'s', 'olive garden', 'red lobster', 'outback',
+  'ihop', 'denny\'s', 'cracker barrel', 'buffalo wild wings', 'hooters',
+  'cheesecake factory', 'p.f. chang', 'benihana', 'ruth\'s chris',
+  'waffle house', 'panera', 'noodles & company', 'wingstop',
+  'planet fitness', 'la fitness', 'gold\'s gym', 'anytime fitness', 'equinox',
+  'hilton', 'marriott', 'hyatt', 'holiday inn', 'best western',
+  'sheraton', 'courtyard', 'hampton inn', 'fairfield', 'comfort inn',
+  'walmart', 'target', 'costco', 'walgreens', 'cvs',
+  'home depot', 'lowe\'s', 'petco', 'petsmart', 'bath & body',
+  'victoria\'s secret', 'gap', 'old navy', 'h&m', 'zara', 'forever 21',
+  'shell', 'exxon', 'chevron', 'bp', 'speedway',
+  'jersey mike', 'jimmy john', 'firehouse subs', 'quiznos',
+  'el pollo loco', 'del taco', 'in-n-out', 'shake shack', 'smashburger',
+  'raising cane', 'zaxby', 'culver', 'dairy queen', 'baskin-robbins',
+  'cold stone', 'jamba', 'smoothie king', 'tropical smoothie',
+  'sweetgreen', 'cava', 'nando', 'wagamama',
+];
+
+export function isChain(name: string): boolean {
+  const lower = name.toLowerCase();
+  return CHAIN_KEYWORDS.some(chain => lower.includes(chain));
+}
+
+/** Hidden gem score: high rating + few reviews = more "hidden" */
+function hiddenGemScore(place: Place): number {
+  // Must have a decent rating (4.0+)
+  if (place.rating < 4.0) return -1;
+  // Ideal: rated 4.3+ with 10-200 reviews
+  const ratingBonus = (place.rating - 4.0) * 25; // 0-25 points
+  // Fewer reviews = more hidden (cap at 500)
+  const reviewPenalty = Math.min(place.reviewCount, 500) / 5; // 0-100 penalty
+  // Bonus for editorial summary (unique places tend to have one)
+  const editorialBonus = place.editorialSummary ? 15 : 0;
+  // Bonus for having photos
+  const photoBonus = place.photoUrl ? 5 : 0;
+  return ratingBonus - reviewPenalty + editorialBonus + photoBonus;
+}
+
+// ============================================================================
 // API FUNCTIONS
 // ============================================================================
 
@@ -269,7 +321,7 @@ export async function searchNearby(
     types: types.join(','),
   });
 
-  const response = await fetch(`${API_BASE}?${params}`);
+  const response = await fetchRetry(`${API_BASE}?${params}`);
   if (!response.ok) {
     console.error('Nearby search failed:', response.status);
     return [];
@@ -282,6 +334,16 @@ export async function searchNearby(
   if (vibes.length > 0) {
     const allowedTypes = new Set(types);
     places = places.filter((p: Place) => allowedTypes.has(p.category));
+  }
+
+  // Hidden Gems: filter out chains, require 4.0+ rating, sort by gem score
+  if (vibes.includes('hidden')) {
+    places = places
+      .filter((p: Place) => !isChain(p.name))
+      .filter((p: Place) => p.rating >= 4.0)
+      .filter((p: Place) => p.reviewCount < 500); // Skip mega-popular tourist traps
+    places.sort((a: Place, b: Place) => hiddenGemScore(b) - hiddenGemScore(a));
+    return places;
   }
 
   // Sort by distance
@@ -304,7 +366,7 @@ export async function textSearchPlaces(
     radius: radius.toString(),
   });
 
-  const response = await fetch(`${API_BASE}?${params}`);
+  const response = await fetchRetry(`${API_BASE}?${params}`);
   if (!response.ok) {
     console.error('Text search failed:', response.status);
     return [];
@@ -322,7 +384,7 @@ export async function getPlaceDetails(placeId: string): Promise<Place | null> {
     placeId,
   });
 
-  const response = await fetch(`${API_BASE}?${params}`);
+  const response = await fetchRetry(`${API_BASE}?${params}`);
   if (!response.ok) return null;
 
   const data = await response.json();

@@ -1,6 +1,8 @@
+import { useCallback } from 'react';
 import { track } from '@vercel/analytics';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
+import { useModalA11y } from '../hooks/useModalA11y';
 import { getCardStyle } from '../styles/shared';
 import { CloseIcon, DirectionsIcon, PhoneIcon, WebsiteIcon, ShareIcon } from './icons';
 import { PriceDots, StarRating } from './ui';
@@ -39,9 +41,12 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
     reviewSubmitting,
     handleSubmitReview,
     user,
+    requireAuth,
   } = useApp();
   const { theme } = useTheme();
   const cardStyle = getCardStyle(theme);
+  const closeModal = useCallback(() => setSelectedPlace(null), [setSelectedPlace]);
+  const modalRef = useModalA11y(true, closeModal);
 
   const hoursStatus = getHoursStatus(place.hours, place.openNow);
   const inPlan = isInPlan(place.placeId);
@@ -59,14 +64,17 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
 
   return (
     <div
+      ref={modalRef}
+      tabIndex={-1}
       className="modal-backdrop"
       role="dialog"
+      aria-modal="true"
       aria-label={`Details for ${place.name}`}
       style={{
         position: 'fixed', inset: 0, background: theme.bg.modalOverlay, zIndex: 100,
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+        display: 'flex', alignItems: 'flex-end', justifyContent: 'center', outline: 'none',
       }}
-      onClick={() => setSelectedPlace(null)}
+      onClick={closeModal}
     >
       <div
         className="modal-sheet"
@@ -91,9 +99,10 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                 <img
                   key={i}
                   src={url}
-                  alt={`${place.name} photo ${i + 1}`}
+                  alt={`${place.name} photo ${i + 1} of ${galleryPhotos.length}`}
                   loading="lazy"
                   decoding="async"
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   style={{
                     width: `${100 / galleryPhotos.length}%`, height: '100%',
                     objectFit: 'cover', display: 'block', flexShrink: 0,
@@ -308,14 +317,18 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
           {(isReservable(place) || isBookable(place)) && (
             <div style={{ marginBottom: '16px' }}>
               <a href={getBookingUrl(place)} target="_blank" rel="noopener noreferrer"
-                onClick={() => track('booking_click', { place: place.name, category: place.categoryDisplay || '', type: isReservable(place) ? 'reserve' : 'book' })}
+                onClick={() => track('booking_click', { place: place.name, category: place.categoryDisplay || '', type: isReservable(place) ? 'opentable' : 'book' })}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                   width: '100%', padding: '14px', borderRadius: '12px', boxSizing: 'border-box',
-                  background: theme.greenTint.bg, border: `1px solid ${theme.greenTint.border}`,
-                  color: theme.status.green, textDecoration: 'none', fontSize: '14px', fontWeight: 600,
+                  background: isReservable(place)
+                    ? 'linear-gradient(135deg, rgba(218,55,67,0.12), rgba(218,55,67,0.05))'
+                    : theme.greenTint.bg,
+                  border: `1px solid ${isReservable(place) ? 'rgba(218,55,67,0.25)' : theme.greenTint.border}`,
+                  color: isReservable(place) ? '#DA3743' : theme.status.green,
+                  textDecoration: 'none', fontSize: '14px', fontWeight: 600,
                 }}>
-                {isReservable(place) ? 'Reserve a Table' : 'Book Tickets'}
+                {isReservable(place) ? 'Reserve on OpenTable' : 'Book Tickets'}
               </a>
               {place.googleMapsUrl && (
                 <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
@@ -410,8 +423,8 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
           <div style={{ marginBottom: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
               <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Community Reviews</div>
-              {user && !showReviewForm && (
-                <button onClick={() => setShowReviewForm(true)}
+              {!showReviewForm && (
+                <button onClick={() => { if (!requireAuth()) return; setShowReviewForm(true); }}
                   style={{ background: 'none', border: `1px solid ${theme.amberTint.border30}`, color: theme.accent.amber, borderRadius: '8px', padding: '5px 12px', fontSize: '11px', cursor: 'pointer' }}>
                   Leave a Review
                 </button>

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { Place, formatDistance, getHoursStatus } from '../services/places';
@@ -6,7 +7,7 @@ import { DirectionsIcon, PhoneIcon, ShareIcon } from './icons';
 import { getCardStyle } from '../styles/shared';
 import { COMMUNITY_TAGS } from '../data';
 
-export default function PlaceCard({ place }: { place: Place }) {
+export default memo(function PlaceCard({ place }: { place: Place }) {
   const {
     isInPlan,
     addToPlan,
@@ -46,7 +47,9 @@ export default function PlaceCard({ place }: { place: Place }) {
           height: '160px', width: '100%', position: 'relative',
           overflow: 'hidden',
         }}>
-          <img src={place.photoUrl} alt={place.name} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          <img src={place.photoUrl} alt={place.name} loading="lazy" decoding="async"
+            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
           <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(to bottom, transparent 60%, ${theme.bg.imageOverlay})` }} />
           <div style={{
             position: 'absolute', top: '10px', left: '10px',
@@ -147,9 +150,17 @@ export default function PlaceCard({ place }: { place: Place }) {
               <PhoneIcon />
             </a>
           )}
-          {(isReservable(place) || isBookable(place)) && (place.website || place.googleMapsUrl) && (
+          {(isReservable(place) || isBookable(place)) && (
             <a href={getBookingUrl(place)} target="_blank" rel="noopener noreferrer"
-              style={{ padding: '12px 16px', borderRadius: '10px', background: theme.greenTint.bg, color: theme.status.green, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', fontSize: '11px', fontWeight: 600, border: `1px solid ${theme.greenTint.border}`, minHeight: '44px' }}>
+              style={{
+                padding: '12px 16px', borderRadius: '10px',
+                background: isReservable(place) ? 'rgba(218,55,67,0.12)' : theme.greenTint.bg,
+                color: isReservable(place) ? '#DA3743' : theme.status.green,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none',
+                fontSize: '11px', fontWeight: 600,
+                border: `1px solid ${isReservable(place) ? 'rgba(218,55,67,0.25)' : theme.greenTint.border}`,
+                minHeight: '44px',
+              }}>
               {getBookingLabel(place)}
             </a>
           )}
@@ -167,4 +178,4 @@ export default function PlaceCard({ place }: { place: Place }) {
       </div>
     </div>
   );
-}
+});

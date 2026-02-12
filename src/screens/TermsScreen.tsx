@@ -48,7 +48,7 @@ export default function TermsScreen() {
         <p style={{ fontSize: '13px', color: theme.text.tertiary, marginBottom: '32px' }}>Effective date: January 1, 2025</p>
 
         <p style={bodyStyle}>
-          Welcome to NxStops. By accessing or using our service, you agree to be bound by these Terms of Service. NxStops is operated by Eleve Creative Haus.
+          Welcome to NxStops. By accessing or using our service, you agree to be bound by these Terms of Service. NxStops is operated by NxStops.
         </p>
 
         <h2 style={headingStyle}>1. Acceptance of Terms</h2>
@@ -82,12 +82,12 @@ export default function TermsScreen() {
 
         <h2 style={headingStyle}>6. Intellectual Property</h2>
         <p style={bodyStyle}>
-          The NxStops name, logo, design, and original content are the property of Eleve Creative Haus. Place data, maps, and photos are provided by their respective owners (e.g., Google) and are subject to their terms of use.
+          The NxStops name, logo, design, and original content are the property of NxStops. Place data, maps, and photos are provided by their respective owners (e.g., Google) and are subject to their terms of use.
         </p>
 
         <h2 style={headingStyle}>7. Limitation of Liability</h2>
         <p style={bodyStyle}>
-          NxStops is provided for informational and planning purposes only. We do not guarantee the accuracy of place information, business hours, ratings, or event details. To the maximum extent permitted by law, Eleve Creative Haus shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of the service.
+          NxStops is provided for informational and planning purposes only. We do not guarantee the accuracy of place information, business hours, ratings, or event details. To the maximum extent permitted by law, NxStops shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of the service.
         </p>
         <p style={bodyStyle}>
           Always verify important details (hours, availability, safety) directly with businesses and venues before visiting.

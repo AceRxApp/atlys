@@ -48,7 +48,7 @@ export default function PrivacyScreen() {
         <p style={{ fontSize: '13px', color: theme.text.tertiary, marginBottom: '32px' }}>Effective date: January 1, 2025</p>
 
         <p style={bodyStyle}>
-          NxStops ("we", "our", "us") is a product of Eleve Creative Haus. This Privacy Policy explains how we collect, use, and protect your information when you use NxStops.
+          NxStops ("we", "our", "us") is a product of NxStops. This Privacy Policy explains how we collect, use, and protect your information when you use NxStops.
         </p>
 
         <h2 style={headingStyle}>1. Information We Collect</h2>

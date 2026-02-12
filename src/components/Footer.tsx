@@ -37,7 +37,7 @@ export default function Footer() {
         fontSize: '11px',
         color: theme.text.muted,
       }}>
-        &copy; {new Date().getFullYear()} Eleve Creative Haus
+        &copy; {new Date().getFullYear()} NxStops
       </div>
     </footer>
   );

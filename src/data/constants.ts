@@ -57,3 +57,22 @@ export const QUICK_FILTERS: { id: QuickFilter; label: string }[] = [
   { id: 'family', label: 'Family Friendly' },
   { id: 'solo', label: 'Solo Friendly' },
 ];
+
+/** Estimated cost per stop by Google priceLevel (0-4, -1=unknown) */
+export const PRICE_LEVEL_ESTIMATE: Record<number, number> = {
+  [-1]: 15,
+  0: 0,
+  1: 15,
+  2: 30,
+  3: 60,
+  4: 100,
+};
+
+/** Budget presets for the burn rate picker */
+export const BURN_RATE_PRESETS = [
+  { value: 0, label: 'Free Day', emoji: '\u{1F333}', desc: 'Parks & free spots only' },
+  { value: 50, label: '$50 Afternoon', emoji: '\u{2615}', desc: 'Coffee & casual bites' },
+  { value: 100, label: '$100 Day Out', emoji: '\u{1F37D}\u{FE0F}', desc: 'Nice meals & activities' },
+  { value: 200, label: '$200 Splurge', emoji: '\u{1F37E}', desc: 'Upscale dining & events' },
+  { value: -1, label: 'Sky is the Limit', emoji: '\u{1F680}', desc: 'No budget constraints' },
+] as const;

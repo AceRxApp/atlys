@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { track } from '@vercel/analytics';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { createCrewTrip, loadCrewTrip, updateCrewTripDays, subscribeToCrewTrip, unsubscribeFromCrewTrip } from '../supabase';
 import type { City, EventItem, Stop } from '../types';
 import type { Place } from '../services/places';
 import { formatDistance } from '../services/places';
+import { calcWalkMinutes, calcDriveMinutes, buildMapsUrl, haversineKm } from '../utils/transport';
+import { PRICE_LEVEL_ESTIMATE } from '../data/constants';
 
 export function useTripPlan(deps: {
   useGps: boolean;
@@ -14,8 +16,9 @@ export function useTripPlan(deps: {
   citySlug: string;
   useMiles: boolean;
   showToast: (msg: string) => void;
+  requireAuth: () => boolean;
 }) {
-  const { useGps, locCity, selectedCity, cityLabel, citySlug, useMiles, showToast } = deps;
+  const { useGps, locCity, selectedCity, cityLabel, citySlug, useMiles, showToast, requireAuth } = deps;
 
   const [tripDays, setTripDays] = useState<Record<number, Stop[]>>({ 1: [] });
   const [activeDay, setActiveDay] = useState(1);
@@ -29,10 +32,32 @@ export function useTripPlan(deps: {
   const crewChannelRef = useRef<RealtimeChannel | null>(null);
   const crewSyncLock = useRef(false);
 
+  // Budget per day: day number → dollar amount (-1 = unlimited)
+  const [dayBudgets, setDayBudgets] = useState<Record<number, number>>(() => {
+    try {
+      const key = `nxstops_budget_${citySlug}`;
+      const saved = localStorage.getItem(key);
+      return saved ? JSON.parse(saved) : {};
+    } catch { return {}; }
+  });
+
   // Derived
   const dayPlan = tripDays[activeDay] || [];
   const totalStops = Object.values(tripDays).reduce((sum, stops) => sum + stops.length, 0);
   const dayCount = Object.keys(tripDays).length;
+  const activeDayBudget = dayBudgets[activeDay] ?? -1;
+
+  const estimatedSpend = useMemo(() => {
+    return dayPlan.reduce((total, stop) => {
+      if (stop.type === 'event') return total + 20;
+      const pl = stop.place?.priceLevel ?? -1;
+      return total + (PRICE_LEVEL_ESTIMATE[pl] ?? 15);
+    }, 0);
+  }, [dayPlan]);
+
+  const budgetRemaining = activeDayBudget === -1 ? Infinity : activeDayBudget - estimatedSpend;
+  const budgetPercentUsed = activeDayBudget <= 0 ? 0 : Math.min(100, (estimatedSpend / activeDayBudget) * 100);
+  const isOverBudget = activeDayBudget > 0 && estimatedSpend > activeDayBudget;
 
   const setActiveDayStops = useCallback((updater: Stop[] | ((prev: Stop[]) => Stop[])) => {
     setTripDays(prev => ({
@@ -86,6 +111,21 @@ export function useTripPlan(deps: {
     }
   }, [tripDays, totalStops, getPlanKey]);
 
+  // Persist budget
+  useEffect(() => {
+    const key = `nxstops_budget_${citySlug}`;
+    if (Object.keys(dayBudgets).length > 0) {
+      localStorage.setItem(key, JSON.stringify(dayBudgets));
+    } else {
+      localStorage.removeItem(key);
+    }
+  }, [dayBudgets, citySlug]);
+
+  const setDayBudget = useCallback((day: number, amount: number) => {
+    setDayBudgets(prev => ({ ...prev, [day]: amount }));
+    track('set_budget', { day: String(day), amount: String(amount) });
+  }, []);
+
   // Crew mode: subscribe to realtime updates
   useEffect(() => {
     if (!crewMode || !crewCode) {
@@ -121,14 +161,27 @@ export function useTripPlan(deps: {
   // --------------------------------------------------------------------------
 
   const addToPlan = (place: Place) => {
+    if (!requireAuth()) return;
     const allStops = Object.values(tripDays).flat();
     if (allStops.find(s => s.place?.placeId === place.placeId)) return;
     setActiveDayStops(prev => [...prev, { id: crypto.randomUUID(), type: 'place', place, addedAt: new Date() }]);
-    showToast(`Added ${place.name} to Day ${activeDay}`);
+    const budget = dayBudgets[activeDay] ?? -1;
+    if (budget > 0) {
+      const placeEst = PRICE_LEVEL_ESTIMATE[place.priceLevel] ?? 15;
+      const newEstimated = estimatedSpend + placeEst;
+      if (newEstimated > budget) {
+        showToast(`Added ${place.name} — heads up, you're over budget for Day ${activeDay}`);
+      } else {
+        showToast(`Added ${place.name} (~$${Math.round(budget - newEstimated)} left)`);
+      }
+    } else {
+      showToast(`Added ${place.name} to Day ${activeDay}`);
+    }
     track('add_to_plan', { place: place.name, category: place.categoryDisplay || '', day: String(activeDay) });
   };
 
   const addEventToPlan = (event: EventItem) => {
+    if (!requireAuth()) return;
     const allStops = Object.values(tripDays).flat();
     if (allStops.find(s => s.event?.id === event.id)) return;
     setActiveDayStops(prev => [...prev, { id: crypto.randomUUID(), type: 'event', event, addedAt: new Date() }]);
@@ -195,6 +248,30 @@ export function useTripPlan(deps: {
     showToast(`Moved to Day ${toDay}`);
   };
 
+  const pivotStop = useCallback((oldStopId: string, newPlace: Place) => {
+    setTripDays(prev => {
+      const updated = { ...prev };
+      for (const day of Object.keys(updated)) {
+        const dayNum = Number(day);
+        const idx = updated[dayNum].findIndex(s => s.id === oldStopId);
+        if (idx !== -1) {
+          const newStops = [...updated[dayNum]];
+          newStops[idx] = {
+            id: crypto.randomUUID(),
+            type: 'place',
+            place: newPlace,
+            addedAt: new Date(),
+          };
+          updated[dayNum] = newStops;
+          break;
+        }
+      }
+      return updated;
+    });
+    showToast(`Swapped to ${newPlace.name}`);
+    track('pivot_stop', { newPlace: newPlace.name, category: newPlace.categoryDisplay || '' });
+  }, [showToast]);
+
   const getStopName = (stop: Stop) => stop.type === 'event' ? (stop.event?.name || 'Event') : (stop.place?.name || 'Place');
   const getStopCategory = (stop: Stop) => stop.type === 'event' ? (stop.event?.category || 'Event') : (stop.place?.categoryDisplay || '');
 
@@ -225,27 +302,73 @@ export function useTripPlan(deps: {
     }
   };
 
-  const getTransportInfo = (fromStop: Stop, toStop: Stop): { emoji: string; text: string; distance: string; mapsUrl: string } | null => {
-    let fromLat: number | undefined, fromLng: number | undefined, toLat: number | undefined, toLng: number | undefined;
-    if (fromStop.type === 'place' && fromStop.place) { fromLat = fromStop.place.lat; fromLng = fromStop.place.lng; }
-    else if (fromStop.type === 'event' && fromStop.event?.lat) { fromLat = fromStop.event.lat ?? undefined; fromLng = fromStop.event.lng ?? undefined; }
-    if (toStop.type === 'place' && toStop.place) { toLat = toStop.place.lat; toLng = toStop.place.lng; }
-    else if (toStop.type === 'event' && toStop.event?.lat) { toLat = toStop.event.lat ?? undefined; toLng = toStop.event.lng ?? undefined; }
-    if (!fromLat || !fromLng || !toLat || !toLng) return null;
-    const R = 6371;
-    const dLat = ((toLat - fromLat) * Math.PI) / 180;
-    const dLng = ((toLng - fromLng) * Math.PI) / 180;
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos((fromLat * Math.PI) / 180) * Math.cos((toLat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-    const km = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const mapsUrl = `https://www.google.com/maps/dir/${fromLat},${fromLng}/${toLat},${toLng}`;
-    const distStr = (d: number) => {
-      if (useMiles) { const mi = d * 0.621371; return mi < 0.5 ? `${mi.toFixed(1)} mi` : `${Math.round(mi * 10) / 10} mi`; }
-      return d < 2 ? `${d.toFixed(1)} km` : `${Math.round(d)} km`;
+  const getStopCoords = (stop: Stop): { lat: number; lng: number } | null => {
+    if (stop.type === 'place' && stop.place?.lat && stop.place?.lng) return { lat: stop.place.lat, lng: stop.place.lng };
+    if (stop.type === 'event' && stop.event?.lat && stop.event?.lng) return { lat: stop.event.lat, lng: stop.event.lng };
+    return null;
+  };
+
+  const formatDist = (km: number): string => {
+    if (useMiles) {
+      const mi = km * 0.621371;
+      return mi < 0.5 ? `${mi.toFixed(1)} mi` : `${Math.round(mi * 10) / 10} mi`;
+    }
+    return km < 2 ? `${km.toFixed(1)} km` : `${Math.round(km)} km`;
+  };
+
+  const getTransportInfo = (fromStop: Stop, toStop: Stop): {
+    emoji: string; text: string; distance: string;
+    walkMinutes: number; driveMinutes: number; km: number;
+    walkMapsUrl: string; driveMapsUrl: string; mapsUrl: string;
+  } | null => {
+    const from = getStopCoords(fromStop);
+    const to = getStopCoords(toStop);
+    if (!from || !to) return null;
+
+    const km = haversineKm(from, to);
+    const walkMin = calcWalkMinutes(km);
+    const driveMin = calcDriveMinutes(km);
+    const walkUrl = buildMapsUrl(from, to, 'walking');
+    const driveUrl = buildMapsUrl(from, to, 'driving');
+    const legacyUrl = `https://www.google.com/maps/dir/${from.lat},${from.lng}/${to.lat},${to.lng}`;
+
+    let emoji: string;
+    let text: string;
+    if (km < 0.5) {
+      emoji = '\u{1F6B6}';
+      text = `${walkMin} min walk`;
+    } else if (km < 1.5) {
+      emoji = '\u{1F6B6}';
+      text = `${walkMin} min walk · ${driveMin} min drive`;
+    } else if (km < 5) {
+      emoji = '\u{1F695}';
+      text = `${driveMin} min drive · ${walkMin} min walk`;
+    } else {
+      emoji = '\u{1F697}';
+      text = `${driveMin} min drive`;
+    }
+
+    return {
+      emoji, text, distance: formatDist(km),
+      walkMinutes: walkMin, driveMinutes: driveMin, km,
+      walkMapsUrl: walkUrl, driveMapsUrl: driveUrl, mapsUrl: legacyUrl,
     };
-    if (km < 0.5) return { emoji: '\u{1F6B6}', text: '~5 min walk', distance: useMiles ? `${Math.round(km * 3281)}ft` : `${Math.round(km * 1000)}m`, mapsUrl };
-    if (km < 1.5) return { emoji: '\u{1F6B6}\u{1F695}', text: `${Math.round(km * 12)} min walk or quick ride`, distance: distStr(km), mapsUrl };
-    if (km < 5) return { emoji: '\u{1F687}\u{1F695}', text: 'Transit or ride recommended', distance: distStr(km), mapsUrl };
-    return { emoji: '\u{1F697}\u{1F695}', text: 'Drive or ride needed', distance: distStr(km), mapsUrl };
+  };
+
+  const getDaySummary = (): { totalKm: number; totalWalkMin: number; totalDriveMin: number; distance: string } | null => {
+    if (dayPlan.length < 2) return null;
+    let totalKm = 0;
+    let totalWalkMin = 0;
+    let totalDriveMin = 0;
+    for (let i = 0; i < dayPlan.length - 1; i++) {
+      const info = getTransportInfo(dayPlan[i], dayPlan[i + 1]);
+      if (info) {
+        totalKm += info.km;
+        totalWalkMin += info.walkMinutes;
+        totalDriveMin += info.driveMinutes;
+      }
+    }
+    return { totalKm, totalWalkMin, totalDriveMin, distance: formatDist(totalKm) };
   };
 
   // --------------------------------------------------------------------------
@@ -260,6 +383,7 @@ export function useTripPlan(deps: {
   };
 
   const startCrewMode = async () => {
+    if (!requireAuth()) return;
     const code = generateCrewCode();
     setCrewSyncing(true);
     const created = await createCrewTrip(code, citySlug, cityLabel, tripDays);
@@ -284,6 +408,7 @@ export function useTripPlan(deps: {
   };
 
   const joinCrew = async () => {
+    if (!requireAuth()) return;
     const code = joinCrewInput.trim().toUpperCase();
     if (code.length < 4) { showToast('Enter a valid crew code'); return; }
     setCrewSyncing(true);
@@ -334,8 +459,10 @@ export function useTripPlan(deps: {
     tripDays, setTripDays, activeDay, setActiveDay,
     dayPlan, totalStops, dayCount, setActiveDayStops,
     addToPlan, addEventToPlan, removeFromPlan, isInPlan, isEventInPlan,
-    clearPlan, movePlanStop, addDay, removeDay, moveStopToDay,
-    getRouteUrl, sharePlan, getTransportInfo,
+    clearPlan, movePlanStop, addDay, removeDay, moveStopToDay, pivotStop,
+    getRouteUrl, sharePlan, getTransportInfo, getDaySummary,
+    dayBudgets, setDayBudget, activeDayBudget,
+    estimatedSpend, budgetRemaining, budgetPercentUsed, isOverBudget,
     crewMode, crewCode, crewSyncing, joinCrewInput, setJoinCrewInput,
     showJoinCrew, setShowJoinCrew, startCrewMode, stopCrewMode, joinCrew, shareCrewPlan,
   };

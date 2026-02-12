@@ -2,7 +2,7 @@ import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { getCardStyle } from '../styles/shared';
 import { VIBES, QUICK_FILTERS, COMMUNITY_TAGS, NIGHTLIFE_TYPES } from '../data';
-import { formatDistance } from '../services/places';
+import { formatDistance, isChain } from '../services/places';
 import { SkeletonCard } from '../components/ui';
 import PlaceCard from '../components/PlaceCard';
 import { APIProvider, Map, Marker, InfoWindow } from '@vis.gl/react-google-maps';
@@ -191,6 +191,7 @@ export default function DiscoverScreen() {
         <div style={{ display: 'flex', borderRadius: '10px', overflow: 'hidden', border: `1px solid ${theme.border.strong}`, flexShrink: 0 }}>
           <button onClick={() => setViewMode('list')}
             aria-label="List view"
+            aria-pressed={viewMode === 'list'}
             style={{
               padding: '10px 14px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer',
               background: viewMode === 'list' ? theme.amberTint.border15 : 'transparent',
@@ -200,6 +201,7 @@ export default function DiscoverScreen() {
           </button>
           <button onClick={() => setViewMode('map')}
             aria-label="Map view"
+            aria-pressed={viewMode === 'map'}
             style={{
               padding: '10px 14px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer',
               borderLeft: `1px solid ${theme.border.strong}`,
@@ -258,6 +260,7 @@ export default function DiscoverScreen() {
           return (
             <button
               key={vibe.id}
+              aria-pressed={active}
               onClick={() => {
                 setSelectedVibe(active ? null : vibe.id);
                 setSearchRadius(1500);
@@ -282,6 +285,7 @@ export default function DiscoverScreen() {
           return (
             <button
               key={filter.id}
+              aria-pressed={active}
               onClick={() => setQuickFilters(active ? quickFilters.filter(f => f !== filter.id) : [...quickFilters, filter.id])}
               style={{
                 padding: '6px 12px', borderRadius: '16px', fontSize: '11px', fontWeight: 500,
@@ -303,6 +307,8 @@ export default function DiscoverScreen() {
           const active = communityFilters.includes(tag.id);
           return (
             <button key={tag.id}
+              aria-pressed={active}
+              aria-label={`Filter by ${tag.label}`}
               onClick={() => setCommunityFilters(active ? communityFilters.filter(f => f !== tag.id) : [...communityFilters, tag.id])}
               style={{
                 padding: '6px 12px', borderRadius: '16px', fontSize: '11px', fontWeight: 500,
@@ -392,7 +398,7 @@ export default function DiscoverScreen() {
                     <span style={{ fontWeight: 600, fontSize: '15px', color: theme.text.primary }}>Hidden Gems</span>
                   </div>
                   <p style={{ fontSize: '12px', color: theme.text.secondary, lineHeight: 1.5, margin: 0 }}>
-                    Off-the-beaten-path spots — parks, bookstores, spas, markets, and local favorites most tourists miss.
+                    Highly-rated spots most people don't know about — no chains, no tourist traps. The kind of places only locals would take you.
                   </p>
                 </div>
               )}
@@ -452,7 +458,7 @@ export default function DiscoverScreen() {
 
               {/* Hidden Gems Horizontal Section (when not on hidden vibe) */}
               {!placesLoading && selectedVibe !== 'hidden' && (() => {
-                const gems = places.filter(p => p.rating >= 4.2 && p.reviewCount > 0 && p.reviewCount < 150 && !NIGHTLIFE_TYPES.includes(p.category));
+                const gems = places.filter(p => p.rating >= 4.2 && p.reviewCount > 0 && p.reviewCount < 150 && !NIGHTLIFE_TYPES.includes(p.category) && !isChain(p.name));
                 if (gems.length === 0) return null;
                 return (
                   <div style={{ marginBottom: '16px' }}>

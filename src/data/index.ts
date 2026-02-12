@@ -16,3 +16,5 @@ export {
   VIBES,
   QUICK_FILTERS,
 } from './constants';
+export { ESSENTIALS, CATEGORY_PACK_ITEMS, WEATHER_PACK_RULES, GROUP_PACK_ITEMS } from './packingItems';
+export type { PackingItem } from './packingItems';

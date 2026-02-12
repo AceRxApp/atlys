@@ -99,9 +99,21 @@ export async function authSignUp(email: string, password: string, name?: string)
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { full_name: name || '' } },
+    options: {
+      data: { full_name: name || '' },
+      emailRedirectTo: `${window.location.origin}/`,
+    },
   });
   return { data, error };
+}
+
+export async function authResendVerification(email: string) {
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email,
+    options: { emailRedirectTo: `${window.location.origin}/` },
+  });
+  return { error };
 }
 
 export async function authSignIn(email: string, password: string) {
@@ -112,6 +124,44 @@ export async function authSignIn(email: string, password: string) {
 export async function authSignOut() {
   const { error } = await supabase.auth.signOut();
   return { error };
+}
+
+export async function authResetPassword(email: string) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/`,
+  });
+  return { error };
+}
+
+export async function uploadAvatar(userId: string, file: File): Promise<{ url: string | null; error: string | null }> {
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+  const path = `${userId}/avatar.${ext}`;
+
+  // Upload to Supabase Storage (overwrites if exists)
+  const { error: uploadError } = await supabase.storage
+    .from('avatars')
+    .upload(path, file, { upsert: true, contentType: file.type });
+
+  if (uploadError) {
+    console.error('Avatar upload error:', uploadError);
+    return { url: null, error: uploadError.message };
+  }
+
+  // Get public URL
+  const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
+  const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`; // cache-bust
+
+  // Save to user metadata
+  const { error: updateError } = await supabase.auth.updateUser({
+    data: { avatar_url: publicUrl },
+  });
+
+  if (updateError) {
+    console.error('Avatar metadata update error:', updateError);
+    return { url: publicUrl, error: updateError.message };
+  }
+
+  return { url: publicUrl, error: null };
 }
 
 export async function authGetSession(): Promise<Session | null> {
@@ -147,11 +197,18 @@ export async function saveReview(
   reviewText: string,
   tags: string[]
 ) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    console.error('Error saving review: user not authenticated');
+    return { success: false, error: { message: 'Not authenticated' } };
+  }
+
   const { data, error } = await supabase
     .from('reviews')
     .insert({
       place_id: placeId,
       city_slug: citySlug,
+      user_id: user.id,
       rating,
       review_text: reviewText || null,
       tags,
@@ -166,16 +223,13 @@ export async function saveReview(
 
   // Also insert community tags
   if (tags.length > 0) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const tagRows = tags.map(tag => ({
-        place_id: placeId,
-        city_slug: citySlug,
-        user_id: user.id,
-        tag,
-      }));
-      await supabase.from('place_tags').upsert(tagRows, { onConflict: 'place_id,user_id,tag' });
-    }
+    const tagRows = tags.map(tag => ({
+      place_id: placeId,
+      city_slug: citySlug,
+      user_id: user.id,
+      tag,
+    }));
+    await supabase.from('place_tags').upsert(tagRows, { onConflict: 'place_id,user_id,tag' });
   }
 
   return { success: true, data };
@@ -314,4 +368,51 @@ export function subscribeToCrewTrip(
 
 export function unsubscribeFromCrewTrip(channel: RealtimeChannel) {
   supabase.removeChannel(channel);
+}
+
+// ============================================================================
+// SAVED PLACES SYNC
+// ============================================================================
+
+export async function fetchSavedPlaces(): Promise<{ place_id: string; place_data: Record<string, unknown> }[]> {
+  const { data, error } = await supabase
+    .from('saved_places')
+    .select('place_id, place_data')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching saved places:', error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function upsertSavedPlaces(places: { placeId: string; data: Record<string, unknown> }[]): Promise<boolean> {
+  if (places.length === 0) return true;
+  const rows = places.map(p => ({
+    place_id: p.placeId,
+    place_data: p.data,
+  }));
+  const { error } = await supabase
+    .from('saved_places')
+    .upsert(rows, { onConflict: 'user_id,place_id' });
+
+  if (error) {
+    console.error('Error upserting saved places:', error);
+    return false;
+  }
+  return true;
+}
+
+export async function deleteSavedPlace(placeId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('saved_places')
+    .delete()
+    .eq('place_id', placeId);
+
+  if (error) {
+    console.error('Error deleting saved place:', error);
+    return false;
+  }
+  return true;
 }

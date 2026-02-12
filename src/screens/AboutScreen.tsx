@@ -148,7 +148,7 @@ export default function AboutScreen() {
             Built by
           </p>
           <p style={{ fontSize: '18px', fontWeight: 600, color: theme.text.primary }}>
-            Eleve Creative Haus
+            NxStops
           </p>
           <p style={{ fontSize: '13px', color: theme.text.secondary, marginTop: '8px', lineHeight: 1.6 }}>
             A creative studio building tools for modern travelers.

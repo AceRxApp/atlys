@@ -1,5 +1,6 @@
-const CACHE_NAME = 'nxstops-v2';
+const CACHE_NAME = 'nxstops-v3';
 const API_CACHE_NAME = 'nxstops-api-v1';
+const ASSETS_CACHE_NAME = 'nxstops-assets-v1';
 const API_CACHE_MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours in ms
 const API_CACHE_MAX_ENTRIES = 50;
 const API_ROUTES = ['/api/places', '/api/events'];
@@ -7,6 +8,7 @@ const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
+  '/logo.png',
 ];
 
 // Install — cache static assets
@@ -19,7 +21,7 @@ self.addEventListener('install', (event) => {
 
 // Activate — clean old caches
 self.addEventListener('activate', (event) => {
-  const keepCaches = [CACHE_NAME, API_CACHE_NAME];
+  const keepCaches = [CACHE_NAME, API_CACHE_NAME, ASSETS_CACHE_NAME];
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => !keepCaches.includes(k)).map((k) => caches.delete(k)))
@@ -117,7 +119,41 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets — network-first with cache fallback
+  // Hashed build assets (JS/CSS with hash in filename) — cache-first (immutable)
+  const url = new URL(event.request.url);
+  const isHashedAsset = /\/assets\/.*\.[a-f0-9]{8,}\.(js|css|woff2?)$/.test(url.pathname);
+  if (isHashedAsset) {
+    event.respondWith(
+      caches.open(ASSETS_CACHE_NAME).then((cache) =>
+        cache.match(event.request).then((cached) => {
+          if (cached) return cached;
+          return fetch(event.request).then((response) => {
+            if (response.ok) cache.put(event.request, response.clone());
+            return response;
+          });
+        })
+      )
+    );
+    return;
+  }
+
+  // Navigation requests — network-first, fallback to cached index.html
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match('/index.html'))
+    );
+    return;
+  }
+
+  // Other static assets — network-first with cache fallback
   event.respondWith(
     fetch(event.request)
       .then((response) => {
@@ -144,8 +180,8 @@ self.addEventListener('push', (event) => {
   const url = (typeof data.url === 'string' && data.url.startsWith('/')) ? data.url : '/';
   const options = {
     body: body,
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
+    icon: '/logo.png',
+    badge: '/logo.png',
     data: url,
     vibrate: [100, 50, 100],
   };
