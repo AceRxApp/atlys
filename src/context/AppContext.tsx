@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { City, EventItem, Stop, AdminSignup, Vibe, QuickFilter, TravelGroup, CommunityTag, BudgetTier } from '../types';
+import type { City, EventItem, Stop, AdminSignup, Vibe, QuickFilter, TravelGroup, CommunityTag } from '../types';
 import type { Place } from '../services/places';
 import type { Review } from '../supabase';
 import type { User } from '@supabase/supabase-js';
@@ -199,8 +199,6 @@ export interface AppContextType {
   shareCrewPlan: () => Promise<void>;
 
   // --- Modals ---
-  surprisePlace: Place | null;
-  setSurprisePlace: (place: Place | null) => void;
   showSafety: boolean;
   setShowSafety: (show: boolean) => void;
   showProfile: boolean;
@@ -229,11 +227,6 @@ export interface AppContextType {
   loading: boolean;
   isOffline: boolean;
   sharePlace: (place: Place) => Promise<void>;
-  handleSurpriseMe: (budgetTier?: BudgetTier) => void;
-  surprisePlaces: Place[];
-  setSurprisePlaces: (places: Place[]) => void;
-  showBudgetPicker: boolean;
-  setShowBudgetPicker: (show: boolean) => void;
   formatEventDate: (dateStr: string) => string;
   formatEventTime: (timeStr: string) => string;
   getMapCenter: () => { lat: number; lng: number };

@@ -5,8 +5,7 @@ import type { Place } from '../services/places';
 import { saveReview, fetchReviews, fetchPlaceTagCounts, fetchSavedPlaces, upsertSavedPlaces, deleteSavedPlace } from '../supabase';
 import type { Review } from '../supabase';
 import type { User } from '@supabase/supabase-js';
-import type { City, Vibe, QuickFilter, TravelGroup, CommunityTag, BudgetTier } from '../types';
-import { filterSurprisePlaces } from '../utils/surpriseFilter';
+import type { City, Vibe, QuickFilter, TravelGroup, CommunityTag } from '../types';
 import {
   CITY_COORDS, NIGHTLIFE_TYPES, GIRLY_TYPES, GIRLY_KEYWORDS, BOYS_EXCLUDE_TYPES,
   RESERVABLE_TYPES, BOOKABLE_TYPES,
@@ -320,12 +319,6 @@ export function usePlaces(deps: {
     }
   };
 
-  const handleSurpriseMe = (budgetTier: BudgetTier = 'any'): Place[] => {
-    const results = filterSurprisePlaces(places, budgetTier, selectedVibe);
-    if (results.length === 0) { showToast('No matching open places found'); }
-    return results;
-  };
-
   // Helpers
   const isReservable = (place: Place): boolean => RESERVABLE_TYPES.includes(place.category);
   const isBookable = (place: Place): boolean => BOOKABLE_TYPES.includes(place.category);
@@ -366,7 +359,7 @@ export function usePlaces(deps: {
     placeReviews, showReviewForm, setShowReviewForm,
     reviewRating, setReviewRating, reviewText, setReviewText, reviewTags, setReviewTags,
     reviewSubmitting, handleSubmitReview,
-    sharePlace, handleSurpriseMe,
+    sharePlace,
     isReservable, isBookable, getBookingUrl, getBookingLabel, getSafetyIndicators,
   };
 }

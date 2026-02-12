@@ -1,9 +1,9 @@
 // Vercel Serverless API Route — AI Travel Assistant Chat
-// Proxies chat requests to OpenAI API (server-side, keeps keys safe)
+// Proxies chat requests to Google Gemini API (server-side, keeps keys safe)
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
 const ALLOWED_ORIGINS = [
   'https://nxstops.com',
@@ -72,6 +72,16 @@ interface ChatMessage {
   content: string;
 }
 
+// Convert OpenAI-style messages to Gemini format
+function toGeminiContents(messages: ChatMessage[]) {
+  return messages
+    .filter((m) => m.role !== 'system')
+    .map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    }));
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const corsHeaders = getCorsHeaders(req.headers.origin as string);
   Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
@@ -84,8 +94,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(429).json({ error: 'Too many requests. Please wait a moment.' });
   }
 
-  if (!OPENAI_API_KEY) {
-    return res.status(500).json({ error: 'AI chat is not configured yet. Add OPENAI_API_KEY to your environment variables.' });
+  if (!GEMINI_API_KEY) {
+    return res.status(500).json({ error: 'AI chat is not configured yet. Add GEMINI_API_KEY to your environment variables.' });
   }
 
   try {
@@ -104,33 +114,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       systemContent += `\n\nThe user is currently exploring ${city} in the NxStops app. Tailor your suggestions to this city when relevant.`;
     }
 
-    const apiMessages: ChatMessage[] = [
-      { role: 'system', content: systemContent },
-      ...recentMessages,
-    ];
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+    const geminiBody = {
+      system_instruction: {
+        parts: [{ text: systemContent }],
       },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: apiMessages,
-        max_tokens: 300,
+      contents: toGeminiContents(recentMessages),
+      generationConfig: {
         temperature: 0.7,
-      }),
-    });
+        maxOutputTokens: 300,
+      },
+    };
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(geminiBody),
+      },
+    );
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error('[NxStops Chat] OpenAI error:', response.status, errText);
+      console.error('[NxStops Chat] Gemini error:', response.status, errText);
       return res.status(502).json({ error: 'AI service temporarily unavailable' });
     }
 
     const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content || 'Sorry, I couldn\'t generate a response. Try again!';
+    const reply =
+      data.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "Sorry, I couldn't generate a response. Try again!";
 
     return res.status(200).json({ reply });
   } catch (err) {

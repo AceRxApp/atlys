@@ -1,6 +1,4 @@
 import type { Place } from '../services/places';
-import type { BudgetTier, Vibe } from '../types';
-import { PRICE_LEVEL_ESTIMATE } from '../data/constants';
 import { haversineKm } from './transport';
 
 const VIBE_TYPE_MAP: Record<string, string[]> = {
@@ -19,22 +17,6 @@ for (const [vibe, types] of Object.entries(VIBE_TYPE_MAP)) {
   }
 }
 
-function matchesBudget(place: Place, tier: BudgetTier): boolean {
-  if (tier === 'any') return true;
-  if (tier === 'free') return place.priceLevel === 0 || place.priceLevel === -1;
-  if (tier === '$') return place.priceLevel <= 1;
-  if (tier === '$$') return place.priceLevel <= 2;
-  if (tier === '$$$') return place.priceLevel <= 3;
-  if (tier === '$$$$') return place.priceLevel >= 3 && place.priceLevel <= 4;
-  return true;
-}
-
-function matchesVibe(place: Place, vibe: Vibe | null): boolean {
-  if (!vibe) return true;
-  const types = VIBE_TYPE_MAP[vibe];
-  return types ? types.includes(place.category) : true;
-}
-
 /** Shuffle an array (Fisher-Yates) */
 function shuffle<T>(arr: T[]): T[] {
   const copy = [...arr];
@@ -43,53 +25,6 @@ function shuffle<T>(arr: T[]): T[] {
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
   return copy;
-}
-
-/**
- * Filter and return up to 3 surprise places matching budget + vibe.
- * Prioritizes open places with good ratings.
- */
-export function filterSurprisePlaces(
-  places: Place[],
-  budgetTier: BudgetTier,
-  selectedVibe: Vibe | null,
-): Place[] {
-  const candidates = places
-    .filter(p => p.openNow)
-    .filter(p => matchesBudget(p, budgetTier))
-    .filter(p => matchesVibe(p, selectedVibe));
-
-  if (candidates.length === 0) return [];
-
-  // Sort by rating (high first), then shuffle top half for variety
-  const sorted = candidates.sort((a, b) => b.rating - a.rating);
-  const topHalf = sorted.slice(0, Math.max(6, Math.ceil(sorted.length / 2)));
-  return shuffle(topHalf).slice(0, 3);
-}
-
-/**
- * Filter places that fit within a remaining dollar budget.
- */
-export function filterBudgetAwarePlaces(
-  places: Place[],
-  remainingBudget: number,
-  selectedVibe: Vibe | null,
-  count: number = 3,
-): Place[] {
-  if (remainingBudget < 0) {
-    return filterSurprisePlaces(places, 'any', selectedVibe);
-  }
-
-  const candidates = places
-    .filter(p => p.openNow)
-    .filter(p => matchesVibe(p, selectedVibe))
-    .filter(p => (PRICE_LEVEL_ESTIMATE[p.priceLevel] ?? 15) <= remainingBudget);
-
-  if (candidates.length === 0) return [];
-
-  const sorted = candidates.sort((a, b) => b.rating - a.rating);
-  const topHalf = sorted.slice(0, Math.max(count * 2, Math.ceil(sorted.length / 2)));
-  return shuffle(topHalf).slice(0, count);
 }
 
 /**

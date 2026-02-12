@@ -7,12 +7,10 @@ interface BeforeInstallPromptEvent extends Event {
 import { Routes, Route, useLocation as useRouterLocation, useNavigate, useParams } from 'react-router-dom';
 import { track } from '@vercel/analytics';
 import { fetchEmailSignups, fetchAllCities, toggleCityActive } from './supabase';
-import { formatDistance } from './services/places';
 import type { Place } from './services/places';
 import { useLocation as useGeoLocation } from './hooks/useLocation';
-import type { AdminSignup, BudgetTier } from './types';
+import type { AdminSignup } from './types';
 import { CITY_COORDS, EMERGENCY_BY_COUNTRY } from './data';
-import { filterBudgetAwarePlaces } from './utils/surpriseFilter';
 import { getCardStyle } from './styles/shared';
 import { AppContext } from './context/AppContext';
 import { useTheme } from './context/ThemeContext';
@@ -134,9 +132,6 @@ export default function App() {
   const events = useEvents({ useGps: location.useGps, loc, selectedCity: location.selectedCity, screen });
 
   // --- UI state (modals, onboarding, offline, time, notifications, admin) ---
-  const [surprisePlace, setSurprisePlace] = useState<Place | null>(null);
-  const [surprisePlaces, setSurprisePlaces] = useState<Place[]>([]);
-  const [showBudgetPicker, setShowBudgetPicker] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [showSafety, setShowSafety] = useState(false);
   const [showCulture, setShowCulture] = useState(false);
@@ -336,34 +331,6 @@ export default function App() {
     return '';
   };
 
-  const handleSurpriseMe = (budgetTier?: BudgetTier) => {
-    if (!auth.user) { setShowProfile(true); return; }
-    if (!budgetTier) {
-      setShowBudgetPicker(true);
-      return;
-    }
-    // If a burn rate is set, use budget-aware filtering
-    if (trip.activeDayBudget > 0 && trip.budgetRemaining < Infinity) {
-      const results = filterBudgetAwarePlaces(
-        places.places,
-        trip.budgetRemaining,
-        places.selectedVibe,
-      );
-      if (results.length > 0) {
-        setSurprisePlaces(results);
-        setShowBudgetPicker(false);
-        track('surprise_me', { budget: budgetTier, burnRate: String(trip.activeDayBudget) });
-        return;
-      }
-    }
-    const results = places.handleSurpriseMe(budgetTier);
-    if (results.length > 0) {
-      setSurprisePlaces(results);
-      setShowBudgetPicker(false);
-      track('surprise_me', { budget: budgetTier, count: String(results.length) });
-    }
-  };
-
   const openAdmin = async () => {
     setShowAdmin(true);
     setAdminLoading(true);
@@ -400,13 +367,11 @@ export default function App() {
     ...trip,
     // UI state
     selectedPlace, setSelectedPlace, activePhotoIndex, setActivePhotoIndex,
-    surprisePlace, setSurprisePlace, surprisePlaces, setSurprisePlaces,
-    showBudgetPicker, setShowBudgetPicker,
     showSafety, setShowSafety,
     showProfile, setShowProfile, showAdmin, setShowAdmin, showCulture, setShowCulture,
     // Helpers
     showToast, getGreeting, getTimeSuggestion, getDistanceReference, currentTime,
-    handleSurpriseMe, requireAuth,
+    requireAuth,
     // Notifications
     showNotificationPrompt, notificationPermission, requestNotificationPermission, dismissNotificationPrompt,
     // Admin
@@ -417,9 +382,9 @@ export default function App() {
     showOnboarding, onboardingStep, setOnboardingStep, setShowOnboarding,
   }), [
     screen, setScreen, location, auth, places, events, trip,
-    selectedPlace, activePhotoIndex, surprisePlace, surprisePlaces, showBudgetPicker,
+    selectedPlace, activePhotoIndex,
     showSafety, showProfile, showAdmin, showCulture,
-    showToast, getGreeting, getTimeSuggestion, getDistanceReference, currentTime, handleSurpriseMe, requireAuth,
+    showToast, getGreeting, getTimeSuggestion, getDistanceReference, currentTime, requireAuth,
     showNotificationPrompt, notificationPermission, requestNotificationPermission, dismissNotificationPrompt,
     adminSignups, adminCities, adminLoading, adminTab, openAdmin, handleToggleCity,
     isOffline, showOnboarding, onboardingStep,
@@ -867,30 +832,12 @@ export default function App() {
           );
         })()}
 
-        {/* Floating Action Buttons */}
-        {!isInfoPage && !selectedPlace && !showBudgetPicker && !surprisePlaces.length && !showChat && (
+        {/* Floating AI Chat Button */}
+        {!isInfoPage && !selectedPlace && !showChat && (
           <div style={{
             position: 'fixed', bottom: '90px', right: 'calc(50% - 195px)',
-            display: 'flex', flexDirection: 'column', gap: '10px', zIndex: 50,
+            zIndex: 50,
           }}>
-            {/* Surprise Me (Discover only) */}
-            {screen === 'discover' && places.places.length > 0 && (
-              <button
-                onClick={() => handleSurpriseMe()}
-                aria-label="Surprise me with a random place"
-                style={{
-                  width: '52px', height: '52px', borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #F59E0B, #D97706)',
-                  border: 'none', cursor: 'pointer', color: '#0C0A09',
-                  fontSize: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: '0 4px 20px rgba(245,158,11,0.4)',
-                }}
-                title="Surprise Me"
-              >
-                {'\u{1F3B2}'}
-              </button>
-            )}
-            {/* AI Chat Button */}
             <button
               onClick={() => setShowChat(true)}
               aria-label="Open AI travel assistant"
@@ -905,117 +852,6 @@ export default function App() {
             >
               {'\u{2728}'}
             </button>
-          </div>
-        )}
-
-        {/* Budget Picker Bottom Sheet */}
-        {showBudgetPicker && (
-          <div className="modal-backdrop"
-            role="dialog" aria-modal="true" aria-label="Pick your budget"
-            style={{ position: 'fixed', inset: 0, background: theme.bg.modalOverlay, zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
-            onClick={() => setShowBudgetPicker(false)}>
-            <div className="modal-sheet"
-              style={{ background: theme.bg.surface, borderRadius: '24px 24px 0 0', maxWidth: '430px', width: '100%', padding: '24px 20px 40px', border: `1px solid ${theme.border.subtle}`, borderBottom: 'none' }}
-              onClick={e => e.stopPropagation()}>
-              <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                <div style={{ fontSize: '32px', marginBottom: '8px' }}>{'\u{1F3B2}'}</div>
-                <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '4px' }}>Surprise Me</h2>
-                <p style={{ color: theme.text.secondary, fontSize: '13px' }}>Pick a budget and we'll find 3 surprise spots</p>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                {([
-                  { tier: 'any' as BudgetTier, label: 'Any', desc: 'All prices' },
-                  { tier: 'free' as BudgetTier, label: 'Free', desc: 'No cost' },
-                  { tier: '$' as BudgetTier, label: '$', desc: 'Budget' },
-                  { tier: '$$' as BudgetTier, label: '$$', desc: 'Moderate' },
-                  { tier: '$$$' as BudgetTier, label: '$$$', desc: 'Upscale' },
-                  { tier: '$$$$' as BudgetTier, label: '$$$$', desc: 'Luxury' },
-                ]).map(opt => (
-                  <button key={opt.tier}
-                    onClick={() => handleSurpriseMe(opt.tier)}
-                    style={{
-                      padding: '16px 8px', borderRadius: '14px', border: `1px solid ${theme.border.strong}`,
-                      background: theme.bg.subtle, cursor: 'pointer', textAlign: 'center',
-                    }}>
-                    <div style={{ fontSize: '18px', fontWeight: 700, color: theme.accent.amber, marginBottom: '2px' }}>{opt.label}</div>
-                    <div style={{ fontSize: '11px', color: theme.text.tertiary }}>{opt.desc}</div>
-                  </button>
-                ))}
-              </div>
-              <button onClick={() => setShowBudgetPicker(false)}
-                style={{ width: '100%', padding: '12px', marginTop: '16px', background: 'none', border: 'none', color: theme.text.tertiary, fontSize: '14px', cursor: 'pointer' }}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Surprise Me 3-Card Modal */}
-        {surprisePlaces.length > 0 && (
-          <div className="modal-backdrop"
-            role="dialog" aria-modal="true" aria-label="Surprise place recommendations"
-            style={{ position: 'fixed', inset: 0, background: theme.bg.modalOverlay, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
-            onClick={() => setSurprisePlaces([])}>
-            <div className="modal-sheet"
-              style={{ background: theme.bg.surface, borderRadius: '20px', maxWidth: '400px', width: '100%', overflow: 'hidden', border: `1px solid ${theme.amberTint.border20}`, maxHeight: '85vh', overflowY: 'auto' }}
-              onClick={e => e.stopPropagation()}>
-              <div style={{ padding: '20px', textAlign: 'center' }}>
-                <div style={{ fontSize: '14px', color: theme.accent.amber, marginBottom: '4px', fontWeight: 500 }}>{'\u{1F3B2}'} Surprise!</div>
-                <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '16px' }}>We picked {surprisePlaces.length} for you</h2>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', textAlign: 'left' }}>
-                  {surprisePlaces.map((sp, i) => (
-                    <div key={sp.placeId} style={{
-                      ...cardStyle, marginBottom: 0, overflow: 'hidden',
-                      border: `1px solid ${theme.amberTint.border20}`,
-                    }}>
-                      {sp.photoUrl && (
-                        <div style={{ height: '120px', width: '100%', position: 'relative', overflow: 'hidden', borderRadius: '12px 12px 0 0', margin: '-16px -16px 12px' }}>
-                          <img src={sp.photoUrl} alt={sp.name} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                          <div style={{ position: 'absolute', top: '8px', left: '8px', background: theme.accent.amberGradient, color: '#0C0A09', fontSize: '12px', fontWeight: 700, padding: '4px 10px', borderRadius: '8px' }}>
-                            #{i + 1}
-                          </div>
-                        </div>
-                      )}
-                      <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '4px' }}>{sp.name}</h3>
-                      <p style={{ color: theme.text.secondary, fontSize: '12px', marginBottom: '4px' }}>
-                        {sp.categoryDisplay}
-                        {sp.priceLevel > 0 && ` · ${'$'.repeat(sp.priceLevel)}`}
-                        {sp.distance != null && ` · ${formatDistance(sp.distance, location.useMiles)}`}
-                      </p>
-                      {sp.rating > 0 && (
-                        <p style={{ color: theme.accent.amber, fontSize: '13px', marginBottom: '10px' }}>
-                          {'\u{2605}'} {sp.rating.toFixed(1)} ({sp.reviewCount})
-                        </p>
-                      )}
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          onClick={() => { trip.addToPlan(sp); showToast(`Added ${sp.name}`); }}
-                          style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: theme.accent.amberGradient, color: '#0C0A09', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-                          + Add
-                        </button>
-                        <button
-                          onClick={() => { setSurprisePlaces([]); setSelectedPlace(sp); }}
-                          style={{ flex: 1, padding: '10px', borderRadius: '10px', border: `1px solid ${theme.border.strong}`, background: 'transparent', color: theme.text.secondary, fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}>
-                          Details
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  onClick={() => { setSurprisePlaces([]); handleSurpriseMe(); }}
-                  style={{ width: '100%', padding: '12px', borderRadius: '12px', marginTop: '16px', background: 'none', border: `1px solid ${theme.border.strong}`, color: theme.text.secondary, fontSize: '13px', cursor: 'pointer' }}>
-                  {'\u{1F3B2}'} Try different budget
-                </button>
-                <button
-                  onClick={() => setSurprisePlaces([])}
-                  style={{ width: '100%', padding: '10px', marginTop: '8px', background: 'none', border: 'none', color: theme.text.tertiary, fontSize: '13px', cursor: 'pointer' }}>
-                  Close
-                </button>
-              </div>
-            </div>
           </div>
         )}
 

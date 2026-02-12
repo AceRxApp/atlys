@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterSurprisePlaces, filterBudgetAwarePlaces, findPivotAlternatives } from './surpriseFilter';
+import { findPivotAlternatives } from './surpriseFilter';
 import type { Place } from '../services/places';
 
 function makePlace(overrides: Partial<Place> = {}): Place {
@@ -26,99 +26,6 @@ function makePlace(overrides: Partial<Place> = {}): Place {
     ...overrides,
   };
 }
-
-describe('filterSurprisePlaces', () => {
-  it('returns up to 3 places', () => {
-    const places = Array.from({ length: 10 }, (_, i) =>
-      makePlace({ placeId: `p${i}`, name: `Place ${i}` }),
-    );
-    const result = filterSurprisePlaces(places, 'any', null);
-    expect(result.length).toBeLessThanOrEqual(3);
-    expect(result.length).toBeGreaterThan(0);
-  });
-
-  it('returns empty array when no places match', () => {
-    const places = [makePlace({ openNow: false })];
-    expect(filterSurprisePlaces(places, 'any', null)).toEqual([]);
-  });
-
-  it('filters by budget tier — free', () => {
-    const places = [
-      makePlace({ placeId: 'free', priceLevel: 0 }),
-      makePlace({ placeId: 'expensive', priceLevel: 4 }),
-    ];
-    const result = filterSurprisePlaces(places, 'free', null);
-    expect(result.every(p => p.priceLevel === 0 || p.priceLevel === -1)).toBe(true);
-  });
-
-  it('filters by budget tier — $$', () => {
-    const places = [
-      makePlace({ placeId: 'cheap', priceLevel: 1 }),
-      makePlace({ placeId: 'mid', priceLevel: 2 }),
-      makePlace({ placeId: 'expensive', priceLevel: 4 }),
-    ];
-    const result = filterSurprisePlaces(places, '$$', null);
-    expect(result.every(p => p.priceLevel <= 2)).toBe(true);
-  });
-
-  it('filters by vibe — food only', () => {
-    const places = [
-      makePlace({ placeId: 'food', category: 'restaurant' }),
-      makePlace({ placeId: 'hotel', category: 'hotel' }),
-    ];
-    const result = filterSurprisePlaces(places, 'any', 'food');
-    expect(result.every(p => p.category === 'restaurant')).toBe(true);
-  });
-
-  it('only returns open places', () => {
-    const places = [
-      makePlace({ placeId: 'open', openNow: true }),
-      makePlace({ placeId: 'closed', openNow: false }),
-    ];
-    const result = filterSurprisePlaces(places, 'any', null);
-    expect(result.every(p => p.openNow)).toBe(true);
-  });
-
-  it('returns fewer than 3 if not enough candidates', () => {
-    const places = [makePlace({ placeId: 'only' })];
-    const result = filterSurprisePlaces(places, 'any', null);
-    expect(result).toHaveLength(1);
-  });
-});
-
-describe('filterBudgetAwarePlaces', () => {
-  it('returns places within remaining dollar budget', () => {
-    const places = [
-      makePlace({ placeId: 'free', priceLevel: 0 }),
-      makePlace({ placeId: 'expensive', priceLevel: 4 }),
-    ];
-    const result = filterBudgetAwarePlaces(places, 20, null);
-    // priceLevel 0 = $0, priceLevel 4 = $100 — only free fits $20 budget
-    expect(result.every(p => p.priceLevel === 0)).toBe(true);
-  });
-
-  it('returns any places when budget is unlimited (-1)', () => {
-    const places = Array.from({ length: 5 }, (_, i) =>
-      makePlace({ placeId: `p${i}`, priceLevel: i % 5 }),
-    );
-    const result = filterBudgetAwarePlaces(places, -1, null);
-    expect(result.length).toBeGreaterThan(0);
-  });
-
-  it('returns empty when no places fit budget', () => {
-    const places = [makePlace({ priceLevel: 4 })];
-    const result = filterBudgetAwarePlaces(places, 10, null);
-    expect(result).toEqual([]);
-  });
-
-  it('respects count parameter', () => {
-    const places = Array.from({ length: 10 }, (_, i) =>
-      makePlace({ placeId: `p${i}`, priceLevel: 0 }),
-    );
-    const result = filterBudgetAwarePlaces(places, 50, null, 2);
-    expect(result.length).toBeLessThanOrEqual(2);
-  });
-});
 
 describe('findPivotAlternatives', () => {
   it('includes same-category places when available', () => {
