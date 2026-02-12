@@ -263,6 +263,10 @@ export default function HomeScreen() {
   } = useApp();
   const { theme } = useTheme();
   const cardStyle = getCardStyle(theme);
+  const [bannerFailed, setBannerFailed] = useState(false);
+
+  // Reset banner state when city changes
+  useEffect(() => { setBannerFailed(false); }, [selectedCity?.id]);
 
   return (
     <div>
@@ -344,10 +348,10 @@ export default function HomeScreen() {
       {selectedCity && (
         <div style={{ ...cardStyle, padding: 0, overflow: 'hidden', marginTop: '4px', position: 'relative', zIndex: 1 }}>
           <div style={{ height: '140px', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '16px' }}>
-            {selectedCity.banner_url ? (
+            {selectedCity.banner_url && !bannerFailed ? (
               <>
                 <img src={selectedCity.banner_url} alt={selectedCity.name} loading="lazy" decoding="async"
-                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  onError={() => setBannerFailed(true)}
                   style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                 <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.7))' }} />
               </>
