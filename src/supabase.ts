@@ -293,6 +293,7 @@ export async function createCrewTrip(
   cityLabel: string,
   tripDays: Record<number, unknown[]>
 ): Promise<CrewTrip | null> {
+  const { data: { user } } = await supabase.auth.getUser();
   const { data, error } = await supabase
     .from('crew_trips')
     .insert({
@@ -300,6 +301,7 @@ export async function createCrewTrip(
       city_slug: citySlug,
       city_label: cityLabel,
       trip_days: tripDays,
+      created_by: user?.id ?? null,
     })
     .select()
     .single();

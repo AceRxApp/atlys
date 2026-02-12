@@ -15,8 +15,7 @@ const ALLOWED_ORIGINS = [
 ];
 
 function getCorsHeaders(origin?: string) {
-  const isAllowed = ALLOWED_ORIGINS.includes(origin || '') ||
-    (origin || '').endsWith('.vercel.app');
+  const isAllowed = ALLOWED_ORIGINS.includes(origin || '');
   const allowedOrigin = isAllowed ? origin! : ALLOWED_ORIGINS[0];
   return {
     'Access-Control-Allow-Origin': allowedOrigin,

@@ -4,7 +4,6 @@ export type { CityContext } from './cityCulture';
 export { EMERGENCY_BY_COUNTRY } from './emergencyNumbers';
 export { WEATHER_CODES } from './weatherCodes';
 export {
-  ADMIN_EMAIL,
   NIGHTLIFE_TYPES,
   GIRLY_TYPES,
   GIRLY_KEYWORDS,

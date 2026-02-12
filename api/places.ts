@@ -15,8 +15,7 @@ const ALLOWED_ORIGINS = [
 ];
 
 function getCorsHeaders(origin?: string) {
-  const isAllowed = ALLOWED_ORIGINS.includes(origin || '') ||
-    (origin || '').endsWith('.vercel.app');
+  const isAllowed = ALLOWED_ORIGINS.includes(origin || '');
   const allowedOrigin = isAllowed ? origin! : ALLOWED_ORIGINS[0];
   return {
     'Access-Control-Allow-Origin': allowedOrigin,
@@ -252,6 +251,11 @@ async function handlePlaceDetails(req: VercelRequest, res: VercelResponse) {
 
   if (!placeId) {
     return res.status(400).json({ error: 'placeId is required' });
+  }
+
+  // Validate placeId format to prevent SSRF / path traversal
+  if (!/^[A-Za-z0-9\-_]+$/.test(placeId as string)) {
+    return res.status(400).json({ error: 'Invalid placeId format' });
   }
 
   const response = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {

@@ -11,7 +11,7 @@ import { formatDistance } from './services/places';
 import type { Place } from './services/places';
 import { useLocation as useGeoLocation } from './hooks/useLocation';
 import type { AdminSignup, BudgetTier } from './types';
-import { CITY_COORDS, EMERGENCY_BY_COUNTRY, ADMIN_EMAIL } from './data';
+import { CITY_COORDS, EMERGENCY_BY_COUNTRY } from './data';
 import { filterBudgetAwarePlaces } from './utils/surpriseFilter';
 import { getCardStyle } from './styles/shared';
 import { AppContext } from './context/AppContext';
@@ -169,10 +169,31 @@ export default function App() {
   const [showConsent, setShowConsent] = useState(() => !localStorage.getItem('nxstops_consent'));
 
   // Admin state
+  const [isAdmin, setIsAdmin] = useState(false);
   const [adminSignups, setAdminSignups] = useState<AdminSignup[]>([]);
   const [adminCities, setAdminCities] = useState<import('./types').City[]>([]);
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminTab, setAdminTab] = useState<'dashboard' | 'signups' | 'cities'>('dashboard');
+
+  // Check admin status server-side when user changes
+  useEffect(() => {
+    if (!auth.user) { setIsAdmin(false); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: { session } } = await (await import('./supabase')).supabase.auth.getSession();
+        if (!session?.access_token) return;
+        const res = await fetch('/api/admin', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (!cancelled && res.ok) {
+          const { isAdmin: admin } = await res.json();
+          setIsAdmin(admin);
+        }
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [auth.user]);
 
   // Auth gate — opens sign-in if not logged in, returns true if authed
   const requireAuth = useCallback((): boolean => {
@@ -562,7 +583,7 @@ export default function App() {
               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '10px', borderRadius: '10px', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ShieldIcon />
             </button>
-            {auth.user?.email === ADMIN_EMAIL && (
+            {isAdmin && (
               <button onClick={openAdmin}
                 aria-label="Admin settings"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '10px', borderRadius: '10px', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

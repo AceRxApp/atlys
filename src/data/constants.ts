@@ -1,7 +1,5 @@
 import type { TravelGroup, CommunityTag, Vibe, QuickFilter } from '../types';
 
-export const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL as string) || '';
-
 export const NIGHTLIFE_TYPES = ['bar', 'night_club', 'casino'];
 
 export const GIRLY_TYPES = ['cafe', 'coffee_shop', 'bakery', 'brunch_restaurant', 'breakfast_restaurant', 'spa', 'ice_cream_shop', 'art_gallery', 'book_store', 'market', 'performing_arts_theater', 'restaurant'];
