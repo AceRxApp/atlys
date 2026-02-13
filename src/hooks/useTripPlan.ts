@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { track } from '@vercel/analytics';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { createCrewTrip, loadCrewTrip, updateCrewTripDays, subscribeToCrewTrip, unsubscribeFromCrewTrip } from '../supabase';
-import type { City, EventItem, Stop, PlanMood, PlanDuration } from '../types';
+import type { City, EventItem, Stop, PlanDuration } from '../types';
 import type { Place } from '../services/places';
 import { formatDistance } from '../services/places';
 import { calcWalkMinutes, calcDriveMinutes, buildMapsUrl, haversineKm } from '../utils/transport';
@@ -511,7 +511,7 @@ export function useTripPlan(deps: {
   const [autoPlanError, setAutoPlanError] = useState<string | null>(null);
   const [lastPlanTitle, setLastPlanTitle] = useState<string | null>(null);
 
-  const planMyDay = useCallback(async (mood: PlanMood, budget: number, duration: PlanDuration) => {
+  const planMyDay = useCallback(async (mood: string, budget: number, duration: PlanDuration) => {
     if (!lat || !lng) {
       showToast('Location needed — pick a city or enable GPS');
       return;

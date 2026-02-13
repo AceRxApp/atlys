@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { City, EventItem, Stop, AdminSignup, Vibe, QuickFilter, TravelGroup, CommunityTag, PlanMood, PlanDuration } from '../types';
+import type { City, EventItem, Stop, AdminSignup, Vibe, QuickFilter, TravelGroup, CommunityTag, PlanDuration } from '../types';
 import type { Place } from '../services/places';
 import type { Review, UserStop } from '../supabase';
 import type { User } from '@supabase/supabase-js';
@@ -281,7 +281,7 @@ export interface AppContextType {
   autoPlanLoading: boolean;
   autoPlanError: string | null;
   lastPlanTitle: string | null;
-  planMyDay: (mood: PlanMood, budget: number, duration: PlanDuration) => Promise<void>;
+  planMyDay: (mood: string, budget: number, duration: PlanDuration) => Promise<void>;
 
   // --- Fetch triggers ---
   fetchPlaces: () => Promise<void>;

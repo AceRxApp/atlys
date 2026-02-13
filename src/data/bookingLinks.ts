@@ -2,7 +2,7 @@ export interface BookingService {
   id: string;
   name: string;
   emoji: string;
-  category: 'flights' | 'hotels' | 'experiences';
+  category: 'hotels' | 'experiences';
   description: string;
   buildUrl: (cityName: string) => string;
   affiliateNote?: string;
@@ -16,22 +16,6 @@ const KLOOK_AID = import.meta.env.VITE_KLOOK_AID || '';
 
 export const BOOKING_SERVICES: BookingService[] = [
   {
-    id: 'google-flights',
-    name: 'Google Flights',
-    emoji: '\u2708\uFE0F',
-    category: 'flights',
-    description: 'Search flights',
-    buildUrl: (city) => `https://www.google.com/travel/flights?q=flights+to+${encodeURIComponent(city)}`,
-  },
-  {
-    id: 'skyscanner',
-    name: 'Skyscanner',
-    emoji: '\u{1F4B8}',
-    category: 'flights',
-    description: 'Compare flight deals',
-    buildUrl: (city) => `https://www.skyscanner.com/transport/flights-to/${encodeURIComponent(city)}/`,
-  },
-  {
     id: 'booking',
     name: 'Booking.com',
     emoji: '\u{1F3E8}',
@@ -42,14 +26,6 @@ export const BOOKING_SERVICES: BookingService[] = [
       const base = `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(city)}`;
       return BOOKING_AID ? `${base}&aid=${BOOKING_AID}` : base;
     },
-  },
-  {
-    id: 'airbnb',
-    name: 'Airbnb',
-    emoji: '\u{1F3E0}',
-    category: 'hotels',
-    description: 'Homes & apartments',
-    buildUrl: (city) => `https://www.airbnb.com/s/${encodeURIComponent(city)}/homes`,
   },
   {
     id: 'hostelworld',

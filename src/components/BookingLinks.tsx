@@ -6,7 +6,6 @@ interface Props {
 }
 
 const CATEGORIES = [
-  { key: 'flights', label: 'Flights', emoji: '\u2708\uFE0F' },
   { key: 'hotels', label: 'Hotels & Stays', emoji: '\u{1F3E8}' },
   { key: 'experiences', label: 'Experiences', emoji: '\u{1F3AF}' },
 ] as const;

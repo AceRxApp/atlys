@@ -1,6 +1,7 @@
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import EventCard from '../components/EventCard';
+import BookingLinks from '../components/BookingLinks';
 import { APIProvider, Map, Marker, InfoWindow } from '@vis.gl/react-google-maps';
 import type { EventItem } from '../types';
 
@@ -256,6 +257,13 @@ export default function EventsScreen() {
           {filteredEvents.map(event => (
             <EventCard key={event.id} event={event} />
           ))}
+        </div>
+      )}
+
+      {/* Book Your Trip */}
+      {cityLabel && (
+        <div className="mt-4">
+          <BookingLinks cityName={cityLabel} />
         </div>
       )}
     </div>

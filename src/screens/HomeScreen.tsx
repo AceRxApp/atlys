@@ -5,6 +5,7 @@ import { TRAVEL_GROUPS, CITY_CULTURE } from '../data';
 import type { CityContext } from '../data';
 import type { PlanMood, PlanDuration } from '../types';
 import CurrencyWidget from '../components/CurrencyWidget';
+import BookingLinks from '../components/BookingLinks';
 import { getSunsetGuardian, isNightTime, getNightSafetyTips } from '../utils/safetyEngine';
 
 const PLAN_MOODS: { id: PlanMood; emoji: string; label: string }[] = [
@@ -262,7 +263,7 @@ export default function HomeScreen() {
   } = useApp();
   const [bannerFailed, setBannerFailed] = useState(false);
   const [showPlanner, setShowPlanner] = useState(false);
-  const [planMood, setPlanMood] = useState<PlanMood>('adventurous');
+  const [planMoods, setPlanMoods] = useState<PlanMood[]>(['adventurous']);
   const [planBudget, setPlanBudget] = useState(100);
   const [planDuration, setPlanDuration] = useState<PlanDuration>('full');
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
@@ -279,9 +280,22 @@ export default function HomeScreen() {
     return () => clearInterval(interval);
   }, [autoPlanLoading]);
 
+  const togglePlanMood = (id: PlanMood) => {
+    setPlanMoods(prev => {
+      if (prev.includes(id)) {
+        // Don't allow empty — keep at least 1
+        return prev.length > 1 ? prev.filter(m => m !== id) : prev;
+      }
+      // Max 2 vibes
+      if (prev.length >= 2) return [prev[1], id];
+      return [...prev, id];
+    });
+  };
+
   const handlePlanMyDay = async () => {
     setShowPlanner(false);
-    await planMyDay(planMood, planBudget, planDuration);
+    const moodStr = planMoods.join(' + ');
+    await planMyDay(moodStr, planBudget, planDuration);
     setScreen('plan');
   };
 
@@ -348,6 +362,36 @@ export default function HomeScreen() {
           </div>
         );
       })()}
+
+      {/* Plan My Day — Primary CTA (moved to top) */}
+      {(selectedCity || useGps) && !autoPlanLoading && (
+        <button
+          onClick={() => setShowPlanner(true)}
+          className="w-full mt-1 mb-2 p-4 rounded-[16px] border-none cursor-pointer text-left flex items-center gap-4 shadow-[0_4px_24px_var(--amber-tint-shadow)]"
+          style={{ background: `linear-gradient(135deg, var(--accent-amber), #D97706)` }}
+        >
+          <div className="w-12 h-12 rounded-2xl bg-[rgba(0,0,0,0.15)] flex items-center justify-center shrink-0 text-2xl">
+            {'\u2728'}
+          </div>
+          <div className="flex-1">
+            <div className="text-[17px] font-bold text-[#0C0A09]">Plan My Day</div>
+            <div className="text-[12px] text-[#0C0A09] opacity-70">AI builds your perfect itinerary</div>
+          </div>
+          <div className="text-[#0C0A09] text-xl font-bold">{'\u2192'}</div>
+        </button>
+      )}
+
+      {/* AI Generating State */}
+      {autoPlanLoading && (
+        <div className="card mt-1 mb-2 py-8 text-center border border-amber-tint-border20"
+          style={{ background: `linear-gradient(135deg, var(--amber-tint-bg10), var(--bg-subtle))` }}>
+          <div className="w-10 h-[3px] rounded-sm mx-auto mb-4 animate-shimmer"
+            style={{ background: `linear-gradient(90deg, var(--amber-tint-border30) 25%, var(--accent-amber) 50%, var(--amber-tint-border30) 75%)`, backgroundSize: '200% 100%' }} />
+          <div className="text-2xl mb-2">{'\u2728'}</div>
+          <div className="text-sm font-semibold text-text-primary mb-1">Planning your day...</div>
+          <div className="text-xs text-text-tertiary">{LOADING_MESSAGES[loadingMsgIdx]}</div>
+        </div>
+      )}
 
       {/* Currency Converter */}
       {(selectedCity || (useGps && loc.city)) && (
@@ -492,36 +536,6 @@ export default function HomeScreen() {
         );
       })()}
 
-      {/* Plan My Day — Primary CTA */}
-      {(selectedCity || useGps) && !autoPlanLoading && (
-        <button
-          onClick={() => setShowPlanner(true)}
-          className="w-full mt-3 p-4 rounded-[16px] border-none cursor-pointer text-left flex items-center gap-4 shadow-[0_4px_24px_var(--amber-tint-shadow)]"
-          style={{ background: `linear-gradient(135deg, var(--accent-amber), #D97706)` }}
-        >
-          <div className="w-12 h-12 rounded-2xl bg-[rgba(0,0,0,0.15)] flex items-center justify-center shrink-0 text-2xl">
-            {'\u2728'}
-          </div>
-          <div className="flex-1">
-            <div className="text-[17px] font-bold text-[#0C0A09]">Plan My Day</div>
-            <div className="text-[12px] text-[#0C0A09] opacity-70">AI builds your perfect itinerary</div>
-          </div>
-          <div className="text-[#0C0A09] text-xl font-bold">{'\u2192'}</div>
-        </button>
-      )}
-
-      {/* AI Generating State */}
-      {autoPlanLoading && (
-        <div className="card mt-3 py-8 text-center border border-amber-tint-border20"
-          style={{ background: `linear-gradient(135deg, var(--amber-tint-bg10), var(--bg-subtle))` }}>
-          <div className="w-10 h-[3px] rounded-sm mx-auto mb-4 animate-shimmer"
-            style={{ background: `linear-gradient(90deg, var(--amber-tint-border30) 25%, var(--accent-amber) 50%, var(--amber-tint-border30) 75%)`, backgroundSize: '200% 100%' }} />
-          <div className="text-2xl mb-2">{'\u2728'}</div>
-          <div className="text-sm font-semibold text-text-primary mb-1">Planning your day...</div>
-          <div className="text-xs text-text-tertiary">{LOADING_MESSAGES[loadingMsgIdx]}</div>
-        </div>
-      )}
-
       {/* Quick Actions */}
       {(selectedCity || useGps) && !autoPlanLoading && (
         <>
@@ -587,21 +601,24 @@ export default function HomeScreen() {
               <p className="text-[13px] text-text-secondary">Answer a few questions and we'll build your perfect itinerary</p>
             </div>
 
-            {/* Mood Picker */}
+            {/* Mood Picker (pick up to 2) */}
             <div className="mb-5">
-              <label className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.06em] block mb-2">What's the vibe?</label>
+              <label className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.06em] block mb-2">What's the vibe? <span className="text-text-tertiary font-normal">(pick up to 2)</span></label>
               <div className="flex flex-wrap gap-2">
-                {PLAN_MOODS.map(m => (
-                  <button key={m.id}
-                    onClick={() => setPlanMood(m.id)}
-                    className={`py-2 px-3.5 rounded-[20px] text-[13px] font-medium cursor-pointer ${
-                      planMood === m.id
-                        ? 'border-2 border-accent-amber bg-amber-tint-bg15 text-accent-amber'
-                        : 'border border-border-medium bg-transparent text-text-secondary'
-                    }`}>
-                    {m.emoji} {m.label}
-                  </button>
-                ))}
+                {PLAN_MOODS.map(m => {
+                  const selected = planMoods.includes(m.id);
+                  return (
+                    <button key={m.id}
+                      onClick={() => togglePlanMood(m.id)}
+                      className={`py-2 px-3.5 rounded-[20px] text-[13px] font-medium cursor-pointer ${
+                        selected
+                          ? 'border-2 border-accent-amber bg-amber-tint-bg15 text-accent-amber'
+                          : 'border border-border-medium bg-transparent text-text-secondary'
+                      }`}>
+                      {m.emoji} {m.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -661,6 +678,13 @@ export default function HomeScreen() {
               Cancel
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Book Your Trip */}
+      {(selectedCity || useGps) && (
+        <div className="mt-3">
+          <BookingLinks cityName={cityLabel} />
         </div>
       )}
 

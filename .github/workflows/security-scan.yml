@@ -1,0 +1,268 @@
+name: Nightly Security Scan
+
+on:
+  schedule:
+    # Run every night at 3:00 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  dependency-audit:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: |
+          echo "## Dependency Audit Report" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          npm audit --omit=dev 2>&1 | tee audit-output.txt || true
+          cat audit-output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          # Fail on high/critical vulnerabilities only
+          npm audit --omit=dev --audit-level=high
+
+  security-headers:
+    name: Security Headers Check
+    runs-on: ubuntu-latest
+    if: ${{ vars.PROD_URL != '' }}
+
+    steps:
+      - name: Check security headers
+        run: |
+          SITE_URL="${{ vars.PROD_URL }}"
+          echo "## Security Headers Report for $SITE_URL" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          HEADERS=$(curl -sI "$SITE_URL")
+          echo "$HEADERS"
+
+          FAIL=0
+
+          # Check critical security headers
+          check_header() {
+            local header="$1"
+            local label="$2"
+            if echo "$HEADERS" | grep -qi "^$header:"; then
+              VALUE=$(echo "$HEADERS" | grep -i "^$header:" | head -1 | tr -d '\r')
+              echo "- ✅ **$label**: $VALUE" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ⚠️ **$label**: Missing" >> $GITHUB_STEP_SUMMARY
+              FAIL=1
+            fi
+          }
+
+          check_header "strict-transport-security" "HSTS"
+          check_header "x-content-type-options" "X-Content-Type-Options"
+          check_header "x-frame-options" "X-Frame-Options"
+          check_header "content-security-policy" "Content-Security-Policy"
+          check_header "referrer-policy" "Referrer-Policy"
+          check_header "x-xss-protection" "X-XSS-Protection"
+
+          if [ "$FAIL" -eq 1 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ Some security headers are missing. Consider adding them to your Vercel config." >> $GITHUB_STEP_SUMMARY
+          fi
+
+  rate-limit-check:
+    name: Rate Limiting Verification
+    runs-on: ubuntu-latest
+    if: ${{ vars.PROD_URL != '' }}
+
+    steps:
+      - name: Test rate limiting on API endpoints
+        run: |
+          SITE_URL="${{ vars.PROD_URL }}"
+          echo "## Rate Limiting Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          test_rate_limit() {
+            local endpoint="$1"
+            local method="${2:-GET}"
+            local max_requests="${3:-15}"
+            local url="$SITE_URL$endpoint"
+
+            echo "Testing $method $endpoint..."
+            GOT_429=false
+
+            for i in $(seq 1 $max_requests); do
+              if [ "$method" = "POST" ]; then
+                STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$url" \
+                  -H "Content-Type: application/json" \
+                  -d '{"test": true}')
+              else
+                STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+              fi
+
+              if [ "$STATUS" = "429" ]; then
+                GOT_429=true
+                echo "- ✅ **$endpoint**: Rate limited after $i requests (HTTP 429)" >> $GITHUB_STEP_SUMMARY
+                break
+              fi
+            done
+
+            if [ "$GOT_429" = false ]; then
+              echo "- ⚠️ **$endpoint**: No 429 after $max_requests requests — rate limiting may not be active" >> $GITHUB_STEP_SUMMARY
+            fi
+          }
+
+          test_rate_limit "/api/places" "GET" 15
+          test_rate_limit "/api/events" "GET" 15
+          test_rate_limit "/api/chat" "POST" 12
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Rate limit test complete." >> $GITHUB_STEP_SUMMARY
+
+  secret-scan:
+    name: Secret & Credential Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan for hardcoded secrets
+        run: |
+          echo "## Secret Scan Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          FOUND=0
+
+          # Check for common secret patterns in source code
+          PATTERNS=(
+            'SUPABASE_SERVICE_ROLE_KEY\s*[:=]'
+            'sk-[a-zA-Z0-9]{20,}'
+            'AIza[0-9A-Za-z_-]{35}'
+            'ghp_[a-zA-Z0-9]{36}'
+            'password\s*[:=]\s*["\x27][^"\x27]{8,}'
+            'UPSTASH_REDIS_REST_TOKEN\s*[:=]\s*["\x27]'
+          )
+
+          for pattern in "${PATTERNS[@]}"; do
+            MATCHES=$(grep -rn --include='*.ts' --include='*.tsx' --include='*.js' --include='*.json' \
+              -E "$pattern" src/ api/ 2>/dev/null | grep -v node_modules | grep -v '.env.example' || true)
+            if [ -n "$MATCHES" ]; then
+              echo "⛔ Potential secret found matching pattern: \`$pattern\`" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "$MATCHES" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              FOUND=1
+            fi
+          done
+
+          if [ "$FOUND" -eq 0 ]; then
+            echo "✅ No hardcoded secrets detected in source code." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⛔ **Action required**: Remove hardcoded secrets and use environment variables." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+  api-health:
+    name: API Health & SSL Check
+    runs-on: ubuntu-latest
+    if: ${{ vars.PROD_URL != '' }}
+
+    steps:
+      - name: Check API endpoints respond
+        run: |
+          SITE_URL="${{ vars.PROD_URL }}"
+          echo "## API Health Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          ENDPOINTS=("/" "/api/places" "/api/events")
+          ALL_OK=true
+
+          for ep in "${ENDPOINTS[@]}"; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$SITE_URL$ep" --max-time 10)
+            if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 500 ]; then
+              echo "- ✅ **$ep**: HTTP $STATUS" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ❌ **$ep**: HTTP $STATUS" >> $GITHUB_STEP_SUMMARY
+              ALL_OK=false
+            fi
+          done
+
+          if [ "$ALL_OK" = false ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Some endpoints are not responding correctly." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+      - name: Verify SSL certificate
+        run: |
+          SITE_URL="${{ vars.PROD_URL }}"
+          DOMAIN=$(echo "$SITE_URL" | sed 's|https://||' | sed 's|/.*||')
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## SSL Certificate Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check SSL expiry
+          EXPIRY=$(echo | openssl s_client -servername "$DOMAIN" -connect "$DOMAIN:443" 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
+
+          if [ -n "$EXPIRY" ]; then
+            EXPIRY_EPOCH=$(date -d "$EXPIRY" +%s 2>/dev/null || date -j -f "%b %d %T %Y %Z" "$EXPIRY" +%s 2>/dev/null || echo "0")
+            NOW_EPOCH=$(date +%s)
+            DAYS_LEFT=$(( (EXPIRY_EPOCH - NOW_EPOCH) / 86400 ))
+
+            if [ "$DAYS_LEFT" -gt 30 ]; then
+              echo "- ✅ **SSL Certificate**: Valid, expires in $DAYS_LEFT days ($EXPIRY)" >> $GITHUB_STEP_SUMMARY
+            elif [ "$DAYS_LEFT" -gt 0 ]; then
+              echo "- ⚠️ **SSL Certificate**: Expiring soon — $DAYS_LEFT days left ($EXPIRY)" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ❌ **SSL Certificate**: Expired! ($EXPIRY)" >> $GITHUB_STEP_SUMMARY
+              exit 1
+            fi
+          else
+            echo "- ⚠️ Could not retrieve SSL certificate info" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  report:
+    name: Summary Report
+    runs-on: ubuntu-latest
+    needs: [dependency-audit, secret-scan]
+    if: failure()
+
+    steps:
+      - name: Create issue on failure
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `🔒 Nightly Security Scan Failed — ${new Date().toISOString().split('T')[0]}`;
+            const body = [
+              '## Nightly Security Scan Alert',
+              '',
+              'One or more security checks failed. Please review the workflow run:',
+              '',
+              `🔗 [View workflow run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+              '',
+              '### Possible issues:',
+              '- High/critical dependency vulnerabilities found',
+              '- Hardcoded secrets detected in source code',
+              '',
+              '---',
+              '*This issue was automatically created by the nightly security scan.*'
+            ].join('\n');
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ['security', 'automated']
+            });
