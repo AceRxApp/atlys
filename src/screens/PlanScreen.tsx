@@ -6,7 +6,6 @@ import { formatDistance } from '../services/places';
 import type { Place } from '../services/places';
 import { generatePackingList } from '../utils/packingList';
 import { findPivotAlternatives } from '../utils/surpriseFilter';
-import { PRICE_LEVEL_ESTIMATE, BURN_RATE_PRESETS } from '../data/constants';
 import { getPlaceBookingUrl } from '../data/bookingLinks';
 import type { PackingItem } from '../data/packingItems';
 import { getNightRisk, isNightTime } from '../utils/safetyEngine';
@@ -163,13 +162,6 @@ export default function PlanScreen() {
     travelGroup,
     pivotStop,
     places: allPlaces,
-    dayBudgets,
-    setDayBudget,
-    activeDayBudget,
-    estimatedSpend,
-    budgetRemaining,
-    budgetPercentUsed,
-    isOverBudget,
     requireAuth,
     lastPlanTitle,
   } = useApp();
@@ -193,8 +185,7 @@ export default function PlanScreen() {
   });
   const [showPackList, setShowPackList] = useState(false);
 
-  // --- Budget / Pivot state ---
-  const [showBurnRatePicker, setShowBurnRatePicker] = useState(false);
+  // --- Pivot state ---
   const [pivotStopId, setPivotStopId] = useState<string | null>(null);
   const [pivotAlternatives, setPivotAlternatives] = useState<Place[]>([]);
   const [pivotReason, setPivotReason] = useState<'closed' | 'not_feeling_it' | null>(null);
@@ -416,107 +407,6 @@ export default function PlanScreen() {
         </button>
       </div>
 
-      {/* Burn Rate Budget Bar */}
-      <div className={`card mb-3 p-3.5 border ${isOverBudget ? 'border-red-tint-border' : 'border-green-tint-border'}`}
-        style={{
-          background: isOverBudget
-            ? `linear-gradient(135deg, var(--red-tint-bg), var(--bg-subtle))`
-            : `linear-gradient(135deg, var(--green-tint-bg), var(--bg-subtle))`,
-        }}>
-        <div className="flex justify-between items-center mb-2">
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm">{'\u{1F4B0}'}</span>
-            <span className="text-xs font-semibold text-text-primary">
-              Day {activeDay} Budget
-            </span>
-          </div>
-          <button
-            onClick={() => setShowBurnRatePicker(!showBurnRatePicker)}
-            className="py-1 px-2.5 rounded-lg text-[11px] font-semibold border border-amber-tint-border20 bg-amber-tint-bg10 text-accent-amber cursor-pointer"
-          >
-            {activeDayBudget === -1 ? '\u{1F680} No Limit' : `$${activeDayBudget}`}
-          </button>
-        </div>
-
-        {activeDayBudget > 0 && (
-          <>
-            <div className="h-1.5 rounded-sm bg-bg-subtle-medium overflow-hidden mb-1.5">
-              <div
-                className="h-full rounded-sm transition-[width] duration-300 ease-in-out"
-                style={{
-                  width: `${Math.min(100, budgetPercentUsed)}%`,
-                  background: isOverBudget
-                    ? 'var(--status-red)'
-                    : budgetPercentUsed > 75
-                      ? 'var(--accent-amber)'
-                      : 'var(--status-green)',
-                }}
-              />
-            </div>
-            <div className="flex justify-between text-[11px]">
-              <span className="text-text-secondary">
-                ~${estimatedSpend} estimated
-              </span>
-              <span className={`font-semibold ${isOverBudget ? 'text-status-red' : 'text-status-green'}`}>
-                {isOverBudget
-                  ? `$${Math.abs(Math.round(budgetRemaining))} over`
-                  : `$${Math.round(budgetRemaining)} left`}
-              </span>
-            </div>
-          </>
-        )}
-
-        {activeDayBudget === -1 && (
-          <div className="text-[11px] text-text-tertiary">
-            No budget set — tap to set a burn rate for today
-          </div>
-        )}
-      </div>
-
-      {/* Burn Rate Picker */}
-      {showBurnRatePicker && (
-        <div className="card mb-3 p-4">
-          <div className="text-xs font-semibold text-text-primary mb-2.5">
-            Set your burn rate for Day {activeDay}
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {BURN_RATE_PRESETS.map(preset => {
-              const isActive = activeDayBudget === preset.value;
-              return (
-                <button key={preset.value}
-                  onClick={() => { setDayBudget(activeDay, preset.value); setShowBurnRatePicker(false); }}
-                  className={`p-3 rounded-xl cursor-pointer text-center ${
-                    isActive
-                      ? 'border-2 border-accent-amber bg-amber-tint-bg15'
-                      : 'border border-border-strong bg-bg-subtle'
-                  }`}>
-                  <div className="text-base mb-0.5">{preset.emoji}</div>
-                  <div className="text-[13px] font-semibold text-text-primary">{preset.label}</div>
-                  <div className="text-[10px] text-text-tertiary">{preset.desc}</div>
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex gap-2 mt-2.5">
-            <input
-              type="number"
-              placeholder="Custom $"
-              min="0"
-              className="flex-1 p-2.5 rounded-[10px] border border-border-strong bg-bg-input text-text-primary text-sm"
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  const val = parseInt((e.target as HTMLInputElement).value);
-                  if (!isNaN(val) && val >= 0) {
-                    setDayBudget(activeDay, val);
-                    setShowBurnRatePicker(false);
-                  }
-                }
-              }}
-            />
-          </div>
-        </div>
-      )}
-
       {/* Active day stops */}
       {dayPlan.length === 0 ? (
         <div className="card text-center py-8 px-5">
@@ -583,7 +473,7 @@ export default function PlanScreen() {
                             {stop.place.categoryDisplay}
                             {stop.place.priceLevel >= 0 && (
                               <span className={stop.place.priceLevel >= 3 ? 'text-accent-amber' : 'text-text-tertiary'}>
-                                {' '}· ~${PRICE_LEVEL_ESTIMATE[stop.place.priceLevel] ?? 15}
+                                {' '}· {'$'.repeat(Math.max(1, stop.place.priceLevel))}
                               </span>
                             )}
                             {stop.place.distance != null && ` · ${formatDistance(stop.place.distance, useMiles)} ${getDistanceReference()}`}
@@ -917,9 +807,6 @@ export default function PlanScreen() {
                       )}
                       <span className="text-[11px] text-text-tertiary">
                         {'$'.repeat(Math.max(1, alt.priceLevel))}
-                      </span>
-                      <span className="text-[11px] text-status-green">
-                        ~${PRICE_LEVEL_ESTIMATE[alt.priceLevel] ?? 15}
                       </span>
                     </div>
                   </div>

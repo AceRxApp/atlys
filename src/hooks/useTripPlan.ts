@@ -174,18 +174,7 @@ export function useTripPlan(deps: {
     if (allStops.find(s => s.place?.placeId === place.placeId)) return;
     hapticImpact('Medium');
     setActiveDayStops(prev => [...prev, { id: crypto.randomUUID(), type: 'place', place, addedAt: new Date() }]);
-    const budget = dayBudgets[activeDay] ?? -1;
-    if (budget > 0) {
-      const placeEst = PRICE_LEVEL_ESTIMATE[place.priceLevel] ?? 15;
-      const newEstimated = estimatedSpend + placeEst;
-      if (newEstimated > budget) {
-        showToast(`Added ${place.name} — heads up, you're over budget for Day ${activeDay}`);
-      } else {
-        showToast(`Added ${place.name} (~$${Math.round(budget - newEstimated)} left)`);
-      }
-    } else {
-      showToast(`Added ${place.name} to Day ${activeDay}`);
-    }
+    showToast(`Added ${place.name} to Day ${activeDay}`);
     track('add_to_plan', { place: place.name, category: place.categoryDisplay || '', day: String(activeDay) });
     recordAddedToTrip(place.category, place.priceLevel);
   };
@@ -558,19 +547,15 @@ export function useTripPlan(deps: {
         estimatedSpend: s.estimatedSpend,
       }));
 
-      // Set as Day 1 (clear existing plan)
-      setTripDays({ 1: stops });
-      setActiveDay(1);
-      // Map budget tier to approximate dollar amount for budget tracking
-      const budgetDollarMap: Record<number, number> = { 1: 50, 2: 100, 3: 200 };
-      if (budget > 0 && budgetDollarMap[budget]) setDayBudget(1, budgetDollarMap[budget]);
+      // Populate the currently active day (preserve other days)
+      setTripDays(prev => ({ ...prev, [activeDay]: stops }));
       setLastPlanTitle(result.dayTitle);
 
       // Record in preference memory
       recordTripGenerated(mood);
 
       hapticNotification('Success');
-      showToast(`${result.dayTitle} — ${stops.length} stops planned!`);
+      showToast(`Day ${activeDay}: ${result.dayTitle} — ${stops.length} stops planned!`);
       track('auto_plan_generated', {
         mood, duration, budget: String(budget),
         stops: String(stops.length), city: cityLabel,
@@ -585,7 +570,7 @@ export function useTripPlan(deps: {
     } finally {
       setAutoPlanLoading(false);
     }
-  }, [lat, lng, weather, cityLabel, travelGroup, events, showToast, setDayBudget]);
+  }, [lat, lng, weather, cityLabel, travelGroup, events, showToast, activeDay]);
 
   return {
     tripDays, setTripDays, activeDay, setActiveDay,
