@@ -281,7 +281,7 @@ export interface AppContextType {
   autoPlanLoading: boolean;
   autoPlanError: string | null;
   lastPlanTitle: string | null;
-  planMyDay: (mood: string, budget: number, duration: PlanDuration) => Promise<void>;
+  planMyDay: (mood: string, budget: number, duration: PlanDuration) => Promise<boolean>;
 
   // --- Fetch triggers ---
   fetchPlaces: () => Promise<void>;

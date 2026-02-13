@@ -8,7 +8,6 @@ import { generatePackingList } from '../utils/packingList';
 import { findPivotAlternatives } from '../utils/surpriseFilter';
 import { PRICE_LEVEL_ESTIMATE, BURN_RATE_PRESETS } from '../data/constants';
 import { getPlaceBookingUrl } from '../data/bookingLinks';
-import BookingLinks from '../components/BookingLinks';
 import type { PackingItem } from '../data/packingItems';
 import { getNightRisk, isNightTime } from '../utils/safetyEngine';
 import type { Stop } from '../types';
@@ -840,10 +839,6 @@ export default function PlanScreen() {
         </div>
       )}
 
-      {/* Book Your Trip */}
-      {cityLabel && totalStops > 0 && (
-        <BookingLinks cityName={cityLabel} />
-      )}
 
       {/* Pivot Modal */}
       {pivotStopId && pivotAlternatives.length > 0 && (

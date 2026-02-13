@@ -485,31 +485,6 @@ export default function DiscoverScreen() {
             </>
           ) : (
             <>
-              {/* Places to Stay — Booking Links */}
-              {selectedVibe === 'stay' && !placesLoading && cityLabel && (
-                <div className="card mb-3 px-[18px] py-4" style={{ background: `linear-gradient(135deg, var(--amber-tint-bg10), rgba(251,191,36,0.04))`, border: `1px solid var(--amber-tint-border15)` }}>
-                  <div className="flex items-center gap-2.5 mb-2">
-                    <span className="text-xl">🛏️</span>
-                    <span className="font-semibold text-[15px] text-text-primary">Find Places to Stay</span>
-                  </div>
-                  <p className="text-xs text-text-secondary leading-[1.5] mb-3">
-                    Browse hotels, apartments & unique stays in {cityLabel}
-                  </p>
-                  <div className="flex gap-2 flex-wrap">
-                    {[
-                      { label: 'Booking.com', emoji: '🏨', url: `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(cityLabel)}` },
-                      { label: 'Hotels.com', emoji: '⭐', url: `https://www.hotels.com/search.do?q-destination=${encodeURIComponent(cityLabel)}` },
-                      { label: 'Vrbo', emoji: '🏡', url: `https://www.vrbo.com/search?destination=${encodeURIComponent(cityLabel)}` },
-                    ].map(site => (
-                      <a key={site.label} href={site.url} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 py-2.5 px-4 rounded-xl bg-bg-subtle-strong border border-border-strong text-text-primary text-[13px] font-medium no-underline cursor-pointer">
-                        <span>{site.emoji}</span> {site.label}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* Hidden Gems banner */}
               {selectedVibe === 'hidden' && !placesLoading && filteredPlaces.length > 0 && (
                 <div className="card mb-3 px-[18px] py-4" style={{ background: `linear-gradient(135deg, var(--purple-tint-bg08), rgba(139,92,246,0.04))`, border: `1px solid var(--purple-tint-border15)` }}>

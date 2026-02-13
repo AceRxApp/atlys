@@ -511,10 +511,10 @@ export function useTripPlan(deps: {
   const [autoPlanError, setAutoPlanError] = useState<string | null>(null);
   const [lastPlanTitle, setLastPlanTitle] = useState<string | null>(null);
 
-  const planMyDay = useCallback(async (mood: string, budget: number, duration: PlanDuration) => {
+  const planMyDay = useCallback(async (mood: string, budget: number, duration: PlanDuration): Promise<boolean> => {
     if (!lat || !lng) {
       showToast('Location needed — pick a city or enable GPS');
-      return;
+      return false;
     }
 
     setAutoPlanLoading(true);
@@ -573,11 +573,13 @@ export function useTripPlan(deps: {
         mood, duration, budget: String(budget),
         stops: String(stops.length), city: cityLabel,
       });
+      return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to generate plan';
       setAutoPlanError(msg);
       hapticNotification('Error');
       showToast(msg);
+      return false;
     } finally {
       setAutoPlanLoading(false);
     }

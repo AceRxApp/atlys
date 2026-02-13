@@ -351,20 +351,107 @@ export default function HomeScreen() {
   const handlePlanMyDay = async () => {
     setPlanStep('loading');
     const moodStr = planMoods.join(' + ');
-    await planMyDay(moodStr, planBudget, planDuration);
-    setShowPlanner(false);
-    setScreen('plan');
+    const success = await planMyDay(moodStr, planBudget, planDuration);
+    if (success) {
+      setShowPlanner(false);
+      setScreen('plan');
+    } else {
+      // Stay on options step so user can retry
+      setPlanStep('options');
+    }
   };
 
   return (
     <div>
       {/* Greeting */}
-      <div className="mb-6">
+      <div className="mb-4">
         <h1 className="text-[26px] font-bold mb-1">
           {getGreeting()} ✨
         </h1>
         <p className="text-text-secondary text-sm">{getTimeSuggestion()}</p>
       </div>
+
+      {/* ── Location Selection ── */}
+
+      {/* GPS Card */}
+      {loc.hasLocation && (
+        <button
+          onClick={() => { setUseGps(true); setSelectedCity(null); }}
+          className={`card w-full cursor-pointer text-left flex items-center gap-3.5 ${useGps ? 'border-2 border-accent-amber bg-amber-tint-bg10' : 'border border-border-subtle bg-bg-surface-alpha'}`}
+        >
+          <div className="w-11 h-11 rounded-xl bg-accent-gradient flex items-center justify-center shrink-0">
+            <LocationIcon />
+          </div>
+          <div>
+            <div className="font-semibold text-[15px] text-text-primary">{loc.city || 'Near You'}</div>
+            <div className="text-xs text-text-secondary">Use your current location</div>
+          </div>
+          {useGps && <span className="ml-auto text-accent-amber text-sm shrink-0">✓</span>}
+        </button>
+      )}
+
+      {/* Divider */}
+      {loc.hasLocation && (
+        <div className="flex items-center gap-3 my-3">
+          <div className="flex-1 h-px bg-border-subtle" />
+          <span className="text-xs text-text-tertiary">or pick a city</span>
+          <div className="flex-1 h-px bg-border-subtle" />
+        </div>
+      )}
+
+      {/* City Search */}
+      <CitySearch
+        cities={cities}
+        selectedCity={selectedCity}
+        loading={loading}
+        onSelect={(city) => { setSelectedCity(city); setUseGps(false); }}
+      />
+
+      {/* City Banner */}
+      {selectedCity && (
+        <div className="card p-0 overflow-hidden mt-1 relative z-[1]">
+          <div className="h-[140px] relative overflow-hidden flex flex-col justify-end p-4">
+            {selectedCity.banner_url && !bannerFailed ? (
+              <>
+                <img src={selectedCity.banner_url} alt={selectedCity.name} loading="lazy" decoding="async"
+                  onError={() => setBannerFailed(true)}
+                  className="absolute inset-0 w-full h-full object-cover" />
+                <div className="absolute inset-0" style={{ background: 'linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.7))' }} />
+              </>
+            ) : (() => {
+              const regionGradients: Record<string, string> = {
+                'Africa': 'linear-gradient(135deg, #D97706, #92400E)',
+                'Asia': 'linear-gradient(135deg, #DC2626, #9F1239)',
+                'Europe': 'linear-gradient(135deg, #2563EB, #1E3A8A)',
+                'North America': 'linear-gradient(135deg, #059669, #064E3B)',
+                'South America': 'linear-gradient(135deg, #D97706, #065F46)',
+                'Caribbean': 'linear-gradient(135deg, #0891B2, #155E75)',
+                'Central America': 'linear-gradient(135deg, #059669, #0D9488)',
+                'Middle East': 'linear-gradient(135deg, #B45309, #78350F)',
+                'Oceania': 'linear-gradient(135deg, #0284C7, #1E3A8A)',
+              };
+              const regionEmojis: Record<string, string> = {
+                'Africa': '\u{1F30D}', 'Asia': '\u{1F3EF}', 'Europe': '\u{1F3F0}',
+                'North America': '\u{1F5FD}', 'South America': '\u{26F0}\u{FE0F}',
+                'Caribbean': '\u{1F3D6}\u{FE0F}', 'Central America': '\u{1F33A}',
+                'Middle East': '\u{1F54C}', 'Oceania': '\u{1F3D6}\u{FE0F}',
+              };
+              const grad = regionGradients[selectedCity.region] || 'linear-gradient(135deg, #F59E0B, #92400E)';
+              const emoji = regionEmojis[selectedCity.region] || '\u{1F30D}';
+              return (
+                <>
+                  <div className="absolute inset-0" style={{ background: grad }} />
+                  <div className="absolute top-3 right-4 text-4xl opacity-30">{emoji}</div>
+                </>
+              );
+            })()}
+            <h2 className="text-[22px] font-bold relative z-[1]">{selectedCity.name}</h2>
+            <p className="text-text-body text-[13px] relative z-[1]">{selectedCity.country}</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── City Context (weather, safety) ── */}
 
       {/* Weather Card */}
       {weather && (selectedCity || useGps) && (
@@ -419,6 +506,32 @@ export default function HomeScreen() {
           </div>
         );
       })()}
+
+      {/* ── Travel Setup ── */}
+
+      {/* Travel Group Selector */}
+      {(selectedCity || useGps) && (
+        <div className="card relative z-[1]">
+          <label className="section-label block mb-2.5">
+            Who&apos;s traveling?
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {TRAVEL_GROUPS.map(g => {
+              const active = travelGroup === g.id;
+              return (
+                <button key={g.id}
+                  aria-pressed={active}
+                  onClick={() => setTravelGroup(active ? null : g.id)}
+                  className={`py-2 px-3.5 rounded-[20px] text-[13px] font-medium cursor-pointer ${active ? 'border border-amber-tint-border40 bg-amber-tint-bg15 text-accent-amber' : 'border border-border-medium bg-transparent text-text-secondary'}`}>
+                  {g.emoji} {g.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Main Actions ── */}
 
       {/* Plan My Day — always visible, expands inline */}
       <div className="mt-1 mb-2">
@@ -584,112 +697,51 @@ export default function HomeScreen() {
         )}
       </div>
 
-      {/* Currency Converter */}
-      {(selectedCity || (useGps && loc.city)) && (
-        <CurrencyWidget
-          cityName={(selectedCity?.name || loc.city || '').toLowerCase()}
-        />
-      )}
-
-      {/* GPS Card */}
-      {loc.hasLocation && (
-        <button
-          onClick={() => { setUseGps(true); setSelectedCity(null); setScreen('discover'); }}
-          className={`card w-full cursor-pointer text-left flex items-center gap-3.5 ${useGps ? 'border-2 border-accent-amber bg-amber-tint-bg10' : 'border border-border-subtle bg-bg-surface-alpha'}`}
-        >
-          <div className="w-11 h-11 rounded-xl bg-accent-gradient flex items-center justify-center shrink-0">
-            <LocationIcon />
-          </div>
-          <div>
-            <div className="font-semibold text-[15px] text-text-primary">{loc.city || 'Near You'}</div>
-            <div className="text-xs text-text-secondary">Use your current location</div>
-          </div>
-          <div className="ml-auto text-accent-amber text-xl">→</div>
-        </button>
-      )}
-
-      {/* Divider */}
-      {loc.hasLocation && (
-        <div className="flex items-center gap-3 my-4">
-          <div className="flex-1 h-px bg-border-subtle" />
-          <span className="text-xs text-text-tertiary">or pick a city</span>
-          <div className="flex-1 h-px bg-border-subtle" />
-        </div>
-      )}
-
-      {/* City Search */}
-      <CitySearch
-        cities={cities}
-        selectedCity={selectedCity}
-        loading={loading}
-        onSelect={(city) => { setSelectedCity(city); setUseGps(false); }}
-      />
-
-      {/* City Banner */}
-      {selectedCity && (
-        <div className="card p-0 overflow-hidden mt-1 relative z-[1]">
-          <div className="h-[140px] relative overflow-hidden flex flex-col justify-end p-4">
-            {selectedCity.banner_url && !bannerFailed ? (
-              <>
-                <img src={selectedCity.banner_url} alt={selectedCity.name} loading="lazy" decoding="async"
-                  onError={() => setBannerFailed(true)}
-                  className="absolute inset-0 w-full h-full object-cover" />
-                <div className="absolute inset-0" style={{ background: 'linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.7))' }} />
-              </>
-            ) : (() => {
-              const regionGradients: Record<string, string> = {
-                'Africa': 'linear-gradient(135deg, #D97706, #92400E)',
-                'Asia': 'linear-gradient(135deg, #DC2626, #9F1239)',
-                'Europe': 'linear-gradient(135deg, #2563EB, #1E3A8A)',
-                'North America': 'linear-gradient(135deg, #059669, #064E3B)',
-                'South America': 'linear-gradient(135deg, #D97706, #065F46)',
-                'Caribbean': 'linear-gradient(135deg, #0891B2, #155E75)',
-                'Central America': 'linear-gradient(135deg, #059669, #0D9488)',
-                'Middle East': 'linear-gradient(135deg, #B45309, #78350F)',
-                'Oceania': 'linear-gradient(135deg, #0284C7, #1E3A8A)',
-              };
-              const regionEmojis: Record<string, string> = {
-                'Africa': '\u{1F30D}', 'Asia': '\u{1F3EF}', 'Europe': '\u{1F3F0}',
-                'North America': '\u{1F5FD}', 'South America': '\u{26F0}\u{FE0F}',
-                'Caribbean': '\u{1F3D6}\u{FE0F}', 'Central America': '\u{1F33A}',
-                'Middle East': '\u{1F54C}', 'Oceania': '\u{1F3D6}\u{FE0F}',
-              };
-              const grad = regionGradients[selectedCity.region] || 'linear-gradient(135deg, #F59E0B, #92400E)';
-              const emoji = regionEmojis[selectedCity.region] || '\u{1F30D}';
-              return (
-                <>
-                  <div className="absolute inset-0" style={{ background: grad }} />
-                  <div className="absolute top-3 right-4 text-4xl opacity-30">{emoji}</div>
-                </>
-              );
-            })()}
-            <h2 className="text-[22px] font-bold relative z-[1]">{selectedCity.name}</h2>
-            <p className="text-text-body text-[13px] relative z-[1]">{selectedCity.country}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Travel Group Selector */}
+      {/* Quick Actions */}
       {(selectedCity || useGps) && (
-        <div className="card mt-2 relative z-[1]">
-          <label className="section-label block mb-2.5">
-            Who&apos;s traveling?
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {TRAVEL_GROUPS.map(g => {
-              const active = travelGroup === g.id;
-              return (
-                <button key={g.id}
-                  aria-pressed={active}
-                  onClick={() => setTravelGroup(active ? null : g.id)}
-                  className={`py-2 px-3.5 rounded-[20px] text-[13px] font-medium cursor-pointer ${active ? 'border border-amber-tint-border40 bg-amber-tint-bg15 text-accent-amber' : 'border border-border-medium bg-transparent text-text-secondary'}`}>
-                  {g.emoji} {g.label}
-                </button>
-              );
-            })}
+        <>
+          <div className="flex gap-2.5 mt-1">
+            <button
+              className="flex-1 bg-bg-subtle-strong text-text-primary border border-border-medium rounded-[14px] p-3.5 text-[15px] font-semibold cursor-pointer"
+              onClick={() => setScreen('discover')}
+            >
+              Browse Places {'\u2192'}
+            </button>
+            <button
+              className="flex flex-col items-center justify-center gap-0.5 py-3 px-[18px] rounded-[14px] border-[1.5px] border-accent-amber bg-amber-tint-bg10 text-accent-amber cursor-pointer shrink-0"
+              onClick={() => { setSelectedVibe('food'); setScreen('discover'); }}
+              aria-label="Find food near me"
+            >
+              <span className="text-xl">{'\u{1F37D}\u{FE0F}'}</span>
+              <span className="text-[11px] font-semibold">Near Me</span>
+            </button>
           </div>
-        </div>
+          <div className="flex gap-2.5 mt-2.5">
+            <button
+              className="flex-1 flex items-center gap-2.5 py-3 px-4 rounded-[14px] border border-purple-tint-border20 bg-purple-tint-bg08 cursor-pointer"
+              onClick={() => { setQuickFilters(['15min']); setScreen('discover'); }}
+            >
+              <span className="text-lg">{'\u26A1'}</span>
+              <div className="text-left">
+                <div className="text-[13px] font-semibold text-text-primary">15-Min Adventure</div>
+                <div className="text-[11px] text-text-tertiary">Quick stops nearby</div>
+              </div>
+            </button>
+            <button
+              className="flex-1 flex items-center gap-2.5 py-3 px-4 rounded-[14px] border border-purple-tint-border20 bg-purple-tint-bg08 cursor-pointer"
+              onClick={() => { setScreen('discover'); setTimeout(() => spinBlindDate(), 300); }}
+            >
+              <span className="text-lg">{'\u{1F3B2}'}</span>
+              <div className="text-left">
+                <div className="text-[13px] font-semibold text-text-primary">Blind Date</div>
+                <div className="text-[11px] text-text-tertiary">Surprise spot</div>
+              </div>
+            </button>
+          </div>
+        </>
       )}
+
+      {/* ── Extra Info ── */}
 
       {/* Cultural Context */}
       {(selectedCity || (useGps && loc.city)) && (() => {
@@ -697,7 +749,7 @@ export default function HomeScreen() {
         const culture = CITY_CULTURE[key];
         if (!culture) return null;
         return (
-          <div className="card mt-2">
+          <div className="card mt-3">
             <button
               onClick={() => setShowCulture(!showCulture)}
               className="w-full bg-transparent border-none cursor-pointer flex items-center justify-between p-0 text-text-primary">
@@ -727,54 +779,16 @@ export default function HomeScreen() {
         );
       })()}
 
-      {/* Quick Actions */}
-      {(selectedCity || useGps) && (
-        <>
-          <div className="flex gap-2.5 mt-2.5">
-            <button
-              className="flex-1 bg-bg-subtle-strong text-text-primary border border-border-medium rounded-[14px] p-3.5 text-[15px] font-semibold cursor-pointer"
-              onClick={() => setScreen('discover')}
-            >
-              Browse Places {'\u2192'}
-            </button>
-            <button
-              className="flex flex-col items-center justify-center gap-0.5 py-3 px-[18px] rounded-[14px] border-[1.5px] border-accent-amber bg-amber-tint-bg10 text-accent-amber cursor-pointer shrink-0"
-              onClick={() => { setSelectedVibe('food'); setScreen('discover'); }}
-              aria-label="Find food near me"
-            >
-              <span className="text-xl">{'\u{1F37D}\u{FE0F}'}</span>
-              <span className="text-[11px] font-semibold">Near Me</span>
-            </button>
-          </div>
-          {/* Adventure shortcuts */}
-          <div className="flex gap-2.5 mt-2.5">
-            <button
-              className="flex-1 flex items-center gap-2.5 py-3 px-4 rounded-[14px] border border-purple-tint-border20 bg-purple-tint-bg08 cursor-pointer"
-              onClick={() => { setQuickFilters(['15min']); setScreen('discover'); }}
-            >
-              <span className="text-lg">{'\u26A1'}</span>
-              <div className="text-left">
-                <div className="text-[13px] font-semibold text-text-primary">15-Min Adventure</div>
-                <div className="text-[11px] text-text-tertiary">Quick stops nearby</div>
-              </div>
-            </button>
-            <button
-              className="flex-1 flex items-center gap-2.5 py-3 px-4 rounded-[14px] border border-purple-tint-border20 bg-purple-tint-bg08 cursor-pointer"
-              onClick={() => { setScreen('discover'); setTimeout(() => spinBlindDate(), 300); }}
-            >
-              <span className="text-lg">{'\u{1F3B2}'}</span>
-              <div className="text-left">
-                <div className="text-[13px] font-semibold text-text-primary">Blind Date</div>
-                <div className="text-[11px] text-text-tertiary">Surprise spot</div>
-              </div>
-            </button>
-          </div>
-        </>
+      {/* Currency Converter */}
+      {(selectedCity || (useGps && loc.city)) && (
+        <CurrencyWidget
+          cityName={(selectedCity?.name || loc.city || '').toLowerCase()}
+        />
       )}
 
       {/* Saved Places */}
       {savedPlaces.length > 0 && (
-        <div className="mt-5">
+        <div className="mt-4">
           <div className="flex justify-between items-center mb-2.5">
             <h2 className="text-base font-semibold">Saved for Later</h2>
             <span className="text-xs text-text-tertiary">{savedPlaces.length} places</span>
