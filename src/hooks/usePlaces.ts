@@ -195,7 +195,7 @@ export function usePlaces(deps: {
 
   const INDOOR_TYPES = ['museum', 'art_gallery', 'movie_theater', 'bowling_alley', 'library', 'book_store', 'cafe', 'coffee_shop', 'restaurant', 'bar', 'spa', 'shopping_mall', 'performing_arts_theater', 'aquarium', 'casino', 'bakery', 'ice_cream_shop'];
   const OUTDOOR_SCENIC_TYPES = ['park', 'hiking_area', 'national_park', 'tourist_attraction', 'garden', 'zoo', 'beach', 'campground', 'playground'];
-  const QUICK_VISIT_TYPES = ['cafe', 'coffee_shop', 'bakery', 'ice_cream_shop', 'park', 'art_gallery', 'book_store', 'market', 'bar', 'restaurant', 'museum', 'florist', 'gift_shop', 'sandwich_shop'];
+  const QUICK_VISIT_TYPES = ['cafe', 'coffee_shop', 'bakery', 'ice_cream_shop', 'park', 'art_gallery', 'book_store', 'market', 'bar', 'restaurant', 'museum', 'florist', 'gift_shop', 'sandwich_shop', 'tourist_attraction', 'library', 'spa', 'brunch_restaurant', 'breakfast_restaurant', 'juice_shop', 'dessert_shop'];
 
   const filteredPlaces = useMemo(() => places.filter(place => {
     for (const f of quickFilters) {
@@ -207,7 +207,7 @@ export function usePlaces(deps: {
         case 'family': if (NIGHTLIFE_TYPES.includes(place.category)) return false; if (place.rating > 0 && place.rating < 3.5) return false; break;
         case 'solo': if (place.reviewCount < 50) return false; if (place.rating > 0 && place.rating < 3.8) return false; break;
         case 'chainBreaker': if (isChain(place.name)) return false; break;
-        case '15min': if (!place.openNow) return false; if (place.distance !== null && place.distance > 1) return false; if (!QUICK_VISIT_TYPES.includes(place.category)) return false; break;
+        case '15min': if (!place.openNow) return false; if (place.distance !== null && place.distance > 2) return false; if (!QUICK_VISIT_TYPES.includes(place.category)) return false; break;
         case 'lateNight': {
           if (!place.openNow) return false;
           // Check if place is open late (parse hours for closing time after 11 PM)

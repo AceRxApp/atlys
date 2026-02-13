@@ -55,6 +55,7 @@ export function useLocationWeather(loc: LocState) {
     if (selectedCity) {
       const c = CITY_COORDS[selectedCity.name.toLowerCase()];
       if (c) return c;
+      if (selectedCity.lat && selectedCity.lng) return { lat: selectedCity.lat, lng: selectedCity.lng };
     }
     return { lat: 40.7128, lng: -73.996 };
   }, [useGps, loc.lat, loc.lng, selectedCity]);
@@ -90,6 +91,7 @@ export function useLocationWeather(loc: LocState) {
     else if (selectedCity) {
       const c = CITY_COORDS[selectedCity.name.toLowerCase()];
       if (c) { lat = c.lat; lng = c.lng; }
+      else if (selectedCity.lat && selectedCity.lng) { lat = selectedCity.lat; lng = selectedCity.lng; }
     }
     if (!lat || !lng) { setWeather(null); return; }
     const fetchWeather = async () => {

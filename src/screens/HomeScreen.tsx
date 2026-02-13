@@ -241,6 +241,7 @@ export default function HomeScreen() {
     loading,
     autoPlanLoading,
     planMyDay,
+    weather,
   } = useApp();
 
   const [planMoods, setPlanMoods] = useState<PlanMood[]>(['adventurous']);
@@ -293,12 +294,40 @@ export default function HomeScreen() {
   return (
     <div>
       {/* Greeting */}
-      <div className="mb-6">
+      <div className="mb-5">
         <h1 className="text-[26px] font-bold mb-1">
           {getGreeting()} {'\u2728'}
         </h1>
         <p className="text-text-secondary text-sm">{getTimeSuggestion()}</p>
       </div>
+
+      {/* Weather Card */}
+      {weather && (
+        <div className="card mb-5 p-4 border border-blue-tint-border"
+          style={{ background: 'linear-gradient(135deg, var(--blue-tint-bg), var(--bg-subtle))' }}>
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-4xl">{weather.emoji}</span>
+            <div>
+              <div className="text-2xl font-bold text-text-primary">{weather.temp}°F</div>
+              <div className="text-xs text-text-secondary">{weather.description} · H: {weather.high}° L: {weather.low}°</div>
+            </div>
+          </div>
+          {weather.forecast.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto scroll-hidden pt-2 border-t border-border-subtle">
+              {weather.forecast.slice(0, 5).map((day, i) => (
+                <div key={day.date} className="text-center min-w-[52px] shrink-0 py-1.5">
+                  <div className="text-[10px] text-text-tertiary mb-0.5">
+                    {i === 0 ? 'Today' : new Date(day.date + 'T12:00:00').toLocaleDateString('en', { weekday: 'short' })}
+                  </div>
+                  <div className="text-lg mb-0.5">{day.emoji}</div>
+                  <div className="text-[11px] font-semibold text-text-primary">{day.high}°</div>
+                  <div className="text-[10px] text-text-tertiary">{day.low}°</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Where are you going? ── */}
       <div className="mb-5">

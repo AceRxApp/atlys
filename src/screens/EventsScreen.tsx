@@ -119,6 +119,7 @@ export default function EventsScreen() {
     MAPS_API_KEY,
     getMapCenter,
     fetchEventsData,
+    weather,
   } = useApp();
   const { theme } = useTheme();
 
@@ -176,6 +177,21 @@ export default function EventsScreen() {
 
   return (
     <div>
+      {/* Weather Banner */}
+      {weather && (
+        <div className="flex items-center gap-2.5 mb-3 px-3.5 py-2.5 rounded-xl border border-blue-tint-border"
+          style={{ background: 'linear-gradient(135deg, var(--blue-tint-bg), var(--bg-subtle))' }}>
+          <span className="text-2xl">{weather.emoji}</span>
+          <div className="flex-1">
+            <span className="text-sm font-semibold text-text-primary">{weather.temp}°F</span>
+            <span className="text-xs text-text-secondary ml-1.5">{weather.description}</span>
+          </div>
+          <div className="text-[11px] text-text-tertiary shrink-0">
+            H: {weather.high}° L: {weather.low}°
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-3 flex justify-between items-start">
         <div>
