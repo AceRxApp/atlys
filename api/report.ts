@@ -1,7 +1,7 @@
 // Vercel Serverless API Route — Content Report
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
-import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors';
+import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';

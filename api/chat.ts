@@ -2,7 +2,7 @@
 // Proxies chat requests to Groq API (server-side, keeps keys safe)
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors';
+import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors.js';
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';

@@ -2,7 +2,7 @@
 // Keeps API keys server-side, never exposed to the browser
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors';
+import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors.js';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_PLACES_API_KEY || '';
 
