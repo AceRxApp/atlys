@@ -164,6 +164,7 @@ export default function PlanScreen() {
     places: allPlaces,
     requireAuth,
     lastPlanTitle,
+    estimatedSpend,
   } = useApp();
 
 
@@ -407,6 +408,23 @@ export default function PlanScreen() {
         </button>
       </div>
 
+      {/* Estimated Day Cost */}
+      {dayPlan.length > 0 && estimatedSpend > 0 && (
+        <div className="card mb-3 p-3.5 border border-amber-tint-border15"
+          style={{ background: `linear-gradient(135deg, var(--amber-tint-bg06), var(--bg-subtle))` }}>
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm">{'\u{1F4B0}'}</span>
+              <span className="text-xs font-semibold text-text-primary">Estimated Day Cost</span>
+            </div>
+            <span className="text-lg font-bold text-accent-amber">~${estimatedSpend}</span>
+          </div>
+          <div className="text-[11px] text-text-tertiary mt-1">
+            Based on {dayPlan.length} stop{dayPlan.length !== 1 ? 's' : ''} · per person
+          </div>
+        </div>
+      )}
+
       {/* Active day stops */}
       {dayPlan.length === 0 ? (
         <div className="card text-center py-8 px-5">
@@ -471,11 +489,13 @@ export default function PlanScreen() {
                         <>
                           <p className="text-xs text-text-secondary mb-1">
                             {stop.place.categoryDisplay}
-                            {stop.place.priceLevel >= 0 && (
+                            {stop.estimatedSpend && stop.estimatedSpend > 0 ? (
+                              <span className="text-accent-amber"> · ~${stop.estimatedSpend}</span>
+                            ) : stop.place.priceLevel >= 0 ? (
                               <span className={stop.place.priceLevel >= 3 ? 'text-accent-amber' : 'text-text-tertiary'}>
                                 {' '}· {'$'.repeat(Math.max(1, stop.place.priceLevel))}
                               </span>
-                            )}
+                            ) : null}
                             {stop.place.distance != null && ` · ${formatDistance(stop.place.distance, useMiles)} ${getDistanceReference()}`}
                           </p>
                           {stop.place.rating > 0 && (

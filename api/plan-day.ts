@@ -267,8 +267,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // 4. Build AI prompt
-    const budgetMap: Record<number, string> = { 1: 'budget ($)', 2: 'moderate ($$)', 3: 'splurge ($$$)' };
-    const budgetLabel = !budget || budget === -1 ? 'unlimited' : budgetMap[budget] || 'moderate ($$)';
+    const budgetMap: Record<number, { label: string; perStop: string; total: string }> = {
+      1: { label: 'budget ($)', perStop: '$5-15', total: '$40-75' },
+      2: { label: 'moderate ($$)', perStop: '$15-35', total: '$90-175' },
+      3: { label: 'splurge ($$$)', perStop: '$30-80', total: '$180-400' },
+    };
+    const budgetInfo = budget && budget > 0 ? budgetMap[budget] : null;
+    const budgetLabel = budgetInfo?.label || 'any budget';
+    const spendGuidance = budgetInfo
+      ? `Aim for ${budgetInfo.perStop} per stop, roughly ${budgetInfo.total} total for the day.`
+      : 'No budget constraint — pick the best options regardless of price.';
+
     const durationLabel = duration || 'full day';
     const isFullDay = durationLabel === 'full day' || durationLabel === 'full';
     const now = new Date();
@@ -295,7 +304,7 @@ RULES:
 2. Never pick 2 restaurants in a row
 3. Time-logical: breakfast/coffee first, activities mid-day, dinner/nightlife last
 4. Prefer open places and 4.0+ ratings
-5. Match the ${budgetLabel} budget level
+5. ${spendGuidance} The "spend" field must be a realistic USD estimate for one person at that specific stop (e.g. coffee=$5, museum=$20, nice dinner=$45).
 6. Mood: adventurous=unique/offbeat, chill=cafes/parks/relaxed, cultural=museums/galleries/landmarks, foodie=diverse cuisines/best-rated food, nightlife=bars/clubs/late-night, romantic=intimate/scenic/special ambiance
 7. Group: family=no nightlife, couple=romantic, solo=flexible, girls=aesthetic/brunch, boys=casual, bachelorette=festive
 8. Keep stops close together for walkability${eventsSection ? '\n9. Include at most 1 event if it fits the mood/timing' : ''}

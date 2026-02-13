@@ -57,6 +57,8 @@ export function useTripPlan(deps: {
 
   const estimatedSpend = useMemo(() => {
     return dayPlan.reduce((total, stop) => {
+      // Prefer AI's per-stop estimate; fall back to price-level heuristic for manually added stops
+      if (stop.estimatedSpend && stop.estimatedSpend > 0) return total + stop.estimatedSpend;
       if (stop.type === 'event') return total + 20;
       const pl = stop.place?.priceLevel ?? -1;
       return total + (PRICE_LEVEL_ESTIMATE[pl] ?? 15);
