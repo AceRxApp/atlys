@@ -421,24 +421,169 @@ export default function HomeScreen() {
         );
       })()}
 
-      {/* Plan My Day — Primary CTA (always visible) */}
-      <button
-        onClick={() => {
-          setPlanStep((selectedCity || useGps) ? 'options' : 'city');
-          setShowPlanner(true);
-        }}
-        className="w-full mt-1 mb-2 p-4 rounded-[16px] border-none cursor-pointer text-left flex items-center gap-4 shadow-[0_4px_24px_var(--amber-tint-shadow)]"
-        style={{ background: `linear-gradient(135deg, var(--accent-amber), #D97706)` }}
-      >
-        <div className="w-12 h-12 rounded-2xl bg-[rgba(0,0,0,0.15)] flex items-center justify-center shrink-0 text-2xl">
-          {'\u2728'}
-        </div>
-        <div className="flex-1">
-          <div className="text-[17px] font-bold text-[#0C0A09]">Plan My Day</div>
-          <div className="text-[12px] text-[#0C0A09] opacity-70">AI builds your perfect itinerary</div>
-        </div>
-        <div className="text-[#0C0A09] text-xl font-bold">{'\u2192'}</div>
-      </button>
+      {/* Plan My Day — always visible, expands inline */}
+      <div className="mt-1 mb-2">
+        <button
+          onClick={() => {
+            if (showPlanner) { setShowPlanner(false); return; }
+            setPlanStep((selectedCity || useGps) ? 'options' : 'city');
+            setShowPlanner(true);
+          }}
+          className="w-full p-4 rounded-[16px] border-none cursor-pointer text-left flex items-center gap-4 shadow-[0_4px_24px_var(--amber-tint-shadow)]"
+          style={{ background: `linear-gradient(135deg, var(--accent-amber), #D97706)` }}
+        >
+          <div className="w-12 h-12 rounded-2xl bg-[rgba(0,0,0,0.15)] flex items-center justify-center shrink-0 text-2xl">
+            {'\u2728'}
+          </div>
+          <div className="flex-1">
+            <div className="text-[17px] font-bold text-[#0C0A09]">Plan My Day</div>
+            <div className="text-[12px] text-[#0C0A09] opacity-70">AI builds your perfect itinerary</div>
+          </div>
+          <div className="text-[#0C0A09] text-xl font-bold transition-transform duration-200" style={{ transform: showPlanner ? 'rotate(90deg)' : 'none' }}>{'\u2192'}</div>
+        </button>
+
+        {/* Inline planner — expands below the CTA */}
+        {showPlanner && (
+          <div className="card mt-2 p-5">
+            {/* Step: City Selection */}
+            {planStep === 'city' && (
+              <>
+                <div className="text-center mb-4">
+                  <h3 className="text-base font-bold text-text-primary mb-1">Where are you headed?</h3>
+                  <p className="text-[12px] text-text-tertiary">Pick a city so we know where to plan</p>
+                </div>
+
+                {/* GPS option */}
+                {loc.hasLocation && (
+                  <button
+                    onClick={() => { setUseGps(true); setSelectedCity(null); setPlanStep('options'); }}
+                    className="w-full flex items-center gap-3.5 p-3.5 rounded-xl mb-3 cursor-pointer border border-border-medium bg-bg-elevated"
+                  >
+                    <div className="w-9 h-9 rounded-lg bg-accent-gradient flex items-center justify-center shrink-0">
+                      <LocationIcon />
+                    </div>
+                    <div className="text-left flex-1">
+                      <div className="text-[13px] font-semibold text-text-primary">{loc.city || 'Use My Location'}</div>
+                      <div className="text-[11px] text-text-tertiary">GPS nearby spots</div>
+                    </div>
+                  </button>
+                )}
+
+                <label className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.06em] block mb-2">
+                  {loc.hasLocation ? 'Or search a city' : 'Search a city'}
+                </label>
+                <PlannerCityPicker
+                  cities={cities}
+                  onSelect={(city) => {
+                    setSelectedCity(city);
+                    setUseGps(false);
+                    setPlanStep('options');
+                  }}
+                />
+              </>
+            )}
+
+            {/* Step: Options (mood, duration, budget) */}
+            {planStep === 'options' && (
+              <>
+                {/* City indicator */}
+                <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-xl bg-amber-tint-bg06 border border-amber-tint-border15">
+                  <span className="text-sm">{'\u{1F4CD}'}</span>
+                  <span className="text-[13px] text-text-primary font-medium flex-1">
+                    {useGps ? (loc.city || 'Your Location') : selectedCity?.name || 'Unknown'}
+                  </span>
+                  <button
+                    onClick={() => setPlanStep('city')}
+                    className="bg-none border-none text-accent-amber text-xs font-semibold cursor-pointer"
+                  >
+                    Change
+                  </button>
+                </div>
+
+                {/* Mood Picker (pick up to 2) */}
+                <div className="mb-4">
+                  <label className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.06em] block mb-2">What's the vibe? <span className="text-text-tertiary font-normal">(pick up to 2)</span></label>
+                  <div className="flex flex-wrap gap-2">
+                    {PLAN_MOODS.map(m => {
+                      const selected = planMoods.includes(m.id);
+                      return (
+                        <button key={m.id}
+                          onClick={() => togglePlanMood(m.id)}
+                          className={`py-2 px-3.5 rounded-[20px] text-[13px] font-medium cursor-pointer ${
+                            selected
+                              ? 'border-2 border-accent-amber bg-amber-tint-bg15 text-accent-amber'
+                              : 'border border-border-medium bg-transparent text-text-secondary'
+                          }`}>
+                          {m.emoji} {m.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Duration Picker */}
+                <div className="mb-4">
+                  <label className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.06em] block mb-2">How long?</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {PLAN_DURATIONS.map(d => (
+                      <button key={d.id}
+                        onClick={() => setPlanDuration(d.id)}
+                        className={`py-2.5 px-2 rounded-xl text-center cursor-pointer ${
+                          planDuration === d.id
+                            ? 'border-2 border-accent-amber bg-amber-tint-bg15'
+                            : 'border border-border-medium bg-transparent'
+                        }`}>
+                        <div className="text-lg mb-0.5">{d.emoji}</div>
+                        <div className={`text-[11px] font-semibold ${planDuration === d.id ? 'text-accent-amber' : 'text-text-primary'}`}>{d.label}</div>
+                        <div className="text-[10px] text-text-tertiary">{d.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Budget Picker */}
+                <div className="mb-5">
+                  <label className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.06em] block mb-2">Budget</label>
+                  <div className="flex gap-2">
+                    {PLAN_BUDGETS.map(b => (
+                      <button key={b.value}
+                        onClick={() => setPlanBudget(b.value)}
+                        className={`flex-1 py-2.5 rounded-xl text-center cursor-pointer ${
+                          planBudget === b.value
+                            ? 'border-2 border-accent-amber bg-amber-tint-bg15'
+                            : 'border border-border-medium bg-transparent'
+                        }`}>
+                        <div className="text-base mb-0.5">{b.emoji}</div>
+                        <div className={`text-[12px] font-semibold ${planBudget === b.value ? 'text-accent-amber' : 'text-text-primary'}`}>{b.label}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Generate Button */}
+                <button
+                  onClick={handlePlanMyDay}
+                  className="w-full p-4 rounded-[14px] border-none cursor-pointer text-base font-bold shadow-[0_4px_20px_var(--amber-tint-shadow)]"
+                  style={{ background: `linear-gradient(135deg, var(--accent-amber), #D97706)`, color: '#0C0A09' }}
+                >
+                  {'\u2728'} Generate My Day
+                </button>
+              </>
+            )}
+
+            {/* Step: Loading */}
+            {planStep === 'loading' && (
+              <div className="py-6 text-center">
+                <div className="w-10 h-[3px] rounded-sm mx-auto mb-5 animate-shimmer"
+                  style={{ background: `linear-gradient(90deg, var(--amber-tint-border30) 25%, var(--accent-amber) 50%, var(--amber-tint-border30) 75%)`, backgroundSize: '200% 100%' }} />
+                <div className="text-3xl mb-2">{'\u2728'}</div>
+                <div className="text-sm font-semibold text-text-primary mb-1">Planning your day...</div>
+                <div className="text-[13px] text-text-tertiary">{LOADING_MESSAGES[loadingMsgIdx]}</div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Currency Converter */}
       {(selectedCity || (useGps && loc.city)) && (
@@ -626,184 +771,6 @@ export default function HomeScreen() {
             </button>
           </div>
         </>
-      )}
-
-      {/* Plan My Day Modal */}
-      {showPlanner && (
-        <div
-          className="fixed inset-0 bg-[rgba(0,0,0,0.6)] backdrop-blur-[8px] z-[1000] flex items-end justify-center"
-          onClick={() => { if (planStep !== 'loading') setShowPlanner(false); }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            className="w-full max-w-[440px] bg-bg-surface rounded-t-[24px] pt-6 px-5 pb-10 animate-[slideUp_0.3s_ease-out] max-h-[90vh] overflow-y-auto"
-          >
-            {/* Handle */}
-            <div className="w-10 h-1 rounded-sm bg-border-strong mx-auto mb-5" />
-
-            {/* Header */}
-            <div className="text-center mb-5">
-              <div className="text-3xl mb-1">{'\u2728'}</div>
-              <h3 className="text-xl font-bold text-text-primary mb-1">Plan My Day</h3>
-              <p className="text-[13px] text-text-secondary">
-                {planStep === 'city'
-                  ? 'First, pick a city so we know where to plan'
-                  : planStep === 'loading'
-                  ? 'Hang tight, we\'re building your day...'
-                  : 'Answer a few questions and we\'ll build your perfect itinerary'}
-              </p>
-            </div>
-
-            {/* Step: City Selection */}
-            {planStep === 'city' && (
-              <>
-                {/* GPS option */}
-                {loc.hasLocation && (
-                  <button
-                    onClick={() => { setUseGps(true); setSelectedCity(null); setPlanStep('options'); }}
-                    className="w-full flex items-center gap-3.5 p-4 rounded-xl mb-3 cursor-pointer border border-border-medium bg-bg-elevated"
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-accent-gradient flex items-center justify-center shrink-0">
-                      <LocationIcon />
-                    </div>
-                    <div className="text-left flex-1">
-                      <div className="text-[14px] font-semibold text-text-primary">{loc.city || 'Use My Location'}</div>
-                      <div className="text-[11px] text-text-tertiary">Use GPS for nearby spots</div>
-                    </div>
-                  </button>
-                )}
-
-                {/* Mini city search */}
-                <label className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.06em] block mb-2">
-                  Or search a city
-                </label>
-                <PlannerCityPicker
-                  cities={cities}
-                  onSelect={(city) => {
-                    setSelectedCity(city);
-                    setUseGps(false);
-                    setPlanStep('options');
-                  }}
-                />
-
-                {/* Cancel */}
-                <button
-                  onClick={() => setShowPlanner(false)}
-                  className="w-full mt-4 p-3 bg-transparent border-none text-text-tertiary text-sm cursor-pointer"
-                >
-                  Cancel
-                </button>
-              </>
-            )}
-
-            {/* Step: Options (mood, duration, budget) */}
-            {planStep === 'options' && (
-              <>
-                {/* City indicator */}
-                <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-xl bg-amber-tint-bg06 border border-amber-tint-border15">
-                  <span className="text-sm">{'\u{1F4CD}'}</span>
-                  <span className="text-[13px] text-text-primary font-medium flex-1">
-                    {useGps ? (loc.city || 'Your Location') : selectedCity?.name || 'Unknown'}
-                  </span>
-                  <button
-                    onClick={() => setPlanStep('city')}
-                    className="bg-none border-none text-accent-amber text-xs font-semibold cursor-pointer"
-                  >
-                    Change
-                  </button>
-                </div>
-
-                {/* Mood Picker (pick up to 2) */}
-                <div className="mb-5">
-                  <label className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.06em] block mb-2">What's the vibe? <span className="text-text-tertiary font-normal">(pick up to 2)</span></label>
-                  <div className="flex flex-wrap gap-2">
-                    {PLAN_MOODS.map(m => {
-                      const selected = planMoods.includes(m.id);
-                      return (
-                        <button key={m.id}
-                          onClick={() => togglePlanMood(m.id)}
-                          className={`py-2 px-3.5 rounded-[20px] text-[13px] font-medium cursor-pointer ${
-                            selected
-                              ? 'border-2 border-accent-amber bg-amber-tint-bg15 text-accent-amber'
-                              : 'border border-border-medium bg-transparent text-text-secondary'
-                          }`}>
-                          {m.emoji} {m.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Duration Picker */}
-                <div className="mb-5">
-                  <label className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.06em] block mb-2">How long?</label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {PLAN_DURATIONS.map(d => (
-                      <button key={d.id}
-                        onClick={() => setPlanDuration(d.id)}
-                        className={`py-2.5 px-2 rounded-xl text-center cursor-pointer ${
-                          planDuration === d.id
-                            ? 'border-2 border-accent-amber bg-amber-tint-bg15'
-                            : 'border border-border-medium bg-transparent'
-                        }`}>
-                        <div className="text-lg mb-0.5">{d.emoji}</div>
-                        <div className={`text-[11px] font-semibold ${planDuration === d.id ? 'text-accent-amber' : 'text-text-primary'}`}>{d.label}</div>
-                        <div className="text-[10px] text-text-tertiary">{d.desc}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Budget Picker */}
-                <div className="mb-6">
-                  <label className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.06em] block mb-2">Budget</label>
-                  <div className="flex gap-2">
-                    {PLAN_BUDGETS.map(b => (
-                      <button key={b.value}
-                        onClick={() => setPlanBudget(b.value)}
-                        className={`flex-1 py-2.5 rounded-xl text-center cursor-pointer ${
-                          planBudget === b.value
-                            ? 'border-2 border-accent-amber bg-amber-tint-bg15'
-                            : 'border border-border-medium bg-transparent'
-                        }`}>
-                        <div className="text-base mb-0.5">{b.emoji}</div>
-                        <div className={`text-[12px] font-semibold ${planBudget === b.value ? 'text-accent-amber' : 'text-text-primary'}`}>{b.label}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Generate Button */}
-                <button
-                  onClick={handlePlanMyDay}
-                  className="w-full p-4 rounded-[14px] border-none cursor-pointer text-base font-bold shadow-[0_4px_20px_var(--amber-tint-shadow)]"
-                  style={{ background: `linear-gradient(135deg, var(--accent-amber), #D97706)`, color: '#0C0A09' }}
-                >
-                  {'\u2728'} Generate My Day
-                </button>
-
-                {/* Cancel */}
-                <button
-                  onClick={() => setShowPlanner(false)}
-                  className="w-full mt-2 p-3 bg-transparent border-none text-text-tertiary text-sm cursor-pointer"
-                >
-                  Cancel
-                </button>
-              </>
-            )}
-
-            {/* Step: Loading */}
-            {planStep === 'loading' && (
-              <div className="py-8 text-center">
-                <div className="w-10 h-[3px] rounded-sm mx-auto mb-6 animate-shimmer"
-                  style={{ background: `linear-gradient(90deg, var(--amber-tint-border30) 25%, var(--accent-amber) 50%, var(--amber-tint-border30) 75%)`, backgroundSize: '200% 100%' }} />
-                <div className="text-4xl mb-3">{'\u2728'}</div>
-                <div className="text-base font-semibold text-text-primary mb-2">Planning your day...</div>
-                <div className="text-[13px] text-text-tertiary">{LOADING_MESSAGES[loadingMsgIdx]}</div>
-              </div>
-            )}
-          </div>
-        </div>
       )}
 
       {/* Book Your Trip */}
