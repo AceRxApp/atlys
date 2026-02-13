@@ -1,8 +1,6 @@
 // Shared CORS + rate limiting utilities for all API routes
 
 import type { VercelResponse } from '@vercel/node';
-import { Redis } from '@upstash/redis';
-import { Ratelimit } from '@upstash/ratelimit';
 
 export const ALLOWED_ORIGINS = [
   'https://nxstops.com',
@@ -36,37 +34,53 @@ export function setCorsHeaders(
 }
 
 // ---------------------------------------------------------------------------
-// Upstash Redis rate limiter (persistent across cold starts)
+// Upstash Redis rate limiter (lazy-loaded to avoid crash if package missing)
 // ---------------------------------------------------------------------------
 
 const upstashUrl = process.env.UPSTASH_REDIS_REST_URL;
 const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-let redis: Redis | null = null;
-if (upstashUrl && upstashToken) {
-  redis = new Redis({ url: upstashUrl, token: upstashToken });
+let redisInstance: unknown = null;
+let redisInitialized = false;
+
+async function getRedis(): Promise<unknown> {
+  if (redisInitialized) return redisInstance;
+  redisInitialized = true;
+  if (!upstashUrl || !upstashToken) return null;
+  try {
+    const { Redis } = await import('@upstash/redis');
+    redisInstance = new Redis({ url: upstashUrl, token: upstashToken });
+    return redisInstance;
+  } catch {
+    console.warn('[NxStops] Upstash Redis not available, using in-memory rate limiting');
+    return null;
+  }
 }
 
-function formatWindow(ms: number): `${number} s` | `${number} m` | `${number} h` {
+type RatelimitWindow = `${number} s` | `${number} m` | `${number} h`;
+
+function formatWindow(ms: number): RatelimitWindow {
   if (ms >= 3_600_000 && ms % 3_600_000 === 0) return `${ms / 3_600_000} h`;
   if (ms >= 60_000 && ms % 60_000 === 0) return `${ms / 60_000} m`;
   return `${ms / 1_000} s`;
 }
 
-const ratelimitCache = new Map<string, Ratelimit>();
+const ratelimitCache = new Map<string, unknown>();
 
-function getUpstashRatelimit(max: number, windowMs: number): Ratelimit {
+async function getUpstashRatelimit(max: number, windowMs: number, redis: unknown): Promise<unknown> {
   const key = `${max}:${windowMs}`;
   let rl = ratelimitCache.get(key);
-  if (!rl && redis) {
+  if (!rl) {
+    const { Ratelimit } = await import('@upstash/ratelimit');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     rl = new Ratelimit({
-      redis,
+      redis: redis as any,
       limiter: Ratelimit.slidingWindow(max, formatWindow(windowMs)),
       prefix: `nxstops:rl:${key}`,
     });
     ratelimitCache.set(key, rl);
   }
-  return rl!;
+  return rl;
 }
 
 // ---------------------------------------------------------------------------
@@ -107,14 +121,15 @@ export async function checkRateLimit(
   max: number,
   windowMs: number,
 ): Promise<boolean> {
-  if (redis) {
-    try {
-      const rl = getUpstashRatelimit(max, windowMs);
+  try {
+    const redis = await getRedis();
+    if (redis) {
+      const rl = await getUpstashRatelimit(max, windowMs, redis) as { limit: (id: string) => Promise<{ success: boolean }> };
       const { success } = await rl.limit(ip);
       return success;
-    } catch {
-      return checkRateLimitInMemory(ip, max, windowMs);
     }
+  } catch {
+    // Fall through to in-memory
   }
   return checkRateLimitInMemory(ip, max, windowMs);
 }
