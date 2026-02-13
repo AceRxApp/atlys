@@ -1,11 +1,10 @@
 import { memo } from 'react';
 import { useApp } from '../context/AppContext';
-import { useTheme } from '../context/ThemeContext';
 import { Place, formatDistance, getHoursStatus } from '../services/places';
 import { PriceDots, StarRating } from './ui';
 import { DirectionsIcon, PhoneIcon, ShareIcon } from './icons';
-import { getCardStyle } from '../styles/shared';
 import { COMMUNITY_TAGS } from '../data';
+import { getNightRisk, isNightTime } from '../utils/safetyEngine';
 
 export default memo(function PlaceCard({ place }: { place: Place }) {
   const {
@@ -25,9 +24,8 @@ export default memo(function PlaceCard({ place }: { place: Place }) {
     getDistanceReference,
     useMiles,
     placeTagsCache,
+    weather,
   } = useApp();
-  const { theme } = useTheme();
-  const cardStyle = getCardStyle(theme);
 
   const inPlan = isInPlan(place.placeId);
   const hoursStatus = getHoursStatus(place.hours, place.openNow);
@@ -37,84 +35,88 @@ export default memo(function PlaceCard({ place }: { place: Place }) {
       role="button"
       tabIndex={0}
       aria-label={`View details for ${place.name}`}
-      style={{ ...cardStyle, padding: 0, overflow: 'hidden', opacity: place.openNow ? 1 : 0.6, cursor: 'pointer' }}
+      className={`card !p-0 overflow-hidden cursor-pointer ${place.openNow ? 'opacity-100' : 'opacity-60'}`}
       onClick={() => setSelectedPlace(place)}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPlace(place); } }}
     >
       {/* Photo */}
       {place.photoUrl && (
-        <div style={{
-          height: '160px', width: '100%', position: 'relative',
-          overflow: 'hidden',
-        }}>
+        <div className="h-[160px] w-full relative overflow-hidden">
           <img src={place.photoUrl} alt={place.name} loading="lazy" decoding="async"
             onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-          <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(to bottom, transparent 60%, ${theme.bg.imageOverlay})` }} />
-          <div style={{
-            position: 'absolute', top: '10px', left: '10px',
-            padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 600,
-            background: place.openNow ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
-            color: place.openNow ? theme.status.green : theme.status.red, backdropFilter: 'blur(8px)',
-          }}>
+            className="w-full h-full object-cover block" />
+          <div className="absolute inset-0" style={{ background: `linear-gradient(to bottom, transparent 60%, var(--bg-image-overlay))` }} />
+          <div className={`absolute top-2.5 left-2.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold backdrop-blur-[8px] ${place.openNow ? 'bg-[rgba(34,197,94,0.2)] text-status-green' : 'bg-[rgba(239,68,68,0.2)] text-status-red'}`}>
             {hoursStatus.text}
           </div>
           {place.distance != null && (
-            <div style={{
-              position: 'absolute', top: '10px', right: '10px',
-              padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 500,
-              background: theme.bg.photoButton, color: theme.text.primary, backdropFilter: 'blur(8px)',
-            }}>
+            <div className="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-bg-photo-button text-text-primary backdrop-blur-[8px]">
               {formatDistance(place.distance, useMiles)} {getDistanceReference()}
             </div>
           )}
         </div>
       )}
 
-      <div style={{ padding: '14px 16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0, flex: 1 }}>{place.name}</h3>
+      <div className="px-4 py-3.5">
+        <div className="flex justify-between items-start mb-1.5">
+          <h3 className="text-base font-semibold m-0 flex-1">{place.name}</h3>
           {place.rating > 0 && <StarRating rating={place.rating} count={place.reviewCount} />}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
+        <div className="flex items-center gap-1.5 mb-2 flex-wrap">
           {place.categoryDisplay && (
-            <span style={{ padding: '3px 8px', background: theme.amberTint.bg15, color: theme.accent.amber, borderRadius: '6px', fontSize: '11px', fontWeight: 500 }}>
+            <span className="px-2 py-[3px] bg-amber-tint-bg15 text-accent-amber rounded-[6px] text-[11px] font-medium">
               {place.categoryDisplay}
             </span>
           )}
           {place.reviewCount >= 200 && (
-            <span style={{ padding: '3px 8px', background: theme.greenTint.bg, color: theme.status.green, borderRadius: '6px', fontSize: '10px', fontWeight: 600 }}>
+            <span className="px-2 py-[3px] bg-green-tint-bg text-status-green rounded-[6px] text-[10px] font-semibold">
               Popular
             </span>
           )}
           <PriceDots level={place.priceLevel} />
           {!place.photoUrl && place.distance != null && (
-            <span style={{ fontSize: '11px', color: theme.text.secondary }}>{formatDistance(place.distance, useMiles)} {getDistanceReference()}</span>
+            <span className="text-[11px] text-text-secondary">{formatDistance(place.distance, useMiles)} {getDistanceReference()}</span>
           )}
           {!place.photoUrl && (
-            <span style={{ fontSize: '11px', color: place.openNow ? theme.status.green : theme.status.red }}>{hoursStatus.text}</span>
+            <span className={`text-[11px] ${place.openNow ? 'text-status-green' : 'text-status-red'}`}>{hoursStatus.text}</span>
           )}
         </div>
 
         {/* Safety Indicators */}
         {getSafetyIndicators(place).length > 0 && (
-          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '6px' }}>
+          <div className="flex gap-1 flex-wrap mb-1.5">
             {getSafetyIndicators(place).map(ind => (
-              <span key={ind} style={{ fontSize: '10px', color: theme.text.tertiary, padding: '2px 6px', background: theme.bg.subtle, borderRadius: '4px' }}>
+              <span key={ind} className="text-[10px] text-text-tertiary px-1.5 py-0.5 bg-bg-subtle rounded-[4px]">
                 {ind}
               </span>
             ))}
           </div>
         )}
 
+        {/* Night Risk Indicator (only shows at night) */}
+        {isNightTime(weather?.sunset) && (() => {
+          const risk = getNightRisk(place.category, place.rating, place.reviewCount, place.openNow);
+          return (
+            <div className="flex items-center gap-1 mb-1.5">
+              <span className="text-[10px]">{risk.emoji}</span>
+              <span className={`text-[10px] font-medium ${
+                risk.level === 'low' ? 'text-status-green' : risk.level === 'moderate' ? 'text-accent-amber' : 'text-status-red'
+              }`}>
+                {risk.label}
+              </span>
+              <span className="text-[9px] text-text-muted">{'\u00B7'} {risk.tip}</span>
+            </div>
+          );
+        })()}
+
         {/* Community Tags */}
         {placeTagsCache[place.placeId] && Object.entries(placeTagsCache[place.placeId]).filter(([, count]) => count >= 3).length > 0 && (
-          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '6px' }}>
+          <div className="flex gap-1 flex-wrap mb-1.5">
             {Object.entries(placeTagsCache[place.placeId]).filter(([, count]) => count >= 3).map(([tag]) => {
               const tagInfo = COMMUNITY_TAGS.find(t => t.id === tag);
               return tagInfo ? (
-                <span key={tag} style={{ fontSize: '10px', color: theme.community.text, padding: '2px 6px', background: theme.communityTint.bg, borderRadius: '4px' }}>
+                <span key={tag} className="text-[10px] text-community-text px-1.5 py-0.5 bg-community-tint-bg rounded-[4px]">
                   {tagInfo.emoji} {tagInfo.label}
                 </span>
               ) : null;
@@ -123,55 +125,53 @@ export default memo(function PlaceCard({ place }: { place: Place }) {
         )}
 
         {/* Action Row */}
-        <div style={{ display: 'flex', gap: '8px' }} onClick={e => e.stopPropagation()}>
+        <div className="flex gap-2" onClick={e => e.stopPropagation()}>
           <button
             onClick={() => { if (inPlan) { const stop = Object.values(tripDays).flat().find(s => s.place?.placeId === place.placeId); if (stop) removeFromPlan(stop.id); } else { addToPlan(place); } }}
-            style={{
-              flex: 1, padding: '12px 16px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
-              cursor: 'pointer', minHeight: '44px',
-              background: inPlan ? 'transparent' : theme.accent.amberGradient,
-              color: inPlan ? theme.accent.amber : theme.text.onAccent,
-              border: inPlan ? `1.5px solid ${theme.accent.amber}` : 'none',
-            }}
+            className={`flex-1 px-4 py-3 rounded-[10px] text-[13px] font-semibold cursor-pointer min-h-[44px] ${
+              inPlan
+                ? 'bg-transparent text-accent-amber border-[1.5px] border-accent-amber'
+                : 'bg-accent-gradient text-text-on-accent border-none'
+            }`}
           >
-            {inPlan ? '✓ Saved' : '+ Add'}
+            {inPlan ? '\u2713 Saved' : '+ Add'}
           </button>
           {place.googleMapsUrl && (
             <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
               aria-label="Get directions"
-              style={{ padding: '12px 16px', borderRadius: '10px', background: theme.bg.subtleStrong, color: theme.text.secondary, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', minHeight: '44px', minWidth: '44px' }}>
+              className="px-4 py-3 rounded-[10px] bg-bg-subtle-strong text-text-secondary flex items-center justify-center no-underline min-h-[44px] min-w-[44px]">
               <DirectionsIcon />
             </a>
           )}
           {place.phone && (
             <a href={`tel:${place.phone}`}
               aria-label="Call"
-              style={{ padding: '12px 16px', borderRadius: '10px', background: theme.bg.subtleStrong, color: theme.text.secondary, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', minHeight: '44px', minWidth: '44px' }}>
+              className="px-4 py-3 rounded-[10px] bg-bg-subtle-strong text-text-secondary flex items-center justify-center no-underline min-h-[44px] min-w-[44px]">
               <PhoneIcon />
             </a>
           )}
           {(isReservable(place) || isBookable(place)) && (
             <a href={getBookingUrl(place)} target="_blank" rel="noopener noreferrer"
-              style={{
-                padding: '12px 16px', borderRadius: '10px',
-                background: isReservable(place) ? 'rgba(218,55,67,0.12)' : theme.greenTint.bg,
-                color: isReservable(place) ? '#DA3743' : theme.status.green,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none',
-                fontSize: '11px', fontWeight: 600,
-                border: `1px solid ${isReservable(place) ? 'rgba(218,55,67,0.25)' : theme.greenTint.border}`,
-                minHeight: '44px',
-              }}>
+              className={`px-4 py-3 rounded-[10px] flex items-center justify-center no-underline text-[11px] font-semibold min-h-[44px] ${
+                isReservable(place)
+                  ? 'bg-[rgba(218,55,67,0.12)] text-[#DA3743] border border-[rgba(218,55,67,0.25)]'
+                  : 'bg-green-tint-bg text-status-green border border-green-tint-border'
+              }`}>
               {getBookingLabel(place)}
             </a>
           )}
           <button onClick={() => toggleSaved(place)}
             aria-label={isSaved(place.placeId) ? 'Remove from saved' : 'Save place'}
-            style={{ padding: '12px 16px', borderRadius: '10px', background: isSaved(place.placeId) ? theme.amberTint.bg15 : theme.bg.subtleStrong, color: isSaved(place.placeId) ? theme.accent.amber : theme.text.secondary, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', minHeight: '44px', minWidth: '44px' }}>
-            {isSaved(place.placeId) ? '♥' : '♡'}
+            className={`px-4 py-3 rounded-[10px] border-none cursor-pointer flex items-center justify-center text-base min-h-[44px] min-w-[44px] ${
+              isSaved(place.placeId)
+                ? 'bg-amber-tint-bg15 text-accent-amber'
+                : 'bg-bg-subtle-strong text-text-secondary'
+            }`}>
+            {isSaved(place.placeId) ? '\u2665' : '\u2661'}
           </button>
           <button onClick={() => sharePlace(place)}
             aria-label="Share"
-            style={{ padding: '12px 16px', borderRadius: '10px', background: theme.bg.subtleStrong, color: theme.text.secondary, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '44px', minWidth: '44px' }}>
+            className="px-4 py-3 rounded-[10px] bg-bg-subtle-strong text-text-secondary border-none cursor-pointer flex items-center justify-center min-h-[44px] min-w-[44px]">
             <ShareIcon />
           </button>
         </div>

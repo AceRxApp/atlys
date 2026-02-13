@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react';
-import type { City, EventItem, Stop, AdminSignup, Vibe, QuickFilter, TravelGroup, CommunityTag } from '../types';
+import type { City, EventItem, Stop, AdminSignup, Vibe, QuickFilter, TravelGroup, CommunityTag, PlanMood, PlanDuration } from '../types';
 import type { Place } from '../services/places';
-import type { Review } from '../supabase';
+import type { Review, UserStop } from '../supabase';
 import type { User } from '@supabase/supabase-js';
 
 // ============================================================================
@@ -18,6 +18,7 @@ export interface AppContextType {
   places: Place[];
   setPlaces: (places: Place[]) => void;
   filteredPlaces: Place[];
+  forYouPlaces: Place[];
   placesLoading: boolean;
   placesError: boolean;
   useGps: boolean;
@@ -134,6 +135,7 @@ export interface AppContextType {
     code: number;
     description: string;
     emoji: string;
+    sunset?: string;
     forecast: {
       date: string;
       high: number;
@@ -219,8 +221,8 @@ export interface AppContextType {
   adminSignups: AdminSignup[];
   adminCities: City[];
   adminLoading: boolean;
-  adminTab: 'dashboard' | 'signups' | 'cities';
-  setAdminTab: (tab: 'dashboard' | 'signups' | 'cities') => void;
+  adminTab: 'dashboard' | 'signups' | 'cities' | 'reports' | 'stops';
+  setAdminTab: (tab: 'dashboard' | 'signups' | 'cities' | 'reports' | 'stops') => void;
   openAdmin: () => Promise<void>;
   handleToggleCity: (cityId: string, isActive: boolean) => Promise<void>;
 
@@ -260,6 +262,26 @@ export interface AppContextType {
   authSubmitting: boolean;
   acceptedTerms: boolean;
   setAcceptedTerms: (accepted: boolean) => void;
+
+  // --- Blind Date ---
+  blindDatePlace: Place | null;
+  blindDateRevealed: boolean;
+  spinBlindDate: () => void;
+  revealBlindDate: () => void;
+  dismissBlindDate: () => void;
+
+  // --- User Contributed Stops ---
+  userStops: UserStop[];
+  showPinStop: boolean;
+  setShowPinStop: (show: boolean) => void;
+  pinStopSubmitting: boolean;
+  submitPinStop: (stop: { name: string; description?: string; category: string; lat: number; lng: number }) => Promise<void>;
+
+  // --- Auto Day Planner ---
+  autoPlanLoading: boolean;
+  autoPlanError: string | null;
+  lastPlanTitle: string | null;
+  planMyDay: (mood: PlanMood, budget: number, duration: PlanDuration) => Promise<void>;
 
   // --- Fetch triggers ---
   fetchPlaces: () => Promise<void>;

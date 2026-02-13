@@ -2,11 +2,14 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { track } from '@vercel/analytics';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { createCrewTrip, loadCrewTrip, updateCrewTripDays, subscribeToCrewTrip, unsubscribeFromCrewTrip } from '../supabase';
-import type { City, EventItem, Stop } from '../types';
+import type { City, EventItem, Stop, PlanMood, PlanDuration } from '../types';
 import type { Place } from '../services/places';
 import { formatDistance } from '../services/places';
 import { calcWalkMinutes, calcDriveMinutes, buildMapsUrl, haversineKm } from '../utils/transport';
 import { PRICE_LEVEL_ESTIMATE } from '../data/constants';
+import { hapticImpact, hapticNotification, hapticSelection } from '../utils/haptics';
+import { generateDayPlan } from '../services/autoPlan';
+import { getPreferenceSummary, recordTripGenerated, recordAddedToTrip, recordSwapPreference } from '../utils/preferences';
 
 export function useTripPlan(deps: {
   useGps: boolean;
@@ -17,8 +20,13 @@ export function useTripPlan(deps: {
   useMiles: boolean;
   showToast: (msg: string) => void;
   requireAuth: () => boolean;
+  lat: number | null;
+  lng: number | null;
+  weather: { temp: number; description: string; emoji: string } | null;
+  travelGroup: string | null;
+  events: EventItem[];
 }) {
-  const { useGps, locCity, selectedCity, cityLabel, citySlug, useMiles, showToast, requireAuth } = deps;
+  const { useGps, locCity, selectedCity, cityLabel, citySlug, useMiles, showToast, requireAuth, lat, lng, weather, travelGroup, events } = deps;
 
   const [tripDays, setTripDays] = useState<Record<number, Stop[]>>({ 1: [] });
   const [activeDay, setActiveDay] = useState(1);
@@ -164,6 +172,7 @@ export function useTripPlan(deps: {
     if (!requireAuth()) return;
     const allStops = Object.values(tripDays).flat();
     if (allStops.find(s => s.place?.placeId === place.placeId)) return;
+    hapticImpact('Medium');
     setActiveDayStops(prev => [...prev, { id: crypto.randomUUID(), type: 'place', place, addedAt: new Date() }]);
     const budget = dayBudgets[activeDay] ?? -1;
     if (budget > 0) {
@@ -178,12 +187,14 @@ export function useTripPlan(deps: {
       showToast(`Added ${place.name} to Day ${activeDay}`);
     }
     track('add_to_plan', { place: place.name, category: place.categoryDisplay || '', day: String(activeDay) });
+    recordAddedToTrip(place.category, place.priceLevel);
   };
 
   const addEventToPlan = (event: EventItem) => {
     if (!requireAuth()) return;
     const allStops = Object.values(tripDays).flat();
     if (allStops.find(s => s.event?.id === event.id)) return;
+    hapticImpact('Medium');
     setActiveDayStops(prev => [...prev, { id: crypto.randomUUID(), type: 'event', event, addedAt: new Date() }]);
     showToast(`Added ${event.name} to Day ${activeDay}`);
     track('add_event_to_plan', { event: event.name, day: String(activeDay) });
@@ -192,6 +203,7 @@ export function useTripPlan(deps: {
   const isEventInPlan = (eventId: string) => Object.values(tripDays).flat().some(s => s.event?.id === eventId);
 
   const removeFromPlan = (stopId: string) => {
+    hapticImpact('Light');
     setTripDays(prev => {
       const updated = { ...prev };
       for (const day of Object.keys(updated)) {
@@ -204,6 +216,7 @@ export function useTripPlan(deps: {
   const isInPlan = (placeId: string) => Object.values(tripDays).flat().some(s => s.place?.placeId === placeId);
 
   const clearPlan = () => {
+    hapticNotification('Warning');
     setTripDays({ 1: [] });
     setActiveDay(1);
     showToast('Plan cleared');
@@ -213,11 +226,13 @@ export function useTripPlan(deps: {
     const newPlan = [...dayPlan];
     const target = direction === 'up' ? index - 1 : index + 1;
     if (target < 0 || target >= newPlan.length) return;
+    hapticSelection();
     [newPlan[index], newPlan[target]] = [newPlan[target], newPlan[index]];
     setActiveDayStops(newPlan);
   };
 
   const addDay = () => {
+    hapticImpact('Light');
     const nextDay = Math.max(...Object.keys(tripDays).map(Number)) + 1;
     setTripDays(prev => ({ ...prev, [nextDay]: [] }));
     setActiveDay(nextDay);
@@ -226,6 +241,7 @@ export function useTripPlan(deps: {
 
   const removeDay = (day: number) => {
     if (dayCount <= 1) return;
+    hapticNotification('Warning');
     setTripDays(prev => {
       const updated = { ...prev };
       delete updated[day];
@@ -249,6 +265,14 @@ export function useTripPlan(deps: {
   };
 
   const pivotStop = useCallback((oldStopId: string, newPlace: Place) => {
+    // Record the swap in preferences before modifying
+    const allStops = Object.values(tripDays).flat();
+    const oldStop = allStops.find(s => s.id === oldStopId);
+    if (oldStop?.place) {
+      recordSwapPreference(oldStop.place.category, oldStop.place.placeId);
+    }
+    recordAddedToTrip(newPlace.category, newPlace.priceLevel);
+
     setTripDays(prev => {
       const updated = { ...prev };
       for (const day of Object.keys(updated)) {
@@ -270,7 +294,7 @@ export function useTripPlan(deps: {
     });
     showToast(`Swapped to ${newPlace.name}`);
     track('pivot_stop', { newPlace: newPlace.name, category: newPlace.categoryDisplay || '' });
-  }, [showToast]);
+  }, [showToast, tripDays]);
 
   const getStopName = (stop: Stop) => stop.type === 'event' ? (stop.event?.name || 'Event') : (stop.place?.name || 'Place');
   const getStopCategory = (stop: Stop) => stop.type === 'event' ? (stop.event?.category || 'Event') : (stop.place?.categoryDisplay || '');
@@ -307,6 +331,15 @@ export function useTripPlan(deps: {
     const summary = `My ${cityLabel} Trip Plan:\n\n${lines}\n\nPlanned with NxStops`;
     const allStops = Object.values(tripDays).flat().length;
     track('share_plan', { city: cityLabel, days: String(Object.keys(tripDays).length), stops: String(allStops) });
+    hapticImpact('Light');
+    try {
+      const { Capacitor } = await import('@capacitor/core');
+      if (Capacitor.isNativePlatform()) {
+        const { Share } = await import('@capacitor/share');
+        await Share.share({ title: `${cityLabel} Trip Plan`, text: summary, dialogTitle: 'Share your trip' });
+        return;
+      }
+    } catch { /* fall through */ }
     if (navigator.share) {
       await navigator.share({ title: `${cityLabel} Trip Plan`, text: summary });
     } else {
@@ -390,8 +423,10 @@ export function useTripPlan(deps: {
 
   const generateCrewCode = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const bytes = new Uint8Array(8);
+    crypto.getRandomValues(bytes);
     let code = '';
-    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    for (let i = 0; i < 8; i++) code += chars[bytes[i] % chars.length];
     return code;
   };
 
@@ -423,7 +458,7 @@ export function useTripPlan(deps: {
   const joinCrew = async () => {
     if (!requireAuth()) return;
     const code = joinCrewInput.trim().toUpperCase();
-    if (code.length < 4) { showToast('Enter a valid crew code'); return; }
+    if (code.length < 6) { showToast('Enter a valid crew code'); return; }
     setCrewSyncing(true);
     const trip = await loadCrewTrip(code);
     if (trip) {
@@ -468,6 +503,86 @@ export function useTripPlan(deps: {
     }
   };
 
+  // --------------------------------------------------------------------------
+  // Auto Day Planner
+  // --------------------------------------------------------------------------
+
+  const [autoPlanLoading, setAutoPlanLoading] = useState(false);
+  const [autoPlanError, setAutoPlanError] = useState<string | null>(null);
+  const [lastPlanTitle, setLastPlanTitle] = useState<string | null>(null);
+
+  const planMyDay = useCallback(async (mood: PlanMood, budget: number, duration: PlanDuration) => {
+    if (!lat || !lng) {
+      showToast('Location needed — pick a city or enable GPS');
+      return;
+    }
+
+    setAutoPlanLoading(true);
+    setAutoPlanError(null);
+
+    try {
+      const weatherStr = weather
+        ? `${weather.temp}°F, ${weather.description}`
+        : undefined;
+
+      const prefSummary = getPreferenceSummary() || undefined;
+
+      // Get today's events for the AI to optionally include
+      const today = new Date().toISOString().split('T')[0];
+      const todayEvents = events
+        .filter(e => e.date === today)
+        .slice(0, 5)
+        .map(e => ({ name: e.name, category: e.category, time: e.time, venue: e.venue }));
+
+      const result = await generateDayPlan({
+        lat,
+        lng,
+        city: cityLabel || undefined,
+        mood,
+        budget,
+        travelGroup: travelGroup || undefined,
+        duration,
+        weather: weatherStr,
+        preferences: prefSummary,
+        events: todayEvents.length > 0 ? todayEvents : undefined,
+      });
+
+      // Convert plan stops to Stop objects
+      const stops: Stop[] = result.plan.map(s => ({
+        id: crypto.randomUUID(),
+        type: 'place' as const,
+        place: s.place,
+        addedAt: new Date(),
+        timeSlot: s.timeSlot,
+        reason: s.reason,
+        estimatedSpend: s.estimatedSpend,
+      }));
+
+      // Set as Day 1 (clear existing plan)
+      setTripDays({ 1: stops });
+      setActiveDay(1);
+      if (budget > 0) setDayBudget(1, budget);
+      setLastPlanTitle(result.dayTitle);
+
+      // Record in preference memory
+      recordTripGenerated(mood);
+
+      hapticNotification('Success');
+      showToast(`${result.dayTitle} — ${stops.length} stops planned!`);
+      track('auto_plan_generated', {
+        mood, duration, budget: String(budget),
+        stops: String(stops.length), city: cityLabel,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to generate plan';
+      setAutoPlanError(msg);
+      hapticNotification('Error');
+      showToast(msg);
+    } finally {
+      setAutoPlanLoading(false);
+    }
+  }, [lat, lng, weather, cityLabel, travelGroup, events, showToast, setDayBudget]);
+
   return {
     tripDays, setTripDays, activeDay, setActiveDay,
     dayPlan, totalStops, dayCount, setActiveDayStops,
@@ -478,5 +593,6 @@ export function useTripPlan(deps: {
     estimatedSpend, budgetRemaining, budgetPercentUsed, isOverBudget,
     crewMode, crewCode, crewSyncing, joinCrewInput, setJoinCrewInput,
     showJoinCrew, setShowJoinCrew, startCrewMode, stopCrewMode, joinCrew, shareCrewPlan,
+    autoPlanLoading, autoPlanError, lastPlanTitle, planMyDay,
   };
 }

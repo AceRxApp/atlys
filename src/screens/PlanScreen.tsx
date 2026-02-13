@@ -1,16 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { track } from '@vercel/analytics';
 import { useApp } from '../context/AppContext';
-import { useTheme } from '../context/ThemeContext';
-import { getCardStyle } from '../styles/shared';
 import { DirectionsIcon, PhoneIcon, ShareIcon } from '../components/icons';
 import { formatDistance } from '../services/places';
 import type { Place } from '../services/places';
 import { generatePackingList } from '../utils/packingList';
 import { findPivotAlternatives } from '../utils/surpriseFilter';
 import { PRICE_LEVEL_ESTIMATE, BURN_RATE_PRESETS } from '../data/constants';
+import { getPlaceBookingUrl } from '../data/bookingLinks';
 import BookingLinks from '../components/BookingLinks';
 import type { PackingItem } from '../data/packingItems';
+import { getNightRisk, isNightTime } from '../utils/safetyEngine';
 import type { Stop } from '../types';
 
 // Local helpers (not on context)
@@ -172,10 +172,9 @@ export default function PlanScreen() {
     budgetPercentUsed,
     isOverBudget,
     requireAuth,
+    lastPlanTitle,
   } = useApp();
 
-  const { theme } = useTheme();
-  const cardStyle = getCardStyle(theme);
 
   const sortedDays = Object.keys(tripDays).map(Number).sort((a, b) => a - b);
 
@@ -232,40 +231,31 @@ export default function PlanScreen() {
 
   if (totalStops === 0 && !crewMode) {
     return (
-      <div style={{ textAlign: 'center', paddingTop: '60px' }}>
-        <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.6 }}>&#x1f5fa;&#xfe0f;</div>
-        <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '8px' }}>No stops yet</h2>
-        <p style={{ color: theme.text.secondary, fontSize: '14px', marginBottom: '24px', lineHeight: 1.5 }}>
+      <div className="text-center pt-[60px]">
+        <div className="text-[64px] mb-4 opacity-60">&#x1f5fa;&#xfe0f;</div>
+        <h2 className="text-[22px] font-bold mb-2">No stops yet</h2>
+        <p className="text-text-secondary text-sm mb-6 leading-normal">
           Explore places and tap &quot;+ Add&quot; to build your trip plan
         </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
+        <div className="flex flex-col gap-2.5 items-center">
           <button
             onClick={() => setScreen('discover')}
-            style={{
-              background: theme.accent.amberGradient, color: theme.text.onAccent,
-              border: 'none', borderRadius: '14px', padding: '14px 28px',
-              fontSize: '15px', fontWeight: 600, cursor: 'pointer',
-              boxShadow: `0 4px 20px ${theme.amberTint.shadow}`,
-            }}
+            className="bg-accent-gradient text-text-on-accent border-none rounded-[14px] py-3.5 px-7 text-[15px] font-semibold cursor-pointer shadow-[0_4px_20px_var(--amber-tint-shadow)]"
           >
             Start Exploring →
           </button>
           <button
             onClick={() => setShowJoinCrew(true)}
-            style={{
-              background: 'none', border: `1px solid ${theme.border.strong}`,
-              color: theme.text.secondary, borderRadius: '14px', padding: '12px 24px',
-              fontSize: '14px', cursor: 'pointer',
-            }}
+            className="bg-transparent border border-border-strong text-text-secondary rounded-[14px] py-3 px-6 text-sm cursor-pointer"
           >
             &#x1f465; Join a Crew
           </button>
         </div>
         {/* Inline Join Crew */}
         {showJoinCrew && (
-          <div style={{ ...cardStyle, marginTop: '20px', padding: '16px', textAlign: 'left' }}>
-            <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '8px', color: theme.text.primary }}>Enter Crew Code</div>
-            <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="card mt-5 p-4 text-left">
+            <div className="text-sm font-semibold mb-2 text-text-primary">Enter Crew Code</div>
+            <div className="flex gap-2">
               <input
                 type="text"
                 placeholder="e.g. X7K3NP"
@@ -277,22 +267,16 @@ export default function PlanScreen() {
                   }
                 }}
                 maxLength={6}
-                style={{
-                  flex: 1, padding: '12px', borderRadius: '10px',
-                  border: `1px solid ${theme.border.strong}`, background: theme.bg.input,
-                  color: theme.text.primary, fontSize: '18px', fontWeight: 700,
-                  letterSpacing: '4px', textAlign: 'center', outline: 'none',
-                }}
+                className="flex-1 p-3 rounded-[10px] border border-border-strong bg-bg-input text-text-primary text-lg font-bold tracking-[4px] text-center outline-none"
               />
               <button
                 onClick={() => joinCrew()}
                 disabled={crewSyncing || joinCrewInput.length < 4}
-                style={{
-                  padding: '12px 20px', borderRadius: '10px', border: 'none', cursor: 'pointer',
-                  background: joinCrewInput.length >= 4 ? theme.accent.amber : theme.border.subtle,
-                  color: joinCrewInput.length >= 4 ? theme.text.onAccent : theme.text.tertiary,
-                  fontSize: '14px', fontWeight: 600,
-                }}>
+                className={`py-3 px-5 rounded-[10px] border-none cursor-pointer text-sm font-semibold ${
+                  joinCrewInput.length >= 4
+                    ? 'bg-accent-amber text-text-on-accent'
+                    : 'bg-border-subtle text-text-tertiary'
+                }`}>
                 {crewSyncing ? '...' : 'Join'}
               </button>
             </div>
@@ -305,52 +289,42 @@ export default function PlanScreen() {
   return (
     <div>
       {/* Header */}
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '4px' }}>
-            Your Trip Plan
+      <div className="mb-4">
+        <div className="flex justify-between items-center">
+          <h1 className="text-[22px] font-bold mb-1">
+            {lastPlanTitle || 'Your Trip Plan'}
           </h1>
           {/* Crew Toggle */}
-          <div style={{ display: 'flex', gap: '6px' }}>
+          <div className="flex gap-1.5">
             {!crewMode && (
               <button onClick={() => setShowJoinCrew(true)}
-                style={{
-                  padding: '6px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                  border: `1px solid ${theme.border.strong}`, background: 'transparent',
-                  color: theme.text.tertiary, cursor: 'pointer',
-                }}>
+                className="py-1.5 px-3 rounded-[20px] text-[11px] font-semibold border border-border-strong bg-transparent text-text-tertiary cursor-pointer">
                 Join Crew
               </button>
             )}
             <button
               onClick={crewMode ? stopCrewMode : startCrewMode}
               disabled={crewSyncing}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '6px',
-                padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
-                border: crewMode ? `1px solid ${theme.amberTint.border30}` : `1px solid ${theme.border.strong}`,
-                background: crewMode ? theme.amberTint.bg15 : 'transparent',
-                color: crewMode ? theme.accent.amber : theme.text.tertiary, cursor: crewSyncing ? 'default' : 'pointer',
-                opacity: crewSyncing ? 0.5 : 1,
-              }}>
+              className={`flex items-center gap-1.5 py-1.5 px-3.5 rounded-[20px] text-xs font-semibold cursor-pointer ${
+                crewMode
+                  ? 'border border-amber-tint-border30 bg-amber-tint-bg15 text-accent-amber'
+                  : 'border border-border-strong bg-transparent text-text-tertiary'
+              } ${crewSyncing ? 'opacity-50 cursor-default' : ''}`}>
               {crewSyncing ? '...' : crewMode ? '\u{1F465} Crew On' : '\u{1F464} Solo'}
             </button>
           </div>
         </div>
-        <p style={{ color: theme.text.tertiary, fontSize: '13px' }}>
+        <p className="text-text-tertiary text-[13px]">
           {cityLabel} · {totalStops} stop{totalStops !== 1 ? 's' : ''} · {dayCount} day{dayCount !== 1 ? 's' : ''}
         </p>
       </div>
 
       {/* Join Crew Modal */}
       {showJoinCrew && (
-        <div style={{
-          ...cardStyle, marginBottom: '12px', padding: '16px',
-          background: theme.bg.toast, border: `1px solid ${theme.amberTint.border15}`,
-        }}>
-          <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '10px', color: theme.text.primary }}>Join a Crew</div>
-          <p style={{ fontSize: '12px', color: theme.text.secondary, marginBottom: '12px' }}>Enter the crew code shared with you</p>
-          <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="card mb-3 p-4 bg-bg-toast border border-amber-tint-border15">
+          <div className="text-sm font-semibold mb-2.5 text-text-primary">Join a Crew</div>
+          <p className="text-xs text-text-secondary mb-3">Enter the crew code shared with you</p>
+          <div className="flex gap-2">
             <input
               type="text"
               placeholder="e.g. X7K3NP"
@@ -358,26 +332,19 @@ export default function PlanScreen() {
               onChange={e => setJoinCrewInput(e.target.value.toUpperCase())}
               onKeyDown={e => e.key === 'Enter' && joinCrew()}
               maxLength={6}
-              style={{
-                flex: 1, padding: '12px 14px', borderRadius: '10px',
-                border: `1px solid ${theme.border.strong}`, background: theme.bg.input,
-                color: theme.text.primary, fontSize: '18px', fontWeight: 700,
-                letterSpacing: '4px', textAlign: 'center', outline: 'none',
-                textTransform: 'uppercase',
-              }}
+              className="flex-1 py-3 px-3.5 rounded-[10px] border border-border-strong bg-bg-input text-text-primary text-lg font-bold tracking-[4px] text-center outline-none uppercase"
             />
             <button onClick={joinCrew} disabled={crewSyncing || joinCrewInput.length < 4}
-              style={{
-                padding: '12px 20px', borderRadius: '10px', border: 'none', cursor: 'pointer',
-                background: joinCrewInput.length >= 4 ? theme.accent.amberGradient : theme.border.subtle,
-                color: joinCrewInput.length >= 4 ? theme.text.onAccent : theme.text.tertiary,
-                fontSize: '14px', fontWeight: 600,
-              }}>
+              className={`py-3 px-5 rounded-[10px] border-none cursor-pointer text-sm font-semibold ${
+                joinCrewInput.length >= 4
+                  ? 'bg-accent-gradient text-text-on-accent'
+                  : 'bg-border-subtle text-text-tertiary'
+              }`}>
               {crewSyncing ? '...' : 'Join'}
             </button>
           </div>
           <button onClick={() => { setShowJoinCrew(false); setJoinCrewInput(''); }}
-            style={{ width: '100%', padding: '8px', marginTop: '8px', background: 'none', border: 'none', color: theme.text.tertiary, fontSize: '12px', cursor: 'pointer' }}>
+            className="w-full p-2 mt-2 bg-transparent border-none text-text-tertiary text-xs cursor-pointer">
             Cancel
           </button>
         </div>
@@ -385,37 +352,23 @@ export default function PlanScreen() {
 
       {/* Crew Mode Banner */}
       {crewMode && crewCode && (
-        <div style={{
-          ...cardStyle, marginBottom: '12px', padding: '16px',
-          background: `linear-gradient(135deg, ${theme.amberTint.bg10}, ${theme.amberTint.bg06})`,
-          border: `1px solid ${theme.amberTint.border20}`,
-        }}>
-          <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Share this code with your crew</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-            <div style={{
-              flex: 1, fontSize: '28px', fontWeight: 700, letterSpacing: '6px', color: theme.accent.amber,
-              background: theme.bg.photoCounter, borderRadius: '10px', padding: '10px 16px', textAlign: 'center',
-              fontFamily: 'monospace',
-            }}>{crewCode}</div>
+        <div className="card mb-3 p-4 border border-amber-tint-border20"
+          style={{ background: `linear-gradient(135deg, var(--amber-tint-bg10), var(--amber-tint-bg06))` }}>
+          <div className="text-[11px] text-text-tertiary uppercase tracking-[0.08em] mb-1.5">Share this code with your crew</div>
+          <div className="flex items-center gap-2.5 mb-2.5">
+            <div className="flex-1 text-[28px] font-bold tracking-[6px] text-accent-amber bg-bg-photo-counter rounded-[10px] py-2.5 px-4 text-center font-mono">
+              {crewCode}
+            </div>
             <button onClick={() => { navigator.clipboard.writeText(crewCode); showToast('Code copied!'); }}
-              style={{
-                padding: '12px 14px', borderRadius: '10px', border: `1px solid ${theme.amberTint.border30}`,
-                background: theme.amberTint.bg10, color: theme.accent.amber, cursor: 'pointer',
-                fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap',
-              }}>
+              className="py-3 px-3.5 rounded-[10px] border border-amber-tint-border30 bg-amber-tint-bg10 text-accent-amber cursor-pointer text-[13px] font-semibold whitespace-nowrap">
               Copy
             </button>
           </div>
           <button onClick={shareCrewPlan}
-            style={{
-              width: '100%', padding: '12px', borderRadius: '12px', border: 'none', cursor: 'pointer',
-              background: theme.accent.amberGradient,
-              color: theme.text.onAccent, fontSize: '14px', fontWeight: 600,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-            }}>
+            className="w-full p-3 rounded-xl border-none cursor-pointer bg-accent-gradient text-text-on-accent text-sm font-semibold flex items-center justify-center gap-1.5">
             &#x1f4e4; Share Plan with Crew
           </button>
-          <p style={{ fontSize: '11px', color: theme.text.secondary, marginTop: '8px', lineHeight: 1.4, textAlign: 'center' }}>
+          <p className="text-[11px] text-text-secondary mt-2 leading-snug text-center">
             Your crew opens the app → Plan tab → &quot;Join Crew&quot; → enters the code above
           </p>
         </div>
@@ -423,17 +376,18 @@ export default function PlanScreen() {
 
       {/* Trip Weather Forecast */}
       {weather && weather.forecast.length > 0 && dayCount > 0 && (
-        <div style={{ ...cardStyle, marginBottom: '12px', padding: '12px', background: `linear-gradient(135deg, ${theme.blueTint.bg}, ${theme.bg.subtle})`, border: `1px solid ${theme.blueTint.border}` }}>
-          <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Pack for your trip</div>
-          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', scrollbarWidth: 'none' }}>
+        <div className="card mb-3 p-3 border border-blue-tint-border"
+          style={{ background: `linear-gradient(135deg, var(--blue-tint-bg), var(--bg-subtle))` }}>
+          <div className="text-[11px] text-text-tertiary uppercase tracking-[0.08em] mb-2">Pack for your trip</div>
+          <div className="flex gap-2 overflow-x-auto scroll-hidden">
             {weather.forecast.slice(0, dayCount).map((day, i) => (
-              <div key={day.date} style={{ textAlign: 'center', minWidth: '60px', flexShrink: 0, padding: '6px', borderRadius: '10px', background: theme.bg.subtle }}>
-                <div style={{ fontSize: '10px', color: theme.text.tertiary, marginBottom: '2px' }}>Day {i + 1}</div>
-                <div style={{ fontSize: '20px', marginBottom: '2px' }}>{day.emoji}</div>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: theme.text.primary }}>{day.high}°</div>
-                <div style={{ fontSize: '10px', color: theme.text.tertiary }}>{day.low}°</div>
+              <div key={day.date} className="text-center min-w-[60px] shrink-0 p-1.5 rounded-[10px] bg-bg-subtle">
+                <div className="text-[10px] text-text-tertiary mb-0.5">Day {i + 1}</div>
+                <div className="text-xl mb-0.5">{day.emoji}</div>
+                <div className="text-xs font-semibold text-text-primary">{day.high}°</div>
+                <div className="text-[10px] text-text-tertiary">{day.low}°</div>
                 {day.precipChance > 30 && (
-                  <div style={{ fontSize: '9px', color: theme.status.blue, marginTop: '2px' }}>&#x1f4a7; {day.precipChance}%</div>
+                  <div className="text-[9px] text-status-blue mt-0.5">&#x1f4a7; {day.precipChance}%</div>
                 )}
               </div>
             ))}
@@ -442,55 +396,44 @@ export default function PlanScreen() {
       )}
 
       {/* Day Tabs */}
-      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '12px', scrollbarWidth: 'none' }}>
+      <div className="flex gap-2 overflow-x-auto pb-3 mb-3 scroll-hidden">
         {sortedDays.map(day => {
           const stops = tripDays[day] || [];
           const isActive = activeDay === day;
           return (
             <button key={day} onClick={() => setActiveDay(day)}
-              style={{
-                padding: '8px 16px', borderRadius: '12px', fontSize: '13px', fontWeight: 600,
-                border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                background: isActive ? theme.accent.amberGradient : theme.bg.subtleStrong,
-                color: isActive ? theme.text.onAccent : theme.text.secondary,
-              }}>
+              className={`py-2 px-4 rounded-xl text-[13px] font-semibold border-none cursor-pointer whitespace-nowrap shrink-0 ${
+                isActive
+                  ? 'bg-accent-gradient text-text-on-accent'
+                  : 'bg-bg-subtle-strong text-text-secondary'
+              }`}>
               Day {day} ({stops.length})
             </button>
           );
         })}
         <button onClick={addDay}
-          style={{
-            padding: '8px 16px', borderRadius: '12px', fontSize: '13px', fontWeight: 600,
-            border: `1px dashed ${theme.border.dashed}`, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-            background: 'transparent', color: theme.text.tertiary,
-          }}>
+          className="py-2 px-4 rounded-xl text-[13px] font-semibold border border-dashed border-border-dashed cursor-pointer whitespace-nowrap shrink-0 bg-transparent text-text-tertiary">
           + Day
         </button>
       </div>
 
       {/* Burn Rate Budget Bar */}
-      <div style={{
-        ...cardStyle, marginBottom: '12px', padding: '14px',
-        background: isOverBudget
-          ? `linear-gradient(135deg, ${theme.redTint.bg}, ${theme.bg.subtle})`
-          : `linear-gradient(135deg, ${theme.greenTint?.bg || 'rgba(34,197,94,0.06)'}, ${theme.bg.subtle})`,
-        border: `1px solid ${isOverBudget ? theme.redTint.border : (theme.greenTint?.border || 'rgba(34,197,94,0.15)')}`,
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '14px' }}>{'\u{1F4B0}'}</span>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: theme.text.primary }}>
+      <div className={`card mb-3 p-3.5 border ${isOverBudget ? 'border-red-tint-border' : 'border-green-tint-border'}`}
+        style={{
+          background: isOverBudget
+            ? `linear-gradient(135deg, var(--red-tint-bg), var(--bg-subtle))`
+            : `linear-gradient(135deg, var(--green-tint-bg), var(--bg-subtle))`,
+        }}>
+        <div className="flex justify-between items-center mb-2">
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm">{'\u{1F4B0}'}</span>
+            <span className="text-xs font-semibold text-text-primary">
               Day {activeDay} Budget
             </span>
           </div>
           <button
             onClick={() => setShowBurnRatePicker(!showBurnRatePicker)}
-            style={{
-              padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 600,
-              border: `1px solid ${theme.amberTint.border20}`,
-              background: theme.amberTint.bg10, color: theme.accent.amber,
-              cursor: 'pointer',
-            }}
+            className="py-1 px-2.5 rounded-lg text-[11px] font-semibold border border-amber-tint-border20 bg-amber-tint-bg10 text-accent-amber cursor-pointer"
           >
             {activeDayBudget === -1 ? '\u{1F680} No Limit' : `$${activeDayBudget}`}
           </button>
@@ -498,29 +441,24 @@ export default function PlanScreen() {
 
         {activeDayBudget > 0 && (
           <>
-            <div style={{
-              height: '6px', borderRadius: '3px', background: theme.bg.subtleMedium,
-              overflow: 'hidden', marginBottom: '6px',
-            }}>
-              <div style={{
-                height: '100%', borderRadius: '3px',
-                width: `${Math.min(100, budgetPercentUsed)}%`,
-                background: isOverBudget
-                  ? theme.status.red
-                  : budgetPercentUsed > 75
-                    ? theme.accent.amber
-                    : (theme.status?.green || '#22C55E'),
-                transition: 'width 0.3s ease',
-              }} />
+            <div className="h-1.5 rounded-sm bg-bg-subtle-medium overflow-hidden mb-1.5">
+              <div
+                className="h-full rounded-sm transition-[width] duration-300 ease-in-out"
+                style={{
+                  width: `${Math.min(100, budgetPercentUsed)}%`,
+                  background: isOverBudget
+                    ? 'var(--status-red)'
+                    : budgetPercentUsed > 75
+                      ? 'var(--accent-amber)'
+                      : 'var(--status-green)',
+                }}
+              />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-              <span style={{ color: theme.text.secondary }}>
+            <div className="flex justify-between text-[11px]">
+              <span className="text-text-secondary">
                 ~${estimatedSpend} estimated
               </span>
-              <span style={{
-                color: isOverBudget ? theme.status.red : (theme.status?.green || '#22C55E'),
-                fontWeight: 600,
-              }}>
+              <span className={`font-semibold ${isOverBudget ? 'text-status-red' : 'text-status-green'}`}>
                 {isOverBudget
                   ? `$${Math.abs(Math.round(budgetRemaining))} over`
                   : `$${Math.round(budgetRemaining)} left`}
@@ -530,7 +468,7 @@ export default function PlanScreen() {
         )}
 
         {activeDayBudget === -1 && (
-          <div style={{ fontSize: '11px', color: theme.text.tertiary }}>
+          <div className="text-[11px] text-text-tertiary">
             No budget set — tap to set a burn rate for today
           </div>
         )}
@@ -538,38 +476,34 @@ export default function PlanScreen() {
 
       {/* Burn Rate Picker */}
       {showBurnRatePicker && (
-        <div style={{ ...cardStyle, marginBottom: '12px', padding: '16px' }}>
-          <div style={{ fontSize: '12px', fontWeight: 600, color: theme.text.primary, marginBottom: '10px' }}>
+        <div className="card mb-3 p-4">
+          <div className="text-xs font-semibold text-text-primary mb-2.5">
             Set your burn rate for Day {activeDay}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+          <div className="grid grid-cols-2 gap-2">
             {BURN_RATE_PRESETS.map(preset => {
               const isActive = activeDayBudget === preset.value;
               return (
                 <button key={preset.value}
                   onClick={() => { setDayBudget(activeDay, preset.value); setShowBurnRatePicker(false); }}
-                  style={{
-                    padding: '12px 8px', borderRadius: '12px', cursor: 'pointer', textAlign: 'center',
-                    border: isActive ? `2px solid ${theme.accent.amber}` : `1px solid ${theme.border.strong}`,
-                    background: isActive ? theme.amberTint.bg15 : theme.bg.subtle,
-                  }}>
-                  <div style={{ fontSize: '16px', marginBottom: '2px' }}>{preset.emoji}</div>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: theme.text.primary }}>{preset.label}</div>
-                  <div style={{ fontSize: '10px', color: theme.text.tertiary }}>{preset.desc}</div>
+                  className={`p-3 rounded-xl cursor-pointer text-center ${
+                    isActive
+                      ? 'border-2 border-accent-amber bg-amber-tint-bg15'
+                      : 'border border-border-strong bg-bg-subtle'
+                  }`}>
+                  <div className="text-base mb-0.5">{preset.emoji}</div>
+                  <div className="text-[13px] font-semibold text-text-primary">{preset.label}</div>
+                  <div className="text-[10px] text-text-tertiary">{preset.desc}</div>
                 </button>
               );
             })}
           </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+          <div className="flex gap-2 mt-2.5">
             <input
               type="number"
               placeholder="Custom $"
               min="0"
-              style={{
-                flex: 1, padding: '10px', borderRadius: '10px',
-                border: `1px solid ${theme.border.strong}`, background: theme.bg.input,
-                color: theme.text.primary, fontSize: '14px',
-              }}
+              className="flex-1 p-2.5 rounded-[10px] border border-border-strong bg-bg-input text-text-primary text-sm"
               onKeyDown={e => {
                 if (e.key === 'Enter') {
                   const val = parseInt((e.target as HTMLInputElement).value);
@@ -586,124 +520,130 @@ export default function PlanScreen() {
 
       {/* Active day stops */}
       {dayPlan.length === 0 ? (
-        <div style={{ ...cardStyle, textAlign: 'center', padding: '32px 20px' }}>
-          <p style={{ color: theme.text.secondary, fontSize: '14px' }}>No stops on Day {activeDay} yet. Explore to add some!</p>
+        <div className="card text-center py-8 px-5">
+          <p className="text-text-secondary text-sm">No stops on Day {activeDay} yet. Explore to add some!</p>
         </div>
       ) : (<>
         {dayPlan.length > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', padding: '6px 10px', borderRadius: '8px', background: theme.amberTint.bg06 }}>
-            <span style={{ fontSize: '12px' }}>&#x2195;&#xfe0f;</span>
-            <span style={{ fontSize: '11px', color: theme.accent.amberDark, fontWeight: 500 }}>Tap the arrows to reorder your stops</span>
+          <div className="flex items-center gap-1.5 mb-2 py-1.5 px-2.5 rounded-lg bg-amber-tint-bg06">
+            <span className="text-xs">&#x2195;&#xfe0f;</span>
+            <span className="text-[11px] text-accent-amber-dark font-medium">Tap the arrows to reorder your stops</span>
           </div>
         )}
-        <div style={{ position: 'relative', paddingLeft: '32px' }}>
+        <div className="relative pl-8">
           {/* Vertical route line */}
-          <div style={{
-            position: 'absolute', left: '14px', top: '16px',
-            bottom: '16px', width: '2px',
-            background: `linear-gradient(to bottom, ${theme.accent.amber}, ${theme.amberTint.bg10})`,
-            borderRadius: '1px',
-          }} />
+          <div
+            className="absolute left-3.5 top-4 bottom-4 w-0.5 rounded-sm"
+            style={{ background: `linear-gradient(to bottom, var(--accent-amber), var(--amber-tint-bg10))` }}
+          />
 
           {dayPlan.map((stop, index) => (
             <div key={stop.id}>
-              <div style={{ position: 'relative', marginBottom: index < dayPlan.length - 1 ? '4px' : '16px' }}>
+              <div className={`relative ${index < dayPlan.length - 1 ? 'mb-1' : 'mb-4'}`}>
                 {/* Stop number circle */}
-                <div style={{
-                  position: 'absolute', left: '-32px', top: '16px',
-                  width: '28px', height: '28px', borderRadius: '50%',
-                  background: stop.type === 'event'
-                    ? `linear-gradient(135deg, ${theme.events.gradientStart}, ${theme.events.gradientEnd})`
-                    : theme.accent.amberGradient,
-                  color: stop.type === 'event' ? theme.text.primary : theme.text.onAccent,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '12px', fontWeight: 700, zIndex: 1,
-                  boxShadow: `0 0 0 4px ${theme.bg.body}`,
-                }}>
+                <div
+                  className={`absolute -left-8 top-4 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold z-[1] ${
+                    stop.type === 'event'
+                      ? 'bg-events-gradient text-text-primary'
+                      : 'bg-accent-gradient text-text-on-accent'
+                  }`}
+                  style={{ boxShadow: `0 0 0 4px var(--bg-body)` }}
+                >
                   {index + 1}
                 </div>
 
                 {/* Stop card */}
-                <div style={{
-                  ...cardStyle, marginBottom: 0, overflow: 'hidden',
-                  border: stop.type === 'event'
-                    ? `1px solid ${theme.purpleTint.border15}`
-                    : `1px solid ${theme.amberTint.bg10}`,
-                }}>
-                  <div style={{ display: 'flex', gap: '12px' }}>
+                <div className={`card mb-0 overflow-hidden ${
+                  stop.type === 'event'
+                    ? 'border border-purple-tint-border15'
+                    : 'border border-amber-tint-bg10'
+                }`}>
+                  <div className="flex gap-3">
                     {stop.type === 'place' && stop.place?.photoUrl && (
                       <img src={stop.place.photoUrl} alt={stop.place.name} loading="lazy" decoding="async"
-                        style={{ width: '80px', height: '80px', borderRadius: '12px', flexShrink: 0, objectFit: 'cover' }} />
+                        className="w-20 h-20 rounded-xl shrink-0 object-cover" />
                     )}
                     {stop.type === 'event' && stop.event?.imageUrl && (
                       <img src={stop.event.imageUrl} alt={stop.event.name} loading="lazy" decoding="async"
-                        style={{ width: '80px', height: '80px', borderRadius: '12px', flexShrink: 0, objectFit: 'cover' }} />
+                        className="w-20 h-20 rounded-xl shrink-0 object-cover" />
                     )}
 
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div className="flex-1 min-w-0">
+                      {/* Time slot from auto-planner */}
+                      {stop.timeSlot && (
+                        <div className="text-[10px] font-semibold text-accent-amber uppercase tracking-[0.04em] mb-0.5">
+                          {stop.timeSlot}
+                        </div>
+                      )}
+                      <h3 className="text-[15px] font-semibold mb-1 overflow-hidden text-ellipsis whitespace-nowrap">
                         {getStopName(stop)}
                       </h3>
                       {stop.type === 'place' && stop.place && (
                         <>
-                          <p style={{ fontSize: '12px', color: theme.text.secondary, marginBottom: '4px' }}>
+                          <p className="text-xs text-text-secondary mb-1">
                             {stop.place.categoryDisplay}
                             {stop.place.priceLevel >= 0 && (
-                              <span style={{ color: stop.place.priceLevel >= 3 ? theme.accent.amber : theme.text.tertiary }}>
+                              <span className={stop.place.priceLevel >= 3 ? 'text-accent-amber' : 'text-text-tertiary'}>
                                 {' '}· ~${PRICE_LEVEL_ESTIMATE[stop.place.priceLevel] ?? 15}
                               </span>
                             )}
                             {stop.place.distance != null && ` · ${formatDistance(stop.place.distance, useMiles)} ${getDistanceReference()}`}
                           </p>
                           {stop.place.rating > 0 && (
-                            <div style={{ fontSize: '12px' }}>
-                              <span style={{ color: theme.accent.amber }}>★ {stop.place.rating.toFixed(1)}</span>
-                              <span style={{ color: theme.text.tertiary }}> ({stop.place.reviewCount})</span>
+                            <div className="text-xs">
+                              <span className="text-accent-amber">{'\u2605'} {stop.place.rating.toFixed(1)}</span>
+                              <span className="text-text-tertiary"> ({stop.place.reviewCount})</span>
                             </div>
                           )}
+                          {/* AI reason */}
+                          {stop.reason && (
+                            <p className="text-[11px] text-text-tertiary mt-1 italic leading-snug">{'\u2728'} {stop.reason}</p>
+                          )}
+                          {/* Night risk (only at night) */}
+                          {isNightTime(weather?.sunset) && (() => {
+                            const risk = getNightRisk(stop.place.category, stop.place.rating, stop.place.reviewCount, stop.place.openNow);
+                            return (
+                              <div className="flex items-center gap-1 mt-1">
+                                <span className="text-[10px]">{risk.emoji}</span>
+                                <span className={`text-[10px] font-medium ${
+                                  risk.level === 'low' ? 'text-status-green' : risk.level === 'moderate' ? 'text-accent-amber' : 'text-status-red'
+                                }`}>
+                                  {risk.label}
+                                </span>
+                              </div>
+                            );
+                          })()}
                         </>
                       )}
                       {stop.type === 'event' && stop.event && (
                         <>
-                          <p style={{ fontSize: '12px', color: theme.events.text, marginBottom: '4px' }}>
+                          <p className="text-xs text-events-text mb-1">
                             {formatEventDate(stop.event.date)}
                             {stop.event.time && ` · ${formatEventTime(stop.event.time)}`}
                           </p>
-                          <p style={{ fontSize: '12px', color: theme.text.secondary }}>
+                          <p className="text-xs text-text-secondary">
                             {stop.event.venue}
                           </p>
                         </>
                       )}
 
                       {/* Mini actions */}
-                      <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
+                      <div className="flex gap-1.5 mt-2 flex-wrap">
                         {stop.type === 'place' && stop.place?.googleMapsUrl && (
                           <a href={stop.place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
-                            style={{
-                              padding: '5px 10px', borderRadius: '8px', fontSize: '11px',
-                              background: theme.amberTint.bg10, color: theme.accent.amber,
-                              textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px',
-                            }}>
+                            className="py-[5px] px-2.5 rounded-lg text-[11px] bg-amber-tint-bg10 text-accent-amber no-underline flex items-center gap-1">
                             <DirectionsIcon /> Go
                           </a>
                         )}
                         {stop.type === 'place' && stop.place?.phone && (
                           <a href={`tel:${stop.place.phone}`}
-                            style={{
-                              padding: '5px 10px', borderRadius: '8px', fontSize: '11px',
-                              background: theme.bg.subtleMedium, color: theme.text.secondary,
-                              textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px',
-                            }}>
+                            className="py-[5px] px-2.5 rounded-lg text-[11px] bg-bg-subtle-medium text-text-secondary no-underline flex items-center gap-1">
                             <PhoneIcon /> Call
                           </a>
                         )}
                         {stop.type === 'event' && stop.event?.url && (
                           <a href={stop.event.url} target="_blank" rel="noopener noreferrer"
-                            style={{
-                              padding: '5px 10px', borderRadius: '8px', fontSize: '11px',
-                              background: theme.purpleTint.bg08, color: theme.events.text,
-                              textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px',
-                            }}>
+                            className="py-[5px] px-2.5 rounded-lg text-[11px] bg-purple-tint-bg08 text-events-text no-underline flex items-center gap-1">
                             &#x1f3ab; Tickets
                           </a>
                         )}
@@ -712,17 +652,25 @@ export default function PlanScreen() {
                           <select
                             value=""
                             onChange={e => { if (e.target.value) moveStopToDay(stop.id, activeDay, Number(e.target.value)); }}
-                            style={{
-                              padding: '5px 8px', borderRadius: '8px', fontSize: '11px',
-                              background: theme.bg.subtleMedium, color: theme.text.tertiary,
-                              border: `1px solid ${theme.border.medium}`, cursor: 'pointer',
-                            }}>
+                            className="py-[5px] px-2 rounded-lg text-[11px] bg-bg-subtle-medium text-text-tertiary border border-border-medium cursor-pointer">
                             <option value="">Move to...</option>
                             {sortedDays.filter(d => d !== activeDay).map(d => (
                               <option key={d} value={d}>Day {d}</option>
                             ))}
                           </select>
                         )}
+                        {/* Contextual booking link */}
+                        {stop.type === 'place' && stop.place && (() => {
+                          const booking = getPlaceBookingUrl(stop.place!.name, stop.place!.category, cityLabel);
+                          if (!booking) return null;
+                          return (
+                            <a href={booking.url} target="_blank" rel="noopener noreferrer"
+                              onClick={() => track('plan_booking_click', { place: stop.place!.name, service: booking.service })}
+                              className="py-[5px] px-2.5 rounded-lg text-[11px] bg-green-tint-bg text-status-green no-underline flex items-center gap-1 border border-green-tint-border">
+                              {'\u{1F517}'} {booking.label}
+                            </a>
+                          );
+                        })()}
                         {/* Pivot button */}
                         {stop.type === 'place' && stop.place && (
                           <button
@@ -745,12 +693,7 @@ export default function PlanScreen() {
                               }
                               track('pivot_initiated', { place: stop.place!.name, day: String(activeDay) });
                             }}
-                            style={{
-                              padding: '5px 10px', borderRadius: '8px', fontSize: '11px',
-                              background: theme.amberTint.bg10, color: theme.accent.amber,
-                              border: `1px solid ${theme.amberTint.border20}`,
-                              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
-                            }}
+                            className="py-[5px] px-2.5 rounded-lg text-[11px] bg-amber-tint-bg10 text-accent-amber border border-amber-tint-border20 cursor-pointer flex items-center gap-1"
                           >
                             {'\u{1F504}'} Pivot
                           </button>
@@ -759,41 +702,23 @@ export default function PlanScreen() {
                     </div>
 
                     {/* Right controls: reorder + remove */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center', justifyContent: 'center', minWidth: '44px' }}>
+                    <div className="flex flex-col gap-1 items-center justify-center min-w-[44px]">
                       {index > 0 && (
                         <button onClick={() => movePlanStop(index, 'up')}
                           aria-label="Move up"
-                          style={{
-                            background: theme.amberTint.bg10, border: `1px solid ${theme.amberTint.border20}`,
-                            color: theme.accent.amber, cursor: 'pointer', fontSize: '14px', fontWeight: 700,
-                            padding: '6px 10px', borderRadius: '8px',
-                            minHeight: '36px', minWidth: '44px',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px',
-                          }}>
+                          className="bg-amber-tint-bg10 border border-amber-tint-border20 text-accent-amber cursor-pointer text-sm font-bold py-1.5 px-2.5 rounded-lg min-h-9 min-w-[44px] flex items-center justify-center gap-0.5">
                           ↑
                         </button>
                       )}
                       <button onClick={() => removeFromPlan(stop.id)}
                         aria-label="Remove stop"
-                        style={{
-                          background: theme.redTint.bg, border: `1px solid ${theme.redTint.border}`,
-                          color: theme.status.red, cursor: 'pointer', fontSize: '12px', fontWeight: 600,
-                          padding: '6px 8px', borderRadius: '8px',
-                          minHeight: '32px', minWidth: '44px',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}>
+                        className="bg-red-tint-bg border border-red-tint-border text-status-red cursor-pointer text-xs font-semibold py-1.5 px-2 rounded-lg min-h-8 min-w-[44px] flex items-center justify-center">
                         ✕
                       </button>
                       {index < dayPlan.length - 1 && (
                         <button onClick={() => movePlanStop(index, 'down')}
                           aria-label="Move down"
-                          style={{
-                            background: theme.amberTint.bg10, border: `1px solid ${theme.amberTint.border20}`,
-                            color: theme.accent.amber, cursor: 'pointer', fontSize: '14px', fontWeight: 700,
-                            padding: '6px 10px', borderRadius: '8px',
-                            minHeight: '36px', minWidth: '44px',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px',
-                          }}>
+                          className="bg-amber-tint-bg10 border border-amber-tint-border20 text-accent-amber cursor-pointer text-sm font-bold py-1.5 px-2.5 rounded-lg min-h-9 min-w-[44px] flex items-center justify-center gap-0.5">
                           ↓
                         </button>
                       )}
@@ -807,35 +732,21 @@ export default function PlanScreen() {
                 const transport = getTransportInfo(stop, dayPlan[index + 1]);
                 if (!transport) return null;
                 return (
-                  <div style={{
-                    marginLeft: '0', marginBottom: '4px', padding: '10px 12px',
-                    background: theme.bg.subtle, borderRadius: '10px',
-                    border: `1px dashed ${theme.border.subtle}`,
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                      <span style={{ fontSize: '16px' }}>{transport.emoji}</span>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '12px', color: theme.text.secondary }}>{transport.text}</div>
-                        <div style={{ fontSize: '11px', color: theme.text.muted }}>{transport.distance}</div>
+                  <div className="ml-0 mb-1 py-2.5 px-3 bg-bg-subtle rounded-[10px] border border-dashed border-border-subtle">
+                    <div className="flex items-center gap-2.5 mb-1.5">
+                      <span className="text-base">{transport.emoji}</span>
+                      <div className="flex-1">
+                        <div className="text-xs text-text-secondary">{transport.text}</div>
+                        <div className="text-[11px] text-text-muted">{transport.distance}</div>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div className="flex gap-2">
                       <a href={transport.walkMapsUrl} target="_blank" rel="noopener noreferrer"
-                        style={{
-                          flex: 1, padding: '6px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 600,
-                          background: theme.amberTint.bg10, color: theme.accent.amber,
-                          textDecoration: 'none', textAlign: 'center',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-                        }}>
+                        className="flex-1 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold bg-amber-tint-bg10 text-accent-amber no-underline text-center flex items-center justify-center gap-1">
                         {'\u{1F6B6}'} Walk {transport.walkMinutes}m
                       </a>
                       <a href={transport.driveMapsUrl} target="_blank" rel="noopener noreferrer"
-                        style={{
-                          flex: 1, padding: '6px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 600,
-                          background: theme.bg.subtleMedium, color: theme.text.secondary,
-                          textDecoration: 'none', textAlign: 'center',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-                        }}>
+                        className="flex-1 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold bg-bg-subtle-medium text-text-secondary no-underline text-center flex items-center justify-center gap-1">
                         {'\u{1F697}'} Drive {transport.driveMinutes}m
                       </a>
                     </div>
@@ -849,60 +760,55 @@ export default function PlanScreen() {
 
       {/* Day Summary */}
       {daySummary && dayPlan.length >= 2 && (
-        <div style={{
-          ...cardStyle, marginTop: '12px', padding: '14px',
-          background: `linear-gradient(135deg, ${theme.amberTint.bg06}, ${theme.bg.subtle})`,
-          border: `1px solid ${theme.amberTint.border15}`,
-          display: 'flex', justifyContent: 'space-around', textAlign: 'center',
-        }}>
+        <div className="card mt-3 p-3.5 border border-amber-tint-border15 flex justify-around text-center"
+          style={{ background: `linear-gradient(135deg, var(--amber-tint-bg06), var(--bg-subtle))` }}>
           <div>
-            <div style={{ fontSize: '11px', color: theme.text.tertiary, marginBottom: '2px' }}>Total Distance</div>
-            <div style={{ fontSize: '16px', fontWeight: 700, color: theme.text.primary }}>{daySummary.distance}</div>
+            <div className="text-[11px] text-text-tertiary mb-0.5">Total Distance</div>
+            <div className="text-base font-bold text-text-primary">{daySummary.distance}</div>
           </div>
-          <div style={{ width: '1px', background: theme.border.subtle }} />
+          <div className="w-px bg-border-subtle" />
           <div>
-            <div style={{ fontSize: '11px', color: theme.text.tertiary, marginBottom: '2px' }}>{'\u{1F6B6}'} Walking</div>
-            <div style={{ fontSize: '16px', fontWeight: 700, color: theme.text.primary }}>{daySummary.totalWalkMin}m</div>
+            <div className="text-[11px] text-text-tertiary mb-0.5">{'\u{1F6B6}'} Walking</div>
+            <div className="text-base font-bold text-text-primary">{daySummary.totalWalkMin}m</div>
           </div>
-          <div style={{ width: '1px', background: theme.border.subtle }} />
+          <div className="w-px bg-border-subtle" />
           <div>
-            <div style={{ fontSize: '11px', color: theme.text.tertiary, marginBottom: '2px' }}>{'\u{1F697}'} Driving</div>
-            <div style={{ fontSize: '16px', fontWeight: 700, color: theme.text.primary }}>{daySummary.totalDriveMin}m</div>
+            <div className="text-[11px] text-text-tertiary mb-0.5">{'\u{1F697}'} Driving</div>
+            <div className="text-base font-bold text-text-primary">{daySummary.totalDriveMin}m</div>
           </div>
         </div>
       )}
 
       {/* Pack This Checklist */}
       {allStops.length > 0 && packingItems.length > 0 && (
-        <div style={{ ...cardStyle, marginTop: '12px', padding: '0', overflow: 'hidden' }}>
+        <div className="card mt-3 p-0 overflow-hidden">
           <button
             onClick={() => setShowPackList(!showPackList)}
-            style={{
-              width: '100%', padding: '14px 16px', background: 'none', border: 'none', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '18px' }}>{'\u{1F392}'}</span>
-              <span style={{ fontSize: '14px', fontWeight: 600, color: theme.text.primary }}>Pack This</span>
+            className="w-full py-3.5 px-4 bg-transparent border-none cursor-pointer flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{'\u{1F392}'}</span>
+              <span className="text-sm font-semibold text-text-primary">Pack This</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{
-                fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '10px',
-                background: checkedItems.size === packingItems.length ? theme.greenTint?.bg || 'rgba(34,197,94,0.1)' : theme.amberTint.bg10,
-                color: checkedItems.size === packingItems.length ? theme.status?.green || '#22C55E' : theme.accent.amber,
-              }}>
+            <div className="flex items-center gap-2">
+              <span className={`text-[11px] font-semibold py-0.5 px-2 rounded-[10px] ${
+                checkedItems.size === packingItems.length
+                  ? 'bg-green-tint-bg text-status-green'
+                  : 'bg-amber-tint-bg10 text-accent-amber'
+              }`}>
                 {checkedItems.size}/{packingItems.length}
               </span>
-              <span style={{ color: theme.text.tertiary, fontSize: '14px', transform: showPackList ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+              <span
+                className="text-text-tertiary text-sm transition-transform duration-200"
+                style={{ transform: showPackList ? 'rotate(180deg)' : 'rotate(0deg)' }}>
                 {'\u{25BC}'}
               </span>
             </div>
           </button>
           {showPackList && (
-            <div style={{ padding: '0 16px 16px' }}>
+            <div className="px-4 pb-4">
               {Object.entries(groupedPackItems).map(([cat, items]) => (
-                <div key={cat} style={{ marginBottom: '12px' }}>
-                  <div style={{ fontSize: '11px', color: theme.text.tertiary, fontWeight: 600, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <div key={cat} className="mb-3">
+                  <div className="text-[11px] text-text-tertiary font-semibold mb-1.5 uppercase tracking-[0.05em]">
                     {categoryLabels[cat] || cat}
                   </div>
                   {items.map(item => {
@@ -911,24 +817,17 @@ export default function PlanScreen() {
                       <button
                         key={item.label}
                         onClick={() => togglePackItem(item.label)}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: '10px', width: '100%',
-                          padding: '8px 0', background: 'none', border: 'none', cursor: 'pointer',
-                          opacity: checked ? 0.5 : 1,
-                        }}>
-                        <div style={{
-                          width: '20px', height: '20px', borderRadius: '6px', flexShrink: 0,
-                          border: checked ? 'none' : `2px solid ${theme.border.strong}`,
-                          background: checked ? theme.accent.amberGradient : 'transparent',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '12px', color: '#0C0A09',
-                        }}>
+                        className={`flex items-center gap-2.5 w-full py-2 bg-transparent border-none cursor-pointer ${
+                          checked ? 'opacity-50' : 'opacity-100'
+                        }`}>
+                        <div className={`w-5 h-5 rounded-md shrink-0 flex items-center justify-center text-xs ${
+                          checked
+                            ? 'bg-accent-gradient text-[#0C0A09] border-none'
+                            : 'bg-transparent border-2 border-border-strong'
+                        }`}>
                           {checked && '\u{2713}'}
                         </div>
-                        <span style={{
-                          fontSize: '13px', color: theme.text.primary,
-                          textDecoration: checked ? 'line-through' : 'none',
-                        }}>
+                        <span className={`text-[13px] text-text-primary ${checked ? 'line-through' : ''}`}>
                           {item.label}
                         </span>
                       </button>
@@ -943,40 +842,33 @@ export default function PlanScreen() {
 
       {/* Book Your Trip */}
       {cityLabel && totalStops > 0 && (
-        <BookingLinks cityName={cityLabel} theme={theme} cardStyle={cardStyle} />
+        <BookingLinks cityName={cityLabel} />
       )}
 
       {/* Pivot Modal */}
       {pivotStopId && pivotAlternatives.length > 0 && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
-          zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-        }}
+        <div
+          className="fixed inset-0 bg-[rgba(0,0,0,0.6)] backdrop-blur-[8px] z-[1000] flex items-end justify-center"
           onClick={() => { setPivotStopId(null); setPivotAlternatives([]); setPivotReason(null); }}
         >
           <div
             onClick={e => e.stopPropagation()}
-            style={{
-              width: '100%', maxWidth: '440px', maxHeight: '85vh', overflowY: 'auto',
-              background: theme.bg.primary, borderRadius: '20px 20px 0 0',
-              padding: '24px 20px', paddingBottom: '40px',
-            }}
+            className="w-full max-w-[440px] max-h-[85vh] overflow-y-auto bg-bg-surface rounded-t-[20px] pt-6 px-5 pb-10"
           >
             {/* Header */}
-            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-              <div style={{ fontSize: '28px', marginBottom: '4px' }}>{'\u{1F504}'}</div>
-              <h3 style={{ fontSize: '18px', fontWeight: 700, color: theme.text.primary, margin: '0 0 4px 0' }}>
+            <div className="text-center mb-5">
+              <div className="text-[28px] mb-1">{'\u{1F504}'}</div>
+              <h3 className="text-lg font-bold text-text-primary mb-1">
                 Plan B
               </h3>
-              <p style={{ fontSize: '13px', color: theme.text.secondary, margin: 0 }}>
+              <p className="text-[13px] text-text-secondary">
                 Pick an alternative — your day stays on track
               </p>
             </div>
 
             {/* Reason buttons */}
             {!pivotReason && (
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+              <div className="flex gap-2.5 mb-5">
                 {[
                   { key: 'closed' as const, label: "It's closed", emoji: '\u{1F6AA}' },
                   { key: 'not_feeling_it' as const, label: 'Not feeling it', emoji: '\u{1F645}' },
@@ -987,12 +879,7 @@ export default function PlanScreen() {
                       setPivotReason(r.key);
                       track('pivot_reason', { reason: r.key, stopId: pivotStopId });
                     }}
-                    style={{
-                      flex: 1, padding: '12px', borderRadius: '12px', cursor: 'pointer',
-                      background: theme.bg.subtleStrong, border: `1px solid ${theme.border.medium}`,
-                      color: theme.text.primary, fontSize: '13px', fontWeight: 500,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                    }}
+                    className="flex-1 p-3 rounded-xl cursor-pointer bg-bg-subtle-strong border border-border-medium text-text-primary text-[13px] font-medium flex items-center justify-center gap-1.5"
                   >
                     {r.emoji} {r.label}
                   </button>
@@ -1001,56 +888,42 @@ export default function PlanScreen() {
             )}
 
             {/* Alternative cards */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="flex flex-col gap-3">
               {pivotAlternatives.map(alt => (
                 <div
                   key={alt.placeId}
-                  style={{
-                    ...cardStyle,
-                    display: 'flex', gap: '12px', alignItems: 'center',
-                    padding: '14px',
-                  }}
+                  className="card flex gap-3 items-center p-3.5"
                 >
                   {/* Photo */}
-                  <div style={{
-                    width: '64px', height: '64px', borderRadius: '12px', flexShrink: 0,
-                    overflow: 'hidden', background: theme.bg.subtleStrong,
-                  }}>
+                  <div className="w-16 h-16 rounded-xl shrink-0 overflow-hidden bg-bg-subtle-strong">
                     {alt.photoUrl ? (
                       <img src={alt.photoUrl} alt={alt.name}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        className="w-full h-full object-cover" />
                     ) : (
-                      <div style={{
-                        width: '100%', height: '100%', display: 'flex',
-                        alignItems: 'center', justifyContent: 'center',
-                        fontSize: '24px', color: theme.text.tertiary,
-                      }}>
+                      <div className="w-full h-full flex items-center justify-center text-2xl text-text-tertiary">
                         {'\u{1F4CD}'}
                       </div>
                     )}
                   </div>
 
                   {/* Info */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: '14px', fontWeight: 600, color: theme.text.primary,
-                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                    }}>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-text-primary whitespace-nowrap overflow-hidden text-ellipsis">
                       {alt.name}
                     </div>
-                    <div style={{ fontSize: '12px', color: theme.text.secondary, marginTop: '2px' }}>
+                    <div className="text-xs text-text-secondary mt-0.5">
                       {alt.categoryDisplay || alt.category}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                    <div className="flex items-center gap-2 mt-1">
                       {alt.rating > 0 && (
-                        <span style={{ fontSize: '11px', color: theme.accent.amber, fontWeight: 600 }}>
+                        <span className="text-[11px] text-accent-amber font-semibold">
                           {'\u{2B50}'} {alt.rating.toFixed(1)}
                         </span>
                       )}
-                      <span style={{ fontSize: '11px', color: theme.text.tertiary }}>
+                      <span className="text-[11px] text-text-tertiary">
                         {'$'.repeat(Math.max(1, alt.priceLevel))}
                       </span>
-                      <span style={{ fontSize: '11px', color: theme.status.green }}>
+                      <span className="text-[11px] text-status-green">
                         ~${PRICE_LEVEL_ESTIMATE[alt.priceLevel] ?? 15}
                       </span>
                     </div>
@@ -1065,12 +938,7 @@ export default function PlanScreen() {
                       setPivotAlternatives([]);
                       setPivotReason(null);
                     }}
-                    style={{
-                      padding: '10px 14px', borderRadius: '10px', cursor: 'pointer',
-                      background: theme.accent.amberGradient, color: theme.text.onAccent,
-                      border: 'none', fontSize: '12px', fontWeight: 600,
-                      whiteSpace: 'nowrap', flexShrink: 0,
-                    }}
+                    className="py-2.5 px-3.5 rounded-[10px] cursor-pointer bg-accent-gradient text-text-on-accent border-none text-xs font-semibold whitespace-nowrap shrink-0"
                   >
                     Swap
                   </button>
@@ -1081,12 +949,7 @@ export default function PlanScreen() {
             {/* Dismiss */}
             <button
               onClick={() => { setPivotStopId(null); setPivotAlternatives([]); setPivotReason(null); }}
-              style={{
-                width: '100%', marginTop: '16px', padding: '14px',
-                background: 'none', border: `1px solid ${theme.border.medium}`,
-                borderRadius: '12px', color: theme.text.secondary,
-                fontSize: '14px', fontWeight: 500, cursor: 'pointer',
-              }}
+              className="w-full mt-4 p-3.5 bg-transparent border border-border-medium rounded-xl text-text-secondary text-sm font-medium cursor-pointer"
             >
               Keep original
             </button>
@@ -1095,51 +958,29 @@ export default function PlanScreen() {
       )}
 
       {/* Action Buttons */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
+      <div className="flex flex-col gap-2.5 mt-5">
         {dayPlan.length > 0 && (
           <a href={getRouteUrl()} target="_blank" rel="noopener noreferrer"
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-              background: theme.accent.amberGradient, color: theme.text.onAccent,
-              border: 'none', borderRadius: '14px', padding: '14px',
-              fontSize: '15px', fontWeight: 600, textDecoration: 'none',
-              boxShadow: `0 4px 20px ${theme.amberTint.shadow}`,
-            }}>
+            className="flex items-center justify-center gap-2 bg-accent-gradient text-text-on-accent border-none rounded-[14px] p-3.5 text-[15px] font-semibold no-underline shadow-[0_4px_20px_var(--amber-tint-shadow)]">
             <DirectionsIcon /> Get Day {activeDay} Route
           </a>
         )}
 
         {dayCount > 1 && totalStops >= 2 && getFullTripRouteUrl() && (
           <a href={getFullTripRouteUrl()} target="_blank" rel="noopener noreferrer"
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-              background: theme.bg.subtleStrong, color: theme.text.primary,
-              border: `1px solid ${theme.border.medium}`, borderRadius: '14px',
-              padding: '14px', fontSize: '14px', fontWeight: 500, textDecoration: 'none',
-            }}>
+            className="flex items-center justify-center gap-2 bg-bg-subtle-strong text-text-primary border border-border-medium rounded-[14px] p-3.5 text-sm font-medium no-underline">
             <DirectionsIcon /> Full Trip Route ({totalStops} stops)
           </a>
         )}
 
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div className="flex gap-2.5">
           <button onClick={sharePlan}
-            style={{
-              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-              background: theme.bg.subtleStrong, color: theme.text.primary,
-              border: `1px solid ${theme.border.medium}`, borderRadius: '14px',
-              padding: '14px', fontSize: '15px', fontWeight: 500, cursor: 'pointer',
-            }}>
+            className="flex-1 flex items-center justify-center gap-2 bg-bg-subtle-strong text-text-primary border border-border-medium rounded-[14px] p-3.5 text-[15px] font-medium cursor-pointer">
             <ShareIcon /> Share Trip
           </button>
           {dayPlan.length > 0 && (
             <button onClick={() => { if (!requireAuth()) return; exportDayAsImage(dayPlan, activeDay, cityLabel); }}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                padding: '14px 20px', borderRadius: '14px', cursor: 'pointer',
-                border: `1px solid ${theme.border.medium}`,
-                background: theme.bg.subtleStrong, color: theme.text.primary,
-                fontSize: '14px', fontWeight: 500, flexShrink: 0,
-              }}>
+              className="flex items-center justify-center gap-1.5 p-3.5 px-5 rounded-[14px] cursor-pointer border border-border-medium bg-bg-subtle-strong text-text-primary text-sm font-medium shrink-0">
               📸 Export
             </button>
           )}
@@ -1147,19 +988,13 @@ export default function PlanScreen() {
 
         {dayCount > 1 && (
           <button onClick={() => removeDay(activeDay)}
-            style={{
-              background: 'none', border: `1px solid ${theme.redTint.borderStrong}`, color: theme.status.red,
-              fontSize: '13px', cursor: 'pointer', padding: '10px', borderRadius: '10px',
-            }}>
+            className="bg-transparent border border-red-tint-border-strong text-status-red text-[13px] cursor-pointer p-2.5 rounded-[10px]">
             Delete Day {activeDay}
           </button>
         )}
 
         <button onClick={clearPlan}
-          style={{
-            background: 'none', border: 'none', color: theme.text.tertiary,
-            fontSize: '13px', cursor: 'pointer', padding: '10px',
-          }}>
+          className="bg-transparent border-none text-text-tertiary text-[13px] cursor-pointer p-2.5">
           Clear all stops
         </button>
       </div>

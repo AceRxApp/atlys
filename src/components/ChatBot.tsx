@@ -1,6 +1,4 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useTheme } from '../context/ThemeContext';
-import { getCardStyle } from '../styles/shared';
 import { CloseIcon } from './icons';
 
 interface ChatMessage {
@@ -17,8 +15,6 @@ const QUICK_PROMPTS = [
 ];
 
 export default function ChatBot({ city, onClose }: { city: string | null; onClose: () => void }) {
-  const { theme } = useTheme();
-  const cardStyle = getCardStyle(theme);
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: 'assistant', content: city
       ? `Hey! I'm your NxStops travel assistant. You're exploring ${city} — ask me anything about the city, restaurants, things to do, or trip planning!`
@@ -78,41 +74,22 @@ export default function ChatBot({ city, onClose }: { city: string | null; onClos
 
   return (
     <div
-      className="modal-backdrop"
-      style={{
-        position: 'fixed', inset: 0, background: theme.bg.modalOverlay, zIndex: 200,
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-      }}
+      className="modal-backdrop fixed inset-0 bg-bg-modal-overlay z-[200] flex items-end justify-center"
       onClick={onClose}
     >
       <div
-        className="modal-sheet"
-        style={{
-          background: theme.bg.surface, borderRadius: '24px 24px 0 0',
-          maxWidth: '430px', width: '100%', height: '75vh',
-          display: 'flex', flexDirection: 'column',
-          border: `1px solid ${theme.border.subtle}`, borderBottom: 'none',
-        }}
+        className="modal-sheet bg-bg-surface rounded-t-3xl max-w-[430px] w-full h-[75vh] flex flex-col border border-border-subtle border-b-0"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '16px 20px', borderBottom: `1px solid ${theme.border.subtle}`,
-          flexShrink: 0,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{
-              width: '36px', height: '36px', borderRadius: '12px',
-              background: theme.accent.amberGradient,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '18px',
-            }}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-accent-gradient flex items-center justify-center text-lg">
               {'\u{2728}'}
             </div>
             <div>
-              <div style={{ fontSize: '15px', fontWeight: 700, color: theme.text.primary }}>NxStops AI</div>
-              <div style={{ fontSize: '11px', color: theme.text.tertiary }}>
+              <div className="text-[15px] font-bold text-text-primary">NxStops AI</div>
+              <div className="text-[11px] text-text-tertiary">
                 {city ? `Exploring ${city}` : 'Your travel assistant'}
               </div>
             </div>
@@ -120,60 +97,35 @@ export default function ChatBot({ city, onClose }: { city: string | null; onClos
           <button
             onClick={onClose}
             aria-label="Close chat"
-            style={{
-              background: 'none', border: 'none', color: theme.text.tertiary,
-              cursor: 'pointer', padding: '10px', minHeight: '44px', minWidth: '44px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
+            className="bg-transparent border-none text-text-tertiary cursor-pointer p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center"
           >
             <CloseIcon />
           </button>
         </div>
 
         {/* Messages */}
-        <div style={{
-          flex: 1, overflowY: 'auto', padding: '16px 20px',
-          display: 'flex', flexDirection: 'column', gap: '12px',
-        }}>
+        <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3">
           {messages.map((msg, i) => (
             <div
               key={i}
-              style={{
-                display: 'flex',
-                justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-              }}
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
-              <div style={{
-                maxWidth: '80%',
-                padding: '12px 16px',
-                borderRadius: msg.role === 'user'
-                  ? '18px 18px 4px 18px'
-                  : '18px 18px 18px 4px',
-                background: msg.role === 'user'
-                  ? theme.accent.amberGradient
-                  : theme.bg.elevated,
-                color: msg.role === 'user' ? theme.text.onAccent : theme.text.primary,
-                fontSize: '14px',
-                lineHeight: 1.5,
-                border: msg.role === 'user' ? 'none' : `1px solid ${theme.border.subtle}`,
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-              }}>
+              <div className={`max-w-[80%] px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap break-words ${
+                msg.role === 'user'
+                  ? 'rounded-[18px_18px_4px_18px] bg-accent-gradient text-text-on-accent border-none'
+                  : 'rounded-[18px_18px_18px_4px] bg-bg-elevated text-text-primary border border-border-subtle'
+              }`}>
                 {msg.content}
               </div>
             </div>
           ))}
 
           {loading && (
-            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-              <div style={{
-                padding: '12px 20px', borderRadius: '18px 18px 18px 4px',
-                background: theme.bg.elevated, border: `1px solid ${theme.border.subtle}`,
-                display: 'flex', gap: '4px', alignItems: 'center',
-              }}>
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: theme.text.tertiary, animation: 'fadeIn 0.6s ease-in-out infinite alternate', animationDelay: '0s' }} />
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: theme.text.tertiary, animation: 'fadeIn 0.6s ease-in-out infinite alternate', animationDelay: '0.2s' }} />
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: theme.text.tertiary, animation: 'fadeIn 0.6s ease-in-out infinite alternate', animationDelay: '0.4s' }} />
+            <div className="flex justify-start">
+              <div className="px-5 py-3 rounded-[18px_18px_18px_4px] bg-bg-elevated border border-border-subtle flex gap-1 items-center">
+                <span className="w-1.5 h-1.5 rounded-full bg-text-tertiary animate-[fadeIn_0.6s_ease-in-out_infinite_alternate]" style={{ animationDelay: '0s' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-text-tertiary animate-[fadeIn_0.6s_ease-in-out_infinite_alternate]" style={{ animationDelay: '0.2s' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-text-tertiary animate-[fadeIn_0.6s_ease-in-out_infinite_alternate]" style={{ animationDelay: '0.4s' }} />
               </div>
             </div>
           )}
@@ -183,21 +135,12 @@ export default function ChatBot({ city, onClose }: { city: string | null; onClos
 
         {/* Quick Prompts (only show when conversation just started) */}
         {messages.length <= 1 && (
-          <div style={{
-            padding: '0 20px 8px', display: 'flex', gap: '6px',
-            flexWrap: 'wrap', flexShrink: 0,
-          }}>
+          <div className="px-5 pb-2 flex gap-1.5 flex-wrap shrink-0">
             {QUICK_PROMPTS.map(prompt => (
               <button
                 key={prompt}
                 onClick={() => sendMessage(prompt)}
-                style={{
-                  padding: '8px 14px', borderRadius: '20px',
-                  background: theme.amberTint.bg10,
-                  border: `1px solid ${theme.amberTint.border20}`,
-                  color: theme.accent.amber, fontSize: '12px', fontWeight: 500,
-                  cursor: 'pointer', whiteSpace: 'nowrap',
-                }}
+                className="py-2 px-3.5 rounded-[20px] bg-amber-tint-bg10 border border-amber-tint-border20 text-accent-amber text-xs font-medium cursor-pointer whitespace-nowrap"
               >
                 {prompt}
               </button>
@@ -206,10 +149,7 @@ export default function ChatBot({ city, onClose }: { city: string | null; onClos
         )}
 
         {/* Input */}
-        <div style={{
-          padding: '12px 20px 28px', borderTop: `1px solid ${theme.border.subtle}`,
-          display: 'flex', gap: '8px', flexShrink: 0,
-        }}>
+        <div className="px-5 pt-3 pb-7 border-t border-border-subtle flex gap-2 shrink-0">
           <input
             ref={inputRef}
             type="text"
@@ -218,25 +158,17 @@ export default function ChatBot({ city, onClose }: { city: string | null; onClos
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') sendMessage(input); }}
             disabled={loading}
-            style={{
-              flex: 1, padding: '14px 16px', borderRadius: '14px',
-              border: `1px solid ${theme.border.strong}`,
-              background: theme.bg.subtle, color: theme.text.primary,
-              fontSize: '14px', outline: 'none',
-              opacity: loading ? 0.6 : 1,
-            }}
+            className={`flex-1 px-4 py-3.5 rounded-[14px] border border-border-strong bg-bg-subtle text-text-primary text-sm outline-none ${loading ? 'opacity-60' : 'opacity-100'}`}
           />
           <button
             onClick={() => sendMessage(input)}
             disabled={!input.trim() || loading}
             aria-label="Send message"
-            style={{
-              width: '48px', height: '48px', borderRadius: '14px',
-              background: input.trim() && !loading ? theme.accent.amberGradient : theme.bg.subtleStrong,
-              border: 'none', cursor: input.trim() && !loading ? 'pointer' : 'default',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0, color: input.trim() && !loading ? theme.text.onAccent : theme.text.disabled,
-            }}
+            className={`w-12 h-12 rounded-[14px] border-none flex items-center justify-center shrink-0 ${
+              input.trim() && !loading
+                ? 'bg-accent-gradient cursor-pointer text-text-on-accent'
+                : 'bg-bg-subtle-strong cursor-default text-text-disabled'
+            }`}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="22" y1="2" x2="11" y2="13" />

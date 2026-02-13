@@ -1,9 +1,8 @@
 import { useParams, Link, Navigate } from 'react-router-dom';
-import { useTheme } from '../context/ThemeContext';
 import { CITY_COORDS } from '../data/cityCoords';
 import Footer from '../components/Footer';
 
-// Top cities for SEO landing pages — slug → display name + tagline
+// Top cities for SEO landing pages — slug -> display name + tagline
 const CITY_META: Record<string, { name: string; country: string; tagline: string; description: string }> = {
   'new-york': { name: 'New York', country: 'USA', tagline: 'The city that never sleeps', description: 'Discover the best restaurants, hidden speakeasies, rooftop bars, world-class museums, and iconic landmarks in New York City.' },
   'los-angeles': { name: 'Los Angeles', country: 'USA', tagline: 'Where dreams meet the Pacific', description: 'Explore LA\'s best tacos, beachside cafes, hiking trails, art galleries, and nightlife from Hollywood to Venice Beach.' },
@@ -29,7 +28,6 @@ const CITY_META: Record<string, { name: string; country: string; tagline: string
 
 export default function CityScreen() {
   const { slug } = useParams<{ slug: string }>();
-  const { theme } = useTheme();
 
   const meta = slug ? CITY_META[slug] : null;
   if (!meta) return <Navigate to="/" replace />;
@@ -38,94 +36,65 @@ export default function CityScreen() {
   const coords = CITY_COORDS[coordKey];
 
   return (
-    <div style={{
-      fontFamily: "'DM Sans', system-ui, sans-serif",
-      background: theme.bg.body,
-      minHeight: '100vh',
-      color: theme.text.primary,
-    }}>
-      <div style={{ maxWidth: '700px', margin: '0 auto', padding: '40px 24px 60px' }}>
+    <div className="font-sans bg-bg-body min-h-screen text-text-primary">
+      <div className="max-w-[700px] mx-auto px-6 pt-10 pb-[60px]">
         {/* Back */}
-        <Link to="/" style={{ color: theme.accent.amber, textDecoration: 'none', fontSize: '14px', fontWeight: 500 }}>
+        <Link to="/" className="text-accent-amber no-underline text-sm font-medium">
           &larr; Back to NxStops
         </Link>
 
         {/* Hero */}
-        <div style={{ marginTop: '32px', marginBottom: '40px' }}>
-          <div style={{ fontSize: '12px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>
+        <div className="mt-8 mb-10">
+          <div className="text-xs text-text-tertiary uppercase tracking-[0.1em] mb-2">
             {meta.country}
           </div>
-          <h1 style={{
-            fontSize: '36px', fontWeight: 700, marginBottom: '8px', lineHeight: 1.1,
-            background: theme.accent.amberTextGradient,
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-          }}>
+          <h1 className="text-4xl font-bold mb-2 leading-[1.1] bg-accent-text-gradient">
             {meta.name}
           </h1>
-          <p style={{ fontSize: '18px', color: theme.text.secondary, fontStyle: 'italic', marginBottom: '16px' }}>
+          <p className="text-lg text-text-secondary italic mb-4">
             {meta.tagline}
           </p>
-          <p style={{ fontSize: '15px', color: theme.text.body, lineHeight: 1.7 }}>
+          <p className="text-[15px] text-text-body leading-[1.7]">
             {meta.description}
           </p>
         </div>
 
         {/* What you can do */}
-        <div style={{ marginBottom: '40px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '16px' }}>
+        <div className="mb-10">
+          <h2 className="text-xl font-bold mb-4">
             What to explore in {meta.name}
           </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div className="grid grid-cols-2 gap-3">
             {[
               { icon: '\u{1F37D}\u{FE0F}', title: 'Food & Drinks', desc: 'Restaurants, cafes, bars, and local eats' },
               { icon: '\u{1F3E8}', title: 'Places to Stay', desc: 'Hotels, boutique stays, and hostels' },
               { icon: '\u{1F3AD}', title: 'Things to Do', desc: 'Museums, attractions, and nightlife' },
               { icon: '\u{1F48E}', title: 'Hidden Gems', desc: 'Parks, bookstores, and local favorites' },
             ].map((item, i) => (
-              <div key={i} style={{
-                padding: '16px',
-                background: theme.bg.surface,
-                borderRadius: '14px',
-                border: `1px solid ${theme.border.subtle}`,
-              }}>
-                <div style={{ fontSize: '24px', marginBottom: '8px' }}>{item.icon}</div>
-                <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>{item.title}</div>
-                <div style={{ fontSize: '12px', color: theme.text.secondary, lineHeight: 1.4 }}>{item.desc}</div>
+              <div key={i} className="p-4 bg-bg-surface rounded-[14px] border border-border-subtle">
+                <div className="text-2xl mb-2">{item.icon}</div>
+                <div className="font-semibold text-sm mb-1">{item.title}</div>
+                <div className="text-xs text-text-secondary leading-[1.4]">{item.desc}</div>
               </div>
             ))}
           </div>
         </div>
 
         {/* CTA */}
-        <div style={{
-          textAlign: 'center', padding: '32px 24px',
-          background: theme.bg.surface,
-          borderRadius: '16px',
-          border: `1px solid ${theme.amberTint.border20}`,
-          marginBottom: '40px',
-        }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>
+        <div className="text-center px-6 py-8 bg-bg-surface rounded-2xl border border-amber-tint-border20 mb-10">
+          <h2 className="text-xl font-bold mb-2">
             Ready to explore {meta.name}?
           </h2>
-          <p style={{ color: theme.text.secondary, fontSize: '14px', marginBottom: '20px' }}>
+          <p className="text-text-secondary text-sm mb-5">
             Discover places, plan your trip, and find events — all free on NxStops.
           </p>
-          <Link to="/" style={{
-            display: 'inline-block',
-            padding: '14px 32px',
-            borderRadius: '14px',
-            background: theme.accent.amberGradient,
-            color: theme.text.onAccent,
-            fontWeight: 600,
-            fontSize: '16px',
-            textDecoration: 'none',
-          }}>
+          <Link to="/" className="inline-block px-8 py-3.5 rounded-[14px] bg-accent-gradient text-text-on-accent font-semibold text-base no-underline">
             Open NxStops
           </Link>
         </div>
 
         {coords && (
-          <p style={{ fontSize: '12px', color: theme.text.tertiary, textAlign: 'center' }}>
+          <p className="text-xs text-text-tertiary text-center">
             {meta.name} coordinates: {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
           </p>
         )}

@@ -1,42 +1,18 @@
 import { Link } from 'react-router-dom';
-import { useTheme } from '../context/ThemeContext';
 
 export default function Footer() {
-  const { theme } = useTheme();
-
-  const linkStyle: React.CSSProperties = {
-    color: theme.text.tertiary,
-    textDecoration: 'none',
-    fontSize: '12px',
-    padding: '4px 2px',
-  };
-
   return (
-    <footer style={{
-      padding: '24px 20px 16px',
-      textAlign: 'center',
-      borderTop: `1px solid ${theme.border.subtle}`,
-    }}>
-      <nav style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: '8px',
-        marginBottom: '8px',
-        flexWrap: 'wrap',
-      }}>
-        <Link to="/about" style={linkStyle}>About</Link>
-        <span style={{ color: theme.text.muted, fontSize: '10px' }}>&middot;</span>
-        <Link to="/privacy" style={linkStyle}>Privacy</Link>
-        <span style={{ color: theme.text.muted, fontSize: '10px' }}>&middot;</span>
-        <Link to="/terms" style={linkStyle}>Terms</Link>
-        <span style={{ color: theme.text.muted, fontSize: '10px' }}>&middot;</span>
-        <Link to="/contact" style={linkStyle}>Contact</Link>
+    <footer className="px-5 pt-6 pb-4 text-center border-t border-border-subtle">
+      <nav className="flex justify-center items-center gap-2 mb-2 flex-wrap">
+        <Link to="/about" className="text-text-tertiary no-underline text-xs py-1 px-0.5">About</Link>
+        <span className="text-text-muted text-[10px]">&middot;</span>
+        <Link to="/privacy" className="text-text-tertiary no-underline text-xs py-1 px-0.5">Privacy</Link>
+        <span className="text-text-muted text-[10px]">&middot;</span>
+        <Link to="/terms" className="text-text-tertiary no-underline text-xs py-1 px-0.5">Terms</Link>
+        <span className="text-text-muted text-[10px]">&middot;</span>
+        <Link to="/contact" className="text-text-tertiary no-underline text-xs py-1 px-0.5">Contact</Link>
       </nav>
-      <div style={{
-        fontSize: '11px',
-        color: theme.text.muted,
-      }}>
+      <div className="text-[11px] text-text-muted">
         &copy; {new Date().getFullYear()} NxStops
       </div>
     </footer>

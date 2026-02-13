@@ -24,6 +24,12 @@
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
       ]
+    },
+    {
+      "source": "/.well-known/apple-app-site-association",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json" }
+      ]
     }
   ],
   "redirects": [
@@ -43,6 +49,6 @@
   "rewrites": [
     { "source": "/api/events", "destination": "/api/events" },
     { "source": "/api/places", "destination": "/api/places" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    { "source": "/((?!api/|.well-known/).*)", "destination": "/index.html" }
   ]
 }

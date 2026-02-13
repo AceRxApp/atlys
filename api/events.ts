@@ -2,46 +2,11 @@
 // Aggregates events from Ticketmaster + SeatGeek + PredictHQ
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { setCorsHeaders, checkRateLimit, getClientIp } from './_cors';
 
 const TICKETMASTER_API_KEY = process.env.TICKETMASTER_API_KEY || '';
 const SEATGEEK_CLIENT_ID = process.env.SEATGEEK_CLIENT_ID || '';
 const PREDICTHQ_TOKEN = process.env.PREDICTHQ_TOKEN || '';
-
-const ALLOWED_ORIGINS = [
-  'https://nxstops.com',
-  'https://www.nxstops.com',
-  'https://vynbynave.vercel.app',
-  'https://nxstops-new.vercel.app',
-  'http://localhost:5173',
-  'http://localhost:4173',
-];
-
-function getCorsHeaders(origin?: string) {
-  const isAllowed = ALLOWED_ORIGINS.includes(origin || '');
-  const allowedOrigin = isAllowed ? origin! : ALLOWED_ORIGINS[0];
-  return {
-    'Access-Control-Allow-Origin': allowedOrigin,
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Vary': 'Origin',
-  };
-}
-
-const rateLimit = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_MAX = 60; // requests per window
-const RATE_LIMIT_WINDOW = 60_000; // 1 minute
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = rateLimit.get(ip);
-  if (!entry || now > entry.resetAt) {
-    rateLimit.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
-    return true;
-  }
-  if (entry.count >= RATE_LIMIT_MAX) return false;
-  entry.count++;
-  return true;
-}
 
 interface NormalizedEvent {
   id: string;
@@ -59,21 +24,13 @@ interface NormalizedEvent {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const corsHeaders = getCorsHeaders(req.headers.origin as string);
+  const corsOk = setCorsHeaders(res, req.headers.origin as string | undefined, 'GET, OPTIONS');
 
-  if (req.method === 'OPTIONS') {
-    Object.entries(corsHeaders).forEach(([key, value]) => {
-      res.setHeader(key, value);
-    });
-    return res.status(200).json({});
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (!corsOk) return res.status(403).json({ error: 'Origin not allowed' });
 
-  Object.entries(corsHeaders).forEach(([key, value]) => {
-    res.setHeader(key, value);
-  });
-
-  const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
-  if (!checkRateLimit(clientIp)) {
+  const clientIp = getClientIp(req.headers);
+  if (!(await checkRateLimit(clientIp, 60, 60_000))) {
     return res.status(429).json({ error: 'Too many requests. Please try again later.' });
   }
 

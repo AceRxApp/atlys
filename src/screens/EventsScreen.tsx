@@ -38,15 +38,15 @@ function EventsMapView({ eventsList }: { eventsList: EventItem[] }) {
 
   if (mappableEvents.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-        <div style={{ fontSize: '40px', marginBottom: '12px' }}>🗺️</div>
-        <p style={{ color: theme.text.secondary, fontSize: '14px' }}>No event locations available to map</p>
+      <div className="text-center py-[60px] px-5">
+        <div className="text-[40px] mb-3">🗺️</div>
+        <p className="text-text-secondary text-sm">No event locations available to map</p>
       </div>
     );
   }
 
   return (
-    <div style={{ height: 'calc(100vh - 280px)', borderRadius: '16px', overflow: 'hidden', border: `1px solid ${theme.border.subtle}` }}>
+    <div className="h-[calc(100vh-280px)] rounded-2xl overflow-hidden border border-border-subtle">
       <APIProvider apiKey={MAPS_API_KEY}>
         <Map
           defaultCenter={center}
@@ -72,15 +72,15 @@ function EventsMapView({ eventsList }: { eventsList: EventItem[] }) {
                 position={{ lat: event.lat!, lng: event.lng! }}
                 onCloseClick={() => setActiveEventPin(null)}
               >
-                <div style={{ padding: '4px', minWidth: '180px', color: '#1C1917' }}>
-                  <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '4px' }}>{event.name}</div>
-                  <div style={{ fontSize: '12px', color: '#57534E', marginBottom: '2px' }}>
+                <div className="p-1 min-w-[180px] text-[#1C1917]">
+                  <div className="font-bold text-sm mb-1">{event.name}</div>
+                  <div className="text-xs text-[#57534E] mb-0.5">
                     {formatEventDate(event.date)}{event.time ? ` · ${formatEventTime(event.time)}` : ''}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#78716C', marginBottom: '8px' }}>{event.venue}</div>
+                  <div className="text-[11px] text-[#78716C] mb-2">{event.venue}</div>
                   {event.url && (
                     <a href={event.url} target="_blank" rel="noopener noreferrer"
-                      style={{ display: 'block', padding: '6px', borderRadius: '6px', background: '#7C3AED', color: 'white', fontSize: '11px', fontWeight: 600, textAlign: 'center', textDecoration: 'none' }}>
+                      className="block p-1.5 rounded-md bg-[#7C3AED] text-white text-[11px] font-semibold text-center no-underline">
                       Get Tickets
                     </a>
                   )}
@@ -176,52 +176,45 @@ export default function EventsScreen() {
   return (
     <div>
       {/* Header */}
-      <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div className="mb-3 flex justify-between items-start">
         <div>
-          <h1 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '2px' }}>
+          <h1 className="text-xl font-bold mb-0.5">
             Events {cityLabel ? `in ${cityLabel}` : ''} 🎫
           </h1>
-          <p style={{ color: theme.text.tertiary, fontSize: '13px' }}>
+          <p className="text-text-tertiary text-[13px]">
             {eventsLoading ? 'Finding events...' : `${filteredEvents.length} upcoming events`}
           </p>
         </div>
-        <div style={{ display: 'flex', borderRadius: '10px', overflow: 'hidden', border: `1px solid ${theme.border.strong}`, flexShrink: 0 }}>
+        <div className="flex rounded-[10px] overflow-hidden border border-border-strong shrink-0">
           <button onClick={() => setEventsViewMode('list')}
             aria-label="List view"
-            style={{
-              padding: '10px 14px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer',
-              background: eventsViewMode === 'list' ? theme.purpleTint.bg15 : 'transparent',
-              color: eventsViewMode === 'list' ? theme.events.active : theme.text.tertiary, minHeight: '44px',
-            }}>
+            className={`py-2.5 px-3.5 text-xs font-medium border-none cursor-pointer min-h-[44px] ${
+              eventsViewMode === 'list' ? 'bg-purple-tint-bg15 text-events-active' : 'bg-transparent text-text-tertiary'
+            }`}>
             List
           </button>
           <button onClick={() => setEventsViewMode('map')}
             aria-label="Map view"
-            style={{
-              padding: '10px 14px', fontSize: '12px', fontWeight: 500, border: 'none', cursor: 'pointer',
-              borderLeft: `1px solid ${theme.border.strong}`,
-              background: eventsViewMode === 'map' ? theme.purpleTint.bg15 : 'transparent',
-              color: eventsViewMode === 'map' ? theme.events.active : theme.text.tertiary, minHeight: '44px',
-            }}>
+            className={`py-2.5 px-3.5 text-xs font-medium border-none cursor-pointer min-h-[44px] border-l border-border-strong ${
+              eventsViewMode === 'map' ? 'bg-purple-tint-bg15 text-events-active' : 'bg-transparent text-text-tertiary'
+            }`}>
             Map
           </button>
         </div>
       </div>
 
       {/* Event Category Filters */}
-      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '8px', scrollbarWidth: 'none' }}>
+      <div className="flex gap-2 overflow-x-auto pb-3 mb-2 scroll-hidden">
         {EVENT_CATEGORIES.map(cat => {
           const isActive = eventCategoryFilter === cat.id;
           return (
             <button key={cat.id}
               onClick={() => setEventCategoryFilter(isActive && cat.id !== 'all' ? 'all' : cat.id)}
-              style={{
-                padding: '6px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: 500,
-                border: isActive ? `1px solid ${theme.purpleTint.border30}` : `1px solid ${theme.border.medium}`,
-                cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                background: isActive ? theme.purpleTint.bg12 : 'transparent',
-                color: isActive ? theme.events.active : theme.text.tertiary,
-              }}>
+              className={`py-1.5 px-3.5 rounded-2xl text-xs font-medium cursor-pointer whitespace-nowrap shrink-0 ${
+                isActive
+                  ? 'border border-purple-tint-border30 bg-purple-tint-bg12 text-events-active'
+                  : 'border border-border-medium bg-transparent text-text-tertiary'
+              }`}>
               {cat.label}
             </button>
           );
@@ -230,27 +223,27 @@ export default function EventsScreen() {
 
       {/* Events Content */}
       {eventsLoading ? (
-        <div style={{ textAlign: 'center', padding: '60px 0' }}>
-          <div style={{ width: '36px', height: '36px', border: `3px solid ${theme.purpleTint.border20}`, borderTopColor: theme.events.active, borderRadius: '50%', margin: '0 auto 16px', animation: 'spin 0.8s linear infinite' }} />
-          <p style={{ color: theme.text.tertiary, fontSize: '14px' }}>Finding events nearby...</p>
+        <div className="text-center py-[60px]">
+          <div className="w-9 h-9 border-3 border-purple-tint-border20 border-t-events-active rounded-full mx-auto mb-4 animate-spin" />
+          <p className="text-text-tertiary text-sm">Finding events nearby...</p>
         </div>
       ) : eventsError ? (
-        <div style={{ textAlign: 'center', paddingTop: '60px' }}>
-          <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.6 }}>&#x26A0;&#xFE0F;</div>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>Couldn't load events</h2>
-          <p style={{ color: theme.text.secondary, fontSize: '14px', lineHeight: 1.5, marginBottom: '16px' }}>
+        <div className="text-center pt-[60px]">
+          <div className="text-[64px] mb-4 opacity-60">&#x26A0;&#xFE0F;</div>
+          <h2 className="text-xl font-bold mb-2">Couldn't load events</h2>
+          <p className="text-text-secondary text-sm leading-[1.5] mb-4">
             Check your connection and try again.
           </p>
           <button onClick={fetchEventsData}
-            style={{ background: 'none', border: `1px solid ${theme.events.active}`, color: theme.events.active, borderRadius: '10px', padding: '10px 20px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            className="bg-none border border-events-active text-events-active rounded-[10px] py-2.5 px-5 text-[13px] font-semibold cursor-pointer">
             Tap to Retry
           </button>
         </div>
       ) : filteredEvents.length === 0 ? (
-        <div style={{ textAlign: 'center', paddingTop: '60px' }}>
-          <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.6 }}>&#x1F3AB;</div>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>No events found</h2>
-          <p style={{ color: theme.text.secondary, fontSize: '14px', lineHeight: 1.5 }}>
+        <div className="text-center pt-[60px]">
+          <div className="text-[64px] mb-4 opacity-60">&#x1F3AB;</div>
+          <h2 className="text-xl font-bold mb-2">No events found</h2>
+          <p className="text-text-secondary text-sm leading-[1.5]">
             {!useGps && !selectedCity
               ? 'Select a city or use GPS to discover events nearby'
               : 'No upcoming events found in this area. Check back soon!'}

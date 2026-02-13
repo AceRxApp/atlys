@@ -1,11 +1,41 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
-import { useTheme } from '../context/ThemeContext';
-import { getCardStyle } from '../styles/shared';
 import { LocationIcon } from '../components/icons';
 import { TRAVEL_GROUPS, CITY_CULTURE } from '../data';
 import type { CityContext } from '../data';
+import type { PlanMood, PlanDuration } from '../types';
 import CurrencyWidget from '../components/CurrencyWidget';
+import { getSunsetGuardian, isNightTime, getNightSafetyTips } from '../utils/safetyEngine';
+
+const PLAN_MOODS: { id: PlanMood; emoji: string; label: string }[] = [
+  { id: 'adventurous', emoji: '\u{1F525}', label: 'Adventurous' },
+  { id: 'chill', emoji: '\u{1F33F}', label: 'Chill' },
+  { id: 'cultural', emoji: '\u{1F3DB}\u{FE0F}', label: 'Cultural' },
+  { id: 'foodie', emoji: '\u{1F37D}\u{FE0F}', label: 'Foodie' },
+  { id: 'nightlife', emoji: '\u{1F378}', label: 'Nightlife' },
+];
+
+const PLAN_DURATIONS: { id: PlanDuration; emoji: string; label: string; desc: string }[] = [
+  { id: 'full', emoji: '\u{2600}\u{FE0F}', label: 'Full Day', desc: '5-7 stops' },
+  { id: 'morning', emoji: '\u{1F305}', label: 'Morning', desc: '2-3 stops' },
+  { id: 'afternoon', emoji: '\u{26C5}', label: 'Afternoon', desc: '2-3 stops' },
+  { id: 'evening', emoji: '\u{1F319}', label: 'Evening', desc: '2-3 stops' },
+];
+
+const PLAN_BUDGETS = [
+  { value: 50, emoji: '\u{2615}', label: '$50' },
+  { value: 100, emoji: '\u{1F37D}\u{FE0F}', label: '$100' },
+  { value: 200, emoji: '\u{1F37E}', label: '$200' },
+  { value: -1, emoji: '\u{1F680}', label: 'No Limit' },
+];
+
+const LOADING_MESSAGES = [
+  'Finding the best spots nearby...',
+  'Checking what\'s open right now...',
+  'Building your perfect day...',
+  'Curating hidden gems...',
+  'Almost there...',
+];
 
 // ============================================================================
 // City Search Autocomplete
@@ -16,11 +46,9 @@ interface CitySearchProps {
   selectedCity: { id: string; name: string; country: string } | null;
   loading: boolean;
   onSelect: (city: CitySearchProps['cities'][number] | null) => void;
-  theme: Record<string, any>;
-  cardStyle: React.CSSProperties;
 }
 
-function CitySearch({ cities, selectedCity, loading, onSelect, theme, cardStyle }: CitySearchProps) {
+function CitySearch({ cities, selectedCity, loading, onSelect }: CitySearchProps) {
   const [query, setQuery] = useState(selectedCity ? `${selectedCity.name}, ${selectedCity.country}` : '');
   const [open, setOpen] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(-1);
@@ -103,11 +131,11 @@ function CitySearch({ cities, selectedCity, loading, onSelect, theme, cardStyle 
   }, [highlightIndex]);
 
   return (
-    <div ref={containerRef} style={{ ...cardStyle, position: 'relative', zIndex: open ? 999 : 'auto' }}>
-      <label style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '10px' }}>
+    <div ref={containerRef} className={`card relative ${open ? 'z-[999]' : 'z-auto'}`}>
+      <label className="section-label block mb-2.5">
         Search Your City
       </label>
-      <div style={{ position: 'relative' }}>
+      <div className="relative">
         <input
           ref={inputRef}
           type="text"
@@ -127,31 +155,18 @@ function CitySearch({ cities, selectedCity, loading, onSelect, theme, cardStyle 
           aria-expanded={open}
           aria-autocomplete="list"
           aria-controls="city-search-list"
-          style={{
-            width: '100%', padding: '14px 40px 14px 14px', borderRadius: '12px',
-            border: `1px solid ${open ? theme.accent.amber : theme.border.strong}`,
-            background: theme.bg.input, color: theme.text.primary,
-            fontSize: '15px', outline: 'none',
-            transition: 'border-color 0.15s',
-          }}
+          className={`input-field pr-10 transition-[border-color] duration-150 ${open ? 'border-accent-amber' : 'border-border-strong'}`}
         />
         {query && selectedCity ? (
           <button
             onClick={() => { setQuery(''); onSelect(null); setOpen(true); inputRef.current?.focus(); }}
             aria-label="Clear city"
-            style={{
-              position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
-              background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
-              color: theme.text.tertiary, fontSize: '16px', lineHeight: 1,
-            }}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer p-1 text-text-tertiary text-base leading-none"
           >
             ✕
           </button>
         ) : (
-          <div style={{
-            position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)',
-            color: theme.text.tertiary, pointerEvents: 'none',
-          }}>
+          <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -165,27 +180,16 @@ function CitySearch({ cities, selectedCity, loading, onSelect, theme, cardStyle 
           ref={listRef}
           id="city-search-list"
           role="listbox"
-          style={{
-            position: 'absolute', left: 0, right: 0, top: '100%',
-            marginTop: '4px', maxHeight: '280px', overflowY: 'auto',
-            borderRadius: '12px', border: `1px solid ${theme.border.strong}`,
-            background: theme.bg.surface, zIndex: 50,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-          }}
+          className="absolute left-0 right-0 top-full mt-1 max-h-[280px] overflow-y-auto rounded-xl border border-border-strong bg-bg-surface z-50 shadow-[0_8px_32px_rgba(0,0,0,0.2)]"
         >
           {flatList.length === 0 ? (
-            <div style={{ padding: '16px', textAlign: 'center', color: theme.text.tertiary, fontSize: '13px' }}>
+            <div className="p-4 text-center text-text-tertiary text-[13px]">
               No cities found for &ldquo;{query}&rdquo;
             </div>
           ) : (
             regionOrder.map(region => (
               <div key={region}>
-                <div style={{
-                  padding: '8px 14px 4px', fontSize: '10px', fontWeight: 700,
-                  color: theme.text.tertiary, textTransform: 'uppercase',
-                  letterSpacing: '0.08em', position: 'sticky', top: 0,
-                  background: theme.bg.surface, zIndex: 1,
-                }}>
+                <div className="px-3.5 pt-2 pb-1 text-[10px] font-bold text-text-tertiary uppercase tracking-[0.08em] sticky top-0 bg-bg-surface z-[1]">
                   {region}
                 </div>
                 {grouped[region].map(city => {
@@ -200,28 +204,18 @@ function CitySearch({ cities, selectedCity, loading, onSelect, theme, cardStyle 
                       aria-selected={isSelected}
                       onClick={() => selectCity(city)}
                       onMouseEnter={() => setHighlightIndex(idx)}
-                      style={{
-                        width: '100%', padding: '10px 14px', border: 'none',
-                        cursor: 'pointer', textAlign: 'left',
-                        display: 'flex', alignItems: 'center', gap: '10px',
-                        background: isHighlighted ? theme.amberTint.bg10 : 'transparent',
-                        color: theme.text.primary,
-                      }}
+                      className={`w-full py-2.5 px-3.5 border-none cursor-pointer text-left flex items-center gap-2.5 text-text-primary ${isHighlighted ? 'bg-amber-tint-bg10' : 'bg-transparent'}`}
                     >
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{
-                          fontSize: '14px', fontWeight: isSelected ? 700 : 500,
-                          color: isSelected ? theme.accent.amber : theme.text.primary,
-                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                        }}>
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-sm truncate ${isSelected ? 'font-bold text-accent-amber' : 'font-medium text-text-primary'}`}>
                           {city.name}
                         </div>
-                        <div style={{ fontSize: '11px', color: theme.text.tertiary }}>
+                        <div className="text-[11px] text-text-tertiary">
                           {city.country}
                         </div>
                       </div>
                       {isSelected && (
-                        <span style={{ color: theme.accent.amber, fontSize: '14px', flexShrink: 0 }}>✓</span>
+                        <span className="text-accent-amber text-sm shrink-0">✓</span>
                       )}
                     </button>
                   );
@@ -260,52 +254,105 @@ export default function HomeScreen() {
     toggleSaved,
     cityLabel,
     setSelectedVibe,
+    setQuickFilters,
+    spinBlindDate,
     loading,
+    autoPlanLoading,
+    planMyDay,
   } = useApp();
-  const { theme } = useTheme();
-  const cardStyle = getCardStyle(theme);
   const [bannerFailed, setBannerFailed] = useState(false);
+  const [showPlanner, setShowPlanner] = useState(false);
+  const [planMood, setPlanMood] = useState<PlanMood>('adventurous');
+  const [planBudget, setPlanBudget] = useState(100);
+  const [planDuration, setPlanDuration] = useState<PlanDuration>('full');
+  const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
 
   // Reset banner state when city changes
   useEffect(() => { setBannerFailed(false); }, [selectedCity?.id]);
 
+  // Rotate loading messages
+  useEffect(() => {
+    if (!autoPlanLoading) { setLoadingMsgIdx(0); return; }
+    const interval = setInterval(() => {
+      setLoadingMsgIdx(prev => (prev + 1) % LOADING_MESSAGES.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [autoPlanLoading]);
+
+  const handlePlanMyDay = async () => {
+    setShowPlanner(false);
+    await planMyDay(planMood, planBudget, planDuration);
+    setScreen('plan');
+  };
+
   return (
     <div>
       {/* Greeting */}
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '26px', fontWeight: 700, marginBottom: '4px' }}>
+      <div className="mb-6">
+        <h1 className="text-[26px] font-bold mb-1">
           {getGreeting()} ✨
         </h1>
-        <p style={{ color: theme.text.secondary, fontSize: '14px' }}>{getTimeSuggestion()}</p>
+        <p className="text-text-secondary text-sm">{getTimeSuggestion()}</p>
       </div>
 
       {/* Weather Card */}
       {weather && (selectedCity || useGps) && (
-        <div style={{
-          ...cardStyle, display: 'flex', alignItems: 'center', gap: '14px',
-          background: `linear-gradient(135deg, ${theme.blueTint.bg}, rgba(147,197,253,0.04))`,
-          border: `1px solid ${theme.blueTint.border}`,
-        }}>
-          <span style={{ fontSize: '36px' }}>{weather.emoji}</span>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '22px', fontWeight: 700, color: theme.text.primary }}>
+        <div
+          className="card flex items-center gap-3.5 border border-blue-tint-border"
+          style={{ background: `linear-gradient(135deg, var(--blue-tint-bg), rgba(147,197,253,0.04))` }}
+        >
+          <span className="text-4xl">{weather.emoji}</span>
+          <div className="flex-1">
+            <div className="text-[22px] font-bold text-text-primary">
               {weather.temp}°F
             </div>
-            <div style={{ fontSize: '12px', color: theme.status.blue }}>{weather.description}</div>
+            <div className="text-xs text-status-blue">{weather.description}</div>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '13px', color: theme.text.secondary }}>H: {weather.high}° L: {weather.low}°</div>
-            <div style={{ fontSize: '11px', color: theme.text.tertiary }}>{cityLabel}</div>
+          <div className="text-right">
+            <div className="text-[13px] text-text-secondary">H: {weather.high}° L: {weather.low}°</div>
+            <div className="text-[11px] text-text-tertiary">{cityLabel}</div>
           </div>
         </div>
       )}
+
+      {/* Sunset Guardian */}
+      {weather && (() => {
+        const guardian = getSunsetGuardian(weather.sunset);
+        if (!guardian.active) return null;
+        const gradients: Record<string, string> = {
+          golden_hour: 'linear-gradient(135deg, rgba(251,191,36,0.15), rgba(251,191,36,0.04))',
+          approaching_sunset: 'linear-gradient(135deg, rgba(251,146,60,0.15), rgba(251,146,60,0.04))',
+          past_sunset: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(139,92,246,0.04))',
+          night: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(99,102,241,0.04))',
+        };
+        const borders: Record<string, string> = {
+          golden_hour: 'border-amber-tint-border20',
+          approaching_sunset: 'border-[rgba(251,146,60,0.3)]',
+          past_sunset: 'border-purple-tint-border20',
+          night: 'border-[rgba(99,102,241,0.25)]',
+        };
+        return (
+          <div className={`card flex items-center gap-3 border ${borders[guardian.phase!]}`}
+            style={{ background: gradients[guardian.phase!] }}>
+            <span className="text-2xl shrink-0">{guardian.emoji}</span>
+            <div className="flex-1">
+              <div className="text-[13px] font-semibold text-text-primary">{guardian.message}</div>
+              {guardian.phase === 'night' && (
+                <div className="text-[11px] text-text-tertiary mt-1">
+                  {getNightSafetyTips(true, false).slice(0, 2).map((tip, i) => (
+                    <span key={i}>{i > 0 ? ' · ' : ''}{tip}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Currency Converter */}
       {(selectedCity || (useGps && loc.city)) && (
         <CurrencyWidget
           cityName={(selectedCity?.name || loc.city || '').toLowerCase()}
-          theme={theme}
-          cardStyle={cardStyle}
         />
       )}
 
@@ -313,34 +360,25 @@ export default function HomeScreen() {
       {loc.hasLocation && (
         <button
           onClick={() => { setUseGps(true); setSelectedCity(null); setScreen('discover'); }}
-          style={{
-            ...cardStyle, width: '100%', cursor: 'pointer', textAlign: 'left',
-            display: 'flex', alignItems: 'center', gap: '14px',
-            border: useGps ? `2px solid ${theme.accent.amber}` : `1px solid ${theme.border.subtle}`,
-            background: useGps ? theme.amberTint.bg10 : theme.bg.surfaceAlpha,
-          }}
+          className={`card w-full cursor-pointer text-left flex items-center gap-3.5 ${useGps ? 'border-2 border-accent-amber bg-amber-tint-bg10' : 'border border-border-subtle bg-bg-surface-alpha'}`}
         >
-          <div style={{
-            width: '44px', height: '44px', borderRadius: '12px',
-            background: theme.accent.amberGradient,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          }}>
+          <div className="w-11 h-11 rounded-xl bg-accent-gradient flex items-center justify-center shrink-0">
             <LocationIcon />
           </div>
           <div>
-            <div style={{ fontWeight: 600, fontSize: '15px', color: theme.text.primary }}>{loc.city || 'Near You'}</div>
-            <div style={{ fontSize: '12px', color: theme.text.secondary }}>Use your current location</div>
+            <div className="font-semibold text-[15px] text-text-primary">{loc.city || 'Near You'}</div>
+            <div className="text-xs text-text-secondary">Use your current location</div>
           </div>
-          <div style={{ marginLeft: 'auto', color: theme.accent.amber, fontSize: '20px' }}>→</div>
+          <div className="ml-auto text-accent-amber text-xl">→</div>
         </button>
       )}
 
       {/* Divider */}
       {loc.hasLocation && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '16px 0' }}>
-          <div style={{ flex: 1, height: '1px', background: theme.border.subtle }} />
-          <span style={{ fontSize: '12px', color: theme.text.tertiary }}>or pick a city</span>
-          <div style={{ flex: 1, height: '1px', background: theme.border.subtle }} />
+        <div className="flex items-center gap-3 my-4">
+          <div className="flex-1 h-px bg-border-subtle" />
+          <span className="text-xs text-text-tertiary">or pick a city</span>
+          <div className="flex-1 h-px bg-border-subtle" />
         </div>
       )}
 
@@ -350,20 +388,18 @@ export default function HomeScreen() {
         selectedCity={selectedCity}
         loading={loading}
         onSelect={(city) => { setSelectedCity(city); setUseGps(false); }}
-        theme={theme}
-        cardStyle={cardStyle}
       />
 
       {/* City Banner */}
       {selectedCity && (
-        <div style={{ ...cardStyle, padding: 0, overflow: 'hidden', marginTop: '4px', position: 'relative', zIndex: 1 }}>
-          <div style={{ height: '140px', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '16px' }}>
+        <div className="card p-0 overflow-hidden mt-1 relative z-[1]">
+          <div className="h-[140px] relative overflow-hidden flex flex-col justify-end p-4">
             {selectedCity.banner_url && !bannerFailed ? (
               <>
                 <img src={selectedCity.banner_url} alt={selectedCity.name} loading="lazy" decoding="async"
                   onError={() => setBannerFailed(true)}
-                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.7))' }} />
+                  className="absolute inset-0 w-full h-full object-cover" />
+                <div className="absolute inset-0" style={{ background: 'linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.7))' }} />
               </>
             ) : (() => {
               const regionGradients: Record<string, string> = {
@@ -387,36 +423,31 @@ export default function HomeScreen() {
               const emoji = regionEmojis[selectedCity.region] || '\u{1F30D}';
               return (
                 <>
-                  <div style={{ position: 'absolute', inset: 0, background: grad }} />
-                  <div style={{ position: 'absolute', top: '12px', right: '16px', fontSize: '36px', opacity: 0.3 }}>{emoji}</div>
+                  <div className="absolute inset-0" style={{ background: grad }} />
+                  <div className="absolute top-3 right-4 text-4xl opacity-30">{emoji}</div>
                 </>
               );
             })()}
-            <h2 style={{ fontSize: '22px', fontWeight: 700, position: 'relative', zIndex: 1 }}>{selectedCity.name}</h2>
-            <p style={{ color: theme.text.body, fontSize: '13px', position: 'relative', zIndex: 1 }}>{selectedCity.country}</p>
+            <h2 className="text-[22px] font-bold relative z-[1]">{selectedCity.name}</h2>
+            <p className="text-text-body text-[13px] relative z-[1]">{selectedCity.country}</p>
           </div>
         </div>
       )}
 
       {/* Travel Group Selector */}
       {(selectedCity || useGps) && (
-        <div style={{ ...cardStyle, marginTop: '8px', position: 'relative', zIndex: 1 }}>
-          <label style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '10px' }}>
+        <div className="card mt-2 relative z-[1]">
+          <label className="section-label block mb-2.5">
             Who&apos;s traveling?
           </label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          <div className="flex flex-wrap gap-2">
             {TRAVEL_GROUPS.map(g => {
               const active = travelGroup === g.id;
               return (
                 <button key={g.id}
                   aria-pressed={active}
                   onClick={() => setTravelGroup(active ? null : g.id)}
-                  style={{
-                    padding: '8px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: 500,
-                    border: active ? `1px solid ${theme.amberTint.border40}` : `1px solid ${theme.border.medium}`,
-                    cursor: 'pointer', background: active ? theme.amberTint.bg15 : 'transparent',
-                    color: active ? theme.accent.amber : theme.text.secondary,
-                  }}>
+                  className={`py-2 px-3.5 rounded-[20px] text-[13px] font-medium cursor-pointer ${active ? 'border border-amber-tint-border40 bg-amber-tint-bg15 text-accent-amber' : 'border border-border-medium bg-transparent text-text-secondary'}`}>
                   {g.emoji} {g.label}
                 </button>
               );
@@ -431,19 +462,15 @@ export default function HomeScreen() {
         const culture = CITY_CULTURE[key];
         if (!culture) return null;
         return (
-          <div style={{ ...cardStyle, marginTop: '8px' }}>
+          <div className="card mt-2">
             <button
               onClick={() => setShowCulture(!showCulture)}
-              style={{
-                width: '100%', background: 'none', border: 'none', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: 0, color: theme.text.primary,
-              }}>
-              <span style={{ fontSize: '14px', fontWeight: 600 }}>Cultural Tips</span>
-              <span style={{ color: theme.text.tertiary, fontSize: '16px', transform: showCulture ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▼</span>
+              className="w-full bg-transparent border-none cursor-pointer flex items-center justify-between p-0 text-text-primary">
+              <span className="text-sm font-semibold">Cultural Tips</span>
+              <span className={`text-text-tertiary text-base transition-transform duration-200 ${showCulture ? 'rotate-180' : ''}`}>▼</span>
             </button>
             {showCulture && (
-              <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div className="mt-3 flex flex-col gap-2.5">
                 {[
                   { emoji: '💰', label: 'Tipping', value: culture.tipping },
                   { emoji: '👔', label: 'Dress', value: culture.dress },
@@ -451,11 +478,11 @@ export default function HomeScreen() {
                   { emoji: '🤝', label: 'Etiquette', value: culture.etiquette },
                   { emoji: '💵', label: 'Currency', value: culture.currency },
                 ].map(row => (
-                  <div key={row.label} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '16px', flexShrink: 0, width: '24px', textAlign: 'center' }}>{row.emoji}</span>
+                  <div key={row.label} className="flex gap-2.5 items-start">
+                    <span className="text-base shrink-0 w-6 text-center">{row.emoji}</span>
                     <div>
-                      <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>{row.label}</div>
-                      <div style={{ fontSize: '13px', color: theme.text.body, lineHeight: 1.4 }}>{row.value}</div>
+                      <div className="text-[11px] text-text-tertiary uppercase tracking-[0.06em] mb-0.5">{row.label}</div>
+                      <div className="text-[13px] text-text-body leading-[1.4]">{row.value}</div>
                     </div>
                   </div>
                 ))}
@@ -465,82 +492,215 @@ export default function HomeScreen() {
         );
       })()}
 
+      {/* Plan My Day — Primary CTA */}
+      {(selectedCity || useGps) && !autoPlanLoading && (
+        <button
+          onClick={() => setShowPlanner(true)}
+          className="w-full mt-3 p-4 rounded-[16px] border-none cursor-pointer text-left flex items-center gap-4 shadow-[0_4px_24px_var(--amber-tint-shadow)]"
+          style={{ background: `linear-gradient(135deg, var(--accent-amber), #D97706)` }}
+        >
+          <div className="w-12 h-12 rounded-2xl bg-[rgba(0,0,0,0.15)] flex items-center justify-center shrink-0 text-2xl">
+            {'\u2728'}
+          </div>
+          <div className="flex-1">
+            <div className="text-[17px] font-bold text-[#0C0A09]">Plan My Day</div>
+            <div className="text-[12px] text-[#0C0A09] opacity-70">AI builds your perfect itinerary</div>
+          </div>
+          <div className="text-[#0C0A09] text-xl font-bold">{'\u2192'}</div>
+        </button>
+      )}
+
+      {/* AI Generating State */}
+      {autoPlanLoading && (
+        <div className="card mt-3 py-8 text-center border border-amber-tint-border20"
+          style={{ background: `linear-gradient(135deg, var(--amber-tint-bg10), var(--bg-subtle))` }}>
+          <div className="w-10 h-[3px] rounded-sm mx-auto mb-4 animate-shimmer"
+            style={{ background: `linear-gradient(90deg, var(--amber-tint-border30) 25%, var(--accent-amber) 50%, var(--amber-tint-border30) 75%)`, backgroundSize: '200% 100%' }} />
+          <div className="text-2xl mb-2">{'\u2728'}</div>
+          <div className="text-sm font-semibold text-text-primary mb-1">Planning your day...</div>
+          <div className="text-xs text-text-tertiary">{LOADING_MESSAGES[loadingMsgIdx]}</div>
+        </div>
+      )}
+
       {/* Quick Actions */}
-      {(selectedCity || useGps) && (
-        <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
-          <button
-            style={{
-              flex: 1, background: theme.accent.amberGradient,
-              color: theme.text.onAccent, border: 'none', borderRadius: '14px',
-              padding: '16px', fontSize: '16px', fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow: `0 4px 20px ${theme.amberTint.shadow}`,
-            }}
-            onClick={() => setScreen('discover')}
+      {(selectedCity || useGps) && !autoPlanLoading && (
+        <>
+          <div className="flex gap-2.5 mt-2.5">
+            <button
+              className="flex-1 bg-bg-subtle-strong text-text-primary border border-border-medium rounded-[14px] p-3.5 text-[15px] font-semibold cursor-pointer"
+              onClick={() => setScreen('discover')}
+            >
+              Browse Places {'\u2192'}
+            </button>
+            <button
+              className="flex flex-col items-center justify-center gap-0.5 py-3 px-[18px] rounded-[14px] border-[1.5px] border-accent-amber bg-amber-tint-bg10 text-accent-amber cursor-pointer shrink-0"
+              onClick={() => { setSelectedVibe('food'); setScreen('discover'); }}
+              aria-label="Find food near me"
+            >
+              <span className="text-xl">{'\u{1F37D}\u{FE0F}'}</span>
+              <span className="text-[11px] font-semibold">Near Me</span>
+            </button>
+          </div>
+          {/* Adventure shortcuts */}
+          <div className="flex gap-2.5 mt-2.5">
+            <button
+              className="flex-1 flex items-center gap-2.5 py-3 px-4 rounded-[14px] border border-purple-tint-border20 bg-purple-tint-bg08 cursor-pointer"
+              onClick={() => { setQuickFilters(['15min']); setScreen('discover'); }}
+            >
+              <span className="text-lg">{'\u26A1'}</span>
+              <div className="text-left">
+                <div className="text-[13px] font-semibold text-text-primary">15-Min Adventure</div>
+                <div className="text-[11px] text-text-tertiary">Quick stops nearby</div>
+              </div>
+            </button>
+            <button
+              className="flex-1 flex items-center gap-2.5 py-3 px-4 rounded-[14px] border border-purple-tint-border20 bg-purple-tint-bg08 cursor-pointer"
+              onClick={() => { setScreen('discover'); setTimeout(() => spinBlindDate(), 300); }}
+            >
+              <span className="text-lg">{'\u{1F3B2}'}</span>
+              <div className="text-left">
+                <div className="text-[13px] font-semibold text-text-primary">Blind Date</div>
+                <div className="text-[11px] text-text-tertiary">Surprise spot</div>
+              </div>
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Plan My Day Modal */}
+      {showPlanner && (
+        <div
+          className="fixed inset-0 bg-[rgba(0,0,0,0.6)] backdrop-blur-[8px] z-[1000] flex items-end justify-center"
+          onClick={() => setShowPlanner(false)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="w-full max-w-[440px] bg-bg-surface rounded-t-[24px] pt-6 px-5 pb-10 animate-[slideUp_0.3s_ease-out]"
           >
-            Start Exploring →
-          </button>
-          <button
-            style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              gap: '2px', padding: '12px 18px', borderRadius: '14px',
-              border: `1.5px solid ${theme.accent.amber}`,
-              background: theme.amberTint.bg10, color: theme.accent.amber,
-              cursor: 'pointer', flexShrink: 0,
-            }}
-            onClick={() => { setSelectedVibe('food'); setScreen('discover'); }}
-            aria-label="Find food near me"
-          >
-            <span style={{ fontSize: '20px' }}>🍽️</span>
-            <span style={{ fontSize: '11px', fontWeight: 600 }}>Near Me</span>
-          </button>
+            {/* Handle */}
+            <div className="w-10 h-1 rounded-sm bg-border-strong mx-auto mb-5" />
+
+            {/* Header */}
+            <div className="text-center mb-5">
+              <div className="text-3xl mb-1">{'\u2728'}</div>
+              <h3 className="text-xl font-bold text-text-primary mb-1">Plan My Day</h3>
+              <p className="text-[13px] text-text-secondary">Answer a few questions and we'll build your perfect itinerary</p>
+            </div>
+
+            {/* Mood Picker */}
+            <div className="mb-5">
+              <label className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.06em] block mb-2">What's the vibe?</label>
+              <div className="flex flex-wrap gap-2">
+                {PLAN_MOODS.map(m => (
+                  <button key={m.id}
+                    onClick={() => setPlanMood(m.id)}
+                    className={`py-2 px-3.5 rounded-[20px] text-[13px] font-medium cursor-pointer ${
+                      planMood === m.id
+                        ? 'border-2 border-accent-amber bg-amber-tint-bg15 text-accent-amber'
+                        : 'border border-border-medium bg-transparent text-text-secondary'
+                    }`}>
+                    {m.emoji} {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Duration Picker */}
+            <div className="mb-5">
+              <label className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.06em] block mb-2">How long?</label>
+              <div className="grid grid-cols-4 gap-2">
+                {PLAN_DURATIONS.map(d => (
+                  <button key={d.id}
+                    onClick={() => setPlanDuration(d.id)}
+                    className={`py-2.5 px-2 rounded-xl text-center cursor-pointer ${
+                      planDuration === d.id
+                        ? 'border-2 border-accent-amber bg-amber-tint-bg15'
+                        : 'border border-border-medium bg-transparent'
+                    }`}>
+                    <div className="text-lg mb-0.5">{d.emoji}</div>
+                    <div className={`text-[11px] font-semibold ${planDuration === d.id ? 'text-accent-amber' : 'text-text-primary'}`}>{d.label}</div>
+                    <div className="text-[10px] text-text-tertiary">{d.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Budget Picker */}
+            <div className="mb-6">
+              <label className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.06em] block mb-2">Budget</label>
+              <div className="flex gap-2">
+                {PLAN_BUDGETS.map(b => (
+                  <button key={b.value}
+                    onClick={() => setPlanBudget(b.value)}
+                    className={`flex-1 py-2.5 rounded-xl text-center cursor-pointer ${
+                      planBudget === b.value
+                        ? 'border-2 border-accent-amber bg-amber-tint-bg15'
+                        : 'border border-border-medium bg-transparent'
+                    }`}>
+                    <div className="text-base mb-0.5">{b.emoji}</div>
+                    <div className={`text-[12px] font-semibold ${planBudget === b.value ? 'text-accent-amber' : 'text-text-primary'}`}>{b.label}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Generate Button */}
+            <button
+              onClick={handlePlanMyDay}
+              className="w-full p-4 rounded-[14px] border-none cursor-pointer text-base font-bold shadow-[0_4px_20px_var(--amber-tint-shadow)]"
+              style={{ background: `linear-gradient(135deg, var(--accent-amber), #D97706)`, color: '#0C0A09' }}
+            >
+              {'\u2728'} Generate My Day
+            </button>
+
+            {/* Cancel */}
+            <button
+              onClick={() => setShowPlanner(false)}
+              className="w-full mt-2 p-3 bg-transparent border-none text-text-tertiary text-sm cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
 
       {/* Saved Places */}
       {savedPlaces.length > 0 && (
-        <div style={{ marginTop: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: 600 }}>Saved for Later</h2>
-            <span style={{ fontSize: '12px', color: theme.text.tertiary }}>{savedPlaces.length} places</span>
+        <div className="mt-5">
+          <div className="flex justify-between items-center mb-2.5">
+            <h2 className="text-base font-semibold">Saved for Later</h2>
+            <span className="text-xs text-text-tertiary">{savedPlaces.length} places</span>
           </div>
-          <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px', scrollbarWidth: 'none' }}>
+          <div className="flex gap-3 overflow-x-auto pb-2 scroll-hidden">
             {savedPlaces.map(place => (
               <div key={place.placeId} onClick={() => setSelectedPlace(place)}
                 role="button"
                 tabIndex={0}
                 aria-label={`View details for ${place.name}`}
                 onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPlace(place); } }}
-                style={{
-                  ...cardStyle, padding: 0, overflow: 'hidden', minWidth: '200px', maxWidth: '220px',
-                  flexShrink: 0, cursor: 'pointer',
-                }}>
+                className="card p-0 overflow-hidden min-w-[200px] max-w-[220px] shrink-0 cursor-pointer">
                 {place.photoUrl && (
-                  <div style={{ height: '100px', width: '100%', position: 'relative', overflow: 'hidden' }}>
+                  <div className="h-[100px] w-full relative overflow-hidden">
                     <img src={place.photoUrl} alt={place.name} loading="lazy" decoding="async"
                       onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(to bottom, transparent 50%, ${theme.bg.imageOverlay})` }} />
+                      className="w-full h-full object-cover block" />
+                    <div className="absolute inset-0" style={{ background: `linear-gradient(to bottom, transparent 50%, var(--bg-image-overlay))` }} />
                   </div>
                 )}
-                <div style={{ padding: '10px 12px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div className="py-2.5 px-3">
+                  <div className="text-[13px] font-semibold mb-1 truncate">
                     {place.name}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div className="flex items-center gap-1.5">
                     {place.rating > 0 && (
-                      <span style={{ fontSize: '11px', color: theme.accent.amber }}>★ {place.rating.toFixed(1)}</span>
+                      <span className="text-[11px] text-accent-amber">★ {place.rating.toFixed(1)}</span>
                     )}
                     {place.categoryDisplay && (
-                      <span style={{ fontSize: '11px', color: theme.text.tertiary }}>{place.categoryDisplay}</span>
+                      <span className="text-[11px] text-text-tertiary">{place.categoryDisplay}</span>
                     )}
                   </div>
                   <button onClick={e => { e.stopPropagation(); toggleSaved(place); }}
-                    style={{
-                      marginTop: '8px', width: '100%', padding: '6px', borderRadius: '8px',
-                      border: `1px solid ${theme.redTint.border}`, background: theme.redTint.bg,
-                      color: theme.status.red, fontSize: '11px', cursor: 'pointer',
-                    }}>
+                    className="mt-2 w-full py-1.5 rounded-lg border border-red-tint-border bg-red-tint-bg text-status-red text-[11px] cursor-pointer">
                     Remove
                   </button>
                 </div>

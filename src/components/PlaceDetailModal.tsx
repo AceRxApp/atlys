@@ -1,13 +1,13 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { track } from '@vercel/analytics';
 import { useApp } from '../context/AppContext';
-import { useTheme } from '../context/ThemeContext';
 import { useModalA11y } from '../hooks/useModalA11y';
-import { getCardStyle } from '../styles/shared';
 import { CloseIcon, DirectionsIcon, PhoneIcon, WebsiteIcon, ShareIcon } from './icons';
 import { PriceDots, StarRating } from './ui';
 import { formatDistance, getHoursStatus } from '../services/places';
 import { COMMUNITY_TAGS } from '../data';
+import { submitReport } from '../supabase';
+import { getPlaceBookingUrl } from '../data/bookingLinks';
 import type { Place } from '../services/places';
 
 export default function PlaceDetailModal({ place }: { place: Place }) {
@@ -43,10 +43,13 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
     user,
     requireAuth,
   } = useApp();
-  const { theme } = useTheme();
-  const cardStyle = getCardStyle(theme);
   const closeModal = useCallback(() => setSelectedPlace(null), [setSelectedPlace]);
   const modalRef = useModalA11y(true, closeModal);
+
+  const [showReportForm, setShowReportForm] = useState(false);
+  const [reportReason, setReportReason] = useState<string>('');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportSubmitting, setReportSubmitting] = useState(false);
 
   const hoursStatus = getHoursStatus(place.hours, place.openNow);
   const inPlan = isInPlan(place.placeId);
@@ -66,35 +69,27 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
     <div
       ref={modalRef}
       tabIndex={-1}
-      className="modal-backdrop"
+      className="modal-backdrop modal-overlay outline-none"
       role="dialog"
       aria-modal="true"
       aria-label={`Details for ${place.name}`}
-      style={{
-        position: 'fixed', inset: 0, background: theme.bg.modalOverlay, zIndex: 100,
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'center', outline: 'none',
-      }}
       onClick={closeModal}
     >
       <div
-        className="modal-sheet"
-        style={{
-          background: theme.bg.surface, borderRadius: '24px 24px 0 0',
-          maxWidth: '430px', width: '100%', maxHeight: '90vh',
-          overflowY: 'auto', overflowX: 'hidden',
-          border: `1px solid ${theme.border.subtle}`, borderBottom: 'none',
-        }}
+        className="modal-sheet modal-sheet-body !max-h-[90vh] overflow-x-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Photo Gallery / Hero */}
         {galleryPhotos.length > 0 && (
-          <div style={{ position: 'relative', width: '100%', height: '250px', borderRadius: '24px 24px 0 0', overflow: 'hidden', background: theme.bg.elevated }}>
+          <div className="relative w-full h-[250px] rounded-t-3xl overflow-hidden bg-bg-elevated">
             {/* Sliding photo strip */}
-            <div style={{
-              display: 'flex', width: `${galleryPhotos.length * 100}%`, height: '100%',
-              transform: `translateX(-${activePhotoIndex * (100 / galleryPhotos.length)}%)`,
-              transition: 'transform 0.35s ease-out',
-            }}>
+            <div
+              className="flex h-full transition-transform duration-[350ms] ease-out"
+              style={{
+                width: `${galleryPhotos.length * 100}%`,
+                transform: `translateX(-${activePhotoIndex * (100 / galleryPhotos.length)}%)`,
+              }}
+            >
               {galleryPhotos.map((url, i) => (
                 <img
                   key={i}
@@ -103,20 +98,17 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                   loading="lazy"
                   decoding="async"
                   onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                  style={{
-                    width: `${100 / galleryPhotos.length}%`, height: '100%',
-                    objectFit: 'cover', display: 'block', flexShrink: 0,
-                  }}
+                  className="h-full object-cover block shrink-0"
+                  style={{ width: `${100 / galleryPhotos.length}%` }}
                 />
               ))}
             </div>
 
             {/* Gradient overlay */}
-            <div style={{
-              position: 'absolute', inset: 0,
-              background: `linear-gradient(to bottom, transparent 50%, ${theme.bg.surface})`,
-              pointerEvents: 'none',
-            }} />
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{ background: `linear-gradient(to bottom, transparent 50%, var(--bg-surface))` }}
+            />
 
             {/* Tap zones for prev/next */}
             {hasMultiplePhotos && (
@@ -124,18 +116,12 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                 {activePhotoIndex > 0 && (
                   <button onClick={() => goToPhoto('prev')}
                     aria-label="Previous photo"
-                    style={{
-                      position: 'absolute', left: 0, top: 0, width: '40%', height: '100%',
-                      background: 'transparent', border: 'none', cursor: 'pointer', zIndex: 1,
-                    }} />
+                    className="absolute left-0 top-0 w-[40%] h-full bg-transparent border-none cursor-pointer z-[1]" />
                 )}
                 {activePhotoIndex < galleryPhotos.length - 1 && (
                   <button onClick={() => goToPhoto('next')}
                     aria-label="Next photo"
-                    style={{
-                      position: 'absolute', right: 0, top: 0, width: '40%', height: '100%',
-                      background: 'transparent', border: 'none', cursor: 'pointer', zIndex: 1,
-                    }} />
+                    className="absolute right-0 top-0 w-[40%] h-full bg-transparent border-none cursor-pointer z-[1]" />
                 )}
               </>
             )}
@@ -144,65 +130,38 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
             {hasMultiplePhotos && activePhotoIndex > 0 && (
               <button onClick={() => goToPhoto('prev')}
                 aria-label="Previous photo"
-                style={{
-                  position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', zIndex: 2,
-                  background: theme.bg.photoButton, backdropFilter: 'blur(8px)', border: 'none',
-                  borderRadius: '50%', width: '36px', height: '36px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', color: theme.text.primary, fontSize: '16px', fontWeight: 700,
-                }}>
-                ‹
+                className="absolute left-3 top-1/2 -translate-y-1/2 z-[2] bg-bg-photo-button backdrop-blur-[8px] border-none rounded-full w-9 h-9 flex items-center justify-center cursor-pointer text-text-primary text-base font-bold">
+                &#8249;
               </button>
             )}
             {hasMultiplePhotos && activePhotoIndex < galleryPhotos.length - 1 && (
               <button onClick={() => goToPhoto('next')}
                 aria-label="Next photo"
-                style={{
-                  position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', zIndex: 2,
-                  background: theme.bg.photoButton, backdropFilter: 'blur(8px)', border: 'none',
-                  borderRadius: '50%', width: '36px', height: '36px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', color: theme.text.primary, fontSize: '16px', fontWeight: 700,
-                }}>
-                ›
+                className="absolute right-3 top-1/2 -translate-y-1/2 z-[2] bg-bg-photo-button backdrop-blur-[8px] border-none rounded-full w-9 h-9 flex items-center justify-center cursor-pointer text-text-primary text-base font-bold">
+                &#8250;
               </button>
             )}
 
             {/* Close button */}
             <button onClick={() => setSelectedPlace(null)}
               aria-label="Close"
-              style={{
-                position: 'absolute', top: '12px', right: '12px', zIndex: 3,
-                background: theme.bg.photoButton, border: 'none',
-                borderRadius: '50%', width: '36px', height: '36px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', color: theme.text.primary, backdropFilter: 'blur(8px)',
-              }}>
+              className="absolute top-3 right-3 z-[3] bg-bg-photo-button border-none rounded-full w-9 h-9 flex items-center justify-center cursor-pointer text-text-primary backdrop-blur-[8px]">
               <CloseIcon />
             </button>
 
             {/* Photo counter + dots */}
             {hasMultiplePhotos && (
-              <div style={{
-                position: 'absolute', bottom: '10px', left: '50%',
-                transform: 'translateX(-50%)', zIndex: 2,
-                display: 'flex', gap: '5px', alignItems: 'center',
-                background: theme.bg.photoCounter, borderRadius: '12px', padding: '4px 10px',
-                backdropFilter: 'blur(8px)',
-              }}>
+              <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 z-[2] flex gap-[5px] items-center bg-bg-photo-counter rounded-xl px-2.5 py-1 backdrop-blur-[8px]">
                 {galleryPhotos.map((_, i) => (
                   <button
                     key={i}
                     aria-label={`Go to photo ${i + 1}`}
                     onClick={() => setActivePhotoIndex(i)}
-                    style={{
-                      width: i === activePhotoIndex ? '14px' : '8px',
-                      height: '8px',
-                      borderRadius: '4px',
-                      background: i === activePhotoIndex ? theme.accent.amber : 'rgba(255,255,255,0.4)',
-                      border: 'none', padding: 0, cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                    }}
+                    className={`h-2 rounded-[4px] border-none p-0 cursor-pointer transition-all duration-200 ease-in-out ${
+                      i === activePhotoIndex
+                        ? 'w-3.5 bg-accent-amber'
+                        : 'w-2 bg-[rgba(255,255,255,0.4)]'
+                    }`}
                   />
                 ))}
               </div>
@@ -211,24 +170,24 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
         )}
 
         {/* Content */}
-        <div style={{ padding: '20px 20px 120px' }}>
+        <div className="px-5 pt-5 pb-[120px]">
           {galleryPhotos.length === 0 && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+            <div className="flex justify-end mb-3">
               <button onClick={() => setSelectedPlace(null)}
                 aria-label="Close"
-                style={{ background: 'none', border: 'none', color: theme.text.tertiary, cursor: 'pointer', padding: '10px', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                className="bg-transparent border-none text-text-tertiary cursor-pointer p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center">
                 <CloseIcon />
               </button>
             </div>
           )}
 
           {/* Name */}
-          <h2 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '8px' }}>{place.name}</h2>
+          <h2 className="text-2xl font-bold mb-2">{place.name}</h2>
 
           {/* Meta row */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '12px' }}>
+          <div className="flex items-center gap-2.5 flex-wrap mb-3">
             {place.categoryDisplay && (
-              <span style={{ padding: '4px 10px', background: theme.amberTint.bg15, color: theme.accent.amber, borderRadius: '8px', fontSize: '12px', fontWeight: 500 }}>
+              <span className="px-2.5 py-1 bg-amber-tint-bg15 text-accent-amber rounded-lg text-xs font-medium">
                 {place.categoryDisplay}
               </span>
             )}
@@ -237,114 +196,116 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
           </div>
 
           {/* Hours status */}
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: '6px',
-            padding: '8px 14px', borderRadius: '10px', marginBottom: '16px',
-            background: place.openNow ? theme.greenTint.bg : theme.redTint.bg,
-            border: `1px solid ${place.openNow ? theme.greenTint.border : theme.redTint.border}`,
-          }}>
-            <div style={{
-              width: '8px', height: '8px', borderRadius: '50%',
-              background: place.openNow ? theme.status.green : theme.status.red,
-            }} />
-            <span style={{ fontSize: '13px', fontWeight: 500, color: place.openNow ? theme.status.green : theme.status.red }}>
+          <div className={`inline-flex items-center gap-1.5 py-2 px-3.5 rounded-[10px] mb-4 border ${
+            place.openNow
+              ? 'bg-green-tint-bg border-green-tint-border'
+              : 'bg-red-tint-bg border-red-tint-border'
+          }`}>
+            <div className={`w-2 h-2 rounded-full ${place.openNow ? 'bg-status-green' : 'bg-status-red'}`} />
+            <span className={`text-[13px] font-medium ${place.openNow ? 'text-status-green' : 'text-status-red'}`}>
               {hoursStatus.text}
             </span>
             {hoursStatus.urgent && (
-              <span style={{ fontSize: '11px', color: theme.status.red, fontWeight: 600 }}>Hurry!</span>
+              <span className="text-[11px] text-status-red font-semibold">Hurry!</span>
             )}
           </div>
 
           {/* Quick Actions */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '20px' }}>
+          <div className="grid grid-cols-4 gap-2 mb-5">
             {place.googleMapsUrl && (
               <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
-                  padding: '12px 8px', borderRadius: '12px', background: theme.bg.subtleMedium,
-                  color: theme.text.secondary, textDecoration: 'none', fontSize: '11px',
-                }}>
+                className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-bg-subtle-medium text-text-secondary no-underline text-[11px]">
                 <DirectionsIcon />
                 Directions
               </a>
             )}
             {place.phone && (
               <a href={`tel:${place.phone}`}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
-                  padding: '12px 8px', borderRadius: '12px', background: theme.bg.subtleMedium,
-                  color: theme.text.secondary, textDecoration: 'none', fontSize: '11px',
-                }}>
+                className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-bg-subtle-medium text-text-secondary no-underline text-[11px]">
                 <PhoneIcon />
                 Call
               </a>
             )}
             {place.website && (
               <a href={place.website} target="_blank" rel="noopener noreferrer"
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
-                  padding: '12px 8px', borderRadius: '12px', background: theme.bg.subtleMedium,
-                  color: theme.text.secondary, textDecoration: 'none', fontSize: '11px',
-                }}>
+                className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-bg-subtle-medium text-text-secondary no-underline text-[11px]">
                 <WebsiteIcon />
                 Website
               </a>
             )}
             <button onClick={() => toggleSaved(place)}
               aria-label={isSaved(place.placeId) ? 'Remove from saved' : 'Save place'}
-              style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
-                padding: '12px 8px', borderRadius: '12px', minHeight: '44px',
-                background: isSaved(place.placeId) ? theme.amberTint.bg15 : theme.bg.subtleMedium,
-                color: isSaved(place.placeId) ? theme.accent.amber : theme.text.secondary, border: 'none', cursor: 'pointer', fontSize: '11px',
-              }}>
-              <span style={{ fontSize: '16px' }}>{isSaved(place.placeId) ? '♥' : '♡'}</span>
+              className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl min-h-[44px] border-none cursor-pointer text-[11px] ${
+                isSaved(place.placeId)
+                  ? 'bg-amber-tint-bg15 text-accent-amber'
+                  : 'bg-bg-subtle-medium text-text-secondary'
+              }`}>
+              <span className="text-base">{isSaved(place.placeId) ? '\u2665' : '\u2661'}</span>
               {isSaved(place.placeId) ? 'Saved' : 'Save'}
             </button>
             <button onClick={() => sharePlace(place)}
               aria-label="Share place"
-              style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
-                padding: '12px 8px', borderRadius: '12px', background: theme.bg.subtleMedium,
-                color: theme.text.secondary, border: 'none', cursor: 'pointer', fontSize: '11px', minHeight: '44px',
-              }}>
+              className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-bg-subtle-medium text-text-secondary border-none cursor-pointer text-[11px] min-h-[44px]">
               <ShareIcon />
               Share
+            </button>
+            <button onClick={() => {
+              if (!requireAuth()) return;
+              setShowReportForm(true);
+            }}
+              aria-label="Report place"
+              className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-bg-subtle-medium text-text-secondary border-none cursor-pointer text-[11px] min-h-[44px]">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+                <line x1="4" y1="22" x2="4" y2="15" />
+              </svg>
+              Report
             </button>
           </div>
 
           {/* Reserve / Book */}
           {(isReservable(place) || isBookable(place)) && (
-            <div style={{ marginBottom: '16px' }}>
+            <div className="mb-4">
               <a href={getBookingUrl(place)} target="_blank" rel="noopener noreferrer"
                 onClick={() => track('booking_click', { place: place.name, category: place.categoryDisplay || '', type: isReservable(place) ? 'opentable' : 'book' })}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                  width: '100%', padding: '14px', borderRadius: '12px', boxSizing: 'border-box',
-                  background: isReservable(place)
-                    ? 'linear-gradient(135deg, rgba(218,55,67,0.12), rgba(218,55,67,0.05))'
-                    : theme.greenTint.bg,
-                  border: `1px solid ${isReservable(place) ? 'rgba(218,55,67,0.25)' : theme.greenTint.border}`,
-                  color: isReservable(place) ? '#DA3743' : theme.status.green,
-                  textDecoration: 'none', fontSize: '14px', fontWeight: 600,
-                }}>
+                className={`flex items-center justify-center gap-2 w-full p-3.5 rounded-xl box-border no-underline text-sm font-semibold ${
+                  isReservable(place)
+                    ? 'border border-[rgba(218,55,67,0.25)] text-[#DA3743]'
+                    : 'bg-green-tint-bg border border-green-tint-border text-status-green'
+                }`}
+                style={isReservable(place) ? { background: 'linear-gradient(135deg, rgba(218,55,67,0.12), rgba(218,55,67,0.05))' } : undefined}>
                 {isReservable(place) ? 'Reserve on OpenTable' : 'Book Tickets'}
               </a>
               {place.googleMapsUrl && (
                 <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
-                  style={{ display: 'block', textAlign: 'center', marginTop: '8px', color: theme.text.secondary, fontSize: '12px', textDecoration: 'none' }}>
+                  className="block text-center mt-2 text-text-secondary text-xs no-underline">
                   View on Google Maps
                 </a>
               )}
             </div>
           )}
 
+          {/* Experience Booking (tours, activities) */}
+          {(() => {
+            const booking = getPlaceBookingUrl(place.name, place.category, '');
+            if (!booking || isReservable(place) || isBookable(place)) return null;
+            return (
+              <div className="mb-4">
+                <a href={booking.url} target="_blank" rel="noopener noreferrer"
+                  onClick={() => track('detail_booking_click', { place: place.name, service: booking.service })}
+                  className="flex items-center justify-center gap-2 w-full p-3.5 rounded-xl box-border no-underline text-sm font-semibold bg-green-tint-bg border border-green-tint-border text-status-green">
+                  {'\u{1F3AF}'} {booking.label} on {booking.service}
+                </a>
+              </div>
+            );
+          })()}
+
           {/* Address */}
           {place.address && (
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Address</div>
+            <div className="mb-4">
+              <div className="section-label !mb-1.5">Address</div>
               <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
-                style={{ color: theme.text.primary, fontSize: '14px', textDecoration: 'none', lineHeight: 1.4 }}>
+                className="text-text-primary text-sm no-underline leading-[1.4]">
                 {place.address}
               </a>
             </div>
@@ -352,28 +313,24 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
 
           {/* Editorial Summary */}
           {place.editorialSummary && (
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>About</div>
-              <p style={{ color: theme.text.body, fontSize: '14px', lineHeight: 1.5 }}>{place.editorialSummary}</p>
+            <div className="mb-4">
+              <div className="section-label !mb-1.5">About</div>
+              <p className="text-text-body text-sm leading-relaxed">{place.editorialSummary}</p>
             </div>
           )}
 
           {/* Hours */}
           {place.hours.length > 0 && (
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Hours</div>
+            <div className="mb-4">
+              <div className="section-label !mb-1.5">Hours</div>
               {place.hours.map((h, i) => {
                 const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                 const today = days[new Date().getDay()];
                 const isToday = h.startsWith(today);
                 return (
-                  <div key={i} style={{
-                    fontSize: '13px', padding: '4px 0',
-                    color: isToday ? theme.text.primary : theme.text.tertiary,
-                    fontWeight: isToday ? 600 : 400,
-                  }}>
+                  <div key={i} className={`text-[13px] py-1 ${isToday ? 'text-text-primary font-semibold' : 'text-text-tertiary font-normal'}`}>
                     {h}
-                    {isToday && <span style={{ color: theme.accent.amber, marginLeft: '8px', fontSize: '11px' }}>Today</span>}
+                    {isToday && <span className="text-accent-amber ml-2 text-[11px]">Today</span>}
                   </div>
                 );
               })}
@@ -382,19 +339,19 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
 
           {/* Distance */}
           {place.distance != null && (
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Distance</div>
-              <p style={{ color: theme.text.primary, fontSize: '14px' }}>{formatDistance(place.distance, useMiles)} {getDistanceReference()}</p>
+            <div className="mb-4">
+              <div className="section-label !mb-1.5">Distance</div>
+              <p className="text-text-primary text-sm">{formatDistance(place.distance, useMiles)} {getDistanceReference()}</p>
             </div>
           )}
 
           {/* Good to Know (Safety) */}
           {getSafetyIndicators(place).length > 0 && (
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Good to know</div>
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <div className="mb-4">
+              <div className="section-label !mb-1.5">Good to know</div>
+              <div className="flex gap-1.5 flex-wrap">
                 {getSafetyIndicators(place).map(ind => (
-                  <span key={ind} style={{ fontSize: '12px', color: theme.text.secondary, padding: '4px 10px', background: theme.bg.subtle, borderRadius: '8px' }}>
+                  <span key={ind} className="text-xs text-text-secondary px-2.5 py-1 bg-bg-subtle rounded-lg">
                     {ind}
                   </span>
                 ))}
@@ -404,13 +361,13 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
 
           {/* Community Tags */}
           {placeTagsCache[place.placeId] && Object.keys(placeTagsCache[place.placeId]).length > 0 && (
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Community Tags</div>
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <div className="mb-4">
+              <div className="section-label !mb-1.5">Community Tags</div>
+              <div className="flex gap-1.5 flex-wrap">
                 {Object.entries(placeTagsCache[place.placeId]).map(([tag, count]) => {
                   const tagInfo = COMMUNITY_TAGS.find(t => t.id === tag);
                   return tagInfo ? (
-                    <span key={tag} style={{ fontSize: '12px', color: theme.community.text, padding: '4px 10px', background: theme.communityTint.bg, borderRadius: '8px' }}>
+                    <span key={tag} className="text-xs text-community-text px-2.5 py-1 bg-community-tint-bg rounded-lg">
                       {tagInfo.emoji} {tagInfo.label} ({count})
                     </span>
                   ) : null;
@@ -420,12 +377,12 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
           )}
 
           {/* Reviews Section */}
-          <div style={{ marginBottom: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Community Reviews</div>
+          <div className="mb-4">
+            <div className="flex justify-between items-center mb-2.5">
+              <div className="section-label !mb-0">Community Reviews</div>
               {!showReviewForm && (
                 <button onClick={() => { if (!requireAuth()) return; setShowReviewForm(true); }}
-                  style={{ background: 'none', border: `1px solid ${theme.amberTint.border30}`, color: theme.accent.amber, borderRadius: '8px', padding: '5px 12px', fontSize: '11px', cursor: 'pointer' }}>
+                  className="bg-transparent border border-amber-tint-border30 text-accent-amber rounded-lg px-3 py-[5px] text-[11px] cursor-pointer">
                   Leave a Review
                 </button>
               )}
@@ -433,14 +390,16 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
 
             {/* Review Form */}
             {showReviewForm && user && (
-              <div style={{ ...cardStyle, marginBottom: '12px', border: `1px solid ${theme.amberTint.border15}` }}>
+              <div className="card !border-amber-tint-border15 mb-3">
                 {/* Star Rating */}
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                <div className="flex gap-2 mb-3">
                   {[1, 2, 3, 4, 5].map(star => (
                     <button key={star} onClick={() => setReviewRating(star)}
                       aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
-                      style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', padding: '8px', color: star <= reviewRating ? theme.accent.amber : theme.text.disabled, minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      ★
+                      className={`bg-transparent border-none text-2xl cursor-pointer p-2 min-h-[44px] min-w-[44px] flex items-center justify-center ${
+                        star <= reviewRating ? 'text-accent-amber' : 'text-text-disabled'
+                      }`}>
+                      &#9733;
                     </button>
                   ))}
                 </div>
@@ -450,28 +409,23 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                   placeholder="Share your experience (optional)"
                   value={reviewText}
                   onChange={e => setReviewText(e.target.value)}
-                  style={{
-                    width: '100%', padding: '12px', borderRadius: '10px', border: `1px solid ${theme.border.strong}`,
-                    background: theme.bg.input, color: theme.text.primary, fontSize: '14px', resize: 'vertical',
-                    minHeight: '60px', boxSizing: 'border-box', outline: 'none',
-                  }}
+                  className="w-full p-3 rounded-[10px] border border-border-strong bg-bg-input text-text-primary text-sm resize-y min-h-[60px] box-border outline-none"
                 />
 
                 {/* Community Tags */}
-                <div style={{ marginTop: '10px', marginBottom: '10px' }}>
-                  <div style={{ fontSize: '11px', color: theme.text.tertiary, marginBottom: '6px' }}>Tag this place:</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                <div className="mt-2.5 mb-2.5">
+                  <div className="text-[11px] text-text-tertiary mb-1.5">Tag this place:</div>
+                  <div className="flex flex-wrap gap-1.5">
                     {COMMUNITY_TAGS.map(tag => {
                       const selected = reviewTags.includes(tag.id);
                       return (
                         <button key={tag.id}
                           onClick={() => setReviewTags(selected ? reviewTags.filter(t => t !== tag.id) : [...reviewTags, tag.id])}
-                          style={{
-                            padding: '4px 10px', borderRadius: '12px', fontSize: '11px',
-                            border: selected ? `1px solid ${theme.communityTint.border40}` : `1px solid ${theme.border.medium}`,
-                            background: selected ? theme.communityTint.bg12 : 'transparent',
-                            color: selected ? theme.community.text : theme.text.tertiary, cursor: 'pointer',
-                          }}>
+                          className={`px-2.5 py-1 rounded-xl text-[11px] cursor-pointer ${
+                            selected
+                              ? 'border border-community-tint-border40 bg-community-tint-bg12 text-community-text'
+                              : 'border border-border-medium bg-transparent text-text-tertiary'
+                          }`}>
                           {tag.emoji} {tag.label}
                         </button>
                       );
@@ -480,19 +434,18 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                 </div>
 
                 {/* Submit */}
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div className="flex gap-2">
                   <button onClick={handleSubmitReview}
                     disabled={reviewRating === 0 || reviewSubmitting}
-                    style={{
-                      flex: 1, padding: '10px', borderRadius: '10px', border: 'none',
-                      background: reviewRating > 0 ? theme.accent.amberGradient : theme.bg.subtleStrong,
-                      color: reviewRating > 0 ? theme.text.onAccent : theme.text.tertiary,
-                      fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: reviewSubmitting ? 0.6 : 1,
-                    }}>
+                    className={`flex-1 p-2.5 rounded-[10px] border-none text-[13px] font-semibold cursor-pointer ${
+                      reviewRating > 0
+                        ? 'bg-accent-gradient text-text-on-accent'
+                        : 'bg-bg-subtle-strong text-text-tertiary'
+                    } ${reviewSubmitting ? 'opacity-60' : 'opacity-100'}`}>
                     {reviewSubmitting ? 'Submitting...' : 'Submit Review'}
                   </button>
                   <button onClick={() => { setShowReviewForm(false); setReviewRating(0); setReviewText(''); setReviewTags([]); }}
-                    style={{ padding: '10px 16px', borderRadius: '10px', border: `1px solid ${theme.border.medium}`, background: 'none', color: theme.text.tertiary, fontSize: '13px', cursor: 'pointer' }}>
+                    className="px-4 p-2.5 rounded-[10px] border border-border-medium bg-transparent text-text-tertiary text-[13px] cursor-pointer">
                     Cancel
                   </button>
                 </div>
@@ -502,24 +455,24 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
             {/* Existing Reviews */}
             {placeReviews.length > 0 ? (
               placeReviews.slice(0, 5).map(review => (
-                <div key={review.id} style={{ ...cardStyle, marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                    <span style={{ color: theme.accent.amber, fontSize: '13px' }}>
+                <div key={review.id} className="card !mb-2">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-accent-amber text-[13px]">
                       {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
                     </span>
-                    <span style={{ color: theme.text.muted, fontSize: '11px' }}>
+                    <span className="text-text-muted text-[11px]">
                       {new Date(review.created_at).toLocaleDateString()}
                     </span>
                   </div>
                   {review.review_text && (
-                    <p style={{ color: theme.text.body, fontSize: '13px', lineHeight: 1.4, marginBottom: '6px' }}>{review.review_text}</p>
+                    <p className="text-text-body text-[13px] leading-[1.4] mb-1.5">{review.review_text}</p>
                   )}
                   {review.tags && review.tags.length > 0 && (
-                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                    <div className="flex gap-1 flex-wrap">
                       {review.tags.map(tag => {
                         const tagInfo = COMMUNITY_TAGS.find(t => t.id === tag);
                         return tagInfo ? (
-                          <span key={tag} style={{ fontSize: '10px', color: theme.community.text, padding: '2px 6px', background: theme.communityTint.bg, borderRadius: '4px' }}>
+                          <span key={tag} className="text-[10px] text-community-text px-1.5 py-0.5 bg-community-tint-bg rounded-[4px]">
                             {tagInfo.emoji} {tagInfo.label}
                           </span>
                         ) : null;
@@ -529,18 +482,71 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                 </div>
               ))
             ) : (
-              <p style={{ color: theme.text.muted, fontSize: '13px' }}>No reviews yet. Be the first!</p>
+              <p className="text-text-muted text-[13px]">No reviews yet. Be the first!</p>
             )}
           </div>
+          {/* Report Form */}
+          {showReportForm && (
+            <div className="card !border-red-tint-border mb-4 mx-5">
+              <div className="section-label !mb-2">Report this place</div>
+              <div className="flex flex-col gap-2 mb-3">
+                {[
+                  { value: 'spam', label: 'Spam or fake' },
+                  { value: 'inappropriate', label: 'Inappropriate content' },
+                  { value: 'misinformation', label: 'Wrong information' },
+                  { value: 'harassment', label: 'Harassment' },
+                  { value: 'other', label: 'Other' },
+                ].map(opt => (
+                  <button key={opt.value}
+                    onClick={() => setReportReason(opt.value)}
+                    className={`text-left px-3 py-2.5 rounded-[10px] text-[13px] cursor-pointer ${
+                      reportReason === opt.value
+                        ? 'bg-red-tint-bg border border-red-tint-border text-status-red font-medium'
+                        : 'bg-bg-subtle border border-border-subtle text-text-secondary'
+                    }`}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                placeholder="Additional details (optional)"
+                value={reportDetails}
+                onChange={e => setReportDetails(e.target.value)}
+                className="w-full p-3 rounded-[10px] border border-border-strong bg-bg-input text-text-primary text-sm resize-y min-h-[50px] box-border outline-none mb-3"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    if (!reportReason) return;
+                    setReportSubmitting(true);
+                    const result = await submitReport('place', place.placeId, reportReason as 'spam' | 'inappropriate' | 'harassment' | 'misinformation' | 'other', reportDetails);
+                    setReportSubmitting(false);
+                    if (result.success) {
+                      setShowReportForm(false);
+                      setReportReason('');
+                      setReportDetails('');
+                    }
+                  }}
+                  disabled={!reportReason || reportSubmitting}
+                  className={`flex-1 py-2.5 rounded-[10px] border-none text-[13px] font-semibold cursor-pointer ${
+                    reportReason ? 'bg-status-red text-white' : 'bg-bg-subtle-strong text-text-tertiary'
+                  } ${reportSubmitting ? 'opacity-60' : 'opacity-100'}`}>
+                  {reportSubmitting ? 'Submitting...' : 'Submit Report'}
+                </button>
+                <button onClick={() => { setShowReportForm(false); setReportReason(''); setReportDetails(''); }}
+                  className="px-4 py-2.5 rounded-[10px] border border-border-medium bg-transparent text-text-tertiary text-[13px] cursor-pointer">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Sticky Bottom Bar */}
-        <div style={{
-          position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
-          maxWidth: '430px', width: '100%', padding: '16px 20px 32px',
-          background: `linear-gradient(to top, ${theme.bg.surface}, ${theme.bg.surfaceAlpha})`,
-          borderTop: `1px solid ${theme.border.subtle}`,
-        }}>
+        <div
+          className="fixed bottom-0 left-1/2 -translate-x-1/2 max-w-[430px] w-full px-5 pt-4 pb-8 border-t border-border-subtle"
+          style={{ background: `linear-gradient(to top, var(--bg-surface), var(--bg-surface-alpha))` }}
+        >
           <button
             onClick={() => {
               if (inPlan) {
@@ -550,16 +556,13 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                 addToPlan(place);
               }
             }}
-            style={{
-              width: '100%', padding: '16px', borderRadius: '14px',
-              fontSize: '16px', fontWeight: 600, cursor: 'pointer',
-              background: inPlan ? 'transparent' : theme.accent.amberGradient,
-              color: inPlan ? theme.accent.amber : theme.text.onAccent,
-              border: inPlan ? `2px solid ${theme.accent.amber}` : 'none',
-              boxShadow: inPlan ? 'none' : `0 4px 20px ${theme.amberTint.shadow}`,
-            }}
+            className={`w-full p-4 rounded-[14px] text-base font-semibold cursor-pointer ${
+              inPlan
+                ? 'bg-transparent text-accent-amber border-2 border-accent-amber shadow-none'
+                : 'bg-accent-gradient text-text-on-accent border-none shadow-[0_4px_20px_var(--amber-tint-shadow)]'
+            }`}
           >
-            {inPlan ? '✓ In Your Plan — Remove' : '+ Add to Plan'}
+            {inPlan ? '\u2713 In Your Plan \u2014 Remove' : '+ Add to Plan'}
           </button>
         </div>
       </div>

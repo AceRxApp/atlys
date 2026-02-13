@@ -25,7 +25,7 @@ export function useLocationWeather(loc: LocState) {
   const [loading, setLoading] = useState(true);
   const [weather, setWeather] = useState<{
     temp: number; high: number; low: number; code: number;
-    description: string; emoji: string;
+    description: string; emoji: string; sunset?: string;
     forecast: { date: string; high: number; low: number; code: number; emoji: string; description: string; precipChance: number }[];
   } | null>(null);
 
@@ -95,7 +95,7 @@ export function useLocationWeather(loc: LocState) {
     const fetchWeather = async () => {
       try {
         const resp = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weathercode&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max&timezone=auto&forecast_days=10&temperature_unit=fahrenheit`
+          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weathercode&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max,sunset&timezone=auto&forecast_days=10&temperature_unit=fahrenheit`
         );
         if (!resp.ok) return;
         const data = await resp.json();
@@ -121,6 +121,7 @@ export function useLocationWeather(loc: LocState) {
           code,
           description: wInfo.description,
           emoji: wInfo.emoji,
+          sunset: data.daily?.sunset?.[0] || undefined,
           forecast,
         });
       } catch { /* weather is non-critical */ }

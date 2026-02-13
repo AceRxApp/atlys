@@ -49,11 +49,19 @@ export const VIBES: { id: Vibe; emoji: string; label: string }[] = [
 
 export const QUICK_FILTERS: { id: QuickFilter; label: string }[] = [
   { id: 'open', label: 'Open Now' },
+  { id: 'chainBreaker', label: 'No Chains' },
   { id: 'walking', label: 'Walking Distance' },
   { id: 'topRated', label: 'Top Rated' },
   { id: 'budget', label: 'Budget' },
   { id: 'family', label: 'Family Friendly' },
   { id: 'solo', label: 'Solo Friendly' },
+];
+
+export const SMART_FILTERS: { id: QuickFilter; label: string; emoji: string }[] = [
+  { id: '15min', emoji: '\u{26A1}', label: '15-Min Adventure' },
+  { id: 'lateNight', emoji: '\u{1F319}', label: 'Late Night' },
+  { id: 'rainyDay', emoji: '\u{2614}', label: 'Rainy Day' },
+  { id: 'goldenHour', emoji: '\u{1F305}', label: 'Golden Hour' },
 ];
 
 /** Estimated cost per stop by Google priceLevel (0-4, -1=unknown) */

@@ -2,8 +2,8 @@ import { useCallback, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { useModalA11y } from '../hooks/useModalA11y';
-import { getCardStyle } from '../styles/shared';
-import { uploadAvatar } from '../supabase';
+import { useBiometricAuth } from '../hooks/useBiometricAuth';
+import { uploadAvatar, deleteAccount } from '../supabase';
 
 export default function ProfileScreen() {
   const {
@@ -23,9 +23,9 @@ export default function ProfileScreen() {
     handleSignIn, handleSignUp, handleSignOut, handleResetPassword, handleResendVerification,
   } = useApp();
   const { theme, themePreference, setThemePreference } = useTheme();
-  const cardStyle = getCardStyle(theme);
   const closeProfile = useCallback(() => setShowProfile(false), [setShowProfile]);
   const modalRef = useModalA11y(true, closeProfile);
+  const { isAvailable: biometricAvailable, isEnabled: biometricEnabled, biometricType, enableBiometric, authenticateWithBiometric, disableBiometric } = useBiometricAuth();
 
   const fullName = (user?.user_metadata?.full_name as string) || user?.email || 'Traveler';
   const avatarUrl = (user?.user_metadata?.avatar_url as string) || null;
@@ -34,6 +34,11 @@ export default function ProfileScreen() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
+  const [showBiometricPasswordPrompt, setShowBiometricPasswordPrompt] = useState(false);
+  const [biometricPassword, setBiometricPassword] = useState('');
 
   const handleAvatarChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -60,46 +65,27 @@ export default function ProfileScreen() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, [user, showToast]);
 
-  const inputStyle = {
-    width: '100%', padding: '14px 16px', borderRadius: '12px',
-    border: `1px solid ${theme.border.strong}`, background: theme.bg.input,
-    color: theme.text.primary, fontSize: '15px', outline: 'none',
-  };
-
   return (
     <div
       ref={modalRef}
       tabIndex={-1}
-      className="modal-backdrop"
+      className="modal-backdrop fixed inset-0 bg-bg-modal-overlay-deep z-[1000] flex items-end justify-center outline-none"
       role="dialog"
       aria-label="Profile"
-      style={{
-        position: 'fixed', inset: 0, background: theme.bg.modalOverlayDeep, zIndex: 1000,
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'center', outline: 'none',
-      }}
       onClick={closeProfile}
     >
       <div
-        className="modal-sheet"
-        style={{
-          background: theme.bg.surface, borderRadius: '24px 24px 0 0',
-          maxWidth: '430px', width: '100%', maxHeight: '92vh', overflow: 'auto',
-          border: `1px solid ${theme.border.subtle}`, borderBottom: 'none',
-        }}
+        className="modal-sheet bg-bg-surface rounded-t-3xl max-w-[430px] w-full max-h-[92vh] overflow-auto border border-border-subtle border-b-0"
         onClick={e => e.stopPropagation()}
       >
-        <div style={{ padding: '24px 20px 40px' }}>
+        <div className="px-5 pt-6 pb-10">
           {/* Header with close button */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-            <h2 style={{ fontSize: '20px', fontWeight: 700 }}>Profile</h2>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold">Profile</h2>
             <button
               onClick={() => setShowProfile(false)}
               aria-label="Close profile"
-              style={{
-                background: theme.bg.subtleStrong, border: 'none', borderRadius: '50%',
-                width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', color: theme.text.secondary, fontSize: '18px',
-              }}
+              className="bg-bg-subtle-strong border-none rounded-full w-[44px] h-[44px] flex items-center justify-center cursor-pointer text-text-secondary text-lg"
             >
               ✕
             </button>
@@ -113,48 +99,74 @@ export default function ProfileScreen() {
               {/* Sign In */}
               {authScreen === 'signin' && (
                 <div>
-                  <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                    <div style={{ fontSize: '28px', marginBottom: '8px' }}>
-                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={theme.accent.amber} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <div className="text-center mb-5">
+                    <div className="text-[28px] mb-2">
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent-amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                         <circle cx="12" cy="7" r="4" />
                       </svg>
                     </div>
-                    <div style={{ fontSize: '16px', fontWeight: 600, color: theme.text.primary }}>Welcome back</div>
-                    <div style={{ fontSize: '13px', color: theme.text.secondary }}>Sign in to sync your saved places and trips</div>
+                    <div className="text-base font-semibold text-text-primary">Welcome back</div>
+                    <div className="text-[13px] text-text-secondary">Sign in to sync your saved places and trips</div>
                   </div>
+                  {biometricEnabled && (
+                    <div className="mb-4">
+                      <button
+                        onClick={async () => {
+                          setBiometricLoading(true);
+                          const creds = await authenticateWithBiometric();
+                          if (creds) {
+                            setAuthEmail(creds.email);
+                            setAuthPassword(creds.password);
+                            // Small delay so state updates before handleSignIn reads them
+                            setTimeout(() => handleSignIn(), 50);
+                          }
+                          setBiometricLoading(false);
+                        }}
+                        disabled={biometricLoading}
+                        className="w-full py-4 rounded-xl cursor-pointer bg-amber-tint-bg10 border border-amber-tint-border20 text-accent-amber text-sm font-semibold flex items-center justify-center gap-2.5"
+                        style={{ opacity: biometricLoading ? 0.6 : 1 }}
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg>
+                        {biometricLoading ? 'Authenticating...' : `Sign in with ${biometricType}`}
+                      </button>
+                      <div className="flex items-center gap-3 my-3">
+                        <div className="flex-1 h-px bg-border-subtle" />
+                        <span className="text-[11px] text-text-tertiary">or use email</span>
+                        <div className="flex-1 h-px bg-border-subtle" />
+                      </div>
+                    </div>
+                  )}
                   {authError && (
-                    <div style={{ padding: '10px 14px', borderRadius: '10px', background: theme.redTint.bg, border: `1px solid ${theme.redTint.border}`, color: theme.status.red, fontSize: '13px', marginBottom: '12px' }}>
+                    <div className="px-3.5 py-2.5 rounded-[10px] bg-red-tint-bg border border-red-tint-border text-status-red text-[13px] mb-3">
                       {authError}
                     </div>
                   )}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <input type="email" placeholder="Email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} style={inputStyle} autoComplete="email" />
-                    <input type="password" placeholder="Password" value={authPassword} onChange={e => setAuthPassword(e.target.value)} style={inputStyle} autoComplete="current-password"
+                  <div className="flex flex-col gap-2.5">
+                    <input type="email" placeholder="Email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} className="input-field" autoComplete="email" />
+                    <input type="password" placeholder="Password" value={authPassword} onChange={e => setAuthPassword(e.target.value)} className="input-field" autoComplete="current-password"
                       onKeyDown={e => { if (e.key === 'Enter') handleSignIn(); }} />
                     <button onClick={handleSignIn} disabled={authSubmitting}
-                      style={{
-                        width: '100%', padding: '14px', borderRadius: '12px', border: 'none',
-                        background: theme.accent.amberGradient, color: theme.text.onAccent,
-                        fontSize: '15px', fontWeight: 600, cursor: authSubmitting ? 'wait' : 'pointer',
-                        opacity: authSubmitting ? 0.7 : 1,
-                      }}>
+                      className="btn-primary w-full py-3.5 text-[15px]"
+                      style={{ opacity: authSubmitting ? 0.7 : 1, cursor: authSubmitting ? 'wait' : 'pointer' }}>
                       {authSubmitting ? 'Signing in...' : 'Sign In'}
                     </button>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
+                  <div className="flex justify-between mt-3">
                     <button onClick={() => { setAuthScreen('reset'); }}
-                      style={{ background: 'none', border: 'none', color: theme.accent.amber, fontSize: '13px', cursor: 'pointer', padding: '4px 0' }}>
+                      className="bg-none border-none text-accent-amber text-[13px] cursor-pointer py-1 px-0">
                       Forgot password?
                     </button>
                     <button onClick={() => setAuthScreen('signup')}
-                      style={{ background: 'none', border: 'none', color: theme.accent.amber, fontSize: '13px', cursor: 'pointer', padding: '4px 0' }}>
+                      className="bg-none border-none text-accent-amber text-[13px] cursor-pointer py-1 px-0">
                       Create account
                     </button>
                   </div>
-                  <div style={{ textAlign: 'center', marginTop: '8px' }}>
+                  <div className="text-center mt-2">
                     <button onClick={() => setAuthScreen('verify')}
-                      style={{ background: 'none', border: 'none', color: theme.text.tertiary, fontSize: '12px', cursor: 'pointer', padding: '4px 0' }}>
+                      className="bg-none border-none text-text-tertiary text-xs cursor-pointer py-1 px-0">
                       Didn't get a verification email?
                     </button>
                   </div>
@@ -164,40 +176,36 @@ export default function ProfileScreen() {
               {/* Sign Up */}
               {authScreen === 'signup' && (
                 <div>
-                  <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                    <div style={{ fontSize: '16px', fontWeight: 600, color: theme.text.primary }}>Create your account</div>
-                    <div style={{ fontSize: '13px', color: theme.text.secondary }}>Start saving places and building trips</div>
+                  <div className="text-center mb-5">
+                    <div className="text-base font-semibold text-text-primary">Create your account</div>
+                    <div className="text-[13px] text-text-secondary">Start saving places and building trips</div>
                   </div>
                   {authError && (
-                    <div style={{ padding: '10px 14px', borderRadius: '10px', background: theme.redTint.bg, border: `1px solid ${theme.redTint.border}`, color: theme.status.red, fontSize: '13px', marginBottom: '12px' }}>
+                    <div className="px-3.5 py-2.5 rounded-[10px] bg-red-tint-bg border border-red-tint-border text-status-red text-[13px] mb-3">
                       {authError}
                     </div>
                   )}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <input type="text" placeholder="Name (optional)" value={authName} onChange={e => setAuthName(e.target.value)} style={inputStyle} autoComplete="name" />
-                    <input type="email" placeholder="Email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} style={inputStyle} autoComplete="email" />
-                    <input type="password" placeholder="Password (min 6 characters)" value={authPassword} onChange={e => setAuthPassword(e.target.value)} style={inputStyle} autoComplete="new-password" />
+                  <div className="flex flex-col gap-2.5">
+                    <input type="text" placeholder="Name (optional)" value={authName} onChange={e => setAuthName(e.target.value)} className="input-field" autoComplete="name" />
+                    <input type="email" placeholder="Email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} className="input-field" autoComplete="email" />
+                    <input type="password" placeholder="Password (min 6 characters)" value={authPassword} onChange={e => setAuthPassword(e.target.value)} className="input-field" autoComplete="new-password" />
                     {/* Terms acceptance */}
-                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', padding: '4px 0' }}>
+                    <label className="flex items-start gap-2.5 cursor-pointer py-1">
                       <input type="checkbox" checked={acceptedTerms} onChange={e => setAcceptedTerms(e.target.checked)}
-                        style={{ width: '18px', height: '18px', marginTop: '2px', accentColor: '#F59E0B', flexShrink: 0 }} />
-                      <span style={{ fontSize: '12px', color: theme.text.secondary, lineHeight: 1.4 }}>
-                        I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: theme.accent.amber, textDecoration: 'underline' }}>Terms of Service</a> and <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: theme.accent.amber, textDecoration: 'underline' }}>Privacy Policy</a>
+                        className="w-[18px] h-[18px] mt-0.5 shrink-0" style={{ accentColor: '#F59E0B' }} />
+                      <span className="text-xs text-text-secondary leading-[1.4]">
+                        I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-accent-amber underline">Terms of Service</a> and <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-accent-amber underline">Privacy Policy</a>
                       </span>
                     </label>
                     <button onClick={handleSignUp} disabled={authSubmitting}
-                      style={{
-                        width: '100%', padding: '14px', borderRadius: '12px', border: 'none',
-                        background: theme.accent.amberGradient, color: theme.text.onAccent,
-                        fontSize: '15px', fontWeight: 600, cursor: authSubmitting ? 'wait' : 'pointer',
-                        opacity: authSubmitting ? 0.7 : 1,
-                      }}>
+                      className="btn-primary w-full py-3.5 text-[15px]"
+                      style={{ opacity: authSubmitting ? 0.7 : 1, cursor: authSubmitting ? 'wait' : 'pointer' }}>
                       {authSubmitting ? 'Creating account...' : 'Sign Up'}
                     </button>
                   </div>
-                  <div style={{ textAlign: 'center', marginTop: '12px' }}>
+                  <div className="text-center mt-3">
                     <button onClick={() => setAuthScreen('signin')}
-                      style={{ background: 'none', border: 'none', color: theme.accent.amber, fontSize: '13px', cursor: 'pointer', padding: '4px 0' }}>
+                      className="bg-none border-none text-accent-amber text-[13px] cursor-pointer py-1 px-0">
                       Already have an account? Sign in
                     </button>
                   </div>
@@ -207,81 +215,66 @@ export default function ProfileScreen() {
               {/* Email Verification */}
               {authScreen === 'verify' && (
                 <div>
-                  <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                    <div style={{ fontSize: '48px', marginBottom: '12px' }}>
-                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={theme.accent.amber} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <div className="text-center mb-5">
+                    <div className="text-[48px] mb-3">
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--accent-amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
                         <polyline points="22,6 12,13 2,6" />
                       </svg>
                     </div>
-                    <div style={{ fontSize: '18px', fontWeight: 700, color: theme.text.primary, marginBottom: '8px' }}>
+                    <div className="text-lg font-bold text-text-primary mb-2">
                       Check your email
                     </div>
-                    <div style={{ fontSize: '14px', color: theme.text.secondary, lineHeight: 1.5 }}>
+                    <div className="text-sm text-text-secondary leading-[1.5]">
                       We sent a verification link to
                     </div>
-                    <div style={{ fontSize: '14px', fontWeight: 600, color: theme.accent.amber, marginTop: '4px' }}>
+                    <div className="text-sm font-semibold text-accent-amber mt-1">
                       {authEmail}
                     </div>
                   </div>
 
-                  <div style={{
-                    padding: '14px 16px', borderRadius: '12px', marginBottom: '16px',
-                    background: theme.amberTint.bg10, border: `1px solid ${theme.amberTint.border20}`,
-                  }}>
-                    <div style={{ fontSize: '13px', color: theme.text.secondary, lineHeight: 1.6 }}>
-                      <div style={{ marginBottom: '8px', fontWeight: 600, color: theme.text.primary }}>
+                  <div className="px-4 py-3.5 rounded-xl mb-4 bg-amber-tint-bg10 border border-amber-tint-border20">
+                    <div className="text-[13px] text-text-secondary leading-[1.6]">
+                      <div className="mb-2 font-semibold text-text-primary">
                         Next steps:
                       </div>
-                      <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+                      <div className="flex gap-2 mb-1.5">
                         <span>1.</span>
                         <span>Open your email app (Gmail, Outlook, etc.)</span>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+                      <div className="flex gap-2 mb-1.5">
                         <span>2.</span>
                         <span>Look for an email from NxStops</span>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+                      <div className="flex gap-2 mb-1.5">
                         <span>3.</span>
                         <span>Click the verification link inside</span>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px' }}>
+                      <div className="flex gap-2">
                         <span>4.</span>
                         <span>Come back here and sign in</span>
                       </div>
                     </div>
                   </div>
 
-                  <div style={{
-                    padding: '10px 14px', borderRadius: '10px', marginBottom: '16px',
-                    background: theme.bg.subtle, border: `1px solid ${theme.border.subtle}`,
-                    fontSize: '12px', color: theme.text.tertiary, lineHeight: 1.5,
-                  }}>
-                    Don't see it? Check your <strong style={{ color: theme.text.secondary }}>spam</strong> or <strong style={{ color: theme.text.secondary }}>promotions</strong> folder. The email may take a minute to arrive.
+                  <div className="px-3.5 py-2.5 rounded-[10px] mb-4 bg-bg-subtle border border-border-subtle text-xs text-text-tertiary leading-[1.5]">
+                    Don't see it? Check your <strong className="text-text-secondary">spam</strong> or <strong className="text-text-secondary">promotions</strong> folder. The email may take a minute to arrive.
                   </div>
 
                   {authError && (
-                    <div style={{ padding: '10px 14px', borderRadius: '10px', background: theme.redTint.bg, border: `1px solid ${theme.redTint.border}`, color: theme.status.red, fontSize: '13px', marginBottom: '12px' }}>
+                    <div className="px-3.5 py-2.5 rounded-[10px] bg-red-tint-bg border border-red-tint-border text-status-red text-[13px] mb-3">
                       {authError}
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div className="flex flex-col gap-2.5">
                     <button onClick={handleResendVerification} disabled={authSubmitting}
-                      style={{
-                        width: '100%', padding: '14px', borderRadius: '12px', cursor: authSubmitting ? 'wait' : 'pointer',
-                        border: `1px solid ${theme.accent.amber}`,
-                        background: 'transparent', color: theme.accent.amber,
-                        fontSize: '14px', fontWeight: 600, opacity: authSubmitting ? 0.7 : 1,
-                      }}>
+                      className="w-full py-3.5 rounded-xl border border-accent-amber bg-transparent text-accent-amber text-sm font-semibold"
+                      style={{ opacity: authSubmitting ? 0.7 : 1, cursor: authSubmitting ? 'wait' : 'pointer' }}>
                       {authSubmitting ? 'Sending...' : 'Resend verification email'}
                     </button>
                     <button onClick={() => { setAuthScreen('signin'); }}
-                      style={{
-                        width: '100%', padding: '14px', borderRadius: '12px', border: 'none',
-                        background: theme.accent.amberGradient, color: theme.text.onAccent,
-                        fontSize: '15px', fontWeight: 600, cursor: 'pointer',
-                      }}>
+                      className="btn-primary w-full py-3.5 text-[15px]">
                       Go to Sign In
                     </button>
                   </div>
@@ -291,31 +284,27 @@ export default function ProfileScreen() {
               {/* Password Reset */}
               {authScreen === 'reset' && (
                 <div>
-                  <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                    <div style={{ fontSize: '16px', fontWeight: 600, color: theme.text.primary }}>Reset your password</div>
-                    <div style={{ fontSize: '13px', color: theme.text.secondary }}>We'll send you an email with a reset link</div>
+                  <div className="text-center mb-5">
+                    <div className="text-base font-semibold text-text-primary">Reset your password</div>
+                    <div className="text-[13px] text-text-secondary">We'll send you an email with a reset link</div>
                   </div>
                   {authError && (
-                    <div style={{ padding: '10px 14px', borderRadius: '10px', background: theme.redTint.bg, border: `1px solid ${theme.redTint.border}`, color: theme.status.red, fontSize: '13px', marginBottom: '12px' }}>
+                    <div className="px-3.5 py-2.5 rounded-[10px] bg-red-tint-bg border border-red-tint-border text-status-red text-[13px] mb-3">
                       {authError}
                     </div>
                   )}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <input type="email" placeholder="Email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} style={inputStyle} autoComplete="email"
+                  <div className="flex flex-col gap-2.5">
+                    <input type="email" placeholder="Email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} className="input-field" autoComplete="email"
                       onKeyDown={e => { if (e.key === 'Enter') handleResetPassword(); }} />
                     <button onClick={handleResetPassword} disabled={authSubmitting}
-                      style={{
-                        width: '100%', padding: '14px', borderRadius: '12px', border: 'none',
-                        background: theme.accent.amberGradient, color: theme.text.onAccent,
-                        fontSize: '15px', fontWeight: 600, cursor: authSubmitting ? 'wait' : 'pointer',
-                        opacity: authSubmitting ? 0.7 : 1,
-                      }}>
+                      className="btn-primary w-full py-3.5 text-[15px]"
+                      style={{ opacity: authSubmitting ? 0.7 : 1, cursor: authSubmitting ? 'wait' : 'pointer' }}>
                       {authSubmitting ? 'Sending...' : 'Send Reset Link'}
                     </button>
                   </div>
-                  <div style={{ textAlign: 'center', marginTop: '12px' }}>
+                  <div className="text-center mt-3">
                     <button onClick={() => setAuthScreen('signin')}
-                      style={{ background: 'none', border: 'none', color: theme.accent.amber, fontSize: '13px', cursor: 'pointer', padding: '4px 0' }}>
+                      className="bg-none border-none text-accent-amber text-[13px] cursor-pointer py-1 px-0">
                       Back to sign in
                     </button>
                   </div>
@@ -323,10 +312,10 @@ export default function ProfileScreen() {
               )}
 
               {/* Divider */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '24px 0' }}>
-                <div style={{ flex: 1, height: '1px', background: theme.border.subtle }} />
-                <span style={{ fontSize: '11px', color: theme.text.tertiary }}>or continue without account</span>
-                <div style={{ flex: 1, height: '1px', background: theme.border.subtle }} />
+              <div className="flex items-center gap-3 my-6">
+                <div className="flex-1 h-px bg-border-subtle" />
+                <span className="text-[11px] text-text-tertiary">or continue without account</span>
+                <div className="flex-1 h-px bg-border-subtle" />
               </div>
             </div>
           )}
@@ -337,85 +326,66 @@ export default function ProfileScreen() {
           {user && (
             <div>
               {/* Avatar & Name */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '24px' }}>
+              <div className="flex flex-col items-center mb-6">
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
                   onChange={handleAvatarChange}
-                  style={{ display: 'none' }}
+                  className="hidden"
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={avatarUploading}
                   aria-label="Change profile photo"
+                  className="relative w-20 h-20 rounded-full mb-3 border-[3px] border-amber-tint-border30 overflow-hidden flex items-center justify-center p-0"
                   style={{
-                    position: 'relative', width: '80px', height: '80px', borderRadius: '50%', marginBottom: '12px',
-                    border: `3px solid ${theme.amberTint.border30}`, overflow: 'hidden',
                     background: avatarUrl
                       ? `url(${avatarUrl}) center/cover no-repeat`
-                      : `linear-gradient(135deg, ${theme.amberTint.border20}, ${theme.amberTint.border20})`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: avatarUploading ? 'wait' : 'pointer', padding: 0,
+                      : `linear-gradient(135deg, var(--amber-tint-border20), var(--amber-tint-border20))`,
+                    cursor: avatarUploading ? 'wait' : 'pointer',
                     opacity: avatarUploading ? 0.6 : 1,
                   }}
                 >
                   {!avatarUrl && !avatarUploading && (
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={theme.accent.amber} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent-amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                       <circle cx="12" cy="7" r="4" />
                     </svg>
                   )}
                   {avatarUploading && (
-                    <div style={{ fontSize: '11px', color: '#fff', fontWeight: 600, textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>
+                    <div className="text-[11px] text-white font-semibold" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>
                       Uploading...
                     </div>
                   )}
                   {/* Camera badge */}
-                  <div style={{
-                    position: 'absolute', bottom: '0', right: '0',
-                    width: '24px', height: '24px', borderRadius: '50%',
-                    background: theme.accent.amber, display: 'flex',
-                    alignItems: 'center', justifyContent: 'center',
-                    border: `2px solid ${theme.bg.surface}`,
-                  }}>
+                  <div className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-accent-amber flex items-center justify-center border-2 border-bg-surface">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                       <circle cx="12" cy="13" r="4" />
                     </svg>
                   </div>
                 </button>
-                <div style={{ fontSize: '18px', fontWeight: 700, color: theme.text.primary, marginBottom: '4px' }}>
+                <div className="text-lg font-bold text-text-primary mb-1">
                   {fullName}
                 </div>
                 {user.email && (
-                  <div style={{ fontSize: '12px', color: theme.text.tertiary }}>{user.email}</div>
+                  <div className="text-xs text-text-tertiary">{user.email}</div>
                 )}
               </div>
 
               {/* Stats Row */}
-              <div style={{
-                display: 'flex', justifyContent: 'center', gap: '0',
-                background: theme.bg.subtle, borderRadius: '16px',
-                border: `1px solid ${theme.border.subtle}`, marginBottom: '24px', overflow: 'hidden',
-              }}>
+              <div className="flex justify-center bg-bg-subtle rounded-2xl border border-border-subtle mb-6 overflow-hidden">
                 {[
                   { value: savedPlaces.length, label: 'Saved' },
                   { value: profileTotalStops, label: 'Planned' },
                   { value: profileDayCount, label: 'Days' },
                 ].map((stat, i) => (
-                  <div key={stat.label} style={{
-                    flex: 1, textAlign: 'center', padding: '16px 12px',
-                    borderRight: i < 2 ? `1px solid ${theme.border.subtle}` : 'none',
-                  }}>
-                    <div style={{
-                      fontSize: '22px', fontWeight: 700,
-                      background: theme.accent.amberTextGradient,
-                      WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                    }}>
+                  <div key={stat.label} className={`flex-1 text-center py-4 px-3 ${i < 2 ? 'border-r border-border-subtle' : ''}`}>
+                    <div className="text-[22px] font-bold bg-accent-text-gradient">
                       {stat.value}
                     </div>
-                    <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '4px' }}>
+                    <div className="text-[11px] text-text-tertiary uppercase tracking-[0.06em] mt-1">
                       {stat.label}
                     </div>
                   </div>
@@ -429,13 +399,11 @@ export default function ProfileScreen() {
           {/* ================================================================ */}
 
           {/* Theme Section */}
-          <div style={{ marginBottom: '24px' }}>
-            <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
+          <div className="mb-6">
+            <div className="section-label">
               Theme
             </div>
-            <div style={{
-              display: 'flex', gap: '8px', marginBottom: '10px',
-            }}>
+            <div className="flex gap-2 mb-2.5">
               {([
                 { key: 'light' as const, label: 'Light', icon: (
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -469,30 +437,25 @@ export default function ProfileScreen() {
                   <button
                     key={key}
                     onClick={() => setThemePreference(key)}
-                    style={{
-                      flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
-                      padding: '12px 8px', borderRadius: '12px', cursor: 'pointer',
-                      background: isActive ? theme.amberTint.bg15 : theme.bg.subtle,
-                      border: `1.5px solid ${isActive ? theme.accent.amber : theme.border.subtle}`,
-                      color: isActive ? theme.accent.amber : theme.text.secondary,
-                    }}
+                    className={`flex-1 flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl cursor-pointer ${
+                      isActive
+                        ? 'bg-amber-tint-bg15 border-[1.5px] border-accent-amber text-accent-amber'
+                        : 'bg-bg-subtle border-[1.5px] border-border-subtle text-text-secondary'
+                    }`}
                   >
-                    <span style={{ display: 'flex', stroke: 'currentColor' }}>{icon}</span>
-                    <span style={{ fontSize: '12px', fontWeight: isActive ? 600 : 500 }}>{label}</span>
+                    <span className="flex stroke-current">{icon}</span>
+                    <span className={`text-xs ${isActive ? 'font-semibold' : 'font-medium'}`}>{label}</span>
                   </button>
                 );
               })}
             </div>
             <button
               onClick={() => setThemePreference('auto')}
-              style={{
-                width: '100%', padding: '10px', borderRadius: '10px', cursor: 'pointer',
-                background: themePreference === 'auto' ? theme.amberTint.bg15 : theme.bg.subtle,
-                border: `1.5px solid ${themePreference === 'auto' ? theme.accent.amber : theme.border.subtle}`,
-                color: themePreference === 'auto' ? theme.accent.amber : theme.text.secondary,
-                fontSize: '12px', fontWeight: themePreference === 'auto' ? 600 : 500,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-              }}
+              className={`w-full py-2.5 rounded-[10px] cursor-pointer text-xs flex items-center justify-center gap-1.5 ${
+                themePreference === 'auto'
+                  ? 'bg-amber-tint-bg15 border-[1.5px] border-accent-amber text-accent-amber font-semibold'
+                  : 'bg-bg-subtle border-[1.5px] border-border-subtle text-text-secondary font-medium'
+              }`}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" />
@@ -502,48 +465,138 @@ export default function ProfileScreen() {
             </button>
           </div>
 
+          {/* Security Section — Biometric */}
+          {user && biometricAvailable && (
+            <div className="mb-6">
+              <div className="section-label">
+                Security
+              </div>
+              {!showBiometricPasswordPrompt ? (
+                <button
+                  onClick={() => {
+                    if (biometricEnabled) {
+                      disableBiometric();
+                      showToast(`${biometricType} login disabled`);
+                    } else {
+                      setShowBiometricPasswordPrompt(true);
+                      setBiometricPassword('');
+                    }
+                  }}
+                  className="w-full flex items-center justify-between py-3.5 px-4 rounded-xl bg-bg-subtle border border-border-subtle cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-amber)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                    <div className="text-left">
+                      <div className="text-sm font-medium text-text-primary">{biometricType} Login</div>
+                      <div className="text-[11px] text-text-tertiary">Sign in without typing your password</div>
+                    </div>
+                  </div>
+                  <div className={`w-[42px] h-[24px] rounded-full relative transition-colors ${
+                    biometricEnabled ? 'bg-accent-amber' : 'bg-bg-subtle-strong'
+                  }`}>
+                    <div className={`absolute top-[2px] w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${
+                      biometricEnabled ? 'left-[20px]' : 'left-[2px]'
+                    }`} />
+                  </div>
+                </button>
+              ) : (
+                <div className="card !border-amber-tint-border20">
+                  <div className="text-[13px] text-text-secondary mb-3">
+                    Confirm your password to enable {biometricType}:
+                  </div>
+                  <input
+                    type="password"
+                    placeholder="Your password"
+                    value={biometricPassword}
+                    onChange={e => setBiometricPassword(e.target.value)}
+                    className="input-field mb-3"
+                    autoComplete="current-password"
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && biometricPassword && user?.email) {
+                        setBiometricLoading(true);
+                        enableBiometric(user.email, biometricPassword).then(ok => {
+                          setBiometricLoading(false);
+                          setShowBiometricPasswordPrompt(false);
+                          setBiometricPassword('');
+                          showToast(ok ? `${biometricType} login enabled!` : 'Failed — try again');
+                        });
+                      }
+                    }}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={async () => {
+                        if (!biometricPassword || !user?.email) return;
+                        setBiometricLoading(true);
+                        const ok = await enableBiometric(user.email, biometricPassword);
+                        setBiometricLoading(false);
+                        setShowBiometricPasswordPrompt(false);
+                        setBiometricPassword('');
+                        showToast(ok ? `${biometricType} login enabled!` : 'Failed — try again');
+                      }}
+                      disabled={!biometricPassword || biometricLoading}
+                      className="flex-1 py-2.5 rounded-[10px] border-none text-[13px] font-semibold cursor-pointer bg-accent-gradient text-text-on-accent"
+                      style={{ opacity: (!biometricPassword || biometricLoading) ? 0.5 : 1 }}
+                    >
+                      {biometricLoading ? 'Verifying...' : `Enable ${biometricType}`}
+                    </button>
+                    <button
+                      onClick={() => { setShowBiometricPasswordPrompt(false); setBiometricPassword(''); }}
+                      className="px-4 py-2.5 rounded-[10px] border border-border-medium bg-transparent text-text-tertiary text-[13px] cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Saved Places Section */}
           {savedPlaces.length > 0 && (
-            <div style={{ marginBottom: '24px' }}>
-              <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
+            <div className="mb-6">
+              <div className="section-label">
                 Saved Places
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div className="flex flex-col gap-2">
                 {savedPlaces.map(place => (
                   <button
                     key={place.placeId}
                     onClick={() => { setSelectedPlace(place); setShowProfile(false); }}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '12px', width: '100%',
-                      padding: '12px', borderRadius: '12px', border: `1px solid ${theme.border.subtle}`,
-                      background: theme.bg.subtle, cursor: 'pointer', textAlign: 'left',
-                    }}
+                    className="flex items-center gap-3 w-full p-3 rounded-xl border border-border-subtle bg-bg-subtle cursor-pointer text-left"
                   >
-                    <div style={{
-                      width: '44px', height: '44px', borderRadius: '10px', flexShrink: 0, overflow: 'hidden',
-                      background: place.photoUrl
-                        ? `url(${place.photoUrl}) center/cover no-repeat`
-                        : theme.amberTint.bg10,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      {!place.photoUrl && <span style={{ fontSize: '18px' }}>📍</span>}
+                    <div
+                      className="w-[44px] h-[44px] rounded-[10px] shrink-0 overflow-hidden flex items-center justify-center"
+                      style={{
+                        background: place.photoUrl
+                          ? `url(${place.photoUrl}) center/cover no-repeat`
+                          : undefined,
+                      }}
+                    >
+                      {!place.photoUrl && (
+                        <div className="w-full h-full bg-amber-tint-bg10 flex items-center justify-center">
+                          <span className="text-lg">📍</span>
+                        </div>
+                      )}
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '14px', fontWeight: 600, color: theme.text.primary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-text-primary whitespace-nowrap overflow-hidden text-ellipsis">
                         {place.name}
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                      <div className="flex items-center gap-1.5 mt-0.5">
                         {place.rating > 0 && (
-                          <span style={{ fontSize: '11px', color: theme.accent.amber }}>★ {place.rating.toFixed(1)}</span>
+                          <span className="text-[11px] text-accent-amber">★ {place.rating.toFixed(1)}</span>
                         )}
                         {place.address && (
-                          <span style={{ fontSize: '11px', color: theme.text.tertiary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <span className="text-[11px] text-text-tertiary whitespace-nowrap overflow-hidden text-ellipsis">
                             {place.address.split(',')[0]}
                           </span>
                         )}
                       </div>
                     </div>
-                    <span style={{ color: theme.text.tertiary, fontSize: '14px', flexShrink: 0 }}>›</span>
+                    <span className="text-text-tertiary text-sm shrink-0">›</span>
                   </button>
                 ))}
               </div>
@@ -552,51 +605,44 @@ export default function ProfileScreen() {
 
           {/* My Trips Section */}
           {profileTotalStops > 0 && (
-            <div style={{ marginBottom: '24px' }}>
-              <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
+            <div className="mb-6">
+              <div className="section-label">
                 My Trips
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div className="flex flex-col gap-2">
                 {Object.entries(tripDays).map(([day, stops]) => (
                   <div
                     key={day}
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '12px 14px', borderRadius: '12px',
-                      background: theme.bg.subtle, border: `1px solid ${theme.border.subtle}`,
-                    }}
+                    className="flex items-center justify-between py-3 px-3.5 rounded-xl bg-bg-subtle border border-border-subtle"
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div style={{
-                        width: '36px', height: '36px', borderRadius: '10px',
-                        background: theme.amberTint.bg10, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '14px', fontWeight: 700, color: theme.accent.amber,
-                      }}>
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-[10px] bg-amber-tint-bg10 flex items-center justify-center text-sm font-bold text-accent-amber">
                         {day}
                       </div>
                       <div>
-                        <div style={{ fontSize: '14px', fontWeight: 600, color: theme.text.primary }}>Day {day}</div>
-                        <div style={{ fontSize: '11px', color: theme.text.tertiary }}>
+                        <div className="text-sm font-semibold text-text-primary">Day {day}</div>
+                        <div className="text-[11px] text-text-tertiary">
                           {stops.length} {stops.length === 1 ? 'stop' : 'stops'}
                         </div>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '4px' }}>
+                    <div className="flex gap-1">
                       {stops.slice(0, 3).map((stop, i) => (
-                        <div key={i} style={{
-                          width: '24px', height: '24px', borderRadius: '6px', overflow: 'hidden',
-                          background: (stop.place?.photoUrl)
-                            ? `url(${stop.place.photoUrl}) center/cover no-repeat`
-                            : theme.amberTint.bg15,
-                          border: `1px solid ${theme.border.subtle}`,
-                        }} />
+                        <div key={i}
+                          className="w-6 h-6 rounded-md overflow-hidden border border-border-subtle"
+                          style={{
+                            background: (stop.place?.photoUrl)
+                              ? `url(${stop.place.photoUrl}) center/cover no-repeat`
+                              : undefined,
+                          }}
+                        >
+                          {!stop.place?.photoUrl && (
+                            <div className="w-full h-full bg-amber-tint-bg15" />
+                          )}
+                        </div>
                       ))}
                       {stops.length > 3 && (
-                        <div style={{
-                          width: '24px', height: '24px', borderRadius: '6px',
-                          background: theme.bg.subtleStrong, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '9px', color: theme.text.tertiary, fontWeight: 600,
-                        }}>
+                        <div className="w-6 h-6 rounded-md bg-bg-subtle-strong flex items-center justify-center text-[9px] text-text-tertiary font-semibold">
                           +{stops.length - 3}
                         </div>
                       )}
@@ -607,18 +653,61 @@ export default function ProfileScreen() {
             </div>
           )}
 
-          {/* Sign Out Button */}
+          {/* Sign Out Button & Danger Zone */}
           {user && (
-            <button
-              onClick={handleSignOut}
-              style={{
-                width: '100%', padding: '14px', borderRadius: '12px', cursor: 'pointer',
-                background: 'none', border: `1px solid ${theme.redTint.border}`,
-                color: theme.status.red, fontSize: '14px', fontWeight: 500,
-              }}
-            >
-              Sign Out
-            </button>
+            <>
+              <button
+                onClick={handleSignOut}
+                className="w-full py-3.5 rounded-xl cursor-pointer bg-none border border-red-tint-border text-status-red text-sm font-medium"
+              >
+                Sign Out
+              </button>
+
+              {/* Danger Zone */}
+              <div className="mt-8 pt-6 border-t border-border-subtle">
+                <div className="section-label text-status-red">Danger Zone</div>
+                {!showDeleteConfirm ? (
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="w-full py-3 rounded-xl cursor-pointer bg-transparent border border-border-subtle text-text-tertiary text-sm"
+                  >
+                    Delete My Account
+                  </button>
+                ) : (
+                  <div className="card !border-red-tint-border-strong">
+                    <p className="text-[13px] text-text-secondary mb-3 leading-relaxed">
+                      This will permanently delete your account, saved places, reviews, trip plans, and all associated data. This action cannot be undone.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async () => {
+                          setDeleting(true);
+                          const result = await deleteAccount();
+                          setDeleting(false);
+                          if (result.success) {
+                            showToast('Account deleted successfully');
+                            setShowProfile(false);
+                          } else {
+                            showToast(result.error || 'Failed to delete account');
+                          }
+                        }}
+                        disabled={deleting}
+                        className="flex-1 py-3 rounded-xl border-none cursor-pointer bg-status-red text-white text-sm font-semibold"
+                        style={{ opacity: deleting ? 0.6 : 1 }}
+                      >
+                        {deleting ? 'Deleting...' : 'Yes, Delete Everything'}
+                      </button>
+                      <button
+                        onClick={() => setShowDeleteConfirm(false)}
+                        className="px-4 py-3 rounded-xl bg-transparent border border-border-medium text-text-secondary text-[13px] cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
       </div>

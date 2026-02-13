@@ -2,45 +2,10 @@
 // Proxies chat requests to Groq API (server-side, keeps keys safe)
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { setCorsHeaders, checkRateLimit, getClientIp } from './_cors';
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
-
-const ALLOWED_ORIGINS = [
-  'https://nxstops.com',
-  'https://www.nxstops.com',
-  'https://vynbynave.vercel.app',
-  'https://nxstops-new.vercel.app',
-  'http://localhost:5173',
-  'http://localhost:4173',
-];
-
-function getCorsHeaders(origin?: string) {
-  const isAllowed = ALLOWED_ORIGINS.includes(origin || '');
-  const allowedOrigin = isAllowed ? origin! : ALLOWED_ORIGINS[0];
-  return {
-    'Access-Control-Allow-Origin': allowedOrigin,
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Vary': 'Origin',
-  };
-}
-
-const rateLimit = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_MAX = 10; // requests per window
-const RATE_LIMIT_WINDOW = 60_000; // 1 minute
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = rateLimit.get(ip);
-  if (!entry || now > entry.resetAt) {
-    rateLimit.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
-    return true;
-  }
-  if (entry.count >= RATE_LIMIT_MAX) return false;
-  entry.count++;
-  return true;
-}
 
 const SYSTEM_PROMPT = `You are NxStops AI, a friendly and knowledgeable travel assistant built into the NxStops travel app. You help travelers discover places, plan trips, and make the most of their destinations.
 
@@ -89,7 +54,6 @@ async function callGroq(body: object, maxRetries = 2): Promise<Response> {
 
     if (response.status === 429 && attempt < maxRetries) {
       const delay = (attempt + 1) * 2000;
-      console.log(`[NxStops Chat] Rate limited, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
       await new Promise(resolve => setTimeout(resolve, delay));
       continue;
     }
@@ -101,19 +65,19 @@ async function callGroq(body: object, maxRetries = 2): Promise<Response> {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const corsHeaders = getCorsHeaders(req.headers.origin as string);
-  Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
+  const corsOk = setCorsHeaders(res, req.headers.origin as string | undefined, 'POST, OPTIONS');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
+  if (!corsOk) return res.status(403).json({ error: 'Origin not allowed' });
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
-  if (!checkRateLimit(ip)) {
+  const ip = getClientIp(req.headers);
+  if (!(await checkRateLimit(ip, 10, 60_000))) {
     return res.status(429).json({ error: 'Too many requests. Please wait a moment.' });
   }
 
   if (!GROQ_API_KEY) {
-    return res.status(500).json({ error: 'AI chat is not configured yet. Add GROQ_API_KEY to your environment variables.' });
+    return res.status(500).json({ error: 'AI chat is not configured yet.' });
   }
 
   try {
@@ -146,7 +110,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error(`[NxStops Chat] Groq ${response.status}:`, errText);
+      console.error(`[NxStops Chat] Groq error: ${response.status}`);
 
       let detail = '';
       try {
@@ -155,7 +119,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } catch { /* not JSON */ }
 
       if (response.status === 401) {
-        return res.status(502).json({ error: 'Groq API key is invalid. Check your GROQ_API_KEY environment variable.' });
+        return res.status(502).json({ error: 'AI service configuration error.' });
       }
       if (response.status === 429) {
         return res.status(429).json({ error: detail || 'AI rate limit reached. Try again in a minute.' });

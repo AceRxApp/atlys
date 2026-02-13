@@ -1,21 +1,28 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { track } from '@vercel/analytics';
-import { searchNearby, textSearchPlaces } from '../services/places';
+import { searchNearby, textSearchPlaces, isChain } from '../services/places';
 import type { Place } from '../services/places';
-import { saveReview, fetchReviews, fetchPlaceTagCounts, fetchSavedPlaces, upsertSavedPlaces, deleteSavedPlace } from '../supabase';
-import type { Review } from '../supabase';
+import { saveReview, fetchReviews, fetchPlaceTagCounts, fetchSavedPlaces, upsertSavedPlaces, deleteSavedPlace, fetchUserStops, createUserStop } from '../supabase';
+import type { Review, UserStop } from '../supabase';
 import type { User } from '@supabase/supabase-js';
 import type { City, Vibe, QuickFilter, TravelGroup, CommunityTag } from '../types';
 import {
   CITY_COORDS, NIGHTLIFE_TYPES, GIRLY_TYPES, GIRLY_KEYWORDS, BOYS_EXCLUDE_TYPES,
   RESERVABLE_TYPES, BOOKABLE_TYPES,
 } from '../data';
+import { hapticImpact, hapticNotification } from '../utils/haptics';
+import { scorePlaceByPreference, getPreferences } from '../utils/preferences';
 
 interface LocState {
   lat: number | null;
   lng: number | null;
   city: string | null;
   hasLocation: boolean;
+}
+
+interface WeatherState {
+  code: number;
+  sunset?: string;
 }
 
 export function usePlaces(deps: {
@@ -29,8 +36,9 @@ export function usePlaces(deps: {
   citySlug: string;
   useMiles: boolean;
   showToast: (msg: string) => void;
+  weather?: WeatherState | null;
 }) {
-  const { useGps, loc, selectedCity, searchRadius, screen, user, selectedPlace, citySlug, useMiles, showToast } = deps;
+  const { useGps, loc, selectedCity, searchRadius, screen, user, selectedPlace, citySlug, useMiles, showToast, weather } = deps;
 
   // --- Places ---
   const [places, setPlaces] = useState<Place[]>([]);
@@ -65,6 +73,15 @@ export function usePlaces(deps: {
   const [searchResults, setSearchResults] = useState<Place[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+
+  // --- Blind Date ---
+  const [blindDatePlace, setBlindDatePlace] = useState<Place | null>(null);
+  const [blindDateRevealed, setBlindDateRevealed] = useState(false);
+
+  // --- User Contributed Stops ---
+  const [userStops, setUserStops] = useState<UserStop[]>([]);
+  const [showPinStop, setShowPinStop] = useState(false);
+  const [pinStopSubmitting, setPinStopSubmitting] = useState(false);
 
   // --- Abort controller for race condition prevention ---
   const fetchAbortRef = useRef<AbortController | null>(null);
@@ -126,6 +143,13 @@ export function usePlaces(deps: {
     fetchPlaceTagCounts(ids).then(setPlaceTagsCache);
   }, [places]);
 
+  // Load user-contributed stops for current city
+  useEffect(() => {
+    const slug = selectedCity?.slug || (useGps && loc.city ? loc.city.toLowerCase().replace(/\s+/g, '-') : '');
+    if (!slug) return;
+    fetchUserStops(slug).then(setUserStops);
+  }, [selectedCity, useGps, loc.city]);
+
   // Load reviews when selectedPlace changes
   useEffect(() => {
     if (!selectedPlace) { setPlaceReviews([]); setShowReviewForm(false); return; }
@@ -169,6 +193,10 @@ export function usePlaces(deps: {
   // Filtered places
   // --------------------------------------------------------------------------
 
+  const INDOOR_TYPES = ['museum', 'art_gallery', 'movie_theater', 'bowling_alley', 'library', 'book_store', 'cafe', 'coffee_shop', 'restaurant', 'bar', 'spa', 'shopping_mall', 'performing_arts_theater', 'aquarium', 'casino', 'bakery', 'ice_cream_shop'];
+  const OUTDOOR_SCENIC_TYPES = ['park', 'hiking_area', 'national_park', 'tourist_attraction', 'garden', 'zoo', 'beach', 'campground', 'playground'];
+  const QUICK_VISIT_TYPES = ['cafe', 'coffee_shop', 'bakery', 'ice_cream_shop', 'park', 'art_gallery', 'book_store', 'market', 'bar', 'restaurant', 'museum', 'florist', 'gift_shop', 'sandwich_shop'];
+
   const filteredPlaces = useMemo(() => places.filter(place => {
     for (const f of quickFilters) {
       switch (f) {
@@ -178,6 +206,23 @@ export function usePlaces(deps: {
         case 'budget': if (place.priceLevel > 2 && place.priceLevel !== -1) return false; break;
         case 'family': if (NIGHTLIFE_TYPES.includes(place.category)) return false; if (place.rating > 0 && place.rating < 3.5) return false; break;
         case 'solo': if (place.reviewCount < 50) return false; if (place.rating > 0 && place.rating < 3.8) return false; break;
+        case 'chainBreaker': if (isChain(place.name)) return false; break;
+        case '15min': if (!place.openNow) return false; if (place.distance !== null && place.distance > 1) return false; if (!QUICK_VISIT_TYPES.includes(place.category)) return false; break;
+        case 'lateNight': {
+          if (!place.openNow) return false;
+          // Check if place is open late (parse hours for closing time after 11 PM)
+          const closesLate = place.hours.some(h => {
+            const match = h.match(/–\s*(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+            if (!match) return h.toLowerCase().includes('open 24 hours');
+            const [, hr, , ampm] = match;
+            const hour24 = ampm.toUpperCase() === 'AM' ? (parseInt(hr) === 12 ? 0 : parseInt(hr)) : (parseInt(hr) === 12 ? 12 : parseInt(hr) + 12);
+            return hour24 >= 23 || hour24 <= 4; // Closes after 11 PM or early morning
+          });
+          if (!closesLate) return false;
+          break;
+        }
+        case 'rainyDay': if (!INDOOR_TYPES.includes(place.category)) return false; break;
+        case 'goldenHour': if (!OUTDOOR_SCENIC_TYPES.includes(place.category)) return false; break;
       }
     }
     if (travelGroup) {
@@ -254,6 +299,28 @@ export function usePlaces(deps: {
   }), [places, quickFilters, travelGroup, communityFilters, placeTagsCache]);
 
   // --------------------------------------------------------------------------
+  // Personalized "For You" picks based on preference learning
+  // --------------------------------------------------------------------------
+
+  const forYouPlaces = useMemo(() => {
+    const prefs = getPreferences();
+    // Need at least some data to personalize
+    if (prefs.tripCount === 0 && Object.keys(prefs.likedCategories).length === 0) return [];
+
+    const swappedSet = new Set(prefs.swappedAwayIds);
+    const scored = filteredPlaces
+      .filter(p => !swappedSet.has(p.placeId)) // exclude places user has swapped away
+      .map(p => ({
+        place: p,
+        score: scorePlaceByPreference(p.category, p.priceLevel, p.rating),
+      }))
+      .filter(item => item.score >= 60) // only show strong matches
+      .sort((a, b) => b.score - a.score);
+
+    return scored.slice(0, 10).map(item => item.place);
+  }, [filteredPlaces]);
+
+  // --------------------------------------------------------------------------
   // Handlers
   // --------------------------------------------------------------------------
 
@@ -276,6 +343,7 @@ export function usePlaces(deps: {
 
   const isSaved = (placeId: string) => savedPlaces.some(p => p.placeId === placeId);
   const toggleSaved = (place: Place) => {
+    hapticImpact(isSaved(place.placeId) ? 'Light' : 'Medium');
     if (isSaved(place.placeId)) {
       setSavedPlaces(prev => prev.filter(p => p.placeId !== place.placeId));
       showToast('Removed from saved');
@@ -294,6 +362,7 @@ export function usePlaces(deps: {
     setReviewSubmitting(true);
     const result = await saveReview(selectedPlace.placeId, citySlug, reviewRating, reviewText, reviewTags);
     if (result.success) {
+      hapticNotification('Success');
       showToast('Review submitted!');
       setShowReviewForm(false);
       setReviewRating(0);
@@ -310,7 +379,17 @@ export function usePlaces(deps: {
   };
 
   const sharePlace = async (place: Place) => {
-    const deepLink = `${window.location.origin}/place/${encodeURIComponent(place.placeId)}`;
+    hapticImpact('Light');
+    const deepLink = `https://nxstops.com/place/${encodeURIComponent(place.placeId)}`;
+    try {
+      // Use native Capacitor Share on mobile for better native sheet
+      const { Capacitor } = await import('@capacitor/core');
+      if (Capacitor.isNativePlatform()) {
+        const { Share } = await import('@capacitor/share');
+        await Share.share({ title: place.name, text: `Check out ${place.name} on NxStops`, url: deepLink, dialogTitle: 'Share this place' });
+        return;
+      }
+    } catch { /* fall through to web share */ }
     if (navigator.share) {
       await navigator.share({ title: place.name, text: `Check out ${place.name} on NxStops`, url: deepLink });
     } else {
@@ -318,6 +397,58 @@ export function usePlaces(deps: {
       showToast('Link copied');
     }
   };
+
+  // Blind Date: pick a random highly-rated nearby place
+  const spinBlindDate = useCallback(() => {
+    const candidates = places.filter(p => p.openNow && p.rating >= 4.0 && p.distance !== null && p.distance <= 0.5);
+    if (candidates.length === 0) {
+      // Widen to 1km if nothing within 500m
+      const wider = places.filter(p => p.openNow && p.rating >= 4.0 && p.distance !== null && p.distance <= 1);
+      if (wider.length === 0) { showToast('No nearby spots found — try a different area'); return; }
+      const pick = wider[Math.floor(Math.random() * wider.length)];
+      setBlindDatePlace(pick);
+    } else {
+      const pick = candidates[Math.floor(Math.random() * candidates.length)];
+      setBlindDatePlace(pick);
+    }
+    setBlindDateRevealed(false);
+    hapticImpact('Heavy');
+  }, [places, showToast]);
+
+  const revealBlindDate = useCallback(() => {
+    setBlindDateRevealed(true);
+    hapticNotification('Success');
+  }, []);
+
+  const dismissBlindDate = useCallback(() => {
+    setBlindDatePlace(null);
+    setBlindDateRevealed(false);
+  }, []);
+
+  // Submit a user-pinned stop
+  const submitPinStop = useCallback(async (stop: {
+    name: string;
+    description?: string;
+    category: string;
+    lat: number;
+    lng: number;
+  }) => {
+    const slug = selectedCity?.slug || (useGps && loc.city ? loc.city.toLowerCase().replace(/\s+/g, '-') : '');
+    if (!slug) { showToast('Select a city first'); return; }
+    setPinStopSubmitting(true);
+    const result = await createUserStop({ ...stop, city_slug: slug });
+    if (result.success) {
+      hapticNotification('Success');
+      showToast('Stop submitted for review!');
+      setShowPinStop(false);
+      // Refresh user stops
+      fetchUserStops(slug).then(setUserStops);
+      track('pin_stop', { name: stop.name, category: stop.category });
+    } else {
+      showToast(result.error || 'Failed to submit stop');
+    }
+    setPinStopSubmitting(false);
+  }, [selectedCity, useGps, loc.city, showToast]);
 
   // Helpers
   const isReservable = (place: Place): boolean => RESERVABLE_TYPES.includes(place.category);
@@ -350,7 +481,7 @@ export function usePlaces(deps: {
   };
 
   return {
-    places, setPlaces, filteredPlaces, placesLoading, placesError, fetchPlaces,
+    places, setPlaces, filteredPlaces, forYouPlaces, placesLoading, placesError, fetchPlaces,
     selectedVibe, setSelectedVibe, quickFilters, setQuickFilters,
     viewMode, setViewMode, activeMapPin, setActiveMapPin,
     communityFilters, setCommunityFilters, placeTagsCache, travelGroup, setTravelGroup,
@@ -361,5 +492,7 @@ export function usePlaces(deps: {
     reviewSubmitting, handleSubmitReview,
     sharePlace,
     isReservable, isBookable, getBookingUrl, getBookingLabel, getSafetyIndicators,
+    blindDatePlace, blindDateRevealed, spinBlindDate, revealBlindDate, dismissBlindDate,
+    userStops, showPinStop, setShowPinStop, pinStopSubmitting, submitPinStop,
   };
 }

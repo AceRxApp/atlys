@@ -24,3 +24,10 @@ dist-ssr
 *.sw?
 .vercel
 PROJECT_SECRETS.md
+
+# Android signing (never commit secrets)
+*.keystore
+*.jks
+android/keystore.properties
+google-services.json
+GoogleService-Info.plist

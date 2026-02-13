@@ -7,13 +7,13 @@ interface BeforeInstallPromptEvent extends Event {
 import { Routes, Route, useLocation as useRouterLocation, useNavigate, useParams } from 'react-router-dom';
 import { track } from '@vercel/analytics';
 import { fetchEmailSignups, fetchAllCities, toggleCityActive } from './supabase';
+import { hapticSelection } from './utils/haptics';
 import type { Place } from './services/places';
 import { useLocation as useGeoLocation } from './hooks/useLocation';
 import type { AdminSignup } from './types';
 import { CITY_COORDS, EMERGENCY_BY_COUNTRY } from './data';
-import { getCardStyle } from './styles/shared';
+
 import { AppContext } from './context/AppContext';
-import { useTheme } from './context/ThemeContext';
 import { HomeIcon, DiscoverIcon, EventsIcon, PlanIcon, ShieldIcon, GearIcon, CloseIcon, SearchIcon } from './components/icons';
 import { SkeletonCard } from './components/ui';
 import Footer from './components/Footer';
@@ -70,11 +70,11 @@ function PlaceDeepLink() {
 
   if (error) {
     return (
-      <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-        <div style={{ fontSize: '32px', marginBottom: '12px' }}>😕</div>
-        <p style={{ fontSize: '15px', marginBottom: '16px' }}>Place not found</p>
+      <div className="text-center px-5 py-[60px]">
+        <div className="text-[32px] mb-3">😕</div>
+        <p className="text-[15px] mb-4">Place not found</p>
         <button onClick={() => navigate('/', { replace: true })}
-          style={{ padding: '12px 24px', borderRadius: '12px', background: 'linear-gradient(135deg, #F59E0B, #D97706)', color: '#0C0A09', fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+          className="px-6 py-3 rounded-xl bg-accent-gradient text-[#0C0A09] font-semibold border-none cursor-pointer">
           Go Home
         </button>
       </div>
@@ -83,9 +83,9 @@ function PlaceDeepLink() {
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: '80px 20px' }}>
-        <div style={{ width: '40px', height: '3px', borderRadius: '2px', margin: '0 auto', background: 'linear-gradient(90deg, rgba(245,158,11,0.3) 25%, #F59E0B 50%, rgba(245,158,11,0.3) 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
-        <p style={{ fontSize: '13px', color: '#A8A29E', marginTop: '16px' }}>Loading place...</p>
+      <div className="text-center px-5 py-20">
+        <div className="w-10 h-[3px] rounded-sm mx-auto animate-shimmer" style={{ background: 'linear-gradient(90deg, rgba(245,158,11,0.3) 25%, #F59E0B 50%, rgba(245,158,11,0.3) 75%)', backgroundSize: '200% 100%' }} />
+        <p className="text-[13px] text-[#A8A29E] mt-4">Loading place...</p>
       </div>
     );
   }
@@ -98,9 +98,6 @@ function PlaceDeepLink() {
 // ============================================================================
 
 export default function App() {
-  const { theme } = useTheme();
-  const cardStyle = getCardStyle(theme);
-
   // --- Router integration ---
   const routerLocation = useRouterLocation();
   const navigate = useNavigate();
@@ -168,7 +165,7 @@ export default function App() {
   const [adminSignups, setAdminSignups] = useState<AdminSignup[]>([]);
   const [adminCities, setAdminCities] = useState<import('./types').City[]>([]);
   const [adminLoading, setAdminLoading] = useState(false);
-  const [adminTab, setAdminTab] = useState<'dashboard' | 'signups' | 'cities'>('dashboard');
+  const [adminTab, setAdminTab] = useState<'dashboard' | 'signups' | 'cities' | 'reports' | 'stops'>('dashboard');
 
   // Check admin status server-side when user changes
   useEffect(() => {
@@ -202,7 +199,7 @@ export default function App() {
     useGps: location.useGps, loc, selectedCity: location.selectedCity,
     searchRadius: location.searchRadius, screen, user: auth.user,
     selectedPlace, citySlug: location.citySlug, useMiles: location.useMiles,
-    showToast,
+    showToast, weather: location.weather,
   });
 
   // Trip plan hook
@@ -210,6 +207,11 @@ export default function App() {
     useGps: location.useGps, locCity: loc.city, selectedCity: location.selectedCity,
     cityLabel: location.cityLabel, citySlug: location.citySlug, useMiles: location.useMiles,
     showToast, requireAuth,
+    lat: location.useGps ? loc.lat : (location.selectedCity?.lat ?? null),
+    lng: location.useGps ? loc.lng : (location.selectedCity?.lng ?? null),
+    weather: location.weather,
+    travelGroup: places.travelGroup,
+    events: events.events,
   });
 
   // --- Reset photo index when selectedPlace changes ---
@@ -396,26 +398,17 @@ export default function App() {
 
   if (location.loading && location.cities.length === 0) {
     return (
-      <div style={{
-        fontFamily: "'DM Sans', system-ui, sans-serif",
-        background: theme.bg.body, minHeight: '100vh', color: theme.text.primary,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            fontSize: '36px', fontWeight: 700, marginBottom: '4px',
-            background: theme.accent.amberTextGradient,
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-          }}>
+      <div className="font-['DM_Sans',system-ui,sans-serif] bg-bg-body min-h-screen text-text-primary flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl font-bold mb-1 bg-accent-text-gradient bg-clip-text text-transparent">
             NxStops
           </div>
-          <div style={{ fontSize: '11px', color: theme.text.tertiary, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '24px' }}>
+          <div className="text-[11px] text-text-tertiary tracking-[0.1em] uppercase mb-6">
             by Nav&eacute;
           </div>
-          <div style={{
-            width: '40px', height: '3px', borderRadius: '2px', margin: '0 auto',
-            background: `linear-gradient(90deg, ${theme.amberTint.border30} 25%, ${theme.accent.amber} 50%, ${theme.amberTint.border30} 75%)`,
-            backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite',
+          <div className="w-10 h-[3px] rounded-sm mx-auto animate-shimmer" style={{
+            background: `linear-gradient(90deg, var(--amber-tint-border30) 25%, var(--accent-amber) 50%, var(--amber-tint-border30) 75%)`,
+            backgroundSize: '200% 100%',
           }} />
         </div>
       </div>
@@ -428,36 +421,22 @@ export default function App() {
 
   if (showOnboarding) {
     return (
-      <div style={{
-        fontFamily: "'DM Sans', system-ui, sans-serif",
-        background: theme.bg.body, minHeight: '100vh', color: theme.text.primary,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        maxWidth: '430px', margin: '0 auto', padding: '40px 24px',
-      }}>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-          <div style={{
-            fontSize: '36px', fontWeight: 700, marginBottom: '4px',
-            background: theme.accent.amberTextGradient,
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-          }}>
+      <div className="font-['DM_Sans',system-ui,sans-serif] bg-bg-body min-h-screen text-text-primary flex flex-col items-center justify-center max-w-[430px] mx-auto px-6 py-10">
+        <div className="flex-1 flex flex-col items-center justify-center text-center">
+          <div className="text-4xl font-bold mb-1 bg-accent-text-gradient bg-clip-text text-transparent">
             NxStops
           </div>
-          <div style={{ fontSize: '11px', color: theme.text.tertiary, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '32px' }}>
+          <div className="text-[11px] text-text-tertiary tracking-[0.1em] uppercase mb-8">
             by Nav&eacute;
           </div>
-          <p style={{ fontSize: '17px', color: theme.text.secondary, lineHeight: 1.6, maxWidth: '300px', marginBottom: '8px' }}>
+          <p className="text-[17px] text-text-secondary leading-relaxed max-w-[300px] mb-2">
             Discover places, plan trips, and explore cities — wherever you are.
           </p>
         </div>
-        <div style={{ width: '100%' }}>
+        <div className="w-full">
           <button
             onClick={() => { localStorage.setItem('nxstops_onboarded', 'true'); setShowOnboarding(false); track('onboarding_complete'); }}
-            style={{
-              width: '100%', padding: '16px', borderRadius: '14px', border: 'none',
-              background: theme.accent.amberGradient,
-              color: theme.text.onAccent, fontSize: '16px', fontWeight: 600, cursor: 'pointer',
-              boxShadow: `0 4px 20px ${theme.amberTint.shadow}`,
-            }}>
+            className="w-full p-4 rounded-[14px] border-none bg-accent-gradient text-text-on-accent text-base font-semibold cursor-pointer shadow-[0_4px_20px_var(--amber-tint-shadow)]">
             Get Started
           </button>
         </div>
@@ -471,100 +450,60 @@ export default function App() {
 
   return (
     <AppContext.Provider value={contextValue}>
-      <div style={{
-        fontFamily: "'DM Sans', system-ui, sans-serif",
-        background: theme.bg.bodyGradient,
-        minHeight: '100vh', color: theme.text.primary,
-        maxWidth: '430px', margin: '0 auto', position: 'relative', overflow: 'hidden',
-      }}>
-        {/* Animations */}
-        <style>{`
-          @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-          @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-          @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-          @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-          @keyframes toastIn { from { opacity: 0; transform: translateY(16px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
-          @keyframes offlineBannerIn { from { opacity: 0; transform: translateY(-100%); } to { opacity: 1; transform: translateY(0); } }
-          .modal-sheet { animation: slideUp 0.3s ease-out; }
-          .modal-backdrop { animation: fadeIn 0.2s ease-out; }
-          .photo-gallery-scroll::-webkit-scrollbar { display: none; }
-          *:focus-visible { outline: 2px solid #F59E0B; outline-offset: 2px; }
-          button:focus-visible { outline: 2px solid #F59E0B; outline-offset: 2px; }
-          a:focus-visible { outline: 2px solid #F59E0B; outline-offset: 2px; }
-          input:focus-visible { outline: 2px solid #F59E0B; outline-offset: 2px; }
-          .skip-link { position: absolute; top: -100px; left: 16px; z-index: 10000; padding: 12px 24px; background: #F59E0B; color: #0C0A09; font-weight: 700; font-size: 14px; border-radius: 0 0 12px 12px; text-decoration: none; transition: top 0.2s; }
-          .skip-link:focus { top: 0; }
-          @media (prefers-reduced-motion: reduce) {
-            *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
-          }
-        `}</style>
-
+      <div className="font-['DM_Sans',system-ui,sans-serif] bg-body-gradient min-h-screen text-text-primary max-w-[430px] mx-auto relative overflow-hidden">
         {/* Skip to content link for keyboard users */}
         <a href="#main-content" className="skip-link">Skip to content</a>
 
         {/* Offline banner */}
         {isOffline && (
-          <div style={{
-            position: 'fixed', top: 0, left: 0, right: 0,
-            background: '#78716C', color: '#FFFFFF',
-            fontSize: '12px', textAlign: 'center', padding: '6px',
-            zIndex: 9999, animation: 'offlineBannerIn 0.3s ease-out',
-          }}>
+          <div className="fixed top-0 left-0 right-0 bg-[#78716C] text-white text-xs text-center p-1.5 z-[9999] animate-offline-banner">
             You're offline — showing cached data
           </div>
         )}
 
         {/* Header */}
         {!isInfoPage && (
-        <header style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <header className="px-5 py-4 flex justify-between items-center">
           <div>
-            <div style={{
-              fontSize: '22px', fontWeight: 700,
-              background: theme.accent.amberTextGradient,
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-            }}>
+            <div className="text-[22px] font-bold bg-accent-text-gradient bg-clip-text text-transparent">
               NxStops
             </div>
-            <div style={{ fontSize: '10px', color: theme.text.tertiary, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+            <div className="text-[10px] text-text-tertiary tracking-[0.1em] uppercase">
               by Nav&eacute;
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '14px', color: theme.text.primary }}>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <div className="text-sm text-text-primary">
                 {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </div>
-              <div style={{ fontSize: '10px', color: theme.text.tertiary }}>
+              <div className="text-[10px] text-text-tertiary">
                 {currentTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
               </div>
             </div>
             <button onClick={() => { setShowGlobalSearch(true); setGlobalSearchQuery(''); }}
               aria-label="Search"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '10px', borderRadius: '10px', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              className="bg-transparent border-none cursor-pointer p-2.5 rounded-[10px] min-h-[44px] min-w-[44px] flex items-center justify-center">
               <SearchIcon />
             </button>
             <button onClick={() => setShowSafety(true)}
               aria-label="Travel toolkit"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '10px', borderRadius: '10px', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              className="bg-transparent border-none cursor-pointer p-2.5 rounded-[10px] min-h-[44px] min-w-[44px] flex items-center justify-center">
               <ShieldIcon />
             </button>
             {isAdmin && (
               <button onClick={openAdmin}
                 aria-label="Admin settings"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '10px', borderRadius: '10px', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                className="bg-transparent border-none cursor-pointer p-2.5 rounded-[10px] min-h-[44px] min-w-[44px] flex items-center justify-center">
                 <GearIcon />
               </button>
             )}
             <button onClick={() => setShowProfile(true)}
               aria-label="Open profile"
-              style={{
-                width: '44px', height: '44px', borderRadius: '50%', border: `2px solid ${theme.amberTint.border30}`,
-                background: auth.user?.user_metadata?.avatar_url
-                  ? `url(${auth.user.user_metadata.avatar_url}) center/cover no-repeat`
-                  : theme.bg.subtleButton,
-                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '16px', padding: 0, color: theme.text.secondary, flexShrink: 0,
-              }}>
+              className={`w-[44px] h-[44px] rounded-full border-2 border-amber-tint-border30 cursor-pointer flex items-center justify-center text-base p-0 text-text-secondary shrink-0 ${!auth.user?.user_metadata?.avatar_url ? 'bg-bg-subtle-button' : ''}`}
+              style={auth.user?.user_metadata?.avatar_url
+                ? { background: `url(${auth.user.user_metadata.avatar_url}) center/cover no-repeat` }
+                : undefined}>
               {!auth.user?.user_metadata?.avatar_url && (
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A8A29E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -577,7 +516,7 @@ export default function App() {
         )}
 
         {/* Content — routed screens */}
-        <main id="main-content" style={{ padding: isInfoPage ? '0' : '0 20px 100px' }}>
+        <main id="main-content" className={isInfoPage ? 'p-0' : 'px-5 pb-[100px] pt-0'}>
           <Suspense fallback={<><SkeletonCard /><SkeletonCard /><SkeletonCard /></>}>
             <div key={routerLocation.pathname} className="page-enter">
               <Routes>
@@ -592,14 +531,14 @@ export default function App() {
                 <Route path="/cities/:slug" element={<CityScreen />} />
                 <Route path="/place/:placeId" element={<PlaceDeepLink />} />
                 <Route path="*" element={
-                  <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-                    <div style={{ fontSize: '48px', marginBottom: '12px' }}>🗺️</div>
-                    <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>Page Not Found</h2>
-                    <p style={{ color: theme.text.secondary, fontSize: '14px', marginBottom: '20px' }}>
+                  <div className="text-center px-5 py-[60px]">
+                    <div className="text-5xl mb-3">🗺️</div>
+                    <h2 className="text-xl font-bold mb-2">Page Not Found</h2>
+                    <p className="text-text-secondary text-sm mb-5">
                       This page doesn't exist. Let's get you back on track.
                     </p>
                     <button onClick={() => navigate('/', { replace: true })}
-                      style={{ padding: '12px 28px', borderRadius: '12px', background: theme.accent.amberGradient, color: theme.text.onAccent, fontWeight: 600, border: 'none', cursor: 'pointer', fontSize: '14px' }}>
+                      className="px-7 py-3 rounded-xl bg-accent-gradient text-text-on-accent font-semibold border-none cursor-pointer text-sm">
                       Go Home
                     </button>
                   </div>
@@ -611,14 +550,7 @@ export default function App() {
         </main>
 
         {/* Bottom Navigation */}
-        {!isInfoPage && <nav aria-label="Main navigation" style={{
-          position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
-          width: '100%', maxWidth: '430px',
-          background: theme.bg.nav, backdropFilter: 'blur(24px)',
-          borderTop: `1px solid ${theme.border.nav}`,
-          display: 'flex', justifyContent: 'space-around',
-          padding: '8px 0 28px',
-        }}>
+        {!isInfoPage && <nav aria-label="Main navigation" className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-bg-nav backdrop-blur-[24px] border-t border-border-nav flex justify-around pt-2 pb-7">
           {([
             { id: 'home' as Screen, icon: HomeIcon, label: 'Home' },
             { id: 'discover' as Screen, icon: DiscoverIcon, label: 'Discover' },
@@ -632,24 +564,11 @@ export default function App() {
                 key={tab.id}
                 aria-label={tab.label}
                 aria-current={isActive ? 'page' : undefined}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
-                  background: 'none', border: 'none',
-                  color: isActive ? theme.text.primary : canNavigate ? theme.text.tertiary : theme.text.disabled,
-                  fontSize: '10px', fontWeight: 500, cursor: canNavigate ? 'pointer' : 'default',
-                  padding: '8px 20px', borderRadius: '12px', position: 'relative',
-                  opacity: canNavigate ? 1 : 0.4, minHeight: '48px',
-                }}
-                onClick={() => canNavigate && setScreen(tab.id)}
+                className={`flex flex-col items-center gap-1 bg-transparent border-none text-[10px] font-medium px-5 py-2 rounded-xl relative min-h-[48px] ${isActive ? 'text-text-primary' : canNavigate ? 'text-text-tertiary' : 'text-text-disabled'} ${canNavigate ? 'cursor-pointer opacity-100' : 'cursor-default opacity-40'}`}
+                onClick={() => { if (canNavigate) { hapticSelection(); setScreen(tab.id); } }}
               >
                 {isActive && (
-                  <div style={{
-                    position: 'absolute', top: '50%', left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    width: '44px', height: '44px',
-                    background: 'radial-gradient(circle, rgba(245,158,11,0.2) 0%, transparent 70%)',
-                    borderRadius: '50%', pointerEvents: 'none', zIndex: -1,
-                  }} />
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[44px] h-[44px] rounded-full pointer-events-none -z-1" style={{ background: 'radial-gradient(circle, rgba(245,158,11,0.2) 0%, transparent 70%)' }} />
                 )}
                 <tab.icon active={isActive} />
                 <span style={{
@@ -660,12 +579,7 @@ export default function App() {
                   {tab.label}
                 </span>
                 {tab.id === 'plan' && trip.totalStops > 0 && (
-                  <span style={{
-                    position: 'absolute', top: '2px', right: '8px',
-                    background: 'linear-gradient(135deg, #F59E0B, #D97706)',
-                    color: '#0C0A09', fontSize: '9px', fontWeight: 700,
-                    padding: '2px 5px', borderRadius: '8px',
-                  }}>
+                  <span className="absolute top-0.5 right-2 bg-accent-gradient text-[#0C0A09] text-[9px] font-bold px-[5px] py-0.5 rounded-lg">
                     {trip.totalStops}
                   </span>
                 )}
@@ -688,14 +602,9 @@ export default function App() {
               ).slice(0, 5)
             : [];
           return (
-            <div
-              style={{
-                position: 'fixed', inset: 0, background: theme.bg.body, zIndex: 200,
-                display: 'flex', flexDirection: 'column', maxWidth: '430px', margin: '0 auto',
-              }}
-            >
+            <div className="fixed inset-0 bg-bg-body z-[200] flex flex-col max-w-[430px] mx-auto">
               {/* Search Header */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '16px 20px', borderBottom: `1px solid ${theme.border.subtle}` }}>
+              <div className="flex items-center gap-2.5 px-5 py-4 border-b border-border-subtle">
                 <input
                   autoFocus
                   type="text"
@@ -711,36 +620,29 @@ export default function App() {
                       setTimeout(() => places.handleSearch(), 100);
                     }
                   }}
-                  style={{
-                    flex: 1, padding: '14px 16px', borderRadius: '14px',
-                    border: `1px solid ${theme.border.strong}`, background: theme.bg.subtle,
-                    color: theme.text.primary, fontSize: '16px', outline: 'none',
-                  }}
+                  className="flex-1 px-4 py-3.5 rounded-[14px] border border-border-strong bg-bg-subtle text-text-primary text-base outline-none"
                 />
                 <button
                   onClick={() => setShowGlobalSearch(false)}
-                  style={{
-                    background: 'none', border: 'none', color: theme.text.secondary,
-                    fontSize: '14px', fontWeight: 500, cursor: 'pointer', padding: '10px',
-                  }}
+                  className="bg-transparent border-none text-text-secondary text-sm font-medium cursor-pointer p-2.5"
                 >
                   Cancel
                 </button>
               </div>
 
               {/* Results */}
-              <div style={{ flex: 1, overflow: 'auto', padding: '12px 20px' }}>
+              <div className="flex-1 overflow-auto px-5 py-3">
                 {!q && (
-                  <div style={{ textAlign: 'center', paddingTop: '60px' }}>
-                    <div style={{ fontSize: '32px', marginBottom: '8px', opacity: 0.5 }}>&#x1F50D;</div>
-                    <p style={{ color: theme.text.tertiary, fontSize: '14px' }}>Search for a city, event, or place</p>
+                  <div className="text-center pt-[60px]">
+                    <div className="text-[32px] mb-2 opacity-50">&#x1F50D;</div>
+                    <p className="text-text-tertiary text-sm">Search for a city, event, or place</p>
                   </div>
                 )}
 
                 {/* City Results */}
                 {cityMatches.length > 0 && (
-                  <div style={{ marginBottom: '20px' }}>
-                    <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Cities</div>
+                  <div className="mb-5">
+                    <div className="section-label">Cities</div>
                     {cityMatches.map(city => (
                       <button
                         key={city.id}
@@ -750,23 +652,14 @@ export default function App() {
                           setShowGlobalSearch(false);
                           setScreen('discover');
                         }}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: '12px', width: '100%',
-                          padding: '12px', borderRadius: '12px', border: 'none',
-                          background: theme.bg.subtle, cursor: 'pointer', textAlign: 'left',
-                          marginBottom: '6px',
-                        }}
+                        className="flex items-center gap-3 w-full p-3 rounded-xl border-none bg-bg-subtle cursor-pointer text-left mb-1.5"
                       >
-                        <div style={{
-                          width: '40px', height: '40px', borderRadius: '10px', flexShrink: 0,
-                          background: theme.amberTint.bg10, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '18px',
-                        }}>
+                        <div className="w-10 h-10 rounded-[10px] shrink-0 bg-amber-tint-bg10 flex items-center justify-center text-lg">
                           &#x1F30D;
                         </div>
                         <div>
-                          <div style={{ fontSize: '14px', fontWeight: 600, color: theme.text.primary }}>{city.name}</div>
-                          <div style={{ fontSize: '12px', color: theme.text.tertiary }}>{city.country}</div>
+                          <div className="text-sm font-semibold text-text-primary">{city.name}</div>
+                          <div className="text-xs text-text-tertiary">{city.country}</div>
                         </div>
                       </button>
                     ))}
@@ -775,8 +668,8 @@ export default function App() {
 
                 {/* Event Results */}
                 {eventMatches.length > 0 && (
-                  <div style={{ marginBottom: '20px' }}>
-                    <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Events</div>
+                  <div className="mb-5">
+                    <div className="section-label">Events</div>
                     {eventMatches.map(ev => (
                       <button
                         key={ev.id}
@@ -784,23 +677,14 @@ export default function App() {
                           setShowGlobalSearch(false);
                           setScreen('events');
                         }}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: '12px', width: '100%',
-                          padding: '12px', borderRadius: '12px', border: 'none',
-                          background: theme.bg.subtle, cursor: 'pointer', textAlign: 'left',
-                          marginBottom: '6px',
-                        }}
+                        className="flex items-center gap-3 w-full p-3 rounded-xl border-none bg-bg-subtle cursor-pointer text-left mb-1.5"
                       >
-                        <div style={{
-                          width: '40px', height: '40px', borderRadius: '10px', flexShrink: 0,
-                          background: theme.purpleTint.bg08, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '18px',
-                        }}>
+                        <div className="w-10 h-10 rounded-[10px] shrink-0 bg-purple-tint-bg08 flex items-center justify-center text-lg">
                           &#x1F3AB;
                         </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '14px', fontWeight: 600, color: theme.text.primary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.name}</div>
-                          <div style={{ fontSize: '12px', color: theme.text.tertiary }}>{ev.venue}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold text-text-primary whitespace-nowrap overflow-hidden text-ellipsis">{ev.name}</div>
+                          <div className="text-xs text-text-tertiary">{ev.venue}</div>
                         </div>
                       </button>
                     ))}
@@ -816,14 +700,9 @@ export default function App() {
                       setScreen('discover');
                       setTimeout(() => places.handleSearch(), 100);
                     }}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '12px', width: '100%',
-                      padding: '14px', borderRadius: '14px', cursor: 'pointer',
-                      background: theme.accent.amberGradient, border: 'none',
-                      color: theme.text.onAccent, fontSize: '14px', fontWeight: 600,
-                    }}
+                    className="flex items-center gap-3 w-full p-3.5 rounded-[14px] cursor-pointer bg-accent-gradient border-none text-text-on-accent text-sm font-semibold"
                   >
-                    <SearchIcon color={theme.text.onAccent} />
+                    <SearchIcon color="var(--text-on-accent)" />
                     Search places for &ldquo;{globalSearchQuery.trim()}&rdquo;
                   </button>
                 )}
@@ -834,20 +713,12 @@ export default function App() {
 
         {/* Floating AI Chat Button */}
         {!isInfoPage && !selectedPlace && !showChat && (
-          <div style={{
-            position: 'fixed', bottom: '90px', right: 'calc(50% - 195px)',
-            zIndex: 50,
-          }}>
+          <div className="fixed bottom-[90px] right-[calc(50%-195px)] z-50">
             <button
               onClick={() => setShowChat(true)}
               aria-label="Open AI travel assistant"
-              style={{
-                width: '52px', height: '52px', borderRadius: '50%',
-                background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)',
-                border: 'none', cursor: 'pointer', color: '#FFFFFF',
-                fontSize: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 4px 20px rgba(139,92,246,0.4)',
-              }}
+              className="w-[52px] h-[52px] rounded-full border-none cursor-pointer text-white text-[22px] flex items-center justify-center shadow-[0_4px_20px_rgba(139,92,246,0.4)]"
+              style={{ background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)' }}
               title="AI Travel Assistant"
             >
               {'\u{2728}'}
@@ -864,24 +735,22 @@ export default function App() {
 
         {/* Safety Toolkit Modal */}
         {showSafety && (
-          <div className="modal-backdrop"
+          <div className="modal-overlay"
             role="dialog"
             aria-modal="true"
             aria-label="Travel toolkit"
-            style={{ position: 'fixed', inset: 0, background: theme.bg.modalOverlay, zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
             onClick={() => setShowSafety(false)}>
-            <div className="modal-sheet"
-              style={{ background: theme.bg.surface, borderRadius: '24px 24px 0 0', maxWidth: '430px', width: '100%', maxHeight: '85vh', overflow: 'auto', border: `1px solid ${theme.border.subtle}`, borderBottom: 'none' }}
+            <div className="modal-sheet modal-sheet-body"
               onClick={e => e.stopPropagation()}>
-              <div style={{ padding: '24px 20px 40px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div className="px-5 pt-6 pb-10">
+                <div className="flex justify-between items-center mb-5">
                   <div>
-                    <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '2px' }}>Travel Toolkit</h2>
-                    <p style={{ color: theme.text.tertiary, fontSize: '12px' }}>Stay connected & informed</p>
+                    <h2 className="text-xl font-bold mb-0.5">Travel Toolkit</h2>
+                    <p className="text-text-tertiary text-xs">Stay connected & informed</p>
                   </div>
                   <button onClick={() => setShowSafety(false)}
                     aria-label="Close travel toolkit"
-                    style={{ background: 'none', border: 'none', color: theme.text.tertiary, cursor: 'pointer', padding: '10px', minHeight: '44px', minWidth: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    className="bg-transparent border-none text-text-tertiary cursor-pointer p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center">
                     <CloseIcon />
                   </button>
                 </div>
@@ -902,25 +771,17 @@ export default function App() {
                       showToast('Location not available \u{2014} enable GPS');
                     }
                   }}
-                  style={{
-                    ...cardStyle, width: '100%', cursor: 'pointer', textAlign: 'left',
-                    display: 'flex', alignItems: 'center', gap: '14px',
-                    background: 'linear-gradient(135deg, rgba(34,197,94,0.08), rgba(34,197,94,0.03))',
-                    border: '1px solid rgba(34,197,94,0.15)',
-                  }}
+                  className="card w-full cursor-pointer text-left flex items-center gap-3.5 border border-[rgba(34,197,94,0.15)]"
+                  style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.08), rgba(34,197,94,0.03))' }}
                 >
-                  <div style={{
-                    width: '44px', height: '44px', borderRadius: '12px', flexShrink: 0,
-                    background: 'rgba(34,197,94,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '20px',
-                  }}>
+                  <div className="w-[44px] h-[44px] rounded-xl shrink-0 bg-[rgba(34,197,94,0.15)] flex items-center justify-center text-xl">
                     {'\u{1F4CD}'}
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: '15px', color: theme.text.primary }}>Share My Location</div>
-                    <div style={{ fontSize: '12px', color: theme.text.secondary }}>Send your GPS pin to someone you trust</div>
+                  <div className="flex-1">
+                    <div className="font-semibold text-[15px] text-text-primary">Share My Location</div>
+                    <div className="text-xs text-text-secondary">Send your GPS pin to someone you trust</div>
                   </div>
-                  <div style={{ color: '#34D399', fontSize: '18px' }}>{'\u{2192}'}</div>
+                  <div className="text-[#34D399] text-lg">{'\u{2192}'}</div>
                 </button>
 
                 {/* Emergency Numbers */}
@@ -933,41 +794,33 @@ export default function App() {
                   const displayCountry = location.selectedCity?.country || country || null;
 
                   return (
-                    <div style={{ ...cardStyle, marginTop: '4px' }}>
-                      <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
+                    <div className="card mt-1">
+                      <div className="section-label">
                         Emergency Numbers{displayCountry ? ` \u{2014} ${displayCountry}` : ''}
                       </div>
                       {nums ? (
-                        <div style={{ display: 'flex', gap: '10px' }}>
+                        <div className="flex gap-2.5">
                           <a href={`tel:${nums.emergency}`}
-                            style={{
-                              flex: 1, padding: '14px', borderRadius: '12px', textAlign: 'center',
-                              background: theme.redTint.bg, border: `1px solid ${theme.redTint.border}`,
-                              color: theme.status.red, textDecoration: 'none', fontWeight: 600, fontSize: '16px',
-                            }}>
-                            <div style={{ fontSize: '11px', color: theme.text.secondary, fontWeight: 400, marginBottom: '4px' }}>Emergency</div>
+                            className="flex-1 p-3.5 rounded-xl text-center bg-red-tint-bg border border-red-tint-border text-status-red no-underline font-semibold text-base">
+                            <div className="text-[11px] text-text-secondary font-normal mb-1">Emergency</div>
                             {nums.emergency}
                           </a>
                           <a href={`tel:${nums.police}`}
-                            style={{
-                              flex: 1, padding: '14px', borderRadius: '12px', textAlign: 'center',
-                              background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.15)',
-                              color: '#93C5FD', textDecoration: 'none', fontWeight: 600, fontSize: '16px',
-                            }}>
-                            <div style={{ fontSize: '11px', color: theme.text.secondary, fontWeight: 400, marginBottom: '4px' }}>Police</div>
+                            className="flex-1 p-3.5 rounded-xl text-center bg-[rgba(96,165,250,0.1)] border border-[rgba(96,165,250,0.15)] text-[#93C5FD] no-underline font-semibold text-base">
+                            <div className="text-[11px] text-text-secondary font-normal mb-1">Police</div>
                             {nums.police}
                           </a>
                         </div>
                       ) : (
-                        <p style={{ color: theme.text.secondary, fontSize: '13px' }}>Select a city to see local emergency numbers</p>
+                        <p className="text-text-secondary text-[13px]">Select a city to see local emergency numbers</p>
                       )}
                     </div>
                   );
                 })()}
 
                 {/* Travel Tips */}
-                <div style={{ ...cardStyle, marginTop: '4px' }}>
-                  <div style={{ fontSize: '11px', color: theme.text.tertiary, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
+                <div className="card mt-1">
+                  <div className="section-label">
                     Quick Tips
                   </div>
                   {[
@@ -978,9 +831,9 @@ export default function App() {
                     { icon: '\u{1F319}', tip: 'Stick to well-lit, busy streets at night' },
                     { icon: '\u{1F465}', tip: 'Look for places with lots of reviews \u{2014} popular spots are usually welcoming' },
                   ].map((item, i) => (
-                    <div key={i} style={{ display: 'flex', gap: '10px', padding: '8px 0', borderBottom: i < 5 ? `1px solid ${theme.bg.subtleMedium}` : 'none' }}>
-                      <span style={{ fontSize: '16px', flexShrink: 0 }}>{item.icon}</span>
-                      <span style={{ fontSize: '13px', color: theme.text.body, lineHeight: 1.4 }}>{item.tip}</span>
+                    <div key={i} className="flex gap-2.5 py-2" style={{ borderBottom: i < 5 ? '1px solid var(--bg-subtle-medium)' : 'none' }}>
+                      <span className="text-base shrink-0">{item.icon}</span>
+                      <span className="text-[13px] text-text-body leading-snug">{item.tip}</span>
                     </div>
                   ))}
                 </div>
@@ -1015,34 +868,21 @@ export default function App() {
 
         {/* PWA Install Banner */}
         {showInstallBanner && (
-          <div style={{
-            position: 'fixed', bottom: '90px', left: '50%', transform: 'translateX(-50%)',
-            maxWidth: '400px', width: 'calc(100% - 40px)',
-            background: theme.bg.surface, border: `1px solid ${theme.amberTint.border30}`,
-            borderRadius: '16px', padding: '16px', zIndex: 250,
-            boxShadow: '0 8px 30px rgba(0,0,0,0.4)',
-            animation: 'toastIn 0.3s ease-out',
-            display: 'flex', alignItems: 'center', gap: '12px',
-          }}>
-            <div style={{
-              width: '44px', height: '44px', borderRadius: '12px', flexShrink: 0,
-              background: theme.accent.amberGradient,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '20px', color: '#0C0A09', fontWeight: 700,
-            }}>
+          <div className="fixed bottom-[90px] left-1/2 -translate-x-1/2 max-w-[400px] w-[calc(100%-40px)] bg-bg-surface border border-amber-tint-border30 rounded-2xl p-4 z-[250] shadow-[0_8px_30px_rgba(0,0,0,0.4)] animate-toast-in flex items-center gap-3">
+            <div className="w-[44px] h-[44px] rounded-xl shrink-0 bg-accent-gradient flex items-center justify-center text-xl text-[#0C0A09] font-bold">
               N
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: theme.text.primary }}>Add NxStops to Home Screen</div>
-              <div style={{ fontSize: '12px', color: theme.text.secondary }}>Quick access, works offline</div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-text-primary">Add NxStops to Home Screen</div>
+              <div className="text-xs text-text-secondary">Quick access, works offline</div>
             </div>
-            <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+            <div className="flex gap-1.5 shrink-0">
               <button onClick={dismissInstallBanner}
-                style={{ padding: '8px 12px', borderRadius: '10px', background: 'none', border: `1px solid ${theme.border.medium}`, color: theme.text.tertiary, fontSize: '12px', cursor: 'pointer' }}>
+                className="px-3 py-2 rounded-[10px] bg-transparent border border-border-medium text-text-tertiary text-xs cursor-pointer">
                 Later
               </button>
               <button onClick={handleInstallApp}
-                style={{ padding: '8px 14px', borderRadius: '10px', background: theme.accent.amberGradient, border: 'none', color: '#0C0A09', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                className="px-3.5 py-2 rounded-[10px] bg-accent-gradient border-none text-[#0C0A09] text-xs font-semibold cursor-pointer">
                 Install
               </button>
             </div>
@@ -1051,35 +891,21 @@ export default function App() {
 
         {/* GDPR Consent Banner */}
         {showConsent && (
-          <div style={{
-            position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
-            maxWidth: '430px', width: '100%',
-            background: theme.bg.surface, borderTop: `1px solid ${theme.border.subtle}`,
-            padding: '16px 20px', zIndex: 260,
-            animation: 'slideUp 0.3s ease-out',
-          }}>
-            <p style={{ fontSize: '13px', color: theme.text.secondary, lineHeight: 1.5, marginBottom: '12px' }}>
+          <div className="fixed bottom-0 left-1/2 -translate-x-1/2 max-w-[430px] w-full bg-bg-surface border-t border-border-subtle px-5 py-4 z-[260] animate-slide-up">
+            <p className="text-[13px] text-text-secondary leading-normal mb-3">
               We use cookies and location data to improve your experience. By continuing, you agree to our{' '}
-              <a href="/privacy" style={{ color: theme.accent.amber, textDecoration: 'underline' }}>Privacy Policy</a> and{' '}
-              <a href="/terms" style={{ color: theme.accent.amber, textDecoration: 'underline' }}>Terms</a>.
+              <a href="/privacy" className="text-accent-amber underline">Privacy Policy</a> and{' '}
+              <a href="/terms" className="text-accent-amber underline">Terms</a>.
             </p>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div className="flex gap-2">
               <button
                 onClick={() => { localStorage.setItem('nxstops_consent', 'true'); setShowConsent(false); }}
-                style={{
-                  flex: 1, padding: '12px', borderRadius: '12px', border: 'none',
-                  background: theme.accent.amberGradient, color: '#0C0A09',
-                  fontSize: '14px', fontWeight: 600, cursor: 'pointer',
-                }}>
+                className="flex-1 p-3 rounded-xl border-none bg-accent-gradient text-[#0C0A09] text-sm font-semibold cursor-pointer">
                 Accept
               </button>
               <button
                 onClick={() => { localStorage.setItem('nxstops_consent', 'minimal'); setShowConsent(false); }}
-                style={{
-                  padding: '12px 16px', borderRadius: '12px',
-                  background: 'none', border: `1px solid ${theme.border.medium}`,
-                  color: theme.text.secondary, fontSize: '13px', cursor: 'pointer',
-                }}>
+                className="px-4 py-3 rounded-xl bg-transparent border border-border-medium text-text-secondary text-[13px] cursor-pointer">
                 Essential only
               </button>
             </div>
@@ -1087,23 +913,13 @@ export default function App() {
         )}
 
         {/* Toast */}
-        <div aria-live="polite" aria-atomic="true" style={{ position: 'fixed', bottom: '100px', left: '50%', transform: 'translateX(-50%)', zIndex: 300, pointerEvents: toast ? 'auto' : 'none' }}>
+        <div aria-live="polite" aria-atomic="true" className={`fixed bottom-[100px] left-1/2 -translate-x-1/2 z-[300] ${toast ? 'pointer-events-auto' : 'pointer-events-none'}`}>
           {toast && (
-            <div style={{
-              background: toast.type === 'error' ? theme.redTint.bg : theme.bg.toast,
-              backdropFilter: 'blur(20px)',
-              border: `1px solid ${toast.type === 'error' ? theme.redTint.border : theme.amberTint.border20}`,
-              borderRadius: '12px',
-              padding: '12px 20px', fontSize: '14px', fontWeight: 500,
-              color: toast.type === 'error' ? theme.status.red : theme.text.primary,
-              animation: 'toastIn 0.3s ease-out',
-              boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
-              display: 'flex', alignItems: 'center', gap: '8px',
-            }}>
+            <div className={`backdrop-blur-[20px] rounded-xl px-5 py-3 text-sm font-medium animate-toast-in shadow-[0_8px_30px_rgba(0,0,0,0.3)] flex items-center gap-2 ${toast.type === 'error' ? 'bg-red-tint-bg border border-red-tint-border text-status-red' : 'bg-bg-toast border border-amber-tint-border20 text-text-primary'}`}>
               {toast.msg}
               <button onClick={() => setToast(null)}
                 aria-label="Dismiss"
-                style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: '4px', fontSize: '16px', lineHeight: 1, opacity: 0.6 }}>
+                className="bg-transparent border-none text-inherit cursor-pointer p-1 text-base leading-none opacity-60">
                 ✕
               </button>
             </div>

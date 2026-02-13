@@ -49,11 +49,33 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty('--bg-body', theme.bg.body);
-    root.style.setProperty('--text-primary', theme.text.primary);
-    root.style.setProperty('--scrollbar-track', theme.scrollbar.track);
-    root.style.setProperty('--scrollbar-thumb', theme.scrollbar.thumb);
-    root.style.setProperty('--scrollbar-thumb-hover', theme.scrollbar.thumbHover);
+
+    // Flatten all theme tokens into CSS custom properties
+    const groups: [string, Record<string, string>][] = [
+      ['bg', theme.bg],
+      ['text', theme.text],
+      ['accent', theme.accent],
+      ['status', theme.status],
+      ['events', theme.events],
+      ['community', theme.community],
+      ['border', theme.border],
+      ['amber-tint', theme.amberTint],
+      ['green-tint', theme.greenTint],
+      ['red-tint', theme.redTint],
+      ['blue-tint', theme.blueTint],
+      ['purple-tint', theme.purpleTint],
+      ['community-tint', theme.communityTint],
+      ['skeleton', theme.skeleton],
+      ['scrollbar', theme.scrollbar],
+    ];
+
+    for (const [prefix, group] of groups) {
+      for (const [key, value] of Object.entries(group)) {
+        const kebab = key.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+        root.style.setProperty(`--${prefix}-${kebab}`, value);
+      }
+    }
+
     root.style.setProperty('--selection-bg', theme.selection.bg);
     root.setAttribute('data-theme', mode);
   }, [theme, mode]);

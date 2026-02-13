@@ -1,8 +1,8 @@
 import { createClient, RealtimeChannel } from '@supabase/supabase-js';
 import type { Session } from '@supabase/supabase-js';
 
-const SUPABASE_URL = 'https://hwtsyigwsucpefadznnp.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3dHN5aWd3c3VjcGVmYWR6bm5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwODcwOTgsImV4cCI6MjA4NTY2MzA5OH0.EnqHcTqoPN1pfSEUggwm_mMUNWME8kNcih5EvB4JlD4';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -373,6 +373,32 @@ export function unsubscribeFromCrewTrip(channel: RealtimeChannel) {
 }
 
 // ============================================================================
+// ACCOUNT DELETION
+// ============================================================================
+
+export async function deleteAccount(): Promise<{ success: boolean; error?: string }> {
+  const session = await authGetSession();
+  if (!session) return { success: false, error: 'Not authenticated' };
+
+  const response = await fetch('/api/account-delete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    return { success: false, error: data.error || 'Failed to delete account' };
+  }
+
+  // Sign out locally after server-side deletion
+  await supabase.auth.signOut();
+  return { success: true };
+}
+
+// ============================================================================
 // SAVED PLACES SYNC
 // ============================================================================
 
@@ -414,6 +440,181 @@ export async function deleteSavedPlace(placeId: string): Promise<boolean> {
 
   if (error) {
     console.error('Error deleting saved place:', error);
+    return false;
+  }
+  return true;
+}
+
+// ============================================================================
+// CONTENT REPORTS
+// ============================================================================
+
+export async function submitReport(
+  contentType: 'review' | 'place_tag' | 'place',
+  contentId: string,
+  reason: 'spam' | 'inappropriate' | 'harassment' | 'misinformation' | 'other',
+  details?: string
+): Promise<{ success: boolean; error?: string }> {
+  const session = await authGetSession();
+  if (!session) return { success: false, error: 'Not authenticated' };
+
+  const response = await fetch('/api/report', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ content_type: contentType, content_id: contentId, reason, details }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    return { success: false, error: data.error || 'Failed to submit report' };
+  }
+
+  return { success: true };
+}
+
+export async function fetchReports(): Promise<{ id: string; reporter_id: string; content_type: string; content_id: string; reason: string; details: string | null; status: string; created_at: string }[]> {
+  const { data, error } = await supabase
+    .from('reports')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (error) {
+    console.error('Error fetching reports:', error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function updateReportStatus(reportId: string, status: 'resolved' | 'dismissed'): Promise<boolean> {
+  const { error } = await supabase
+    .from('reports')
+    .update({ status, resolved_at: new Date().toISOString() })
+    .eq('id', reportId);
+
+  if (error) {
+    console.error('Error updating report:', error);
+    return false;
+  }
+  return true;
+}
+
+export async function deleteReviewById(reviewId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('reviews')
+    .delete()
+    .eq('id', reviewId);
+
+  if (error) {
+    console.error('Error deleting review:', error);
+    return false;
+  }
+  return true;
+}
+
+// =============================================================================
+// USER CONTRIBUTED STOPS
+// =============================================================================
+
+export interface UserStop {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  category: string;
+  lat: number;
+  lng: number;
+  city_slug: string;
+  photo_url: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  upvotes: number;
+  created_at: string;
+}
+
+export async function createUserStop(stop: {
+  name: string;
+  description?: string;
+  category: string;
+  lat: number;
+  lng: number;
+  city_slug: string;
+}): Promise<{ success: boolean; data?: UserStop; error?: string }> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { success: false, error: 'Not authenticated' };
+
+  const { data, error } = await supabase
+    .from('user_stops')
+    .insert({
+      user_id: session.user.id,
+      name: stop.name.trim(),
+      description: stop.description?.trim() || null,
+      category: stop.category,
+      lat: stop.lat,
+      lng: stop.lng,
+      city_slug: stop.city_slug,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating user stop:', error);
+    return { success: false, error: error.message };
+  }
+  return { success: true, data };
+}
+
+export async function fetchUserStops(citySlug: string): Promise<UserStop[]> {
+  const { data, error } = await supabase
+    .from('user_stops')
+    .select('*')
+    .eq('city_slug', citySlug)
+    .order('upvotes', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching user stops:', error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function fetchPendingStops(): Promise<UserStop[]> {
+  const { data, error } = await supabase
+    .from('user_stops')
+    .select('*')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching pending stops:', error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function updateStopStatus(stopId: string, status: 'approved' | 'rejected'): Promise<boolean> {
+  const { error } = await supabase
+    .from('user_stops')
+    .update({ status })
+    .eq('id', stopId);
+
+  if (error) {
+    console.error('Error updating stop status:', error);
+    return false;
+  }
+  return true;
+}
+
+export async function deleteUserStop(stopId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('user_stops')
+    .delete()
+    .eq('id', stopId);
+
+  if (error) {
+    console.error('Error deleting user stop:', error);
     return false;
   }
   return true;

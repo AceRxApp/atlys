@@ -1,6 +1,4 @@
 import { useApp } from '../context/AppContext';
-import { useTheme } from '../context/ThemeContext';
-import { getCardStyle } from '../styles/shared';
 import type { EventItem } from '../types';
 
 export default function EventCard({ event }: { event: EventItem }) {
@@ -12,65 +10,70 @@ export default function EventCard({ event }: { event: EventItem }) {
     formatEventDate,
     formatEventTime,
   } = useApp();
-  const { theme } = useTheme();
-  const cardStyle = getCardStyle(theme);
 
   const inPlan = isEventInPlan(event.id);
 
   return (
-    <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+    <div className="card p-0 overflow-hidden">
       {event.imageUrl && (
-        <div style={{
-          height: '140px', width: '100%', position: 'relative',
-          overflow: 'hidden',
-        }}>
-          <img src={event.imageUrl} alt={event.name} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-          <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(to bottom, transparent 50%, ${theme.bg.imageOverlay})` }} />
-          <div style={{
-            position: 'absolute', top: '10px', left: '10px',
-            padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 600,
-            background: theme.purpleTint.bg20, color: theme.events.text, backdropFilter: 'blur(8px)',
-          }}>
+        <div className="h-[140px] w-full relative overflow-hidden">
+          <img
+            src={event.imageUrl}
+            alt={event.name}
+            loading="lazy"
+            decoding="async"
+            className="w-full h-full object-cover block"
+          />
+          <div
+            className="absolute inset-0"
+            style={{ background: `linear-gradient(to bottom, transparent 50%, var(--bg-image-overlay))` }}
+          />
+          <div className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-purple-tint-bg20 text-events-text backdrop-blur-[8px]">
             {event.category}
           </div>
         </div>
       )}
-      <div style={{ padding: '14px 16px' }}>
-        <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>{event.name}</h3>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
-          <span style={{ fontSize: '13px', color: theme.accent.amber, fontWeight: 500 }}>
+      <div className="px-4 py-3.5">
+        <h3 className="text-base font-semibold mb-1.5">{event.name}</h3>
+        <div className="flex items-center gap-2 flex-wrap mb-2">
+          <span className="text-[13px] text-accent-amber font-medium">
             {formatEventDate(event.date)}
           </span>
           {event.time && (
-            <span style={{ fontSize: '12px', color: theme.text.secondary }}>
+            <span className="text-xs text-text-secondary">
               {formatEventTime(event.time)}
             </span>
           )}
         </div>
-        <p style={{ fontSize: '12px', color: theme.text.secondary, marginBottom: '10px' }}>
+        <p className="text-xs text-text-secondary mb-2.5">
           {event.venue}{event.venueAddress ? ` — ${event.venueAddress}` : ''}
         </p>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="flex gap-2">
           <button
-            onClick={() => { if (inPlan) { const stop = Object.values(tripDays).flat().find(s => s.event?.id === event.id); if (stop) removeFromPlan(stop.id); } else { addEventToPlan(event); } }}
-            style={{
-              flex: 1, padding: '12px 16px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
-              cursor: 'pointer', minHeight: '44px',
-              background: inPlan ? 'transparent' : `linear-gradient(135deg, ${theme.events.gradientStart}, ${theme.events.gradientEnd})`,
-              color: inPlan ? theme.events.text : theme.text.primary,
-              border: inPlan ? `1.5px solid ${theme.events.gradientStart}` : 'none',
+            onClick={() => {
+              if (inPlan) {
+                const stop = Object.values(tripDays).flat().find(s => s.event?.id === event.id);
+                if (stop) removeFromPlan(stop.id);
+              } else {
+                addEventToPlan(event);
+              }
             }}
+            className={`flex-1 px-4 py-3 rounded-[10px] text-[13px] font-semibold cursor-pointer min-h-[44px] ${
+              inPlan
+                ? 'bg-transparent text-events-text'
+                : 'bg-events-gradient text-text-primary border-none'
+            }`}
+            style={inPlan ? { border: '1.5px solid var(--events-gradient-start)' } : undefined}
           >
             {inPlan ? '✓ In Plan' : '+ Add to Plan'}
           </button>
           {event.url && (
-            <a href={event.url} target="_blank" rel="noopener noreferrer"
-              style={{
-                flex: 1, padding: '10px', borderRadius: '10px',
-                background: theme.purpleTint.bg08, border: `1px solid ${theme.purpleTint.border20}`,
-                color: theme.events.text, fontSize: '13px', fontWeight: 600,
-                textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box',
-              }}>
+            <a
+              href={event.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 py-2.5 px-2.5 rounded-[10px] bg-purple-tint-bg08 border border-purple-tint-border20 text-events-text text-[13px] font-semibold text-center no-underline box-border"
+            >
               Get Tickets
             </a>
           )}

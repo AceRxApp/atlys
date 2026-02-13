@@ -36,7 +36,13 @@ export interface Stop {
   event?: EventItem;
   type: 'place' | 'event';
   addedAt: Date;
+  timeSlot?: string;
+  reason?: string;
+  estimatedSpend?: number;
 }
+
+export type PlanMood = 'adventurous' | 'chill' | 'cultural' | 'foodie' | 'nightlife';
+export type PlanDuration = 'full' | 'morning' | 'afternoon' | 'evening';
 
 export interface AdminSignup {
   id: string;
@@ -47,6 +53,6 @@ export interface AdminSignup {
 
 export type Screen = 'home' | 'discover' | 'events' | 'plan';
 export type Vibe = 'food' | 'stay' | 'todo' | 'hidden' | 'locals';
-export type QuickFilter = 'open' | 'walking' | 'topRated' | 'budget' | 'family' | 'solo';
+export type QuickFilter = 'open' | 'walking' | 'topRated' | 'budget' | 'family' | 'solo' | 'chainBreaker' | '15min' | 'lateNight' | 'rainyDay' | 'goldenHour';
 export type TravelGroup = 'solo' | 'couple' | 'family' | 'friends' | 'girls' | 'boys' | 'bachelorette';
 export type CommunityTag = 'black-owned' | 'women-owned' | 'hispanic-owned' | 'asian-owned' | 'lgbtq-friendly' | 'kid-friendly' | 'baby-friendly' | 'wheelchair-accessible' | 'solo-friendly';

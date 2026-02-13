@@ -23,16 +23,19 @@ describe('PriceDots', () => {
     const { container } = renderWithTheme(<PriceDots level={2} />);
     const spans = container.querySelectorAll('span span');
     // First 2 should be amber, last 2 dimmed
-    expect(spans[0].style.color).not.toBe(spans[2].style.color);
-    expect(spans[1].style.color).not.toBe(spans[3].style.color);
+    expect(spans[0].className).toContain('text-accent-amber');
+    expect(spans[1].className).toContain('text-accent-amber');
+    expect(spans[2].className).toContain('text-text-disabled');
+    expect(spans[3].className).toContain('text-text-disabled');
   });
 
   it('renders zero highlighted for level 0', () => {
     const { container } = renderWithTheme(<PriceDots level={0} />);
     const spans = container.querySelectorAll('span span');
-    const colors = Array.from(spans).map(s => s.style.color);
-    // All should be the same (dimmed) color
-    expect(new Set(colors).size).toBe(1);
+    // All should be dimmed
+    Array.from(spans).forEach(s => {
+      expect(s.className).toContain('text-text-disabled');
+    });
   });
 });
 

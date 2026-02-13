@@ -63,99 +63,64 @@ export default function SupabaseTest() {
   }, [selectedCity]);
 
   return (
-    <div style={{
-      fontFamily: 'system-ui, sans-serif',
-      maxWidth: '800px',
-      margin: '0 auto',
-      padding: '40px 20px',
-      background: '#0C0A09',
-      minHeight: '100vh',
-      color: '#FFFBEB'
-    }}>
-      <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-        <h1 style={{ fontSize: '32px', fontWeight: 700, marginBottom: '8px' }}>
-          🔌 Supabase Connection Test
+    <div className="font-sans max-w-[800px] mx-auto px-5 py-10 bg-bg-body min-h-screen text-text-primary">
+      <div className="text-center mb-10">
+        <h1 className="text-[32px] font-bold mb-2">
+          {'\u{1F50C}'} Supabase Connection Test
         </h1>
-        <p style={{ color: '#A8A29E', fontSize: '16px' }}>NxStops by Navé</p>
+        <p className="text-text-secondary text-base">NxStops by Nav{'\u00E9'}</p>
       </div>
 
-      <div style={{
-        padding: '20px',
-        borderRadius: '12px',
-        marginBottom: '24px',
-        textAlign: 'center',
-        background: status === 'connected' ? 'rgba(52, 211, 153, 0.15)' :
-                   status === 'error' ? 'rgba(248, 113, 113, 0.15)' :
-                   'rgba(245, 158, 11, 0.15)',
-        border: `1px solid ${status === 'connected' ? 'rgba(52, 211, 153, 0.3)' :
-                            status === 'error' ? 'rgba(248, 113, 113, 0.3)' :
-                            'rgba(245, 158, 11, 0.3)'}`
-      }}>
+      <div className={`p-5 rounded-xl mb-6 text-center border ${
+        status === 'connected' ? 'bg-green-tint-bg border-green-tint-border' :
+        status === 'error' ? 'bg-red-tint-bg border-red-tint-border' :
+        'bg-amber-tint-bg10 border-amber-tint-border20'
+      }`}>
         {status === 'loading' && (
           <>
-            <div style={{ fontSize: '24px', marginBottom: '8px' }}>⏳</div>
+            <div className="text-2xl mb-2">{'\u23F3'}</div>
             <div>Connecting to Supabase...</div>
           </>
         )}
         {status === 'connected' && (
           <>
-            <div style={{ fontSize: '24px', marginBottom: '8px' }}>✅</div>
-            <div style={{ color: '#34D399', fontWeight: 600 }}>Connected Successfully!</div>
+            <div className="text-2xl mb-2">{'\u2705'}</div>
+            <div className="text-status-green font-semibold">Connected Successfully!</div>
           </>
         )}
         {status === 'error' && (
           <>
-            <div style={{ fontSize: '24px', marginBottom: '8px' }}>❌</div>
-            <div style={{ color: '#F87171', fontWeight: 600 }}>Connection Failed</div>
-            <div style={{ color: '#A8A29E', marginTop: '8px', fontSize: '14px' }}>{error}</div>
+            <div className="text-2xl mb-2">{'\u274C'}</div>
+            <div className="text-status-red font-semibold">Connection Failed</div>
+            <div className="text-text-secondary mt-2 text-sm">{error}</div>
           </>
         )}
       </div>
 
       {status === 'connected' && (
         <>
-          <div style={{
-            background: '#1C1917',
-            borderRadius: '12px',
-            padding: '20px',
-            marginBottom: '20px',
-            border: '1px solid rgba(255,255,255,0.06)'
-          }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#F59E0B', marginBottom: '16px' }}>
+          <div className="bg-bg-surface rounded-xl p-5 mb-5 border border-border-subtle">
+            <h3 className="text-sm font-semibold text-accent-amber mb-4">
               DATABASE STATS
             </h3>
-            <div style={{ display: 'flex', gap: '40px', justifyContent: 'center' }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '48px', fontWeight: 700, color: '#F59E0B' }}>{cities.length}</div>
-                <div style={{ color: '#A8A29E' }}>Cities</div>
+            <div className="flex gap-10 justify-center">
+              <div className="text-center">
+                <div className="text-[48px] font-bold text-accent-amber">{cities.length}</div>
+                <div className="text-text-secondary">Cities</div>
               </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '48px', fontWeight: 700, color: '#F59E0B' }}>{places.length}</div>
-                <div style={{ color: '#A8A29E' }}>Places in {selectedCity?.name}</div>
+              <div className="text-center">
+                <div className="text-[48px] font-bold text-accent-amber">{places.length}</div>
+                <div className="text-text-secondary">Places in {selectedCity?.name}</div>
               </div>
             </div>
           </div>
 
-          <div style={{
-            background: '#1C1917',
-            borderRadius: '12px',
-            padding: '20px',
-            marginBottom: '20px',
-            border: '1px solid rgba(255,255,255,0.06)'
-          }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#F59E0B', marginBottom: '16px' }}>
+          <div className="bg-bg-surface rounded-xl p-5 mb-5 border border-border-subtle">
+            <h3 className="text-sm font-semibold text-accent-amber mb-4">
               SELECT A CITY
             </h3>
             <select
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                borderRadius: '8px',
-                border: '1px solid rgba(255,255,255,0.1)',
-                background: '#0C0A09',
-                color: '#FFFBEB',
-                fontSize: '16px'
-              }}
+              className="w-full px-4 py-3 rounded-lg border border-border-strong bg-bg-body text-text-primary text-base"
               value={selectedCity?.id || ''}
               onChange={(e) => {
                 const city = cities.find(c => c.id === e.target.value);
@@ -170,30 +135,20 @@ export default function SupabaseTest() {
             </select>
           </div>
 
-          <div style={{
-            background: '#1C1917',
-            borderRadius: '12px',
-            padding: '20px',
-            border: '1px solid rgba(255,255,255,0.06)'
-          }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#F59E0B', marginBottom: '16px' }}>
+          <div className="bg-bg-surface rounded-xl p-5 border border-border-subtle">
+            <h3 className="text-sm font-semibold text-accent-amber mb-4">
               PLACES IN {selectedCity?.name?.toUpperCase()} ({places.length})
             </h3>
             {places.length === 0 ? (
-              <div style={{ color: '#A8A29E', textAlign: 'center', padding: '20px' }}>
+              <div className="text-text-secondary text-center p-5">
                 No places found for this city.
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div className="flex flex-col gap-3">
                 {places.map(place => (
-                  <div key={place.id} style={{
-                    padding: '16px',
-                    background: '#0C0A09',
-                    borderRadius: '10px',
-                    border: '1px solid rgba(255,255,255,0.06)'
-                  }}>
-                    <div style={{ fontWeight: 600, fontSize: '16px' }}>{place.name}</div>
-                    <div style={{ color: '#A8A29E', fontSize: '14px', marginTop: '4px' }}>
+                  <div key={place.id} className="p-4 bg-bg-body rounded-[10px] border border-border-subtle">
+                    <div className="font-semibold text-base">{place.name}</div>
+                    <div className="text-text-secondary text-sm mt-1">
                       {place.blurb}
                     </div>
                   </div>

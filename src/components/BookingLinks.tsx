@@ -3,8 +3,6 @@ import { BOOKING_SERVICES } from '../data/bookingLinks';
 
 interface Props {
   cityName: string;
-  theme: Record<string, any>;
-  cardStyle: React.CSSProperties;
 }
 
 const CATEGORIES = [
@@ -13,76 +11,58 @@ const CATEGORIES = [
   { key: 'experiences', label: 'Experiences', emoji: '\u{1F3AF}' },
 ] as const;
 
-export default function BookingLinks({ cityName, theme, cardStyle }: Props) {
+export default function BookingLinks({ cityName }: Props) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div style={{
-      ...cardStyle,
-      border: `1px solid ${theme.border.subtle}`,
-      background: theme.bg.surfaceAlpha,
-      padding: 0, overflow: 'hidden',
-    }}>
+    <div className="card p-0 overflow-hidden">
       {/* Header (toggle) */}
       <button
         onClick={() => setExpanded(!expanded)}
-        style={{
-          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '16px 20px', background: 'none', border: 'none', cursor: 'pointer',
-        }}
+        className="w-full flex items-center justify-between px-5 py-4 bg-transparent border-none cursor-pointer"
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '18px' }}>{'\u{1F30D}'}</span>
-          <span style={{ fontSize: '14px', fontWeight: 600, color: theme.text.primary }}>Book Your Trip</span>
+        <div className="flex items-center gap-2.5">
+          <span className="text-lg">{'\u{1F30D}'}</span>
+          <span className="text-sm font-semibold text-text-primary">Book Your Trip</span>
         </div>
-        <span style={{
-          fontSize: '12px', color: theme.text.tertiary,
-          transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
-          transition: 'transform 0.2s',
-        }}>
+        <span
+          className="text-xs text-text-tertiary transition-transform duration-200"
+          style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+        >
           {'\u25BC'}
         </span>
       </button>
 
       {/* Body */}
       {expanded && (
-        <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="px-5 pb-4 flex flex-col gap-4">
           {CATEGORIES.map(cat => {
             const services = BOOKING_SERVICES.filter(s => s.category === cat.key);
             if (services.length === 0) return null;
             return (
               <div key={cat.key}>
-                <div style={{
-                  fontSize: '12px', fontWeight: 600, color: theme.text.tertiary,
-                  marginBottom: '8px', textTransform: 'uppercase' as const, letterSpacing: '0.5px',
-                }}>
+                <div className="section-label">
                   {cat.emoji} {cat.label}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div className="flex flex-col gap-1.5">
                   {services.map(service => (
                     <a
                       key={service.id}
                       href={service.buildUrl(cityName)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '12px',
-                        padding: '12px 14px', borderRadius: '12px',
-                        background: theme.bg.elevated,
-                        border: `1px solid ${theme.border.subtle}`,
-                        textDecoration: 'none', cursor: 'pointer',
-                      }}
+                      className="flex items-center gap-3 px-3.5 py-3 rounded-xl bg-bg-elevated border border-border-subtle no-underline cursor-pointer"
                     >
-                      <span style={{ fontSize: '20px', flexShrink: 0 }}>{service.emoji}</span>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '14px', fontWeight: 500, color: theme.text.primary }}>
+                      <span className="text-xl shrink-0">{service.emoji}</span>
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-text-primary">
                           {service.name}
                         </div>
-                        <div style={{ fontSize: '11px', color: theme.text.tertiary }}>
+                        <div className="text-[11px] text-text-tertiary">
                           {service.description}
                         </div>
                       </div>
-                      <span style={{ color: theme.text.tertiary, fontSize: '16px' }}>{'\u2197'}</span>
+                      <span className="text-text-tertiary text-base">{'\u2197'}</span>
                     </a>
                   ))}
                 </div>
