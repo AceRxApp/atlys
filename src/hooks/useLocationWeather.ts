@@ -126,7 +126,7 @@ export function useLocationWeather(loc: LocState) {
           sunset: data.daily?.sunset?.[0] || undefined,
           forecast,
         });
-      } catch { /* weather is non-critical */ }
+      } catch (err) { console.warn('Weather fetch failed:', err); }
     };
     fetchWeather();
   }, [useGps, loc.lat, loc.lng, selectedCity]);
