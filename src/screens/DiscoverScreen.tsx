@@ -727,10 +727,13 @@ export default function DiscoverScreen() {
         </button>
       )}
 
-      {/* Book Your Trip */}
-      {cityLabel && !placesLoading && (
+      {/* Booking — contextual to current vibe */}
+      {cityLabel && !placesLoading && places.length > 0 && (
         <div className="mt-4">
-          <BookingLinks cityName={cityLabel} />
+          <BookingLinks
+            cityName={cityLabel}
+            category={selectedVibe === 'stay' ? 'hotels' : undefined}
+          />
         </div>
       )}
 

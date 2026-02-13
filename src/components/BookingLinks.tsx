@@ -1,73 +1,77 @@
-import { useState } from 'react';
 import { BOOKING_SERVICES } from '../data/bookingLinks';
 
 interface Props {
   cityName: string;
+  /** Optional: only show one category ('hotels' | 'experiences'). Defaults to all. */
+  category?: 'hotels' | 'experiences';
 }
 
-const CATEGORIES = [
-  { key: 'hotels', label: 'Hotels & Stays', emoji: '\u{1F3E8}' },
-  { key: 'experiences', label: 'Experiences', emoji: '\u{1F3AF}' },
-] as const;
+export default function BookingLinks({ cityName, category }: Props) {
+  const services = category
+    ? BOOKING_SERVICES.filter(s => s.category === category)
+    : BOOKING_SERVICES;
 
-export default function BookingLinks({ cityName }: Props) {
-  const [expanded, setExpanded] = useState(false);
+  if (services.length === 0) return null;
+
+  // Group by category for display
+  const hotels = services.filter(s => s.category === 'hotels');
+  const experiences = services.filter(s => s.category === 'experiences');
 
   return (
-    <div className="card p-0 overflow-hidden">
-      {/* Header (toggle) */}
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-5 py-4 bg-transparent border-none cursor-pointer"
-      >
-        <div className="flex items-center gap-2.5">
-          <span className="text-lg">{'\u{1F30D}'}</span>
-          <span className="text-sm font-semibold text-text-primary">Book Your Trip</span>
+    <div className="flex flex-col gap-3">
+      {/* Hotels & Stays */}
+      {hotels.length > 0 && (
+        <div>
+          <div className="section-label mb-2">{'\u{1F3E8}'} Hotels & Stays</div>
+          <div className="flex gap-2.5 overflow-x-auto pb-1 scroll-hidden">
+            {hotels.map(service => (
+              <a
+                key={service.id}
+                href={service.buildUrl(cityName)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-col items-center gap-2 min-w-[110px] max-w-[130px] shrink-0 py-3.5 px-3 rounded-xl bg-bg-elevated border border-border-subtle no-underline cursor-pointer text-center"
+              >
+                <span className="text-2xl">{service.emoji}</span>
+                <div>
+                  <div className="text-[13px] font-semibold text-text-primary leading-tight">
+                    {service.name}
+                  </div>
+                  <div className="text-[10px] text-text-tertiary mt-0.5 leading-tight">
+                    {service.description}
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
         </div>
-        <span
-          className="text-xs text-text-tertiary transition-transform duration-200"
-          style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
-        >
-          {'\u25BC'}
-        </span>
-      </button>
+      )}
 
-      {/* Body */}
-      {expanded && (
-        <div className="px-5 pb-4 flex flex-col gap-4">
-          {CATEGORIES.map(cat => {
-            const services = BOOKING_SERVICES.filter(s => s.category === cat.key);
-            if (services.length === 0) return null;
-            return (
-              <div key={cat.key}>
-                <div className="section-label">
-                  {cat.emoji} {cat.label}
+      {/* Experiences */}
+      {experiences.length > 0 && (
+        <div>
+          <div className="section-label mb-2">{'\u{1F3AF}'} Experiences & Tours</div>
+          <div className="flex gap-2.5 overflow-x-auto pb-1 scroll-hidden">
+            {experiences.map(service => (
+              <a
+                key={service.id}
+                href={service.buildUrl(cityName)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-col items-center gap-2 min-w-[110px] max-w-[130px] shrink-0 py-3.5 px-3 rounded-xl bg-bg-elevated border border-border-subtle no-underline cursor-pointer text-center"
+              >
+                <span className="text-2xl">{service.emoji}</span>
+                <div>
+                  <div className="text-[13px] font-semibold text-text-primary leading-tight">
+                    {service.name}
+                  </div>
+                  <div className="text-[10px] text-text-tertiary mt-0.5 leading-tight">
+                    {service.description}
+                  </div>
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  {services.map(service => (
-                    <a
-                      key={service.id}
-                      href={service.buildUrl(cityName)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-3 px-3.5 py-3 rounded-xl bg-bg-elevated border border-border-subtle no-underline cursor-pointer"
-                    >
-                      <span className="text-xl shrink-0">{service.emoji}</span>
-                      <div className="flex-1">
-                        <div className="text-sm font-medium text-text-primary">
-                          {service.name}
-                        </div>
-                        <div className="text-[11px] text-text-tertiary">
-                          {service.description}
-                        </div>
-                      </div>
-                      <span className="text-text-tertiary text-base">{'\u2197'}</span>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+              </a>
+            ))}
+          </div>
         </div>
       )}
     </div>

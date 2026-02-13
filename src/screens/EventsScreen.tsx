@@ -260,10 +260,10 @@ export default function EventsScreen() {
         </div>
       )}
 
-      {/* Book Your Trip */}
-      {cityLabel && (
+      {/* Book Experiences */}
+      {cityLabel && !eventsLoading && filteredEvents.length > 0 && (
         <div className="mt-4">
-          <BookingLinks cityName={cityLabel} />
+          <BookingLinks cityName={cityLabel} category="experiences" />
         </div>
       )}
     </div>

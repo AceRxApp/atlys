@@ -231,6 +231,58 @@ function CitySearch({ cities, selectedCity, loading, onSelect }: CitySearchProps
 }
 
 // ============================================================================
+// Planner City Picker — lightweight inline search for the Plan My Day modal
+// ============================================================================
+
+function PlannerCityPicker({
+  cities,
+  onSelect,
+}: {
+  cities: { id: string; name: string; country: string; region: string }[];
+  onSelect: (city: { id: string; name: string; country: string; region: string }) => void;
+}) {
+  const [q, setQ] = useState('');
+  const norm = q.toLowerCase().trim();
+  const matches = norm.length === 0
+    ? cities.slice(0, 20)
+    : cities.filter(c =>
+        c.name.toLowerCase().includes(norm) ||
+        c.country.toLowerCase().includes(norm)
+      ).slice(0, 20);
+
+  return (
+    <div>
+      <input
+        type="text"
+        placeholder="Type a city name..."
+        value={q}
+        onChange={e => setQ(e.target.value)}
+        className="input-field w-full mb-2"
+      />
+      <div className="max-h-[200px] overflow-y-auto rounded-xl border border-border-medium">
+        {matches.map(city => (
+          <button
+            key={city.id}
+            onClick={() => onSelect(city)}
+            className="w-full flex items-center gap-2.5 py-2.5 px-3.5 border-none bg-transparent cursor-pointer text-left hover:bg-amber-tint-bg06"
+          >
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-text-primary truncate">{city.name}</div>
+              <div className="text-[11px] text-text-tertiary">{city.country}</div>
+            </div>
+          </button>
+        ))}
+        {matches.length === 0 && (
+          <div className="p-4 text-center text-text-tertiary text-[13px]">
+            No cities found
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // Home Screen
 // ============================================================================
 
@@ -267,6 +319,7 @@ export default function HomeScreen() {
   const [planBudget, setPlanBudget] = useState(100);
   const [planDuration, setPlanDuration] = useState<PlanDuration>('full');
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
+  const [planStep, setPlanStep] = useState<'city' | 'options'>('options');
 
   // Reset banner state when city changes
   useEffect(() => { setBannerFailed(false); }, [selectedCity?.id]);
@@ -363,10 +416,14 @@ export default function HomeScreen() {
         );
       })()}
 
-      {/* Plan My Day — Primary CTA (moved to top) */}
-      {(selectedCity || useGps) && !autoPlanLoading && (
+      {/* Plan My Day — Primary CTA (always visible) */}
+      {!autoPlanLoading && (
         <button
-          onClick={() => setShowPlanner(true)}
+          onClick={() => {
+            // If no city/GPS, start on city step; otherwise skip straight to options
+            setPlanStep((selectedCity || useGps) ? 'options' : 'city');
+            setShowPlanner(true);
+          }}
           className="w-full mt-1 mb-2 p-4 rounded-[16px] border-none cursor-pointer text-left flex items-center gap-4 shadow-[0_4px_24px_var(--amber-tint-shadow)]"
           style={{ background: `linear-gradient(135deg, var(--accent-amber), #D97706)` }}
         >
@@ -589,7 +646,7 @@ export default function HomeScreen() {
         >
           <div
             onClick={e => e.stopPropagation()}
-            className="w-full max-w-[440px] bg-bg-surface rounded-t-[24px] pt-6 px-5 pb-10 animate-[slideUp_0.3s_ease-out]"
+            className="w-full max-w-[440px] bg-bg-surface rounded-t-[24px] pt-6 px-5 pb-10 animate-[slideUp_0.3s_ease-out] max-h-[90vh] overflow-y-auto"
           >
             {/* Handle */}
             <div className="w-10 h-1 rounded-sm bg-border-strong mx-auto mb-5" />
@@ -598,85 +655,150 @@ export default function HomeScreen() {
             <div className="text-center mb-5">
               <div className="text-3xl mb-1">{'\u2728'}</div>
               <h3 className="text-xl font-bold text-text-primary mb-1">Plan My Day</h3>
-              <p className="text-[13px] text-text-secondary">Answer a few questions and we'll build your perfect itinerary</p>
+              <p className="text-[13px] text-text-secondary">
+                {planStep === 'city'
+                  ? 'First, pick a city so we know where to plan'
+                  : 'Answer a few questions and we\'ll build your perfect itinerary'}
+              </p>
             </div>
 
-            {/* Mood Picker (pick up to 2) */}
-            <div className="mb-5">
-              <label className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.06em] block mb-2">What's the vibe? <span className="text-text-tertiary font-normal">(pick up to 2)</span></label>
-              <div className="flex flex-wrap gap-2">
-                {PLAN_MOODS.map(m => {
-                  const selected = planMoods.includes(m.id);
-                  return (
-                    <button key={m.id}
-                      onClick={() => togglePlanMood(m.id)}
-                      className={`py-2 px-3.5 rounded-[20px] text-[13px] font-medium cursor-pointer ${
-                        selected
-                          ? 'border-2 border-accent-amber bg-amber-tint-bg15 text-accent-amber'
-                          : 'border border-border-medium bg-transparent text-text-secondary'
-                      }`}>
-                      {m.emoji} {m.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Duration Picker */}
-            <div className="mb-5">
-              <label className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.06em] block mb-2">How long?</label>
-              <div className="grid grid-cols-4 gap-2">
-                {PLAN_DURATIONS.map(d => (
-                  <button key={d.id}
-                    onClick={() => setPlanDuration(d.id)}
-                    className={`py-2.5 px-2 rounded-xl text-center cursor-pointer ${
-                      planDuration === d.id
-                        ? 'border-2 border-accent-amber bg-amber-tint-bg15'
-                        : 'border border-border-medium bg-transparent'
-                    }`}>
-                    <div className="text-lg mb-0.5">{d.emoji}</div>
-                    <div className={`text-[11px] font-semibold ${planDuration === d.id ? 'text-accent-amber' : 'text-text-primary'}`}>{d.label}</div>
-                    <div className="text-[10px] text-text-tertiary">{d.desc}</div>
+            {/* Step: City Selection */}
+            {planStep === 'city' && (
+              <>
+                {/* GPS option */}
+                {loc.hasLocation && (
+                  <button
+                    onClick={() => { setUseGps(true); setSelectedCity(null); setPlanStep('options'); }}
+                    className="w-full flex items-center gap-3.5 p-4 rounded-xl mb-3 cursor-pointer border border-border-medium bg-bg-elevated"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-accent-gradient flex items-center justify-center shrink-0">
+                      <LocationIcon />
+                    </div>
+                    <div className="text-left flex-1">
+                      <div className="text-[14px] font-semibold text-text-primary">{loc.city || 'Use My Location'}</div>
+                      <div className="text-[11px] text-text-tertiary">Use GPS for nearby spots</div>
+                    </div>
                   </button>
-                ))}
-              </div>
-            </div>
+                )}
 
-            {/* Budget Picker */}
-            <div className="mb-6">
-              <label className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.06em] block mb-2">Budget</label>
-              <div className="flex gap-2">
-                {PLAN_BUDGETS.map(b => (
-                  <button key={b.value}
-                    onClick={() => setPlanBudget(b.value)}
-                    className={`flex-1 py-2.5 rounded-xl text-center cursor-pointer ${
-                      planBudget === b.value
-                        ? 'border-2 border-accent-amber bg-amber-tint-bg15'
-                        : 'border border-border-medium bg-transparent'
-                    }`}>
-                    <div className="text-base mb-0.5">{b.emoji}</div>
-                    <div className={`text-[12px] font-semibold ${planBudget === b.value ? 'text-accent-amber' : 'text-text-primary'}`}>{b.label}</div>
+                {/* Mini city search */}
+                <label className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.06em] block mb-2">
+                  Or search a city
+                </label>
+                <PlannerCityPicker
+                  cities={cities}
+                  onSelect={(city) => {
+                    setSelectedCity(city);
+                    setUseGps(false);
+                    setPlanStep('options');
+                  }}
+                />
+
+                {/* Cancel */}
+                <button
+                  onClick={() => setShowPlanner(false)}
+                  className="w-full mt-4 p-3 bg-transparent border-none text-text-tertiary text-sm cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </>
+            )}
+
+            {/* Step: Options (mood, duration, budget) */}
+            {planStep === 'options' && (
+              <>
+                {/* City indicator */}
+                <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-xl bg-amber-tint-bg06 border border-amber-tint-border15">
+                  <span className="text-sm">{'\u{1F4CD}'}</span>
+                  <span className="text-[13px] text-text-primary font-medium flex-1">
+                    {useGps ? (loc.city || 'Your Location') : selectedCity?.name || 'Unknown'}
+                  </span>
+                  <button
+                    onClick={() => setPlanStep('city')}
+                    className="bg-none border-none text-accent-amber text-xs font-semibold cursor-pointer"
+                  >
+                    Change
                   </button>
-                ))}
-              </div>
-            </div>
+                </div>
 
-            {/* Generate Button */}
-            <button
-              onClick={handlePlanMyDay}
-              className="w-full p-4 rounded-[14px] border-none cursor-pointer text-base font-bold shadow-[0_4px_20px_var(--amber-tint-shadow)]"
-              style={{ background: `linear-gradient(135deg, var(--accent-amber), #D97706)`, color: '#0C0A09' }}
-            >
-              {'\u2728'} Generate My Day
-            </button>
+                {/* Mood Picker (pick up to 2) */}
+                <div className="mb-5">
+                  <label className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.06em] block mb-2">What's the vibe? <span className="text-text-tertiary font-normal">(pick up to 2)</span></label>
+                  <div className="flex flex-wrap gap-2">
+                    {PLAN_MOODS.map(m => {
+                      const selected = planMoods.includes(m.id);
+                      return (
+                        <button key={m.id}
+                          onClick={() => togglePlanMood(m.id)}
+                          className={`py-2 px-3.5 rounded-[20px] text-[13px] font-medium cursor-pointer ${
+                            selected
+                              ? 'border-2 border-accent-amber bg-amber-tint-bg15 text-accent-amber'
+                              : 'border border-border-medium bg-transparent text-text-secondary'
+                          }`}>
+                          {m.emoji} {m.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
-            {/* Cancel */}
-            <button
-              onClick={() => setShowPlanner(false)}
-              className="w-full mt-2 p-3 bg-transparent border-none text-text-tertiary text-sm cursor-pointer"
-            >
-              Cancel
-            </button>
+                {/* Duration Picker */}
+                <div className="mb-5">
+                  <label className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.06em] block mb-2">How long?</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {PLAN_DURATIONS.map(d => (
+                      <button key={d.id}
+                        onClick={() => setPlanDuration(d.id)}
+                        className={`py-2.5 px-2 rounded-xl text-center cursor-pointer ${
+                          planDuration === d.id
+                            ? 'border-2 border-accent-amber bg-amber-tint-bg15'
+                            : 'border border-border-medium bg-transparent'
+                        }`}>
+                        <div className="text-lg mb-0.5">{d.emoji}</div>
+                        <div className={`text-[11px] font-semibold ${planDuration === d.id ? 'text-accent-amber' : 'text-text-primary'}`}>{d.label}</div>
+                        <div className="text-[10px] text-text-tertiary">{d.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Budget Picker */}
+                <div className="mb-6">
+                  <label className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.06em] block mb-2">Budget</label>
+                  <div className="flex gap-2">
+                    {PLAN_BUDGETS.map(b => (
+                      <button key={b.value}
+                        onClick={() => setPlanBudget(b.value)}
+                        className={`flex-1 py-2.5 rounded-xl text-center cursor-pointer ${
+                          planBudget === b.value
+                            ? 'border-2 border-accent-amber bg-amber-tint-bg15'
+                            : 'border border-border-medium bg-transparent'
+                        }`}>
+                        <div className="text-base mb-0.5">{b.emoji}</div>
+                        <div className={`text-[12px] font-semibold ${planBudget === b.value ? 'text-accent-amber' : 'text-text-primary'}`}>{b.label}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Generate Button */}
+                <button
+                  onClick={handlePlanMyDay}
+                  className="w-full p-4 rounded-[14px] border-none cursor-pointer text-base font-bold shadow-[0_4px_20px_var(--amber-tint-shadow)]"
+                  style={{ background: `linear-gradient(135deg, var(--accent-amber), #D97706)`, color: '#0C0A09' }}
+                >
+                  {'\u2728'} Generate My Day
+                </button>
+
+                {/* Cancel */}
+                <button
+                  onClick={() => setShowPlanner(false)}
+                  className="w-full mt-2 p-3 bg-transparent border-none text-text-tertiary text-sm cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
