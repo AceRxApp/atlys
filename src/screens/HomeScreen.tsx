@@ -14,6 +14,10 @@ const PLAN_MOODS: { id: PlanMood; emoji: string; label: string }[] = [
   { id: 'cultural', emoji: '\u{1F3DB}\u{FE0F}', label: 'Cultural' },
   { id: 'foodie', emoji: '\u{1F37D}\u{FE0F}', label: 'Foodie' },
   { id: 'nightlife', emoji: '\u{1F378}', label: 'Nightlife' },
+  { id: 'eat', emoji: '\u{1F374}', label: 'Place to Eat' },
+  { id: 'sleep', emoji: '\u{1F6CF}\u{FE0F}', label: 'Place to Sleep' },
+  { id: 'adventure', emoji: '\u{1F3D4}\u{FE0F}', label: 'Adventure' },
+  { id: 'event', emoji: '\u{1F3AB}', label: 'Event' },
 ];
 
 const PLAN_DURATIONS: { id: PlanDuration; emoji: string; label: string; desc: string }[] = [
@@ -319,7 +323,7 @@ export default function HomeScreen() {
   const [planBudget, setPlanBudget] = useState(100);
   const [planDuration, setPlanDuration] = useState<PlanDuration>('full');
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
-  const [planStep, setPlanStep] = useState<'city' | 'options'>('options');
+  const [planStep, setPlanStep] = useState<'city' | 'options' | 'loading'>('options');
 
   // Reset banner state when city changes
   useEffect(() => { setBannerFailed(false); }, [selectedCity?.id]);
@@ -346,9 +350,10 @@ export default function HomeScreen() {
   };
 
   const handlePlanMyDay = async () => {
-    setShowPlanner(false);
+    setPlanStep('loading');
     const moodStr = planMoods.join(' + ');
     await planMyDay(moodStr, planBudget, planDuration);
+    setShowPlanner(false);
     setScreen('plan');
   };
 
@@ -417,38 +422,23 @@ export default function HomeScreen() {
       })()}
 
       {/* Plan My Day — Primary CTA (always visible) */}
-      {!autoPlanLoading && (
-        <button
-          onClick={() => {
-            // If no city/GPS, start on city step; otherwise skip straight to options
-            setPlanStep((selectedCity || useGps) ? 'options' : 'city');
-            setShowPlanner(true);
-          }}
-          className="w-full mt-1 mb-2 p-4 rounded-[16px] border-none cursor-pointer text-left flex items-center gap-4 shadow-[0_4px_24px_var(--amber-tint-shadow)]"
-          style={{ background: `linear-gradient(135deg, var(--accent-amber), #D97706)` }}
-        >
-          <div className="w-12 h-12 rounded-2xl bg-[rgba(0,0,0,0.15)] flex items-center justify-center shrink-0 text-2xl">
-            {'\u2728'}
-          </div>
-          <div className="flex-1">
-            <div className="text-[17px] font-bold text-[#0C0A09]">Plan My Day</div>
-            <div className="text-[12px] text-[#0C0A09] opacity-70">AI builds your perfect itinerary</div>
-          </div>
-          <div className="text-[#0C0A09] text-xl font-bold">{'\u2192'}</div>
-        </button>
-      )}
-
-      {/* AI Generating State */}
-      {autoPlanLoading && (
-        <div className="card mt-1 mb-2 py-8 text-center border border-amber-tint-border20"
-          style={{ background: `linear-gradient(135deg, var(--amber-tint-bg10), var(--bg-subtle))` }}>
-          <div className="w-10 h-[3px] rounded-sm mx-auto mb-4 animate-shimmer"
-            style={{ background: `linear-gradient(90deg, var(--amber-tint-border30) 25%, var(--accent-amber) 50%, var(--amber-tint-border30) 75%)`, backgroundSize: '200% 100%' }} />
-          <div className="text-2xl mb-2">{'\u2728'}</div>
-          <div className="text-sm font-semibold text-text-primary mb-1">Planning your day...</div>
-          <div className="text-xs text-text-tertiary">{LOADING_MESSAGES[loadingMsgIdx]}</div>
+      <button
+        onClick={() => {
+          setPlanStep((selectedCity || useGps) ? 'options' : 'city');
+          setShowPlanner(true);
+        }}
+        className="w-full mt-1 mb-2 p-4 rounded-[16px] border-none cursor-pointer text-left flex items-center gap-4 shadow-[0_4px_24px_var(--amber-tint-shadow)]"
+        style={{ background: `linear-gradient(135deg, var(--accent-amber), #D97706)` }}
+      >
+        <div className="w-12 h-12 rounded-2xl bg-[rgba(0,0,0,0.15)] flex items-center justify-center shrink-0 text-2xl">
+          {'\u2728'}
         </div>
-      )}
+        <div className="flex-1">
+          <div className="text-[17px] font-bold text-[#0C0A09]">Plan My Day</div>
+          <div className="text-[12px] text-[#0C0A09] opacity-70">AI builds your perfect itinerary</div>
+        </div>
+        <div className="text-[#0C0A09] text-xl font-bold">{'\u2192'}</div>
+      </button>
 
       {/* Currency Converter */}
       {(selectedCity || (useGps && loc.city)) && (
@@ -594,7 +584,7 @@ export default function HomeScreen() {
       })()}
 
       {/* Quick Actions */}
-      {(selectedCity || useGps) && !autoPlanLoading && (
+      {(selectedCity || useGps) && (
         <>
           <div className="flex gap-2.5 mt-2.5">
             <button
@@ -642,7 +632,7 @@ export default function HomeScreen() {
       {showPlanner && (
         <div
           className="fixed inset-0 bg-[rgba(0,0,0,0.6)] backdrop-blur-[8px] z-[1000] flex items-end justify-center"
-          onClick={() => setShowPlanner(false)}
+          onClick={() => { if (planStep !== 'loading') setShowPlanner(false); }}
         >
           <div
             onClick={e => e.stopPropagation()}
@@ -658,6 +648,8 @@ export default function HomeScreen() {
               <p className="text-[13px] text-text-secondary">
                 {planStep === 'city'
                   ? 'First, pick a city so we know where to plan'
+                  : planStep === 'loading'
+                  ? 'Hang tight, we\'re building your day...'
                   : 'Answer a few questions and we\'ll build your perfect itinerary'}
               </p>
             </div>
@@ -798,6 +790,17 @@ export default function HomeScreen() {
                   Cancel
                 </button>
               </>
+            )}
+
+            {/* Step: Loading */}
+            {planStep === 'loading' && (
+              <div className="py-8 text-center">
+                <div className="w-10 h-[3px] rounded-sm mx-auto mb-6 animate-shimmer"
+                  style={{ background: `linear-gradient(90deg, var(--amber-tint-border30) 25%, var(--accent-amber) 50%, var(--amber-tint-border30) 75%)`, backgroundSize: '200% 100%' }} />
+                <div className="text-4xl mb-3">{'\u2728'}</div>
+                <div className="text-base font-semibold text-text-primary mb-2">Planning your day...</div>
+                <div className="text-[13px] text-text-tertiary">{LOADING_MESSAGES[loadingMsgIdx]}</div>
+              </div>
             )}
           </div>
         </div>
