@@ -1,6 +1,9 @@
 // Shared CORS + rate limiting utilities for all API routes
+// NOTE: No imports here — @vercel/node in devDeps causes FUNCTION_INVOCATION_FAILED
 
-import type { VercelResponse } from '@vercel/node';
+interface ServerResponse {
+  setHeader(name: string, value: string): void;
+}
 
 export const ALLOWED_ORIGINS = [
   'https://nxstops.com',
@@ -15,7 +18,7 @@ export const ALLOWED_ORIGINS = [
  * Set CORS headers. Returns false if origin is not allowed (reject the request).
  */
 export function setCorsHeaders(
-  res: VercelResponse,
+  res: ServerResponse,
   origin: string | undefined,
   methods: string = 'GET, OPTIONS',
 ): boolean {
