@@ -561,7 +561,9 @@ export function useTripPlan(deps: {
       // Set as Day 1 (clear existing plan)
       setTripDays({ 1: stops });
       setActiveDay(1);
-      if (budget > 0) setDayBudget(1, budget);
+      // Map budget tier to approximate dollar amount for budget tracking
+      const budgetDollarMap: Record<number, number> = { 1: 50, 2: 100, 3: 200 };
+      if (budget > 0 && budgetDollarMap[budget]) setDayBudget(1, budgetDollarMap[budget]);
       setLastPlanTitle(result.dayTitle);
 
       // Record in preference memory

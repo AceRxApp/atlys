@@ -267,10 +267,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // 4. Build AI prompt
-    const budgetLabel = !budget || budget === -1 ? 'unlimited' : `$${budget}`;
+    const budgetMap: Record<number, string> = { 1: 'budget ($)', 2: 'moderate ($$)', 3: 'splurge ($$$)' };
+    const budgetLabel = !budget || budget === -1 ? 'unlimited' : budgetMap[budget] || 'moderate ($$)';
     const durationLabel = duration || 'full day';
+    const isFullDay = durationLabel === 'full day' || durationLabel === 'full';
     const now = new Date();
     const timeLabel = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    const structureRule = isFullDay
+      ? 'Pick exactly 6 stops in this order: breakfast/coffee → activity → lunch/brunch → adventure/attraction → dinner → nightlife/bar. Each stop must fill one of these slots.'
+      : 'Pick 3 stops appropriate for the time of day, alternating food and activities.';
 
     const prompt = `Create a ${durationLabel} itinerary from ONLY the numbered places below.
 
@@ -278,19 +284,19 @@ CONTEXT:
 - City: ${city || 'nearby area'}
 - Current time: ${timeLabel}
 - Mood: ${mood || 'adventurous'}
-- Budget: ${budgetLabel} total
+- Budget: ${budgetLabel}
 - Group: ${travelGroup || 'solo'}${weather ? `\n- Weather: ${weather}` : ''}${preferences ? `\n- User preferences: ${preferences}` : ''}
 
 PLACES (pick from these only, reference by idx):
 ${JSON.stringify(condensed)}${eventsSection}
 
 RULES:
-1. Pick ${durationLabel === 'full day' || durationLabel === 'full' ? '5-7' : '3-4'} stops
-2. Alternate categories: food → activity → food (never 2 restaurants in a row)
+1. ${structureRule}
+2. Never pick 2 restaurants in a row
 3. Time-logical: breakfast/coffee first, activities mid-day, dinner/nightlife last
 4. Prefer open places and 4.0+ ratings
-5. Stay within ${budgetLabel} budget
-6. Mood: adventurous=unique/offbeat, chill=cafes/parks, cultural=museums/galleries, foodie=diverse cuisines, nightlife=bars/clubs
+5. Match the ${budgetLabel} budget level
+6. Mood: adventurous=unique/offbeat, chill=cafes/parks/relaxed, cultural=museums/galleries/landmarks, foodie=diverse cuisines/best-rated food, nightlife=bars/clubs/late-night, romantic=intimate/scenic/special ambiance
 7. Group: family=no nightlife, couple=romantic, solo=flexible, girls=aesthetic/brunch, boys=casual, bachelorette=festive
 8. Keep stops close together for walkability${eventsSection ? '\n9. Include at most 1 event if it fits the mood/timing' : ''}
 
