@@ -2,7 +2,7 @@
 // Aggregates events from Ticketmaster + SeatGeek + PredictHQ
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { setCorsHeaders, checkRateLimit, getClientIp } from './_cors';
+import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors';
 
 const TICKETMASTER_API_KEY = process.env.TICKETMASTER_API_KEY || '';
 const SEATGEEK_CLIENT_ID = process.env.SEATGEEK_CLIENT_ID || '';

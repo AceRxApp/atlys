@@ -2,7 +2,7 @@
 // Uses Groq AI + Google Places to generate personalized day itineraries
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { setCorsHeaders, checkRateLimit, getClientIp } from './_cors';
+import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors';
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const GOOGLE_API_KEY = process.env.GOOGLE_PLACES_API_KEY || '';

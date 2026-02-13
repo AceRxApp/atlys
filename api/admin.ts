@@ -3,7 +3,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
-import { setCorsHeaders, checkRateLimit, getClientIp } from './_cors';
+import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
