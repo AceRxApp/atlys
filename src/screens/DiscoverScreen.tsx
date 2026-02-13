@@ -5,7 +5,6 @@ import { VIBES, QUICK_FILTERS, SMART_FILTERS, COMMUNITY_TAGS, NIGHTLIFE_TYPES } 
 import { formatDistance, isChain } from '../services/places';
 import { SkeletonCard } from '../components/ui';
 import PlaceCard from '../components/PlaceCard';
-import BookingLinks from '../components/BookingLinks';
 import { APIProvider, Map, Marker, InfoWindow } from '@vis.gl/react-google-maps';
 import type { Place } from '../services/places';
 
@@ -725,16 +724,6 @@ export default function DiscoverScreen() {
         >
           {'\u{1F4CC}'}
         </button>
-      )}
-
-      {/* Booking — contextual to current vibe */}
-      {cityLabel && !placesLoading && places.length > 0 && (
-        <div className="mt-4">
-          <BookingLinks
-            cityName={cityLabel}
-            category={selectedVibe === 'stay' ? 'hotels' : undefined}
-          />
-        </div>
       )}
 
       {/* Pin a Stop Modal */}

@@ -5,7 +5,6 @@ import { TRAVEL_GROUPS, CITY_CULTURE } from '../data';
 import type { CityContext } from '../data';
 import type { PlanMood, PlanDuration } from '../types';
 import CurrencyWidget from '../components/CurrencyWidget';
-import BookingLinks from '../components/BookingLinks';
 import { getSunsetGuardian, isNightTime, getNightSafetyTips } from '../utils/safetyEngine';
 
 const PLAN_MOODS: { id: PlanMood; emoji: string; label: string }[] = [
@@ -771,13 +770,6 @@ export default function HomeScreen() {
             </button>
           </div>
         </>
-      )}
-
-      {/* Book Your Trip */}
-      {(selectedCity || useGps) && (
-        <div className="mt-3">
-          <BookingLinks cityName={cityLabel} />
-        </div>
       )}
 
       {/* Saved Places */}
