@@ -4,7 +4,7 @@
     "target": {
       "namespace": "android_app",
       "package_name": "com.nave.nxstops",
-      "sha256_cert_fingerprints": ["TODO:ADD_YOUR_SHA256_FINGERPRINT"]
+      "sha256_cert_fingerprints": ["C0:D2:29:4D:60:78:D9:EA:3C:67:5D:09:CA:30:F0:EA:66:D5:D5:E1:9C:B7:16:83:3C:37:EA:E5:27:F4:17:EF"]
     }
   }
 ]
