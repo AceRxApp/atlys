@@ -133,14 +133,42 @@ export async function authResetPassword(email: string) {
   return { error };
 }
 
-export async function uploadAvatar(userId: string, file: File): Promise<{ url: string | null; error: string | null }> {
-  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-  const path = `${userId}/avatar.${ext}`;
+async function compressImage(file: File, maxSize = 512, quality = 0.8): Promise<File> {
+  if (file.size <= 100_000) return file;
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let { width, height } = img;
+      if (width > maxSize || height > maxSize) {
+        const ratio = Math.min(maxSize / width, maxSize / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { resolve(file); return; }
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => resolve(blob ? new File([blob], file.name, { type: 'image/jpeg' }) : file),
+        'image/jpeg',
+        quality,
+      );
+    };
+    img.onerror = () => resolve(file);
+    img.src = URL.createObjectURL(file);
+  });
+}
 
-  // Upload to Supabase Storage (overwrites if exists)
+export async function uploadAvatar(userId: string, file: File): Promise<{ url: string | null; error: string | null }> {
+  const compressed = await compressImage(file);
+  const path = `${userId}/avatar.jpg`;
+
+  // Upload compressed image to Supabase Storage (overwrites if exists)
   const { error: uploadError } = await supabase.storage
     .from('avatars')
-    .upload(path, file, { upsert: true, contentType: file.type });
+    .upload(path, compressed, { upsert: true, contentType: 'image/jpeg' });
 
   if (uploadError) {
     console.error('Avatar upload error:', uploadError);

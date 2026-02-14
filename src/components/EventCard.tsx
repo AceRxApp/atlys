@@ -75,6 +75,7 @@ export default function EventCard({ event }: { event: EventItem }) {
                 addEventToPlan(event);
               }
             }}
+            aria-label={inPlan ? `Remove ${event.name} from plan` : `Add ${event.name} to plan`}
             className={`flex-1 px-4 py-3 rounded-[10px] text-[13px] font-semibold cursor-pointer min-h-[44px] ${
               inPlan
                 ? 'bg-transparent text-events-text'
@@ -89,6 +90,7 @@ export default function EventCard({ event }: { event: EventItem }) {
               href={event.url}
               target="_blank"
               rel="noopener noreferrer"
+              aria-label={`Get tickets for ${event.name}`}
               className="flex-1 py-2.5 px-2.5 rounded-[10px] bg-purple-tint-bg08 border border-purple-tint-border20 text-events-text text-[13px] font-semibold text-center no-underline box-border"
             >
               Get Tickets

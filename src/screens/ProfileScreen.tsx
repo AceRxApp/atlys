@@ -437,6 +437,8 @@ export default function ProfileScreen() {
                   <button
                     key={key}
                     onClick={() => setThemePreference(key)}
+                    aria-label={`Set theme to ${label}`}
+                    aria-pressed={isActive}
                     className={`flex-1 flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl cursor-pointer ${
                       isActive
                         ? 'bg-amber-tint-bg15 border-[1.5px] border-accent-amber text-accent-amber'
@@ -451,6 +453,8 @@ export default function ProfileScreen() {
             </div>
             <button
               onClick={() => setThemePreference('auto')}
+              aria-label="Set theme to auto, changes with time of day"
+              aria-pressed={themePreference === 'auto'}
               className={`w-full py-2.5 rounded-[10px] cursor-pointer text-xs flex items-center justify-center gap-1.5 ${
                 themePreference === 'auto'
                   ? 'bg-amber-tint-bg15 border-[1.5px] border-accent-amber text-accent-amber font-semibold'

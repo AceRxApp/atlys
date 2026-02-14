@@ -623,6 +623,8 @@ export default function PlanScreen() {
                             const pid = stop.place?.placeId || stop.event?.id || '';
                             rateStop(stop.id, pid, 'up');
                           }}
+                          aria-label={`Rate ${getStopName(stop)} thumbs up`}
+                          aria-pressed={getRating(stop.id) === 'up'}
                           className={`py-[5px] px-2.5 rounded-lg text-[11px] cursor-pointer flex items-center gap-1 border ${
                             getRating(stop.id) === 'up'
                               ? 'bg-green-tint-bg border-green-tint-border text-status-green'
@@ -637,6 +639,8 @@ export default function PlanScreen() {
                             rateStop(stop.id, pid, 'down');
                             if (getRating(stop.id) !== 'down') showToast('Tap Pivot to swap this stop');
                           }}
+                          aria-label={`Rate ${getStopName(stop)} thumbs down`}
+                          aria-pressed={getRating(stop.id) === 'down'}
                           className={`py-[5px] px-2.5 rounded-lg text-[11px] cursor-pointer flex items-center gap-1 border ${
                             getRating(stop.id) === 'down'
                               ? 'bg-red-tint-bg border-red-tint-border text-status-red'
@@ -918,6 +922,7 @@ export default function PlanScreen() {
           <button
             onClick={saveForOffline}
             disabled={offlineSaving || offlineSaved}
+            aria-label={offlineSaved ? 'Plan saved for offline use' : 'Save plan for offline use'}
             className={`flex items-center justify-center gap-2 rounded-[14px] p-3.5 text-sm font-medium cursor-pointer border ${
               offlineSaved
                 ? 'bg-green-tint-bg border-green-tint-border text-status-green'
@@ -933,15 +938,18 @@ export default function PlanScreen() {
         {/* Share buttons */}
         <div className="flex gap-2.5">
           <button onClick={() => { if (!requireAuth()) return; shareAsLink(); }}
+            aria-label="Share plan as link"
             className="flex-1 flex items-center justify-center gap-2 bg-accent-gradient text-text-on-accent border-none rounded-[14px] p-3.5 text-[15px] font-semibold cursor-pointer shadow-[0_4px_20px_var(--amber-tint-shadow)]">
             <ShareIcon /> Share Link
           </button>
           <button onClick={sharePlan}
+            aria-label="Share plan via text message"
             className="flex items-center justify-center gap-1.5 p-3.5 px-5 rounded-[14px] cursor-pointer border border-border-medium bg-bg-subtle-strong text-text-primary text-sm font-medium shrink-0">
             Text
           </button>
           {dayPlan.length > 0 && (
             <button onClick={() => { if (!requireAuth()) return; exportDayAsImage(dayPlan, activeDay, cityLabel); }}
+              aria-label="Export day as image"
               className="flex items-center justify-center gap-1.5 p-3.5 px-5 rounded-[14px] cursor-pointer border border-border-medium bg-bg-subtle-strong text-text-primary text-sm font-medium shrink-0">
               📸
             </button>
@@ -950,12 +958,14 @@ export default function PlanScreen() {
 
         {dayCount > 1 && (
           <button onClick={() => removeDay(activeDay)}
+            aria-label={`Delete day ${activeDay} from trip`}
             className="bg-transparent border border-red-tint-border-strong text-status-red text-[13px] cursor-pointer p-2.5 rounded-[10px]">
             Delete Day {activeDay}
           </button>
         )}
 
         <button onClick={clearPlan}
+          aria-label="Clear all stops from plan"
           className="bg-transparent border-none text-text-tertiary text-[13px] cursor-pointer p-2.5">
           Clear all stops
         </button>

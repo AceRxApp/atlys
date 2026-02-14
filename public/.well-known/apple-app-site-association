@@ -4,13 +4,14 @@
     "details": [
       {
         "appIDs": ["A7R7S5DAZA.com.nave.nxstops"],
-        "paths": ["/place/*", "/cities/*", "/discover", "/events", "/plan"],
+        "paths": ["/place/*", "/cities/*", "/discover", "/events", "/plan", "/trip/*"],
         "components": [
           { "/": "/place/*" },
           { "/": "/cities/*" },
           { "/": "/discover" },
           { "/": "/events" },
-          { "/": "/plan" }
+          { "/": "/plan" },
+          { "/": "/trip/*" }
         ]
       }
     ]
