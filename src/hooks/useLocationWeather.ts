@@ -96,9 +96,7 @@ export function useLocationWeather(loc: LocState) {
     if (!lat || !lng) { setWeather(null); return; }
     const fetchWeather = async () => {
       try {
-        const resp = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weathercode&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max,sunset&timezone=auto&forecast_days=10&temperature_unit=fahrenheit`
-        );
+        const resp = await fetch(`/api/weather?lat=${lat}&lng=${lng}`);
         if (!resp.ok) return;
         const data = await resp.json();
         const code = data.current?.weathercode ?? 0;
