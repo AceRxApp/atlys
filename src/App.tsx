@@ -24,6 +24,8 @@ import { useLocationWeather } from './hooks/useLocationWeather';
 import { usePlaces } from './hooks/usePlaces';
 import { useEvents } from './hooks/useEvents';
 import { useTripPlan } from './hooks/useTripPlan';
+import { useStopRatings } from './hooks/useStopRatings';
+import { useOfflineSave } from './hooks/useOfflineSave';
 
 type Screen = 'home' | 'discover' | 'events' | 'plan';
 
@@ -41,6 +43,7 @@ const TermsScreen = lazy(() => import('./screens/TermsScreen'));
 const ContactScreen = lazy(() => import('./screens/ContactScreen'));
 const CityScreen = lazy(() => import('./screens/CityScreen'));
 const ChatBot = lazy(() => import('./components/ChatBot'));
+const SharedPlanScreen = lazy(() => import('./screens/SharedPlanScreen'));
 
 // ============================================================================
 // DEEP LINK — /place/:placeId
@@ -214,6 +217,16 @@ export default function App() {
     events: events.events,
   });
 
+  // --- Stop Ratings ---
+  const stopRatings = useStopRatings(location.citySlug, auth.user);
+
+  // --- Offline Save ---
+  const offlineSave = useOfflineSave(
+    trip.tripDays, location.citySlug,
+    location.useGps ? loc.lat : (location.selectedCity ? (location.selectedCity.lat ?? CITY_COORDS[location.selectedCity.name.toLowerCase()]?.lat ?? null) : null),
+    location.useGps ? loc.lng : (location.selectedCity ? (location.selectedCity.lng ?? CITY_COORDS[location.selectedCity.name.toLowerCase()]?.lng ?? null) : null),
+  );
+
   // --- Reset photo index when selectedPlace changes ---
   useEffect(() => {
     if (selectedPlace) {
@@ -291,14 +304,21 @@ export default function App() {
       if (permission === 'granted') {
         if ('serviceWorker' in navigator) {
           const registration = await navigator.serviceWorker.ready;
-          await registration.pushManager.subscribe({ userVisibleOnly: true });
+          const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+          const subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            ...(vapidKey ? { applicationServerKey: vapidKey } : {}),
+          });
+          import('./supabase').then(({ savePushSubscription }) => {
+            savePushSubscription(subscription, location.citySlug).catch(() => {});
+          });
         }
         showToast('Notifications enabled!');
       }
     } catch (err) {
       console.error('[NxStops] Notification permission error:', err);
     }
-  }, [showToast]);
+  }, [showToast, location.citySlug]);
 
   const dismissNotificationPrompt = useCallback(() => {
     setShowNotificationPrompt(false);
@@ -367,6 +387,12 @@ export default function App() {
     ...events,
     // Trip plan + crew
     ...trip,
+    // Stop ratings
+    ...stopRatings,
+    // Offline save
+    saveForOffline: offlineSave.saveForOffline,
+    offlineSaved: offlineSave.isSaved,
+    offlineSaving: offlineSave.isSaving,
     // UI state
     selectedPlace, setSelectedPlace, activePhotoIndex, setActivePhotoIndex,
     showSafety, setShowSafety,
@@ -383,7 +409,7 @@ export default function App() {
     // Onboarding
     showOnboarding, onboardingStep, setOnboardingStep, setShowOnboarding,
   }), [
-    screen, setScreen, location, auth, places, events, trip,
+    screen, setScreen, location, auth, places, events, trip, stopRatings, offlineSave,
     selectedPlace, activePhotoIndex,
     showSafety, showProfile, showAdmin, showCulture,
     showToast, getGreeting, getTimeSuggestion, getDistanceReference, currentTime, requireAuth,
@@ -530,6 +556,7 @@ export default function App() {
                 <Route path="/contact" element={<ContactScreen />} />
                 <Route path="/cities/:slug" element={<CityScreen />} />
                 <Route path="/place/:placeId" element={<PlaceDeepLink />} />
+                <Route path="/trip/:slug" element={<SharedPlanScreen />} />
                 <Route path="*" element={
                   <div className="text-center px-5 py-[60px]">
                     <div className="text-5xl mb-3">🗺️</div>

@@ -55,6 +55,10 @@
     { "source": "/api/events", "destination": "/api/events" },
     { "source": "/api/places", "destination": "/api/places" },
     { "source": "/api/weather", "destination": "/api/weather" },
+    { "source": "/api/currency", "destination": "/api/currency" },
     { "source": "/((?!api/|.well-known/).*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    { "path": "/api/push-send", "schedule": "0 8 * * *" }
   ]
 }

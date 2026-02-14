@@ -619,3 +619,80 @@ export async function deleteUserStop(stopId: string): Promise<boolean> {
   }
   return true;
 }
+
+// ---------------------------------------------------------------------------
+// Stop Ratings
+// ---------------------------------------------------------------------------
+
+export async function saveStopRating(placeId: string, citySlug: string, rating: 'up' | 'down'): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+  const { error } = await supabase.from('stop_ratings').upsert({
+    user_id: user.id, place_id: placeId, city_slug: citySlug, rating,
+  }, { onConflict: 'user_id,place_id,city_slug' });
+  if (error) { console.error('Error saving stop rating:', error); return false; }
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Shared Plans
+// ---------------------------------------------------------------------------
+
+export async function createSharedPlan(
+  slug: string, citySlug: string, cityLabel: string,
+  tripDays: Record<number, unknown[]>, dayTitle?: string,
+): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  const { error } = await supabase.from('shared_plans').insert({
+    slug, city_slug: citySlug, city_label: cityLabel,
+    trip_days: tripDays, day_title: dayTitle || null,
+    shared_by: user?.id || null,
+  });
+  if (error) { console.error('Error creating shared plan:', error); return false; }
+  return true;
+}
+
+export async function fetchSharedPlan(slug: string) {
+  const { data, error } = await supabase
+    .from('shared_plans')
+    .select('*')
+    .eq('slug', slug)
+    .single();
+  if (error || !data) return null;
+  // Increment view count (fire and forget)
+  supabase.from('shared_plans').update({ view_count: (data.view_count || 0) + 1 }).eq('slug', slug).then(() => {});
+  return data;
+}
+
+// ---------------------------------------------------------------------------
+// Push Subscriptions
+// ---------------------------------------------------------------------------
+
+export async function savePushSubscription(
+  subscription: PushSubscription, citySlug?: string,
+): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+  const keys = subscription.toJSON().keys;
+  const { error } = await supabase.from('push_subscriptions').upsert({
+    user_id: user.id, endpoint: subscription.endpoint,
+    p256dh: keys?.p256dh || '', auth: keys?.auth || '',
+    city_slug: citySlug || null,
+  }, { onConflict: 'user_id,endpoint' });
+  if (error) { console.error('Error saving push subscription:', error); return false; }
+  return true;
+}
+
+export async function scheduleNotification(
+  triggerType: string, triggerDate: string, citySlug: string,
+  payload: { title: string; body: string; url: string },
+): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+  const { error } = await supabase.from('scheduled_notifications').insert({
+    user_id: user.id, trigger_type: triggerType, trigger_date: triggerDate,
+    city_slug: citySlug, payload,
+  });
+  if (error) { console.error('Error scheduling notification:', error); return false; }
+  return true;
+}

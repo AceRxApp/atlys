@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { track } from '@vercel/analytics';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { createCrewTrip, loadCrewTrip, updateCrewTripDays, subscribeToCrewTrip, unsubscribeFromCrewTrip } from '../supabase';
+import { createCrewTrip, loadCrewTrip, updateCrewTripDays, subscribeToCrewTrip, unsubscribeFromCrewTrip, createSharedPlan } from '../supabase';
 import type { City, EventItem, Stop, PlanDuration } from '../types';
 import type { Place } from '../services/places';
 import { formatDistance } from '../services/places';
@@ -339,6 +339,22 @@ export function useTripPlan(deps: {
     }
   };
 
+  const shareAsLink = async (): Promise<string | null> => {
+    const slug = generateCrewCode();
+    const success = await createSharedPlan(slug, citySlug, cityLabel, tripDays, lastPlanTitle || undefined);
+    if (!success) { showToast('Failed to create share link', 'error'); return null; }
+    const url = `${window.location.origin}/trip/${slug}`;
+    track('share_plan_link', { city: cityLabel, slug });
+    hapticImpact('Light');
+    if (navigator.share) {
+      try { await navigator.share({ title: `${cityLabel} Trip Plan`, url }); } catch { /* cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(url);
+      showToast('Link copied!');
+    }
+    return url;
+  };
+
   const getStopCoords = (stop: Stop): { lat: number; lng: number } | null => {
     if (stop.type === 'place' && stop.place?.lat && stop.place?.lng) return { lat: stop.place.lat, lng: stop.place.lng };
     if (stop.type === 'event' && stop.event?.lat && stop.event?.lng) return { lat: stop.event.lat, lng: stop.event.lng };
@@ -556,6 +572,24 @@ export function useTripPlan(deps: {
       // Record in preference memory
       recordTripGenerated(mood);
 
+      // Schedule a "morning of" push notification
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        import('../supabase').then(({ scheduleNotification }) => {
+          scheduleNotification(
+            'morning_of',
+            tomorrow.toISOString().split('T')[0],
+            citySlug,
+            {
+              title: `Good morning! Your ${cityLabel} day awaits`,
+              body: weather ? `${weather.emoji} ${weather.temp}°F — ${stops.length} stops planned!` : `${stops.length} stops planned for today!`,
+              url: '/plan',
+            },
+          ).catch(() => {});
+        });
+      }
+
       hapticNotification('Success');
       showToast(`Day ${activeDay}: ${result.dayTitle} — ${stops.length} stops planned!`);
       track('auto_plan_generated', {
@@ -579,7 +613,7 @@ export function useTripPlan(deps: {
     dayPlan, totalStops, dayCount, setActiveDayStops,
     addToPlan, addEventToPlan, removeFromPlan, isInPlan, isEventInPlan,
     clearPlan, movePlanStop, addDay, removeDay, moveStopToDay, pivotStop,
-    getRouteUrl, getFullTripRouteUrl, sharePlan, getTransportInfo, getDaySummary,
+    getRouteUrl, getFullTripRouteUrl, sharePlan, shareAsLink, getTransportInfo, getDaySummary,
     dayBudgets, setDayBudget, activeDayBudget,
     estimatedSpend, budgetRemaining, budgetPercentUsed, isOverBudget,
     crewMode, crewCode, crewSyncing, joinCrewInput, setJoinCrewInput,

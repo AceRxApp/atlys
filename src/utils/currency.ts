@@ -39,7 +39,7 @@ export async function fetchExchangeRate(from: string, to: string): Promise<numbe
   } catch { /* ignore */ }
 
   try {
-    const res = await fetch(`https://api.frankfurter.app/latest?from=${from}&to=${to}`);
+    const res = await fetch(`/api/currency?from=${from}&to=${to}`);
     if (!res.ok) return null;
     const data = await res.json();
     const rate = data.rates?.[to];

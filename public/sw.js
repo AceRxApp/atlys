@@ -30,6 +30,47 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// Offline save: cache specific URLs on demand from the client
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'CACHE_URLS') {
+    const urls = event.data.urls;
+    event.waitUntil(
+      caches.open(ASSETS_CACHE_NAME).then(async (cache) => {
+        let cached = 0;
+        for (const url of urls) {
+          try {
+            const response = await fetch(url, { mode: 'no-cors' });
+            if (response.ok || response.type === 'opaque') {
+              await cache.put(url, response);
+              cached++;
+            }
+          } catch { /* skip failed */ }
+        }
+        const clients = await self.clients.matchAll();
+        clients.forEach((client) => {
+          client.postMessage({ type: 'CACHE_COMPLETE', total: urls.length, cached });
+        });
+      })
+    );
+  }
+
+  if (event.data?.type === 'CACHE_API') {
+    const urls = event.data.urls;
+    event.waitUntil(
+      caches.open(API_CACHE_NAME).then(async (cache) => {
+        for (const url of urls) {
+          try {
+            const response = await fetch(url);
+            if (response.ok) {
+              await cache.put(url, response);
+            }
+          } catch { /* skip */ }
+        }
+      })
+    );
+  }
+});
+
 // Helper: trim cache to max entries (LRU-style, remove oldest)
 async function trimCache(cacheName, maxEntries) {
   const cache = await caches.open(cacheName);

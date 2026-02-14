@@ -8,6 +8,7 @@ import { generatePackingList } from '../utils/packingList';
 import { findPivotAlternatives } from '../utils/surpriseFilter';
 import { getPlaceBookingUrl } from '../data/bookingLinks';
 import type { PackingItem } from '../data/packingItems';
+import CurrencyWidget from '../components/CurrencyWidget';
 import { getNightRisk, isNightTime } from '../utils/safetyEngine';
 import type { Stop } from '../types';
 
@@ -165,6 +166,12 @@ export default function PlanScreen() {
     requireAuth,
     lastPlanTitle,
     estimatedSpend,
+    rateStop,
+    getRating,
+    shareAsLink,
+    saveForOffline,
+    offlineSaved,
+    offlineSaving,
   } = useApp();
 
 
@@ -425,6 +432,9 @@ export default function PlanScreen() {
         </div>
       )}
 
+      {/* Currency Converter */}
+      {dayPlan.length > 0 && <CurrencyWidget cityName={cityLabel} />}
+
       {/* Active day stops */}
       {dayPlan.length === 0 ? (
         <div className="card text-center py-8 px-5">
@@ -607,6 +617,34 @@ export default function PlanScreen() {
                             {'\u{1F504}'} Pivot
                           </button>
                         )}
+                        {/* Thumbs up/down */}
+                        <button
+                          onClick={() => {
+                            const pid = stop.place?.placeId || stop.event?.id || '';
+                            rateStop(stop.id, pid, 'up');
+                          }}
+                          className={`py-[5px] px-2.5 rounded-lg text-[11px] cursor-pointer flex items-center gap-1 border ${
+                            getRating(stop.id) === 'up'
+                              ? 'bg-green-tint-bg border-green-tint-border text-status-green'
+                              : 'bg-bg-subtle-medium border-border-subtle text-text-tertiary'
+                          }`}
+                        >
+                          {'\u{1F44D}'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            const pid = stop.place?.placeId || stop.event?.id || '';
+                            rateStop(stop.id, pid, 'down');
+                            if (getRating(stop.id) !== 'down') showToast('Tap Pivot to swap this stop');
+                          }}
+                          className={`py-[5px] px-2.5 rounded-lg text-[11px] cursor-pointer flex items-center gap-1 border ${
+                            getRating(stop.id) === 'down'
+                              ? 'bg-red-tint-bg border-red-tint-border text-status-red'
+                              : 'bg-bg-subtle-medium border-border-subtle text-text-tertiary'
+                          }`}
+                        >
+                          {'\u{1F44E}'}
+                        </button>
                       </div>
                     </div>
 
@@ -875,15 +913,37 @@ export default function PlanScreen() {
           </a>
         )}
 
+        {/* Save for Offline */}
+        {totalStops > 0 && (
+          <button
+            onClick={saveForOffline}
+            disabled={offlineSaving || offlineSaved}
+            className={`flex items-center justify-center gap-2 rounded-[14px] p-3.5 text-sm font-medium cursor-pointer border ${
+              offlineSaved
+                ? 'bg-green-tint-bg border-green-tint-border text-status-green'
+                : offlineSaving
+                ? 'bg-bg-subtle-strong border-border-medium text-text-tertiary opacity-60'
+                : 'bg-bg-subtle-strong border-border-medium text-text-primary'
+            }`}
+          >
+            {offlineSaved ? '\u{2705} Saved Offline' : offlineSaving ? 'Saving...' : '\u{1F4E5} Save for Offline'}
+          </button>
+        )}
+
+        {/* Share buttons */}
         <div className="flex gap-2.5">
+          <button onClick={() => { if (!requireAuth()) return; shareAsLink(); }}
+            className="flex-1 flex items-center justify-center gap-2 bg-accent-gradient text-text-on-accent border-none rounded-[14px] p-3.5 text-[15px] font-semibold cursor-pointer shadow-[0_4px_20px_var(--amber-tint-shadow)]">
+            <ShareIcon /> Share Link
+          </button>
           <button onClick={sharePlan}
-            className="flex-1 flex items-center justify-center gap-2 bg-bg-subtle-strong text-text-primary border border-border-medium rounded-[14px] p-3.5 text-[15px] font-medium cursor-pointer">
-            <ShareIcon /> Share Trip
+            className="flex items-center justify-center gap-1.5 p-3.5 px-5 rounded-[14px] cursor-pointer border border-border-medium bg-bg-subtle-strong text-text-primary text-sm font-medium shrink-0">
+            Text
           </button>
           {dayPlan.length > 0 && (
             <button onClick={() => { if (!requireAuth()) return; exportDayAsImage(dayPlan, activeDay, cityLabel); }}
               className="flex items-center justify-center gap-1.5 p-3.5 px-5 rounded-[14px] cursor-pointer border border-border-medium bg-bg-subtle-strong text-text-primary text-sm font-medium shrink-0">
-              📸 Export
+              📸
             </button>
           )}
         </div>

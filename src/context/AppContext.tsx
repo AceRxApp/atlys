@@ -63,6 +63,16 @@ export interface AppContextType {
   addEventToPlan: (event: EventItem) => void;
   isEventInPlan: (eventId: string) => boolean;
   pivotStop: (oldStopId: string, newPlace: Place) => void;
+  shareAsLink: () => Promise<string | null>;
+
+  // --- Stop Ratings ---
+  rateStop: (stopId: string, placeId: string, rating: 'up' | 'down') => void;
+  getRating: (stopId: string) => 'up' | 'down' | null;
+
+  // --- Offline Save ---
+  saveForOffline: () => Promise<void>;
+  offlineSaved: boolean;
+  offlineSaving: boolean;
 
   // --- Budget ---
   dayBudgets: Record<number, number>;
