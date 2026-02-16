@@ -1,24 +1,24 @@
 export const HomeIcon = ({ active, inactiveColor = '#78716C' }: { active: boolean; inactiveColor?: string }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-    <defs><linearGradient id="hg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#F59E0B" /><stop offset="100%" stopColor="#FBBF24" /></linearGradient></defs>
+    <defs><linearGradient id="hg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#E8940A" /><stop offset="100%" stopColor="#F5A623" /></linearGradient></defs>
     <path d="M3 10.5L12 3L21 10.5V20C21 20.5523 20.5523 21 20 21H15V15C15 14.4477 14.5523 14 14 14H10C9.44772 14 9 14.4477 9 15V21H4C3.44772 21 3 20.5523 3 20V10.5Z"
       stroke={active ? "url(#hg)" : inactiveColor} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"
-      fill={active ? "rgba(245,158,11,0.15)" : "none"} />
+      fill={active ? "rgba(232,148,10,0.15)" : "none"} />
   </svg>
 );
 
 export const DiscoverIcon = ({ active, inactiveColor = '#78716C' }: { active: boolean; inactiveColor?: string }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-    <defs><linearGradient id="eg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#F59E0B" /><stop offset="100%" stopColor="#FBBF24" /></linearGradient></defs>
-    <circle cx="11" cy="11" r="7" stroke={active ? "url(#eg)" : inactiveColor} strokeWidth="1.75" fill={active ? "rgba(245,158,11,0.1)" : "none"} />
+    <defs><linearGradient id="eg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#E8940A" /><stop offset="100%" stopColor="#F5A623" /></linearGradient></defs>
+    <circle cx="11" cy="11" r="7" stroke={active ? "url(#eg)" : inactiveColor} strokeWidth="1.75" fill={active ? "rgba(232,148,10,0.1)" : "none"} />
     <path d="M21 21L16.5 16.5" stroke={active ? "url(#eg)" : inactiveColor} strokeWidth="1.75" strokeLinecap="round" />
   </svg>
 );
 
 export const EventsIcon = ({ active, inactiveColor = '#78716C' }: { active: boolean; inactiveColor?: string }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-    <defs><linearGradient id="evi" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#F59E0B" /><stop offset="100%" stopColor="#FBBF24" /></linearGradient></defs>
-    <rect x="3" y="4" width="18" height="17" rx="2" stroke={active ? "url(#evi)" : inactiveColor} strokeWidth="1.75" fill={active ? "rgba(245,158,11,0.1)" : "none"} />
+    <defs><linearGradient id="evi" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#E8940A" /><stop offset="100%" stopColor="#F5A623" /></linearGradient></defs>
+    <rect x="3" y="4" width="18" height="17" rx="2" stroke={active ? "url(#evi)" : inactiveColor} strokeWidth="1.75" fill={active ? "rgba(232,148,10,0.1)" : "none"} />
     <path d="M3 9H21" stroke={active ? "url(#evi)" : inactiveColor} strokeWidth="1.5" />
     <path d="M8 2V5" stroke={active ? "url(#evi)" : inactiveColor} strokeWidth="1.75" strokeLinecap="round" />
     <path d="M16 2V5" stroke={active ? "url(#evi)" : inactiveColor} strokeWidth="1.75" strokeLinecap="round" />
@@ -28,10 +28,43 @@ export const EventsIcon = ({ active, inactiveColor = '#78716C' }: { active: bool
 
 export const PlanIcon = ({ active, inactiveColor = '#78716C' }: { active: boolean; inactiveColor?: string }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-    <defs><linearGradient id="pg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#F59E0B" /><stop offset="100%" stopColor="#FBBF24" /></linearGradient></defs>
+    <defs><linearGradient id="pg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#E8940A" /><stop offset="100%" stopColor="#F5A623" /></linearGradient></defs>
     <path d="M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15" stroke={active ? "url(#pg)" : inactiveColor} strokeWidth="1.75" strokeLinecap="round" />
-    <rect x="9" y="3" width="6" height="4" rx="1" stroke={active ? "url(#pg)" : inactiveColor} strokeWidth="1.5" fill={active ? "rgba(245,158,11,0.15)" : "none"} />
+    <rect x="9" y="3" width="6" height="4" rx="1" stroke={active ? "url(#pg)" : inactiveColor} strokeWidth="1.5" fill={active ? "rgba(232,148,10,0.15)" : "none"} />
     <path d="M9 12L11 14L15 10" stroke={active ? "url(#pg)" : inactiveColor} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+export const DragHandleIcon = ({ color = '#78716C' }: { color?: string }) => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill={color}>
+    <circle cx="9" cy="6" r="1.5" />
+    <circle cx="15" cy="6" r="1.5" />
+    <circle cx="9" cy="12" r="1.5" />
+    <circle cx="15" cy="12" r="1.5" />
+    <circle cx="9" cy="18" r="1.5" />
+    <circle cx="15" cy="18" r="1.5" />
+  </svg>
+);
+
+export const CurrencyIcon = ({ active, inactiveColor = '#78716C' }: { active: boolean; inactiveColor?: string }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <defs><linearGradient id="cig" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#E8940A" /><stop offset="100%" stopColor="#F5A623" /></linearGradient></defs>
+    <circle cx="12" cy="12" r="9" stroke={active ? "url(#cig)" : inactiveColor} strokeWidth="1.75" fill={active ? "rgba(232,148,10,0.1)" : "none"} />
+    <path d="M12 6V18M15 8.5C15 8.5 14.1 7 12 7C9.9 7 9 8.5 9 9.5C9 12 15 11 15 14C15 15.5 13.5 17 12 17C10 17 9 15.5 9 15.5" stroke={active ? "url(#cig)" : inactiveColor} strokeWidth="1.75" strokeLinecap="round" />
+  </svg>
+);
+
+export const TasteLensIcon = ({ active, inactiveColor = '#78716C' }: { active: boolean; inactiveColor?: string }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <defs><linearGradient id="tlg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#E8940A" /><stop offset="100%" stopColor="#F5A623" /></linearGradient></defs>
+    {/* Fork */}
+    <path d="M7 3V7C7 8.66 8.34 10 10 10V21" stroke={active ? "url(#tlg)" : inactiveColor} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M7 3V7" stroke={active ? "url(#tlg)" : inactiveColor} strokeWidth="1.75" strokeLinecap="round" />
+    <path d="M10 3V7" stroke={active ? "url(#tlg)" : inactiveColor} strokeWidth="1.75" strokeLinecap="round" />
+    <path d="M13 3V7" stroke={active ? "url(#tlg)" : inactiveColor} strokeWidth="1.75" strokeLinecap="round" />
+    {/* Magnifying glass */}
+    <circle cx="17" cy="14" r="4" stroke={active ? "url(#tlg)" : inactiveColor} strokeWidth="1.75" fill={active ? "rgba(232,148,10,0.15)" : "none"} />
+    <path d="M19.8 17.8L22 20" stroke={active ? "url(#tlg)" : inactiveColor} strokeWidth="1.75" strokeLinecap="round" />
   </svg>
 );
 

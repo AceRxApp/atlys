@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
-import { VIBES, QUICK_FILTERS, SMART_FILTERS, COMMUNITY_TAGS, NIGHTLIFE_TYPES } from '../data';
-import { formatDistance, isChain } from '../services/places';
+import { VIBES, QUICK_FILTERS, SMART_FILTERS, COMMUNITY_TAGS } from '../data';
+import { formatDistance } from '../services/places';
 import { SkeletonCard } from '../components/ui';
 import PlaceCard from '../components/PlaceCard';
 import { APIProvider, Map, Marker, InfoWindow } from '@vis.gl/react-google-maps';
@@ -89,7 +89,7 @@ function PlacesMapView({ places: mapPlaces }: { places: Place[] }) {
                   <div className="flex gap-1.5 mt-2">
                     <button
                       onClick={() => { setSelectedPlace(place); setActiveMapPin(null); }}
-                      className="flex-1 p-1.5 rounded-md border-none bg-[#F59E0B] text-[#0C0A09] text-[11px] font-semibold cursor-pointer"
+                      className="flex-1 p-1.5 rounded-md border-none bg-[#E8940A] text-[#0C0A09] text-[11px] font-semibold cursor-pointer"
                     >
                       Details
                     </button>
@@ -166,6 +166,7 @@ export default function DiscoverScreen() {
     submitPinStop,
     user,
     requireAuth,
+    setScreen,
   } = useApp();
 
   // Pin a Stop form state
@@ -176,6 +177,7 @@ export default function DiscoverScreen() {
   const [pinLng, setPinLng] = useState('');
 
   const { theme } = useTheme();
+  const [showFilters, setShowFilters] = useState(false);
 
   // Contextual smart filter visibility
   const currentHour = new Date().getHours();
@@ -296,9 +298,9 @@ export default function DiscoverScreen() {
         </div>
       )}
 
-      {/* Vibe Chips + Filters (hidden during search) */}
-      {!showSearch && (<>
-      <div className="flex gap-2 overflow-x-auto pb-2.5 mb-1 scroll-hidden">
+      {/* Vibe Chips (always visible, hidden during search) */}
+      {!showSearch && (
+      <div className="flex gap-2 overflow-x-auto pb-2.5 mb-1.5 scroll-hidden">
         {VIBES.map(vibe => {
           const active = selectedVibe === vibe.id;
           return (
@@ -318,75 +320,97 @@ export default function DiscoverScreen() {
           );
         })}
       </div>
+      )}
 
-      {/* Smart Picks — Blind Date + contextual filters */}
-      <div className="flex gap-2 overflow-x-auto pb-2.5 mb-1 scroll-hidden">
+      {/* Filters toggle + collapsible filters */}
+      {!showSearch && (
+      <div className="mb-2">
         <button
-          onClick={spinBlindDate}
-          className="py-1.5 px-3.5 rounded-2xl text-[11px] font-semibold cursor-pointer whitespace-nowrap shrink-0 border border-purple-tint-border20 bg-purple-tint-bg08 text-purple-tint-text"
+          onClick={() => setShowFilters(!showFilters)}
+          className="flex items-center gap-2 py-2 px-0.5 bg-transparent border-none cursor-pointer text-text-secondary text-xs font-medium mb-1.5"
         >
-          {'\u{1F3B2}'} Blind Date
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="16" y2="12" /><line x1="4" y1="18" x2="12" y2="18" />
+          </svg>
+          Filters
+          {(quickFilters.length > 0 || communityFilters.length > 0) && (
+            <span className="px-1.5 py-0.5 rounded-full bg-amber-tint-bg15 text-accent-amber text-[10px] font-bold">
+              {quickFilters.length + communityFilters.length}
+            </span>
+          )}
+          <span className="text-text-muted text-[10px]" style={{ transform: showFilters ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+            {'\u25BC'}
+          </span>
         </button>
-        {visibleSmartFilters.map(filter => {
-          const active = quickFilters.includes(filter.id);
-          return (
-            <button
-              key={filter.id}
-              aria-pressed={active}
-              onClick={() => setQuickFilters(active ? quickFilters.filter(f => f !== filter.id) : [...quickFilters, filter.id])}
-              className={`py-1.5 px-3.5 rounded-2xl text-[11px] font-semibold cursor-pointer whitespace-nowrap shrink-0 ${
-                active
-                  ? 'border border-purple-tint-border30 bg-purple-tint-bg15 text-purple-tint-text'
-                  : 'border border-purple-tint-border20 bg-purple-tint-bg08 text-purple-tint-text'
-              }`}
-            >
-              {filter.emoji} {filter.label}
-            </button>
-          );
-        })}
-      </div>
 
-      {/* Quick Filters */}
-      <div className="flex gap-2 overflow-x-auto pb-3 mb-3 scroll-hidden">
-        {QUICK_FILTERS.map(filter => {
-          const active = quickFilters.includes(filter.id);
-          return (
-            <button
-              key={filter.id}
-              aria-pressed={active}
-              onClick={() => setQuickFilters(active ? quickFilters.filter(f => f !== filter.id) : [...quickFilters, filter.id])}
-              className={`py-1.5 px-3 rounded-2xl text-[11px] font-medium cursor-pointer whitespace-nowrap shrink-0 ${
-                active
-                  ? 'border border-amber-tint-border30 bg-amber-tint-bg15 text-accent-amber'
-                  : 'border border-border-medium bg-transparent text-text-tertiary'
-              }`}
-            >
-              {filter.label}
-            </button>
-          );
-        })}
+        {showFilters && (
+        <div className="flex gap-1.5 overflow-x-auto pb-3 scroll-hidden">
+          <button
+            onClick={spinBlindDate}
+            className="py-2.5 px-3.5 rounded-2xl text-[11px] font-semibold cursor-pointer whitespace-nowrap shrink-0 min-h-[44px] border border-purple-tint-border20 bg-purple-tint-bg08 text-purple-tint-text"
+          >
+            {'\u{1F3B2}'} Blind Date
+          </button>
+          {visibleSmartFilters.map(filter => {
+            const active = quickFilters.includes(filter.id);
+            return (
+              <button
+                key={filter.id}
+                aria-pressed={active}
+                onClick={() => {
+                  if (!active) dismissBlindDate();
+                  setQuickFilters(active ? quickFilters.filter(f => f !== filter.id) : [...quickFilters, filter.id]);
+                }}
+                className={`py-2.5 px-3.5 rounded-2xl text-[11px] font-semibold cursor-pointer whitespace-nowrap shrink-0 min-h-[44px] ${
+                  active
+                    ? 'border border-purple-tint-border30 bg-purple-tint-bg15 text-purple-tint-text'
+                    : 'border border-purple-tint-border20 bg-purple-tint-bg08 text-purple-tint-text'
+                }`}
+              >
+                {filter.emoji} {filter.label}
+              </button>
+            );
+          })}
+          {QUICK_FILTERS.map(filter => {
+            const active = quickFilters.includes(filter.id);
+            return (
+              <button
+                key={filter.id}
+                aria-pressed={active}
+                onClick={() => {
+                  if (!active) dismissBlindDate();
+                  setQuickFilters(active ? quickFilters.filter(f => f !== filter.id) : [...quickFilters, filter.id]);
+                }}
+                className={`py-2.5 px-3.5 rounded-2xl text-[11px] font-medium cursor-pointer whitespace-nowrap shrink-0 min-h-[44px] ${
+                  active
+                    ? 'border border-amber-tint-border30 bg-amber-tint-bg15 text-accent-amber'
+                    : 'border border-border-medium bg-transparent text-text-tertiary'
+                }`}
+              >
+                {filter.label}
+              </button>
+            );
+          })}
+          {COMMUNITY_TAGS.map(tag => {
+            const active = communityFilters.includes(tag.id);
+            return (
+              <button key={tag.id}
+                aria-pressed={active}
+                aria-label={`Filter by ${tag.label}`}
+                onClick={() => setCommunityFilters(active ? communityFilters.filter(f => f !== tag.id) : [...communityFilters, tag.id])}
+                className={`py-2.5 px-3.5 rounded-2xl text-[11px] font-medium cursor-pointer whitespace-nowrap shrink-0 min-h-[44px] ${
+                  active
+                    ? 'border border-community-tint-border40 bg-community-tint-bg12 text-community-text'
+                    : 'border border-border-subtle bg-transparent text-text-muted'
+                }`}>
+                {tag.emoji} {tag.label}
+              </button>
+            );
+          })}
+        </div>
+        )}
       </div>
-
-      {/* Community Tags */}
-      <div className="flex gap-2 overflow-x-auto pb-3 mb-1 scroll-hidden">
-        {COMMUNITY_TAGS.map(tag => {
-          const active = communityFilters.includes(tag.id);
-          return (
-            <button key={tag.id}
-              aria-pressed={active}
-              aria-label={`Filter by ${tag.label}`}
-              onClick={() => setCommunityFilters(active ? communityFilters.filter(f => f !== tag.id) : [...communityFilters, tag.id])}
-              className={`py-1.5 px-3 rounded-2xl text-[11px] font-medium cursor-pointer whitespace-nowrap shrink-0 ${
-                active
-                  ? 'border border-community-tint-border40 bg-community-tint-bg12 text-community-text'
-                  : 'border border-border-subtle bg-transparent text-text-muted'
-              }`}>
-              {tag.emoji} {tag.label}
-            </button>
-          );
-        })}
-      </div>
-      </>)}
+      )}
 
       {/* Community filter active banner */}
       {communityFilters.length > 0 && !showSearch && (
@@ -607,52 +631,6 @@ export default function DiscoverScreen() {
                 </div>
               )}
 
-              {/* Hidden Gems Horizontal Section (when not on hidden vibe) */}
-              {!placesLoading && selectedVibe !== 'hidden' && (() => {
-                const gems = places.filter(p => p.rating >= 4.2 && p.reviewCount > 0 && p.reviewCount < 150 && !NIGHTLIFE_TYPES.includes(p.category) && !isChain(p.name));
-                if (gems.length === 0) return null;
-                return (
-                  <div className="mb-4">
-                    <div className="flex justify-between items-center mb-2.5">
-                      <h3 className="text-[15px] font-semibold flex items-center gap-1.5">
-                        💎 Hidden Gems
-                      </h3>
-                      <button onClick={() => setSelectedVibe('hidden')}
-                        className="bg-none border-none text-accent-amber text-xs cursor-pointer">
-                        See all →
-                      </button>
-                    </div>
-                    <div className="flex gap-3 overflow-x-auto pb-2 scroll-hidden">
-                      {gems.slice(0, 8).map(place => (
-                        <div key={place.placeId} onClick={() => setSelectedPlace(place)}
-                          role="button"
-                          tabIndex={0}
-                          aria-label={`View details for ${place.name}`}
-                          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPlace(place); } }}
-                          className="card !p-0 overflow-hidden min-w-[180px] max-w-[200px] shrink-0 cursor-pointer">
-                          {place.photoUrl && (
-                            <div className="h-[90px] w-full bg-cover bg-center"
-                              style={{
-                                background: `linear-gradient(to bottom, transparent 40%, var(--bg-image-overlay)), url(${place.photoUrl})`,
-                                backgroundSize: 'cover',
-                                backgroundPosition: 'center',
-                              }} />
-                          )}
-                          <div className="py-2.5 px-3">
-                            <div className="text-[13px] font-semibold text-text-primary mb-[3px] overflow-hidden text-ellipsis whitespace-nowrap">{place.name}</div>
-                            <div className="text-[11px] text-text-tertiary flex items-center gap-1">
-                              <span className="text-accent-amber">★</span> {place.rating.toFixed(1)}
-                              <span className="mx-0.5">·</span>
-                              {place.categoryDisplay}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
-
               {/* Place Cards */}
               {!placesLoading && filteredPlaces.map(place => (
                 <PlaceCard key={place.placeId} place={place} />
@@ -703,17 +681,6 @@ export default function DiscoverScreen() {
             </>
           )}
         </>
-      )}
-
-      {/* Pin a Stop FAB */}
-      {(useGps || selectedCity) && !showPinStop && (
-        <button
-          onClick={() => { if (!requireAuth()) return; setShowPinStop(true); }}
-          className="fixed bottom-20 right-4 max-w-[430px] w-12 h-12 rounded-full bg-accent-gradient text-text-on-accent shadow-lg border-none cursor-pointer flex items-center justify-center text-xl z-50"
-          aria-label="Pin a new stop"
-        >
-          {'\u{1F4CC}'}
-        </button>
       )}
 
       {/* Pin a Stop Modal */}

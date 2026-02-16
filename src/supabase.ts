@@ -215,7 +215,29 @@ export interface Review {
   rating: number;
   review_text: string | null;
   tags: string[];
+  photo_urls: string[] | null;
   created_at: string;
+}
+
+export async function uploadReviewPhotos(files: File[]): Promise<string[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user || files.length === 0) return [];
+
+  const urls: string[] = [];
+  for (const file of files.slice(0, 3)) {
+    const compressed = await compressImage(file, 800, 0.75);
+    const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+    const { error } = await supabase.storage
+      .from('review-photos')
+      .upload(fileName, compressed, { contentType: 'image/jpeg' });
+    if (error) {
+      console.error('Review photo upload error:', error);
+      continue;
+    }
+    const { data: urlData } = supabase.storage.from('review-photos').getPublicUrl(fileName);
+    urls.push(urlData.publicUrl);
+  }
+  return urls;
 }
 
 export async function saveReview(
@@ -223,7 +245,8 @@ export async function saveReview(
   citySlug: string,
   rating: number,
   reviewText: string,
-  tags: string[]
+  tags: string[],
+  photoUrls?: string[]
 ) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
@@ -240,6 +263,7 @@ export async function saveReview(
       rating,
       review_text: reviewText || null,
       tags,
+      photo_urls: photoUrls && photoUrls.length > 0 ? photoUrls : null,
     })
     .select()
     .single();

@@ -14,7 +14,7 @@ import type { AdminSignup } from './types';
 import { CITY_COORDS, EMERGENCY_BY_COUNTRY } from './data';
 
 import { AppContext } from './context/AppContext';
-import { HomeIcon, DiscoverIcon, EventsIcon, PlanIcon, ShieldIcon, GearIcon, CloseIcon, SearchIcon } from './components/icons';
+import { HomeIcon, DiscoverIcon, EventsIcon, PlanIcon, TasteLensIcon, ShieldIcon, GearIcon, CloseIcon, SearchIcon } from './components/icons';
 import { SkeletonCard } from './components/ui';
 import Footer from './components/Footer';
 
@@ -27,12 +27,13 @@ import { useTripPlan } from './hooks/useTripPlan';
 import { useStopRatings } from './hooks/useStopRatings';
 import { useOfflineSave } from './hooks/useOfflineSave';
 
-type Screen = 'home' | 'discover' | 'events' | 'plan';
+type Screen = 'home' | 'discover' | 'events' | 'currency' | 'plan' | 'tastelens';
 
 // Lazy-loaded screens & modals
 const HomeScreen = lazy(() => import('./screens/HomeScreen'));
 const DiscoverScreen = lazy(() => import('./screens/DiscoverScreen'));
 const EventsScreen = lazy(() => import('./screens/EventsScreen'));
+const CurrencyScreen = lazy(() => import('./screens/CurrencyScreen'));
 const PlanScreen = lazy(() => import('./screens/PlanScreen'));
 const PlaceDetailModal = lazy(() => import('./components/PlaceDetailModal'));
 const ProfileScreen = lazy(() => import('./screens/ProfileScreen'));
@@ -44,6 +45,7 @@ const ContactScreen = lazy(() => import('./screens/ContactScreen'));
 const CityScreen = lazy(() => import('./screens/CityScreen'));
 const ChatBot = lazy(() => import('./components/ChatBot'));
 const SharedPlanScreen = lazy(() => import('./screens/SharedPlanScreen'));
+const DishLensScreen = lazy(() => import('./screens/DishLensScreen'));
 
 // ============================================================================
 // DEEP LINK — /place/:placeId
@@ -87,7 +89,7 @@ function PlaceDeepLink() {
   if (loading) {
     return (
       <div className="text-center px-5 py-20">
-        <div className="w-10 h-[3px] rounded-sm mx-auto animate-shimmer" style={{ background: 'linear-gradient(90deg, rgba(245,158,11,0.3) 25%, #F59E0B 50%, rgba(245,158,11,0.3) 75%)', backgroundSize: '200% 100%' }} />
+        <div className="w-10 h-[3px] rounded-sm mx-auto animate-shimmer" style={{ background: 'linear-gradient(90deg, rgba(232,148,10,0.3) 25%, #E8940A 50%, rgba(232,148,10,0.3) 75%)', backgroundSize: '200% 100%' }} />
         <p className="text-[13px] text-[#A8A29E] mt-4">Loading place...</p>
       </div>
     );
@@ -107,7 +109,7 @@ export default function App() {
 
   const screen = (() => {
     const path = routerLocation.pathname.slice(1) || 'home';
-    return (['home', 'discover', 'events', 'plan'].includes(path) ? path : 'home') as Screen;
+    return (['home', 'discover', 'events', 'currency', 'plan', 'tastelens'].includes(path) ? path : 'home') as Screen;
   })();
 
   const isInfoPage = ['/about', '/privacy', '/terms', '/contact'].includes(routerLocation.pathname) || routerLocation.pathname.startsWith('/cities/');
@@ -159,6 +161,9 @@ export default function App() {
 
   // AI Chatbox
   const [showChat, setShowChat] = useState(false);
+
+  // TasteLens context (for navigating to TasteLens tab with restaurant context)
+  const [dishLensContext, setDishLensContext] = useState<{ dish?: string; city?: string; restaurant?: string }>({});
 
   // GDPR consent
   const [showConsent, setShowConsent] = useState(() => !localStorage.getItem('nxstops_consent'));
@@ -408,6 +413,8 @@ export default function App() {
     loading: location.loading, isOffline,
     // Onboarding
     showOnboarding, onboardingStep, setOnboardingStep, setShowOnboarding,
+    // DishLens
+    dishLensContext, setDishLensContext,
   }), [
     screen, setScreen, location, auth, places, events, trip, stopRatings, offlineSave,
     selectedPlace, activePhotoIndex,
@@ -416,6 +423,7 @@ export default function App() {
     showNotificationPrompt, notificationPermission, requestNotificationPermission, dismissNotificationPrompt,
     adminSignups, adminCities, adminLoading, adminTab, openAdmin, handleToggleCity,
     isOffline, showOnboarding, onboardingStep,
+    dishLensContext,
   ]);
 
   // ==========================================================================
@@ -476,7 +484,7 @@ export default function App() {
 
   return (
     <AppContext.Provider value={contextValue}>
-      <div className="font-['DM_Sans',system-ui,sans-serif] bg-body-gradient min-h-screen text-text-primary max-w-[430px] mx-auto relative overflow-hidden">
+      <div className="font-['DM_Sans',system-ui,sans-serif] bg-body-gradient min-h-screen text-text-primary max-w-[430px] mx-auto relative overflow-x-hidden">
         {/* Skip to content link for keyboard users */}
         <a href="#main-content" className="skip-link">Skip to content</a>
 
@@ -489,54 +497,62 @@ export default function App() {
 
         {/* Header */}
         {!isInfoPage && (
-        <header className="px-5 py-4 flex justify-between items-center">
-          <div>
-            <div className="text-[22px] font-bold bg-accent-text-gradient bg-clip-text text-transparent">
-              NxStops
-            </div>
-            <div className="text-[10px] text-text-tertiary tracking-[0.1em] uppercase">
-              by Nav&eacute;
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <div className="text-sm text-text-primary">
-                {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        <header className="sticky top-0 z-40 px-5 py-3 bg-bg-body/95 backdrop-blur-md border-b border-border-subtle/50">
+          <div className="flex justify-between items-center">
+            {/* Left: Logo + time */}
+            <div className="flex items-center gap-3">
+              <div>
+                <div className="text-[22px] font-bold leading-tight bg-accent-text-gradient bg-clip-text text-transparent">
+                  NxStops
+                </div>
+                <div className="text-[9px] text-text-tertiary tracking-[0.12em] uppercase leading-none mt-0.5">
+                  by Nav&eacute;
+                </div>
               </div>
-              <div className="text-[10px] text-text-tertiary">
-                {currentTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+              <div className="h-6 w-px bg-border-subtle/60 mx-0.5" />
+              <div className="text-right">
+                <div className="text-[13px] font-medium text-text-primary leading-tight">
+                  {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+                <div className="text-[9px] text-text-tertiary leading-none mt-0.5">
+                  {currentTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+                </div>
               </div>
             </div>
-            <button onClick={() => { setShowGlobalSearch(true); setGlobalSearchQuery(''); }}
-              aria-label="Search"
-              className="bg-transparent border-none cursor-pointer p-2.5 rounded-[10px] min-h-[44px] min-w-[44px] flex items-center justify-center">
-              <SearchIcon />
-            </button>
-            <button onClick={() => setShowSafety(true)}
-              aria-label="Travel toolkit"
-              className="bg-transparent border-none cursor-pointer p-2.5 rounded-[10px] min-h-[44px] min-w-[44px] flex items-center justify-center">
-              <ShieldIcon />
-            </button>
-            {isAdmin && (
-              <button onClick={openAdmin}
-                aria-label="Admin settings"
-                className="bg-transparent border-none cursor-pointer p-2.5 rounded-[10px] min-h-[44px] min-w-[44px] flex items-center justify-center">
-                <GearIcon />
+
+            {/* Right: Action icons */}
+            <div className="flex items-center gap-1">
+              <button onClick={() => { setShowGlobalSearch(true); setGlobalSearchQuery(''); }}
+                aria-label="Search"
+                className="bg-transparent border-none cursor-pointer p-2 rounded-xl min-h-[40px] min-w-[40px] flex items-center justify-center hover:bg-bg-subtle">
+                <SearchIcon />
               </button>
-            )}
-            <button onClick={() => setShowProfile(true)}
-              aria-label="Open profile"
-              className={`w-[44px] h-[44px] rounded-full border-2 border-amber-tint-border30 cursor-pointer flex items-center justify-center text-base p-0 text-text-secondary shrink-0 ${!auth.user?.user_metadata?.avatar_url ? 'bg-bg-subtle-button' : ''}`}
-              style={auth.user?.user_metadata?.avatar_url
-                ? { background: `url(${auth.user.user_metadata.avatar_url}) center/cover no-repeat` }
-                : undefined}>
-              {!auth.user?.user_metadata?.avatar_url && (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A8A29E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
+              <button onClick={() => setShowSafety(true)}
+                aria-label="Travel toolkit"
+                className="bg-transparent border-none cursor-pointer p-2 rounded-xl min-h-[40px] min-w-[40px] flex items-center justify-center hover:bg-bg-subtle">
+                <ShieldIcon />
+              </button>
+              {isAdmin && (
+                <button onClick={openAdmin}
+                  aria-label="Admin settings"
+                  className="bg-transparent border-none cursor-pointer p-2 rounded-xl min-h-[40px] min-w-[40px] flex items-center justify-center hover:bg-bg-subtle">
+                  <GearIcon />
+                </button>
               )}
-            </button>
+              <button onClick={() => setShowProfile(true)}
+                aria-label="Open profile"
+                className={`w-[36px] h-[36px] rounded-full border-2 border-amber-tint-border30 cursor-pointer flex items-center justify-center text-base p-0 text-text-secondary shrink-0 ml-1 ${!auth.user?.user_metadata?.avatar_url ? 'bg-bg-subtle-button' : ''}`}
+                style={auth.user?.user_metadata?.avatar_url
+                  ? { background: `url(${auth.user.user_metadata.avatar_url}) center/cover no-repeat` }
+                  : undefined}>
+                {!auth.user?.user_metadata?.avatar_url && (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A8A29E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
         </header>
         )}
@@ -549,6 +565,8 @@ export default function App() {
                 <Route path="/" element={<HomeScreen />} />
                 <Route path="/discover" element={<DiscoverScreen />} />
                 <Route path="/events" element={<EventsScreen />} />
+                <Route path="/currency" element={<CurrencyScreen />} />
+                <Route path="/tastelens" element={<DishLensScreen />} />
                 <Route path="/plan" element={<PlanScreen />} />
                 <Route path="/about" element={<AboutScreen />} />
                 <Route path="/privacy" element={<PrivacyScreen />} />
@@ -581,6 +599,7 @@ export default function App() {
           {([
             { id: 'home' as Screen, icon: HomeIcon, label: 'Home' },
             { id: 'discover' as Screen, icon: DiscoverIcon, label: 'Discover' },
+            { id: 'tastelens' as Screen, icon: TasteLensIcon, label: 'TasteLens' },
             { id: 'events' as Screen, icon: EventsIcon, label: 'Events' },
             { id: 'plan' as Screen, icon: PlanIcon, label: 'Plan' },
           ]).map(tab => {
@@ -595,11 +614,11 @@ export default function App() {
                 onClick={() => { if (canNavigate) { hapticSelection(); setScreen(tab.id); } }}
               >
                 {isActive && (
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[44px] h-[44px] rounded-full pointer-events-none -z-1" style={{ background: 'radial-gradient(circle, rgba(245,158,11,0.2) 0%, transparent 70%)' }} />
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[44px] h-[44px] rounded-full pointer-events-none -z-1" style={{ background: 'radial-gradient(circle, rgba(232,148,10,0.2) 0%, transparent 70%)' }} />
                 )}
                 <tab.icon active={isActive} />
                 <span style={{
-                  background: isActive ? 'linear-gradient(135deg, #F59E0B, #FBBF24)' : 'none',
+                  background: isActive ? 'linear-gradient(135deg, #E8940A, #F5A623)' : 'none',
                   WebkitBackgroundClip: isActive ? 'text' : 'unset',
                   WebkitTextFillColor: isActive ? 'transparent' : undefined,
                 }}>
@@ -744,8 +763,8 @@ export default function App() {
             <button
               onClick={() => setShowChat(true)}
               aria-label="Open AI travel assistant"
-              className="w-[52px] h-[52px] rounded-full border-none cursor-pointer text-white text-[22px] flex items-center justify-center shadow-[0_4px_20px_rgba(139,92,246,0.4)]"
-              style={{ background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)' }}
+              className="w-[52px] h-[52px] rounded-full border-none cursor-pointer text-white text-[22px] flex items-center justify-center shadow-[0_4px_20px_rgba(196,138,90,0.4)]"
+              style={{ background: 'linear-gradient(135deg, #C48A5A, #A06830)' }}
               title="AI Travel Assistant"
             >
               {'\u{2728}'}
@@ -892,6 +911,8 @@ export default function App() {
             />
           </Suspense>
         )}
+
+        {/* TasteLens is now a routed tab screen — see /tastelens route above */}
 
         {/* PWA Install Banner */}
         {showInstallBanner && (

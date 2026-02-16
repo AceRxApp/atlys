@@ -90,6 +90,7 @@
   --color-blue-tint-border: var(--blue-tint-border);
 
   /* Purple Tint */
+  --color-purple-tint-text: var(--purple-tint-text);
   --color-purple-tint-bg08: var(--purple-tint-bg08);
   --color-purple-tint-bg12: var(--purple-tint-bg12);
   --color-purple-tint-bg15: var(--purple-tint-bg15);
@@ -199,12 +200,18 @@
 
 @layer components {
   .card {
-    background: var(--bg-surface-alpha);
-    backdrop-filter: blur(20px);
+    background: var(--bg-surface);
     border-radius: 16px;
     padding: 16px;
     margin-bottom: 12px;
     border: 1px solid var(--border-subtle);
+  }
+
+  @supports (backdrop-filter: blur(20px)) {
+    .card {
+      background: var(--bg-surface-alpha);
+      backdrop-filter: blur(20px);
+    }
   }
 
   .btn-primary {
@@ -286,7 +293,8 @@
     cursor: pointer;
     white-space: nowrap;
     flex-shrink: 0;
-    padding: 8px 16px;
+    padding: 10px 16px;
+    min-height: 44px;
   }
 }
 
@@ -319,11 +327,11 @@
   ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb, #78716C); border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover, #A8A29E); }
 
-  ::selection { background: var(--selection-bg, rgba(245, 158, 11, 0.3)); }
+  ::selection { background: var(--selection-bg, rgba(232, 148, 10, 0.3)); }
 
   :focus { outline: none; }
   :focus-visible {
-    outline: 2px solid var(--accent-amber, #F59E0B);
+    outline: 2px solid var(--accent-amber, #E8940A);
     outline-offset: 2px;
     border-radius: 4px;
   }
@@ -339,14 +347,14 @@
     padding-right: 40px !important;
   }
 
-  * {
-    transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+  button, a, select, input, textarea {
+    transition-property: background-color, border-color, color, opacity, box-shadow;
     transition-duration: 150ms;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   button, a, select {
-    -webkit-tap-highlight-color: rgba(245, 158, 11, 0.2);
+    -webkit-tap-highlight-color: rgba(232, 148, 10, 0.2);
   }
 }
 
@@ -369,7 +377,7 @@
   font-size: 14px;
   border-radius: 0 0 12px 12px;
   text-decoration: none;
-  background: #F59E0B;
+  background: #E8940A;
   color: #0C0A09;
   transition: top 0.2s;
 }

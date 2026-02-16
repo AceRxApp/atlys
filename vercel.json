@@ -15,7 +15,7 @@
         { "key": "X-Content-Type-Options", "value": "nosniff" },
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
         { "key": "Permissions-Policy", "value": "geolocation=(self), camera=(), microphone=()" },
-        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https: data: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://places.googleapis.com https://maps.googleapis.com https://api.open-meteo.com https://www.google-analytics.com https://vitals.vercel-insights.com https://*.ingest.sentry.io; frame-ancestors 'none'" },
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com https://maps.googleapis.com https://maps.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https: data: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://places.googleapis.com https://maps.googleapis.com https://api.open-meteo.com https://www.google-analytics.com https://vitals.vercel-insights.com https://*.ingest.sentry.io https://images.pexels.com https://images.unsplash.com; frame-ancestors 'none'" },
         { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains; preload" }
       ]
     },
@@ -57,6 +57,8 @@
     { "source": "/api/places", "destination": "/api/places" },
     { "source": "/api/weather", "destination": "/api/weather" },
     { "source": "/api/currency", "destination": "/api/currency" },
+    { "source": "/api/dishlens", "destination": "/api/dishlens" },
+    { "source": "/api/dish-image", "destination": "/api/dish-image" },
     { "source": "/((?!api/|.well-known/).*)", "destination": "/index.html" }
   ],
   "crons": [

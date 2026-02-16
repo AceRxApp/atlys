@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nxstops-v3';
+const CACHE_NAME = 'nxstops-v4';
 const API_CACHE_NAME = 'nxstops-api-v1';
 const ASSETS_CACHE_NAME = 'nxstops-assets-v1';
 const API_CACHE_MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours in ms
@@ -125,6 +125,10 @@ function stampResponse(response) {
 // Fetch — network-first with cache fallback
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+
+  // Skip cross-origin requests — let the browser handle external images, fonts, etc. natively
+  const requestUrl = new URL(event.request.url);
+  if (requestUrl.origin !== self.location.origin) return;
 
   // Handle API requests with separate cache + timeout
   const isApiRequest = API_ROUTES.some((route) => event.request.url.includes(route));

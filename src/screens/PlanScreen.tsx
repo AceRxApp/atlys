@@ -1,16 +1,28 @@
 import { useState, useEffect, useCallback } from 'react';
 import { track } from '@vercel/analytics';
 import { useApp } from '../context/AppContext';
-import { DirectionsIcon, PhoneIcon, ShareIcon } from '../components/icons';
-import { formatDistance } from '../services/places';
+import { DirectionsIcon, ShareIcon, DragHandleIcon } from '../components/icons';
+import { formatDistance, searchNearby } from '../services/places';
 import type { Place } from '../services/places';
 import { generatePackingList } from '../utils/packingList';
 import { findPivotAlternatives } from '../utils/surpriseFilter';
-import { getPlaceBookingUrl } from '../data/bookingLinks';
 import type { PackingItem } from '../data/packingItems';
-import CurrencyWidget from '../components/CurrencyWidget';
 import { getNightRisk, isNightTime } from '../utils/safetyEngine';
 import type { Stop } from '../types';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import SortableStopCard from '../components/SortableStopCard';
 
 // Local helpers (not on context)
 const getStopName = (stop: Stop) =>
@@ -42,13 +54,13 @@ function exportDayAsImage(stops: Stop[], dayNum: number, cityName: string) {
 
   // Amber accent line
   const accent = ctx.createLinearGradient(0, 0, W, 0);
-  accent.addColorStop(0, '#F59E0B');
-  accent.addColorStop(1, '#D97706');
+  accent.addColorStop(0, '#E8940A');
+  accent.addColorStop(1, '#C47D08');
   ctx.fillStyle = accent;
   ctx.fillRect(0, 0, W, 4);
 
   // Header
-  ctx.fillStyle = '#F59E0B';
+  ctx.fillStyle = '#E8940A';
   ctx.font = 'bold 14px system-ui, sans-serif';
   ctx.fillText('NXSTOPS', pad, 44);
 
@@ -66,7 +78,7 @@ function exportDayAsImage(stops: Stop[], dayNum: number, cityName: string) {
     // Number circle
     ctx.beginPath();
     ctx.arc(pad + 14, y + 22, 14, 0, Math.PI * 2);
-    ctx.fillStyle = '#F59E0B';
+    ctx.fillStyle = '#E8940A';
     ctx.fill();
     ctx.fillStyle = '#0C0A09';
     ctx.font = 'bold 13px system-ui, sans-serif';
@@ -132,6 +144,7 @@ export default function PlanScreen() {
     removeDay,
     moveStopToDay,
     movePlanStop,
+    reorderStops,
     removeFromPlan,
     getRouteUrl,
     getFullTripRouteUrl,
@@ -165,13 +178,12 @@ export default function PlanScreen() {
     places: allPlaces,
     requireAuth,
     lastPlanTitle,
-    estimatedSpend,
-    rateStop,
-    getRating,
     shareAsLink,
     saveForOffline,
     offlineSaved,
     offlineSaving,
+    setDishLensContext,
+    setSelectedPlace,
   } = useApp();
 
 
@@ -192,11 +204,26 @@ export default function PlanScreen() {
     } catch { return new Set(); }
   });
   const [showPackList, setShowPackList] = useState(false);
+  const [showWeatherForecast, setShowWeatherForecast] = useState(false);
+
+  // --- Drag & drop sensors ---
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+  );
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = dayPlan.findIndex(s => s.id === active.id);
+    const newIndex = dayPlan.findIndex(s => s.id === over.id);
+    reorderStops(oldIndex, newIndex);
+  };
 
   // --- Pivot state ---
   const [pivotStopId, setPivotStopId] = useState<string | null>(null);
   const [pivotAlternatives, setPivotAlternatives] = useState<Place[]>([]);
-  const [pivotReason, setPivotReason] = useState<'closed' | 'not_feeling_it' | null>(null);
+  const [pivotIndex, setPivotIndex] = useState(0);
+  const [pivotLoading, setPivotLoading] = useState(false);
 
   useEffect(() => {
     localStorage.setItem(packStorageKey, JSON.stringify([...checkedItems]));
@@ -372,24 +399,44 @@ export default function PlanScreen() {
         </div>
       )}
 
-      {/* Trip Weather Forecast */}
+      {/* Trip Weather Forecast (collapsed by default) */}
       {weather && weather.forecast.length > 0 && dayCount > 0 && (
-        <div className="card mb-3 p-3 border border-blue-tint-border"
+        <div className="card mb-3 p-0 overflow-hidden border border-blue-tint-border"
           style={{ background: `linear-gradient(135deg, var(--blue-tint-bg), var(--bg-subtle))` }}>
-          <div className="text-[11px] text-text-tertiary uppercase tracking-[0.08em] mb-2">Pack for your trip</div>
-          <div className="flex gap-2 overflow-x-auto scroll-hidden">
-            {weather.forecast.slice(0, dayCount).map((day, i) => (
-              <div key={day.date} className="text-center min-w-[60px] shrink-0 p-1.5 rounded-[10px] bg-bg-subtle">
-                <div className="text-[10px] text-text-tertiary mb-0.5">Day {i + 1}</div>
-                <div className="text-xl mb-0.5">{day.emoji}</div>
-                <div className="text-xs font-semibold text-text-primary">{day.high}°</div>
-                <div className="text-[10px] text-text-tertiary">{day.low}°</div>
-                {day.precipChance > 30 && (
-                  <div className="text-[9px] text-status-blue mt-0.5">&#x1f4a7; {day.precipChance}%</div>
-                )}
+          <button
+            onClick={() => setShowWeatherForecast(!showWeatherForecast)}
+            className="w-full py-3 px-4 bg-transparent border-none cursor-pointer flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="text-lg">{weather.emoji}</span>
+              <div className="text-left">
+                <span className="text-sm font-semibold text-text-primary">{weather.temp}°F</span>
+                <span className="text-xs text-text-secondary ml-1.5">{weather.description}</span>
               </div>
-            ))}
-          </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-text-tertiary">{dayCount}-day forecast</span>
+              <span className="text-text-tertiary text-sm" style={{ transform: showWeatherForecast ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                {'\u{25BC}'}
+              </span>
+            </div>
+          </button>
+          {showWeatherForecast && (
+            <div className="px-3 pb-3">
+              <div className="flex gap-2 overflow-x-auto scroll-hidden">
+                {weather.forecast.slice(0, dayCount).map((day, i) => (
+                  <div key={day.date} className="text-center min-w-[60px] shrink-0 p-1.5 rounded-[10px] bg-bg-subtle">
+                    <div className="text-[10px] text-text-tertiary mb-0.5">Day {i + 1}</div>
+                    <div className="text-xl mb-0.5">{day.emoji}</div>
+                    <div className="text-xs font-semibold text-text-primary">{day.high}°</div>
+                    <div className="text-[10px] text-text-tertiary">{day.low}°</div>
+                    {day.precipChance > 30 && (
+                      <div className="text-[9px] text-status-blue mt-0.5">&#x1f4a7; {day.precipChance}%</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -415,26 +462,6 @@ export default function PlanScreen() {
         </button>
       </div>
 
-      {/* Estimated Day Cost */}
-      {dayPlan.length > 0 && estimatedSpend > 0 && (
-        <div className="card mb-3 p-3.5 border border-amber-tint-border15"
-          style={{ background: `linear-gradient(135deg, var(--amber-tint-bg06), var(--bg-subtle))` }}>
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm">{'\u{1F4B0}'}</span>
-              <span className="text-xs font-semibold text-text-primary">Estimated Day Cost</span>
-            </div>
-            <span className="text-lg font-bold text-accent-amber">~${estimatedSpend}</span>
-          </div>
-          <div className="text-[11px] text-text-tertiary mt-1">
-            Based on {dayPlan.length} stop{dayPlan.length !== 1 ? 's' : ''} · per person
-          </div>
-        </div>
-      )}
-
-      {/* Currency Converter */}
-      {dayPlan.length > 0 && <CurrencyWidget cityName={cityLabel} />}
-
       {/* Active day stops */}
       {dayPlan.length === 0 ? (
         <div className="card text-center py-8 px-5">
@@ -443,10 +470,12 @@ export default function PlanScreen() {
       ) : (<>
         {dayPlan.length > 1 && (
           <div className="flex items-center gap-1.5 mb-2 py-1.5 px-2.5 rounded-lg bg-amber-tint-bg06">
-            <span className="text-xs">&#x2195;&#xfe0f;</span>
-            <span className="text-[11px] text-accent-amber-dark font-medium">Tap the arrows to reorder your stops</span>
+            <span className="text-xs">{'\u2630'}</span>
+            <span className="text-[11px] text-accent-amber-dark font-medium">Hold and drag to reorder your stops</span>
           </div>
         )}
+        <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={dayPlan.map(s => s.id)} strategy={verticalListSortingStrategy}>
         <div className="relative pl-8">
           {/* Vertical route line */}
           <div
@@ -455,7 +484,8 @@ export default function PlanScreen() {
           />
 
           {dayPlan.map((stop, index) => (
-            <div key={stop.id}>
+            <SortableStopCard key={stop.id} id={stop.id}>
+            {(listeners) => (<div>
               <div className={`relative ${index < dayPlan.length - 1 ? 'mb-1' : 'mb-4'}`}>
                 {/* Stop number circle */}
                 <div
@@ -475,206 +505,257 @@ export default function PlanScreen() {
                     ? 'border border-purple-tint-border15'
                     : 'border border-amber-tint-bg10'
                 }`}>
+                  {/* Top row: clickable content + drag controls */}
                   <div className="flex gap-3">
-                    {stop.type === 'place' && stop.place?.photoUrl && (
-                      <img src={stop.place.photoUrl} alt={stop.place.name} loading="lazy" decoding="async"
-                        className="w-20 h-20 rounded-xl shrink-0 object-cover" />
-                    )}
-                    {stop.type === 'event' && stop.event?.imageUrl && (
-                      <img src={stop.event.imageUrl} alt={stop.event.name} loading="lazy" decoding="async"
-                        className="w-20 h-20 rounded-xl shrink-0 object-cover" />
-                    )}
-
-                    <div className="flex-1 min-w-0">
-                      {/* Time slot from auto-planner */}
-                      {stop.timeSlot && (
-                        <div className="text-[10px] font-semibold text-accent-amber uppercase tracking-[0.04em] mb-0.5">
-                          {stop.timeSlot}
-                        </div>
+                    {/* Clickable area: image + info */}
+                    <div className="flex gap-3 flex-1 min-w-0 cursor-pointer"
+                      onClick={() => {
+                        if (stop.type === 'place' && stop.place) setSelectedPlace(stop.place);
+                      }}
+                      role={stop.type === 'place' ? 'button' : undefined}
+                      tabIndex={stop.type === 'place' ? 0 : undefined}
+                      aria-label={stop.type === 'place' ? `View details for ${getStopName(stop)}` : undefined}
+                    >
+                      {stop.type === 'place' && stop.place?.photoUrl && (
+                        <img src={stop.place.photoUrl} alt={stop.place.name} loading="lazy" decoding="async"
+                          className="w-20 h-20 rounded-xl shrink-0 object-cover" />
                       )}
-                      <h3 className="text-[15px] font-semibold mb-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                        {getStopName(stop)}
-                      </h3>
-                      {stop.type === 'place' && stop.place && (
-                        <>
-                          <p className="text-xs text-text-secondary mb-1">
-                            {stop.place.categoryDisplay}
-                            {stop.estimatedSpend && stop.estimatedSpend > 0 ? (
-                              <span className="text-accent-amber"> · ~${stop.estimatedSpend}</span>
-                            ) : stop.place.priceLevel >= 0 ? (
-                              <span className={stop.place.priceLevel >= 3 ? 'text-accent-amber' : 'text-text-tertiary'}>
-                                {' '}· {'$'.repeat(Math.max(1, stop.place.priceLevel))}
-                              </span>
-                            ) : null}
-                            {stop.place.distance != null && ` · ${formatDistance(stop.place.distance, useMiles)} ${getDistanceReference()}`}
-                          </p>
-                          {stop.place.rating > 0 && (
-                            <div className="text-xs">
-                              <span className="text-accent-amber">{'\u2605'} {stop.place.rating.toFixed(1)}</span>
-                              <span className="text-text-tertiary"> ({stop.place.reviewCount})</span>
-                            </div>
-                          )}
-                          {/* AI reason */}
-                          {stop.reason && (
-                            <p className="text-[11px] text-text-tertiary mt-1 italic leading-snug">{'\u2728'} {stop.reason}</p>
-                          )}
-                          {/* Night risk (only at night) */}
-                          {isNightTime(weather?.sunset) && (() => {
-                            const risk = getNightRisk(stop.place.category, stop.place.rating, stop.place.reviewCount, stop.place.openNow);
-                            return (
-                              <div className="flex items-center gap-1 mt-1">
-                                <span className="text-[10px]">{risk.emoji}</span>
-                                <span className={`text-[10px] font-medium ${
-                                  risk.level === 'low' ? 'text-status-green' : risk.level === 'moderate' ? 'text-accent-amber' : 'text-status-red'
-                                }`}>
-                                  {risk.label}
-                                </span>
-                              </div>
-                            );
-                          })()}
-                        </>
+                      {stop.type === 'event' && stop.event?.imageUrl && (
+                        <img src={stop.event.imageUrl} alt={stop.event.name} loading="lazy" decoding="async"
+                          className="w-20 h-20 rounded-xl shrink-0 object-cover" />
                       )}
-                      {stop.type === 'event' && stop.event && (
-                        <>
-                          <p className="text-xs text-events-text mb-1">
-                            {formatEventDate(stop.event.date)}
-                            {stop.event.time && ` · ${formatEventTime(stop.event.time)}`}
-                          </p>
-                          <p className="text-xs text-text-secondary">
-                            {stop.event.venue}
-                          </p>
-                        </>
-                      )}
-
-                      {/* Mini actions */}
-                      <div className="flex gap-1.5 mt-2 flex-wrap">
-                        {stop.type === 'place' && stop.place?.googleMapsUrl && (
-                          <a href={stop.place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
-                            className="py-[5px] px-2.5 rounded-lg text-[11px] bg-amber-tint-bg10 text-accent-amber no-underline flex items-center gap-1">
-                            <DirectionsIcon /> Go
-                          </a>
+                      <div className="flex-1 min-w-0">
+                        {stop.timeSlot && (
+                          <div className="text-[10px] font-semibold text-accent-amber uppercase tracking-[0.04em] mb-0.5">
+                            {stop.timeSlot}
+                          </div>
                         )}
-                        {stop.type === 'place' && stop.place?.phone && (
-                          <a href={`tel:${stop.place.phone}`}
-                            className="py-[5px] px-2.5 rounded-lg text-[11px] bg-bg-subtle-medium text-text-secondary no-underline flex items-center gap-1">
-                            <PhoneIcon /> Call
-                          </a>
-                        )}
-                        {stop.type === 'event' && stop.event?.url && (
-                          <a href={stop.event.url} target="_blank" rel="noopener noreferrer"
-                            className="py-[5px] px-2.5 rounded-lg text-[11px] bg-purple-tint-bg08 text-events-text no-underline flex items-center gap-1">
-                            &#x1f3ab; Tickets
-                          </a>
-                        )}
-                        {/* Move to different day */}
-                        {dayCount > 1 && (
-                          <select
-                            value=""
-                            onChange={e => { if (e.target.value) moveStopToDay(stop.id, activeDay, Number(e.target.value)); }}
-                            className="py-[5px] px-2 rounded-lg text-[11px] bg-bg-subtle-medium text-text-tertiary border border-border-medium cursor-pointer">
-                            <option value="">Move to...</option>
-                            {sortedDays.filter(d => d !== activeDay).map(d => (
-                              <option key={d} value={d}>Day {d}</option>
-                            ))}
-                          </select>
-                        )}
-                        {/* Contextual booking link */}
-                        {stop.type === 'place' && stop.place && (() => {
-                          const booking = getPlaceBookingUrl(stop.place!.name, stop.place!.category, cityLabel);
-                          if (!booking) return null;
-                          return (
-                            <a href={booking.url} target="_blank" rel="noopener noreferrer"
-                              onClick={() => track('plan_booking_click', { place: stop.place!.name, service: booking.service })}
-                              className="py-[5px] px-2.5 rounded-lg text-[11px] bg-green-tint-bg text-status-green no-underline flex items-center gap-1 border border-green-tint-border">
-                              {'\u{1F517}'} {booking.label}
-                            </a>
-                          );
-                        })()}
-                        {/* Pivot button */}
+                        <h3 className="text-[15px] font-semibold mb-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                          {getStopName(stop)}
+                        </h3>
                         {stop.type === 'place' && stop.place && (
-                          <button
-                            onClick={() => {
-                              const excludeIds = new Set(dayPlan.map(s => s.place?.placeId).filter(Boolean) as string[]);
-                              const stopData = {
-                                category: stop.place!.category,
-                                lat: stop.place!.lat,
-                                lng: stop.place!.lng,
-                                priceLevel: stop.place!.priceLevel,
-                                placeId: stop.place!.placeId,
-                              };
-                              const alternatives = findPivotAlternatives(allPlaces, stopData, excludeIds);
-                              if (alternatives.length > 0) {
-                                setPivotStopId(stop.id);
-                                setPivotAlternatives(alternatives);
-                                setPivotReason(null);
-                              } else {
-                                showToast('No alternatives found nearby');
-                              }
-                              track('pivot_initiated', { place: stop.place!.name, day: String(activeDay) });
-                            }}
-                            className="py-[5px] px-2.5 rounded-lg text-[11px] bg-amber-tint-bg10 text-accent-amber border border-amber-tint-border20 cursor-pointer flex items-center gap-1"
-                          >
-                            {'\u{1F504}'} Pivot
-                          </button>
+                          <>
+                            <p className="text-xs text-text-secondary mb-1">
+                              {stop.place.categoryDisplay}
+                              {stop.place.priceLevel >= 0 ? (
+                                <span className={stop.place.priceLevel >= 3 ? 'text-accent-amber' : 'text-text-tertiary'}>
+                                  {' '}· {'$'.repeat(Math.max(1, stop.place.priceLevel))}
+                                </span>
+                              ) : null}
+                              {stop.place.distance != null && ` · ${formatDistance(stop.place.distance, useMiles)} ${getDistanceReference()}`}
+                            </p>
+                            {stop.place.rating > 0 && (
+                              <div className="text-xs">
+                                <span className="text-accent-amber">{'\u2605'} {stop.place.rating.toFixed(1)}</span>
+                                <span className="text-text-tertiary"> ({stop.place.reviewCount})</span>
+                              </div>
+                            )}
+                            {stop.reason && (
+                              <p className="text-[11px] text-text-tertiary mt-1 italic leading-snug">{'\u2728'} {stop.reason}</p>
+                            )}
+                            {isNightTime(weather?.sunset) && (() => {
+                              const risk = getNightRisk(stop.place.category, stop.place.rating, stop.place.reviewCount, stop.place.openNow);
+                              return (
+                                <div className="flex items-center gap-1 mt-1">
+                                  <span className="text-[10px]">{risk.emoji}</span>
+                                  <span className={`text-[10px] font-medium ${
+                                    risk.level === 'low' ? 'text-status-green' : risk.level === 'moderate' ? 'text-accent-amber' : 'text-status-red'
+                                  }`}>
+                                    {risk.label}
+                                  </span>
+                                </div>
+                              );
+                            })()}
+                          </>
                         )}
-                        {/* Thumbs up/down */}
-                        <button
-                          onClick={() => {
-                            const pid = stop.place?.placeId || stop.event?.id || '';
-                            rateStop(stop.id, pid, 'up');
-                          }}
-                          aria-label={`Rate ${getStopName(stop)} thumbs up`}
-                          aria-pressed={getRating(stop.id) === 'up'}
-                          className={`py-[5px] px-2.5 rounded-lg text-[11px] cursor-pointer flex items-center gap-1 border ${
-                            getRating(stop.id) === 'up'
-                              ? 'bg-green-tint-bg border-green-tint-border text-status-green'
-                              : 'bg-bg-subtle-medium border-border-subtle text-text-tertiary'
-                          }`}
-                        >
-                          {'\u{1F44D}'}
-                        </button>
-                        <button
-                          onClick={() => {
-                            const pid = stop.place?.placeId || stop.event?.id || '';
-                            rateStop(stop.id, pid, 'down');
-                            if (getRating(stop.id) !== 'down') showToast('Tap Pivot to swap this stop');
-                          }}
-                          aria-label={`Rate ${getStopName(stop)} thumbs down`}
-                          aria-pressed={getRating(stop.id) === 'down'}
-                          className={`py-[5px] px-2.5 rounded-lg text-[11px] cursor-pointer flex items-center gap-1 border ${
-                            getRating(stop.id) === 'down'
-                              ? 'bg-red-tint-bg border-red-tint-border text-status-red'
-                              : 'bg-bg-subtle-medium border-border-subtle text-text-tertiary'
-                          }`}
-                        >
-                          {'\u{1F44E}'}
-                        </button>
+                        {stop.type === 'event' && stop.event && (
+                          <>
+                            <p className="text-xs text-events-text mb-1">
+                              {formatEventDate(stop.event.date)}
+                              {stop.event.time && ` · ${formatEventTime(stop.event.time)}`}
+                            </p>
+                            <p className="text-xs text-text-secondary">
+                              {stop.event.venue}
+                            </p>
+                          </>
+                        )}
                       </div>
                     </div>
 
-                    {/* Right controls: reorder + remove */}
+                    {/* Right controls: drag handle + remove */}
                     <div className="flex flex-col gap-1 items-center justify-center min-w-[44px]">
-                      {index > 0 && (
-                        <button onClick={() => movePlanStop(index, 'up')}
-                          aria-label="Move up"
-                          className="bg-amber-tint-bg10 border border-amber-tint-border20 text-accent-amber cursor-pointer text-sm font-bold py-1.5 px-2.5 rounded-lg min-h-9 min-w-[44px] flex items-center justify-center gap-0.5">
-                          ↑
-                        </button>
-                      )}
+                      <div {...listeners} className="cursor-grab active:cursor-grabbing touch-none p-2 rounded-lg bg-amber-tint-bg06 border border-amber-tint-border20"
+                        aria-label="Drag to reorder">
+                        <DragHandleIcon color="var(--accent-amber)" />
+                      </div>
                       <button onClick={() => removeFromPlan(stop.id)}
                         aria-label="Remove stop"
                         className="bg-red-tint-bg border border-red-tint-border text-status-red cursor-pointer text-xs font-semibold py-1.5 px-2 rounded-lg min-h-8 min-w-[44px] flex items-center justify-center">
                         ✕
                       </button>
-                      {index < dayPlan.length - 1 && (
-                        <button onClick={() => movePlanStop(index, 'down')}
-                          aria-label="Move down"
-                          className="bg-amber-tint-bg10 border border-amber-tint-border20 text-accent-amber cursor-pointer text-sm font-bold py-1.5 px-2.5 rounded-lg min-h-9 min-w-[44px] flex items-center justify-center gap-0.5">
-                          ↓
-                        </button>
-                      )}
                     </div>
                   </div>
+
+                  {/* Mini actions */}
+                  <div className="flex gap-1.5 mt-2 flex-wrap">
+                    {stop.type === 'place' && stop.place?.googleMapsUrl && (
+                      <a href={stop.place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+                        className="py-[5px] px-2.5 rounded-lg text-[11px] bg-amber-tint-bg10 text-accent-amber no-underline flex items-center gap-1">
+                        <DirectionsIcon /> Go
+                      </a>
+                    )}
+                    {stop.type === 'event' && stop.event?.url && (
+                      <a href={stop.event.url} target="_blank" rel="noopener noreferrer"
+                        className="py-[5px] px-2.5 rounded-lg text-[11px] bg-purple-tint-bg08 text-events-text no-underline flex items-center gap-1">
+                        &#x1f3ab; Tickets
+                      </a>
+                    )}
+                    {dayCount > 1 && (
+                      <select
+                        value=""
+                        onChange={e => { if (e.target.value) moveStopToDay(stop.id, activeDay, Number(e.target.value)); }}
+                        className="py-[5px] px-2 rounded-lg text-[11px] bg-bg-subtle-medium text-text-tertiary border border-border-medium cursor-pointer">
+                        <option value="">Move to...</option>
+                        {sortedDays.filter(d => d !== activeDay).map(d => (
+                          <option key={d} value={d}>Day {d}</option>
+                        ))}
+                      </select>
+                    )}
+                    {stop.type === 'place' && stop.place && /restaurant|cafe|bakery|bar|food|pizza|sushi|burger|coffee|tea|ice.cream|dessert|brunch|bistro|diner|grill|bbq|seafood|steak/i.test(stop.place.category || '') && (
+                      <button
+                        onClick={() => {
+                          setDishLensContext({ dish: undefined, city: cityLabel, restaurant: stop.place!.name });
+                          setScreen('tastelens');
+                        }}
+                        className="py-[5px] px-2.5 rounded-lg text-[11px] bg-amber-tint-bg10 text-accent-amber border border-amber-tint-border20 cursor-pointer flex items-center gap-1"
+                      >
+                        {'\u{1F37D}\u{FE0F}'} TasteLens
+                      </button>
+                    )}
+                    {stop.type === 'place' && stop.place && (
+                      <button
+                        disabled={pivotLoading}
+                        onClick={async () => {
+                          // If already showing pivot for this stop, dismiss it
+                          if (pivotStopId === stop.id) {
+                            setPivotStopId(null);
+                            setPivotAlternatives([]);
+                            return;
+                          }
+                          const excludeIds = new Set(dayPlan.map(s => s.place?.placeId).filter(Boolean) as string[]);
+                          const stopData = {
+                            category: stop.place!.category,
+                            lat: stop.place!.lat,
+                            lng: stop.place!.lng,
+                            priceLevel: stop.place!.priceLevel,
+                            placeId: stop.place!.placeId,
+                          };
+                          // Try local alternatives first (instant, free)
+                          let alternatives = findPivotAlternatives(allPlaces, stopData, excludeIds);
+                          // If none found locally, search Google Places for nearby similar places
+                          if (alternatives.length === 0) {
+                            setPivotLoading(true);
+                            try {
+                              const vibe = stop.place!.tags?.[0] || 'food';
+                              const googlePlaces = await searchNearby(
+                                stop.place!.lat, stop.place!.lng,
+                                [vibe],
+                                2000,
+                              );
+                              alternatives = googlePlaces
+                                .filter(p => !excludeIds.has(p.placeId) && p.placeId !== stop.place!.placeId)
+                                .slice(0, 8);
+                            } catch { /* ignore API errors */ }
+                            setPivotLoading(false);
+                          }
+                          if (alternatives.length > 0) {
+                            setPivotStopId(stop.id);
+                            setPivotAlternatives(alternatives);
+                            setPivotIndex(0);
+                          } else {
+                            showToast('No alternatives found nearby');
+                          }
+                          track('pivot_initiated', { place: stop.place!.name, day: String(activeDay) });
+                        }}
+                        className={`py-[5px] px-2.5 rounded-lg text-[11px] border cursor-pointer flex items-center gap-1 ${
+                          pivotStopId === stop.id
+                            ? 'bg-accent-amber text-text-on-accent border-accent-amber'
+                            : 'bg-amber-tint-bg10 text-accent-amber border-amber-tint-border20'
+                        }`}
+                      >
+                        {pivotLoading ? '\u23F3' : '\u{1F504}'} Pivot
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Inline Pivot — shows alternative below the stop */}
+                  {pivotStopId === stop.id && pivotAlternatives.length > 0 && (() => {
+                    const alt = pivotAlternatives[pivotIndex];
+                    if (!alt) return null;
+                    return (
+                      <div className="mt-2 p-3 rounded-xl border border-amber-tint-border30 bg-amber-tint-bg06">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xs font-semibold text-accent-amber">{'\u{1F504}'} Plan B</span>
+                          <span className="text-[10px] text-text-muted ml-auto">{pivotIndex + 1} of {pivotAlternatives.length}</span>
+                        </div>
+                        <div className="flex gap-3 items-center">
+                          {/* Photo */}
+                          <div className="w-14 h-14 rounded-xl shrink-0 overflow-hidden bg-bg-subtle-strong">
+                            {alt.photoUrl ? (
+                              <img src={alt.photoUrl} alt={alt.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-xl text-text-tertiary">{'\u{1F4CD}'}</div>
+                            )}
+                          </div>
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-semibold text-text-primary truncate">{alt.name}</div>
+                            <div className="text-xs text-text-secondary mt-0.5">{alt.categoryDisplay || alt.category}</div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              {alt.rating > 0 && (
+                                <span className="text-[11px] text-accent-amber font-semibold">{'\u{2B50}'} {alt.rating.toFixed(1)}</span>
+                              )}
+                              {alt.priceLevel > 0 && (
+                                <span className="text-[11px] text-text-tertiary">{'$'.repeat(alt.priceLevel)}</span>
+                              )}
+                              {alt.distance != null && (
+                                <span className="text-[10px] text-text-muted">{formatDistance(alt.distance)}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        {/* Actions */}
+                        <div className="flex gap-2 mt-2.5">
+                          <button
+                            onClick={() => {
+                              setPivotStopId(null);
+                              setPivotAlternatives([]);
+                            }}
+                            className="py-2 px-3 rounded-lg text-xs font-medium bg-transparent border border-border-medium text-text-secondary cursor-pointer">
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() => {
+                              setPivotIndex((pivotIndex + 1) % pivotAlternatives.length);
+                              track('pivot_next', { current: alt.name });
+                            }}
+                            className="flex-1 py-2 px-3 rounded-lg text-xs font-medium bg-bg-subtle-medium border border-border-medium text-text-primary cursor-pointer">
+                            Next {'\u2192'}
+                          </button>
+                          <button
+                            onClick={() => {
+                              pivotStop(pivotStopId, alt);
+                              track('pivot_swapped', { newPlace: alt.name });
+                              setPivotStopId(null);
+                              setPivotAlternatives([]);
+                            }}
+                            className="flex-1 py-2 px-3 rounded-lg text-xs font-semibold bg-accent-gradient text-text-on-accent border-none cursor-pointer">
+                            Swap {'\u2713'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -704,9 +785,12 @@ export default function PlanScreen() {
                   </div>
                 );
               })()}
-            </div>
+            </div>)}
+            </SortableStopCard>
           ))}
         </div>
+        </SortableContext>
+        </DndContext>
       </>)}
 
       {/* Day Summary */}
@@ -792,183 +876,79 @@ export default function PlanScreen() {
       )}
 
 
-      {/* Pivot Modal */}
-      {pivotStopId && pivotAlternatives.length > 0 && (
-        <div
-          className="fixed inset-0 bg-[rgba(0,0,0,0.6)] backdrop-blur-[8px] z-[1000] flex items-end justify-center"
-          onClick={() => { setPivotStopId(null); setPivotAlternatives([]); setPivotReason(null); }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            className="w-full max-w-[440px] max-h-[85vh] overflow-y-auto bg-bg-surface rounded-t-[20px] pt-6 px-5 pb-10"
-          >
-            {/* Header */}
-            <div className="text-center mb-5">
-              <div className="text-[28px] mb-1">{'\u{1F504}'}</div>
-              <h3 className="text-lg font-bold text-text-primary mb-1">
-                Plan B
-              </h3>
-              <p className="text-[13px] text-text-secondary">
-                Pick an alternative — your day stays on track
-              </p>
-            </div>
-
-            {/* Reason buttons */}
-            {!pivotReason && (
-              <div className="flex gap-2.5 mb-5">
-                {[
-                  { key: 'closed' as const, label: "It's closed", emoji: '\u{1F6AA}' },
-                  { key: 'not_feeling_it' as const, label: 'Not feeling it', emoji: '\u{1F645}' },
-                ].map(r => (
-                  <button
-                    key={r.key}
-                    onClick={() => {
-                      setPivotReason(r.key);
-                      track('pivot_reason', { reason: r.key, stopId: pivotStopId });
-                    }}
-                    className="flex-1 p-3 rounded-xl cursor-pointer bg-bg-subtle-strong border border-border-medium text-text-primary text-[13px] font-medium flex items-center justify-center gap-1.5"
-                  >
-                    {r.emoji} {r.label}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Alternative cards */}
-            <div className="flex flex-col gap-3">
-              {pivotAlternatives.map(alt => (
-                <div
-                  key={alt.placeId}
-                  className="card flex gap-3 items-center p-3.5"
-                >
-                  {/* Photo */}
-                  <div className="w-16 h-16 rounded-xl shrink-0 overflow-hidden bg-bg-subtle-strong">
-                    {alt.photoUrl ? (
-                      <img src={alt.photoUrl} alt={alt.name}
-                        className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-2xl text-text-tertiary">
-                        {'\u{1F4CD}'}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-text-primary whitespace-nowrap overflow-hidden text-ellipsis">
-                      {alt.name}
-                    </div>
-                    <div className="text-xs text-text-secondary mt-0.5">
-                      {alt.categoryDisplay || alt.category}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      {alt.rating > 0 && (
-                        <span className="text-[11px] text-accent-amber font-semibold">
-                          {'\u{2B50}'} {alt.rating.toFixed(1)}
-                        </span>
-                      )}
-                      <span className="text-[11px] text-text-tertiary">
-                        {'$'.repeat(Math.max(1, alt.priceLevel))}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Swap button */}
-                  <button
-                    onClick={() => {
-                      pivotStop(pivotStopId, alt);
-                      track('pivot_swapped', { newPlace: alt.name, reason: pivotReason || 'unknown' });
-                      setPivotStopId(null);
-                      setPivotAlternatives([]);
-                      setPivotReason(null);
-                    }}
-                    className="py-2.5 px-3.5 rounded-[10px] cursor-pointer bg-accent-gradient text-text-on-accent border-none text-xs font-semibold whitespace-nowrap shrink-0"
-                  >
-                    Swap
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* Dismiss */}
-            <button
-              onClick={() => { setPivotStopId(null); setPivotAlternatives([]); setPivotReason(null); }}
-              className="w-full mt-4 p-3.5 bg-transparent border border-border-medium rounded-xl text-text-secondary text-sm font-medium cursor-pointer"
-            >
-              Keep original
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Pivot is now inline — see pivot card inside each stop */}
 
       {/* Action Buttons */}
       <div className="flex flex-col gap-2.5 mt-5">
-        {dayPlan.length > 0 && (
-          <a href={getRouteUrl()} target="_blank" rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 bg-accent-gradient text-text-on-accent border-none rounded-[14px] p-3.5 text-[15px] font-semibold no-underline shadow-[0_4px_20px_var(--amber-tint-shadow)]">
-            <DirectionsIcon /> Get Day {activeDay} Route
-          </a>
-        )}
-
-        {dayCount > 1 && totalStops >= 2 && getFullTripRouteUrl() && (
-          <a href={getFullTripRouteUrl()} target="_blank" rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 bg-bg-subtle-strong text-text-primary border border-border-medium rounded-[14px] p-3.5 text-sm font-medium no-underline">
-            <DirectionsIcon /> Full Trip Route ({totalStops} stops)
-          </a>
-        )}
-
-        {/* Save for Offline */}
-        {totalStops > 0 && (
-          <button
-            onClick={saveForOffline}
-            disabled={offlineSaving || offlineSaved}
-            aria-label={offlineSaved ? 'Plan saved for offline use' : 'Save plan for offline use'}
-            className={`flex items-center justify-center gap-2 rounded-[14px] p-3.5 text-sm font-medium cursor-pointer border ${
-              offlineSaved
-                ? 'bg-green-tint-bg border-green-tint-border text-status-green'
-                : offlineSaving
-                ? 'bg-bg-subtle-strong border-border-medium text-text-tertiary opacity-60'
-                : 'bg-bg-subtle-strong border-border-medium text-text-primary'
-            }`}
-          >
-            {offlineSaved ? '\u{2705} Saved Offline' : offlineSaving ? 'Saving...' : '\u{1F4E5} Save for Offline'}
-          </button>
-        )}
-
-        {/* Share buttons */}
+        {/* Primary: Get Route + Share */}
         <div className="flex gap-2.5">
+          {dayPlan.length > 0 && (
+            <a href={getRouteUrl()} target="_blank" rel="noopener noreferrer"
+              className="flex-1 flex items-center justify-center gap-2 bg-accent-gradient text-text-on-accent border-none rounded-[14px] p-3.5 text-[15px] font-semibold no-underline shadow-[0_4px_20px_var(--amber-tint-shadow)]">
+              <DirectionsIcon /> Get Route
+            </a>
+          )}
           <button onClick={() => { if (!requireAuth()) return; shareAsLink(); }}
             aria-label="Share plan as link"
-            className="flex-1 flex items-center justify-center gap-2 bg-accent-gradient text-text-on-accent border-none rounded-[14px] p-3.5 text-[15px] font-semibold cursor-pointer shadow-[0_4px_20px_var(--amber-tint-shadow)]">
-            <ShareIcon /> Share Link
+            className="flex-1 flex items-center justify-center gap-2 bg-bg-subtle-strong text-text-primary border border-border-medium rounded-[14px] p-3.5 text-[15px] font-semibold cursor-pointer">
+            <ShareIcon /> Share
           </button>
+        </div>
+
+        {/* Secondary: Text + Export + Save */}
+        <div className="flex gap-2">
           <button onClick={sharePlan}
             aria-label="Share plan via text message"
-            className="flex items-center justify-center gap-1.5 p-3.5 px-5 rounded-[14px] cursor-pointer border border-border-medium bg-bg-subtle-strong text-text-primary text-sm font-medium shrink-0">
-            Text
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl cursor-pointer border border-border-medium bg-bg-subtle text-text-secondary text-[13px] font-medium">
+            {'\u{1F4AC}'} Text
           </button>
           {dayPlan.length > 0 && (
             <button onClick={() => { if (!requireAuth()) return; exportDayAsImage(dayPlan, activeDay, cityLabel); }}
               aria-label="Export day as image"
-              className="flex items-center justify-center gap-1.5 p-3.5 px-5 rounded-[14px] cursor-pointer border border-border-medium bg-bg-subtle-strong text-text-primary text-sm font-medium shrink-0">
-              📸
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl cursor-pointer border border-border-medium bg-bg-subtle text-text-secondary text-[13px] font-medium">
+              {'\u{1F4F8}'} Export
+            </button>
+          )}
+          {totalStops > 0 && (
+            <button
+              onClick={saveForOffline}
+              disabled={offlineSaving || offlineSaved}
+              aria-label={offlineSaved ? 'Plan saved for offline use' : 'Save plan for offline use'}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl cursor-pointer border text-[13px] font-medium ${
+                offlineSaved
+                  ? 'bg-green-tint-bg border-green-tint-border text-status-green'
+                  : 'bg-bg-subtle border-border-medium text-text-secondary'
+              }`}
+            >
+              {offlineSaved ? '\u{2705} Saved' : '\u{1F4E5} Offline'}
             </button>
           )}
         </div>
 
-        {dayCount > 1 && (
-          <button onClick={() => removeDay(activeDay)}
-            aria-label={`Delete day ${activeDay} from trip`}
-            className="bg-transparent border border-red-tint-border-strong text-status-red text-[13px] cursor-pointer p-2.5 rounded-[10px]">
-            Delete Day {activeDay}
-          </button>
+        {/* Full trip route (multi-day only) */}
+        {dayCount > 1 && totalStops >= 2 && getFullTripRouteUrl() && (
+          <a href={getFullTripRouteUrl()} target="_blank" rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 bg-bg-subtle text-text-secondary border border-border-medium rounded-xl py-2.5 px-3 text-[13px] font-medium no-underline">
+            <DirectionsIcon /> Full Trip Route ({totalStops} stops)
+          </a>
         )}
 
-        <button onClick={clearPlan}
-          aria-label="Clear all stops from plan"
-          className="bg-transparent border-none text-text-tertiary text-[13px] cursor-pointer p-2.5">
-          Clear all stops
-        </button>
+        {/* Danger zone */}
+        <div className="flex items-center justify-center gap-4 pt-1">
+          {dayCount > 1 && (
+            <button onClick={() => removeDay(activeDay)}
+              aria-label={`Delete day ${activeDay} from trip`}
+              className="bg-transparent border-none text-status-red text-[12px] cursor-pointer p-1.5">
+              Delete Day {activeDay}
+            </button>
+          )}
+          {dayCount > 1 && <span className="text-border-subtle">|</span>}
+          <button onClick={clearPlan}
+            aria-label="Clear all stops from plan"
+            className="bg-transparent border-none text-text-tertiary text-[12px] cursor-pointer p-1.5">
+            Clear all stops
+          </button>
+        </div>
       </div>
     </div>
   );

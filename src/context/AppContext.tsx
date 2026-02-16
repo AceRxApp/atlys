@@ -54,6 +54,7 @@ export interface AppContextType {
   isInPlan: (placeId: string) => boolean;
   clearPlan: () => void;
   movePlanStop: (index: number, direction: 'up' | 'down') => void;
+  reorderStops: (oldIndex: number, newIndex: number) => void;
   addDay: () => void;
   removeDay: (day: number) => void;
   moveStopToDay: (stopId: string, fromDay: number, toDay: number) => void;
@@ -120,6 +121,8 @@ export interface AppContextType {
   setReviewTags: React.Dispatch<React.SetStateAction<CommunityTag[]>>;
   reviewSubmitting: boolean;
   handleSubmitReview: () => Promise<void>;
+  reviewPhotos: File[];
+  setReviewPhotos: React.Dispatch<React.SetStateAction<File[]>>;
 
   // --- Auth ---
   user: User | null;
@@ -251,6 +254,10 @@ export interface AppContextType {
   setOnboardingStep: (step: number) => void;
   setShowOnboarding: (show: boolean) => void;
 
+  // --- TasteLens ---
+  dishLensContext: { dish?: string; city?: string; restaurant?: string };
+  setDishLensContext: (ctx: { dish?: string; city?: string; restaurant?: string }) => void;
+
   // --- Auth gate ---
   requireAuth: () => boolean;
 
@@ -266,6 +273,8 @@ export interface AppContextType {
   setAuthEmail: (email: string) => void;
   authPassword: string;
   setAuthPassword: (password: string) => void;
+  authConfirmPassword: string;
+  setAuthConfirmPassword: (password: string) => void;
   authName: string;
   setAuthName: (name: string) => void;
   authError: string | null;

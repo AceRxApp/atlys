@@ -8,6 +8,7 @@ import { formatDistance, getHoursStatus } from '../services/places';
 import { COMMUNITY_TAGS } from '../data';
 import { submitReport } from '../supabase';
 import { getPlaceBookingUrl } from '../data/bookingLinks';
+import CurrencyMiniConverter from './CurrencyMiniConverter';
 import type { Place } from '../services/places';
 
 export default function PlaceDetailModal({ place }: { place: Place }) {
@@ -40,8 +41,14 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
     setReviewTags,
     reviewSubmitting,
     handleSubmitReview,
+    reviewPhotos,
+    setReviewPhotos,
     user,
     requireAuth,
+    setDishLensContext,
+    setScreen,
+    cityLabel,
+    setShowPinStop,
   } = useApp();
   const closeModal = useCallback(() => setSelectedPlace(null), [setSelectedPlace]);
   const modalRef = useModalA11y(true, closeModal);
@@ -50,6 +57,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
   const [reportReason, setReportReason] = useState<string>('');
   const [reportDetails, setReportDetails] = useState('');
   const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [showCurrencyConverter, setShowCurrencyConverter] = useState(false);
 
   const hoursStatus = getHoursStatus(place.hours, place.openNow);
   const inPlan = isInPlan(place.placeId);
@@ -249,6 +257,36 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
               <ShareIcon />
               Share
             </button>
+            <button onClick={() => setShowCurrencyConverter(!showCurrencyConverter)}
+              aria-label="Currency converter"
+              className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border-none cursor-pointer text-[11px] min-h-[44px] ${
+                showCurrencyConverter ? 'bg-amber-tint-bg15 text-accent-amber' : 'bg-bg-subtle-medium text-text-secondary'
+              }`}>
+              <span className="text-base">{'\u{1F4B1}'}</span>
+              Currency
+            </button>
+            {/restaurant|cafe|bakery|bar|food|pizza|sushi|burger|coffee|tea|ice.cream|dessert|brunch|bistro|diner|grill|bbq|seafood|steak/i.test(place.category || '') && (
+              <button onClick={() => {
+                setDishLensContext({ dish: undefined, city: cityLabel, restaurant: place.name });
+                setSelectedPlace(null); // close modal first
+                setScreen('tastelens');
+              }}
+                aria-label="Open TasteLens for this restaurant"
+                className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-amber-tint-bg10 text-accent-amber border-none cursor-pointer text-[11px] min-h-[44px]">
+                <span className="text-base">{'\u{1F37D}\u{FE0F}'}</span>
+                TasteLens
+              </button>
+            )}
+            <button onClick={() => {
+              if (!requireAuth()) return;
+              setSelectedPlace(null);
+              setShowPinStop(true);
+            }}
+              aria-label="Pin a new stop"
+              className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-bg-subtle-medium text-text-secondary border-none cursor-pointer text-[11px] min-h-[44px]">
+              <span className="text-base">{'\u{1F4CC}'}</span>
+              Pin a Stop
+            </button>
             <button onClick={() => {
               if (!requireAuth()) return;
               setShowReportForm(true);
@@ -262,6 +300,13 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
               Report
             </button>
           </div>
+
+          {/* Currency Mini Converter */}
+          {showCurrencyConverter && (
+            <div className="mb-4">
+              <CurrencyMiniConverter cityName={cityLabel} onClose={() => setShowCurrencyConverter(false)} />
+            </div>
+          )}
 
           {/* Reserve / Book */}
           {(isReservable(place) || isBookable(place)) && (
@@ -412,6 +457,48 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                   className="w-full p-3 rounded-[10px] border border-border-strong bg-bg-input text-text-primary text-sm resize-y min-h-[60px] box-border outline-none"
                 />
 
+                {/* Photo Upload */}
+                <div className="mt-2.5 mb-2.5">
+                  <div className="text-[11px] text-text-tertiary mb-1.5">Add photos (up to 3):</div>
+                  <div className="flex gap-2 flex-wrap">
+                    {reviewPhotos.map((file, i) => (
+                      <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-border-medium">
+                        <img src={URL.createObjectURL(file)} alt={`Review photo ${i + 1}`} className="w-full h-full object-cover" />
+                        <button
+                          onClick={() => setReviewPhotos(prev => prev.filter((_, idx) => idx !== i))}
+                          className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-[rgba(0,0,0,0.6)] border-none text-white text-[10px] cursor-pointer flex items-center justify-center"
+                          aria-label={`Remove photo ${i + 1}`}
+                        >
+                          &#10005;
+                        </button>
+                      </div>
+                    ))}
+                    {reviewPhotos.length < 3 && (
+                      <label className="w-16 h-16 rounded-lg border-2 border-dashed border-border-medium flex flex-col items-center justify-center cursor-pointer text-text-tertiary hover:border-accent-amber hover:text-accent-amber transition-colors">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                          <circle cx="8.5" cy="8.5" r="1.5" />
+                          <polyline points="21 15 16 10 5 21" />
+                        </svg>
+                        <span className="text-[9px] mt-0.5">Add</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            if (!file.type.startsWith('image/')) return;
+                            if (file.size > 10 * 1024 * 1024) return;
+                            setReviewPhotos(prev => [...prev, file]);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
                 {/* Community Tags */}
                 <div className="mt-2.5 mb-2.5">
                   <div className="text-[11px] text-text-tertiary mb-1.5">Tag this place:</div>
@@ -444,7 +531,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                     } ${reviewSubmitting ? 'opacity-60' : 'opacity-100'}`}>
                     {reviewSubmitting ? 'Submitting...' : 'Submit Review'}
                   </button>
-                  <button onClick={() => { setShowReviewForm(false); setReviewRating(0); setReviewText(''); setReviewTags([]); }}
+                  <button onClick={() => { setShowReviewForm(false); setReviewRating(0); setReviewText(''); setReviewTags([]); setReviewPhotos([]); }}
                     className="px-4 p-2.5 rounded-[10px] border border-border-medium bg-transparent text-text-tertiary text-[13px] cursor-pointer">
                     Cancel
                   </button>
@@ -466,6 +553,19 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                   </div>
                   {review.review_text && (
                     <p className="text-text-body text-[13px] leading-[1.4] mb-1.5">{review.review_text}</p>
+                  )}
+                  {review.photo_urls && review.photo_urls.length > 0 && (
+                    <div className="flex gap-1.5 mb-1.5 overflow-x-auto">
+                      {review.photo_urls.map((url, pi) => (
+                        <img
+                          key={pi}
+                          src={url}
+                          alt={`Review photo ${pi + 1}`}
+                          className="w-20 h-20 rounded-lg object-cover shrink-0 border border-border-subtle"
+                          loading="lazy"
+                        />
+                      ))}
+                    </div>
                   )}
                   {review.tags && review.tags.length > 0 && (
                     <div className="flex gap-1 flex-wrap">

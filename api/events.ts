@@ -7,6 +7,7 @@ import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors.js';
 const TICKETMASTER_API_KEY = process.env.TICKETMASTER_API_KEY || '';
 const SEATGEEK_CLIENT_ID = process.env.SEATGEEK_CLIENT_ID || '';
 const PREDICTHQ_TOKEN = process.env.PREDICTHQ_TOKEN || '';
+const GOOGLE_API_KEY = process.env.GOOGLE_PLACES_API_KEY || '';
 
 interface NormalizedEvent {
   id: string;
@@ -89,6 +90,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       seen.add(key);
       return true;
     });
+
+    // Geocode events missing coordinates (batch up to 15 to avoid excessive API calls)
+    if (GOOGLE_API_KEY) {
+      const needsGeocode = deduped.filter(e => !e.lat && !e.lng && (e.venue || e.venueAddress));
+      const toGeocode = needsGeocode.slice(0, 15);
+      if (toGeocode.length > 0) {
+        const geocodeResults = await Promise.allSettled(
+          toGeocode.map(e => geocodeVenue(e.venue, e.venueAddress))
+        );
+        geocodeResults.forEach((result, i) => {
+          if (result.status === 'fulfilled' && result.value) {
+            toGeocode[i].lat = result.value.lat;
+            toGeocode[i].lng = result.value.lng;
+          }
+        });
+      }
+    }
 
     // Sort by date
     deduped.sort((a, b) => {
@@ -243,4 +261,26 @@ async function fetchPredictHQ(lat: number, lng: number, radius: string): Promise
       lng: location ? location[0] : null,
     };
   });
+}
+
+// --------------------------------------------------------------------------
+// Geocode venue name/address to coordinates
+// --------------------------------------------------------------------------
+async function geocodeVenue(venue: string, address: string): Promise<{ lat: number; lng: number } | null> {
+  const query = address ? `${venue}, ${address}` : venue;
+  if (!query.trim()) return null;
+  try {
+    const params = new URLSearchParams({
+      address: query,
+      key: GOOGLE_API_KEY,
+    });
+    const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?${params}`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    const result = data.results?.[0];
+    if (!result?.geometry?.location) return null;
+    return { lat: result.geometry.location.lat, lng: result.geometry.location.lng };
+  } catch {
+    return null;
+  }
 }

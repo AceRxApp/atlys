@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { track } from '@vercel/analytics';
 import { searchNearby, textSearchPlaces, isChain } from '../services/places';
 import type { Place } from '../services/places';
-import { saveReview, fetchReviews, fetchPlaceTagCounts, fetchSavedPlaces, upsertSavedPlaces, deleteSavedPlace, fetchUserStops, createUserStop } from '../supabase';
+import { saveReview, fetchReviews, fetchPlaceTagCounts, fetchSavedPlaces, upsertSavedPlaces, deleteSavedPlace, fetchUserStops, createUserStop, uploadReviewPhotos } from '../supabase';
 import type { Review, UserStop } from '../supabase';
 import type { User } from '@supabase/supabase-js';
 import type { City, Vibe, QuickFilter, TravelGroup, CommunityTag } from '../types';
@@ -93,6 +93,7 @@ export function usePlaces(deps: {
   const [reviewTags, setReviewTags] = useState<CommunityTag[]>([]);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [placeReviews, setPlaceReviews] = useState<Review[]>([]);
+  const [reviewPhotos, setReviewPhotos] = useState<File[]>([]);
 
   // --------------------------------------------------------------------------
   // Effects
@@ -222,7 +223,7 @@ export function usePlaces(deps: {
           break;
         }
         case 'rainyDay': if (!INDOOR_TYPES.includes(place.category)) return false; break;
-        case 'goldenHour': if (!OUTDOOR_SCENIC_TYPES.includes(place.category)) return false; break;
+        case 'goldenHour': if (!place.openNow) return false; if (!OUTDOOR_SCENIC_TYPES.includes(place.category)) return false; if (place.distance !== null && place.distance > 5) return false; break;
       }
     }
     if (travelGroup) {
@@ -360,7 +361,12 @@ export function usePlaces(deps: {
   const handleSubmitReview = async () => {
     if (!selectedPlace || reviewRating === 0 || !user) return;
     setReviewSubmitting(true);
-    const result = await saveReview(selectedPlace.placeId, citySlug, reviewRating, reviewText, reviewTags);
+    // Upload photos first if any
+    let photoUrls: string[] = [];
+    if (reviewPhotos.length > 0) {
+      photoUrls = await uploadReviewPhotos(reviewPhotos);
+    }
+    const result = await saveReview(selectedPlace.placeId, citySlug, reviewRating, reviewText, reviewTags, photoUrls.length > 0 ? photoUrls : undefined);
     if (result.success) {
       hapticNotification('Success');
       showToast('Review submitted!');
@@ -368,6 +374,7 @@ export function usePlaces(deps: {
       setReviewRating(0);
       setReviewText('');
       setReviewTags([]);
+      setReviewPhotos([]);
       const updated = await fetchReviews(selectedPlace.placeId);
       setPlaceReviews(updated);
       const ids = places.map(p => p.placeId);
@@ -489,7 +496,7 @@ export function usePlaces(deps: {
     searchQuery, setSearchQuery, searchResults, isSearching, showSearch, setShowSearch, handleSearch,
     placeReviews, showReviewForm, setShowReviewForm,
     reviewRating, setReviewRating, reviewText, setReviewText, reviewTags, setReviewTags,
-    reviewSubmitting, handleSubmitReview,
+    reviewSubmitting, handleSubmitReview, reviewPhotos, setReviewPhotos,
     sharePlace,
     isReservable, isBookable, getBookingUrl, getBookingLabel, getSafetyIndicators,
     blindDatePlace, blindDateRevealed, spinBlindDate, revealBlindDate, dismissBlindDate,

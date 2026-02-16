@@ -222,6 +222,17 @@ export function useTripPlan(deps: {
     setActiveDayStops(newPlan);
   };
 
+  const reorderStops = (oldIndex: number, newIndex: number) => {
+    if (oldIndex === newIndex) return;
+    hapticImpact('Medium');
+    setActiveDayStops(prev => {
+      const result = [...prev];
+      const [removed] = result.splice(oldIndex, 1);
+      result.splice(newIndex, 0, removed);
+      return result;
+    });
+  };
+
   const addDay = () => {
     hapticImpact('Light');
     const nextDay = Math.max(...Object.keys(tripDays).map(Number)) + 1;
@@ -612,7 +623,7 @@ export function useTripPlan(deps: {
     tripDays, setTripDays, activeDay, setActiveDay,
     dayPlan, totalStops, dayCount, setActiveDayStops,
     addToPlan, addEventToPlan, removeFromPlan, isInPlan, isEventInPlan,
-    clearPlan, movePlanStop, addDay, removeDay, moveStopToDay, pivotStop,
+    clearPlan, movePlanStop, reorderStops, addDay, removeDay, moveStopToDay, pivotStop,
     getRouteUrl, getFullTripRouteUrl, sharePlan, shareAsLink, getTransportInfo, getDaySummary,
     dayBudgets, setDayBudget, activeDayBudget,
     estimatedSpend, budgetRemaining, budgetPercentUsed, isOverBudget,

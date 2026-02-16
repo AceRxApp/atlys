@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import EventCard from '../components/EventCard';
 import BookingLinks from '../components/BookingLinks';
+import { SkeletonCard } from '../components/ui';
 import { APIProvider, Map, Marker, InfoWindow } from '@vis.gl/react-google-maps';
 import type { EventItem } from '../types';
 
@@ -17,6 +19,13 @@ const EVENT_CATEGORIES = [
   { id: 'arts', label: 'Arts' },
   { id: 'family', label: 'Family' },
   { id: 'festivals', label: 'Festivals' },
+];
+
+const DATE_FILTERS = [
+  { id: 'all', label: 'All Dates' },
+  { id: 'today', label: 'Today' },
+  { id: 'weekend', label: 'This Weekend' },
+  { id: 'month', label: 'This Month' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -35,12 +44,21 @@ function EventsMapView({ eventsList }: { eventsList: EventItem[] }) {
   const { theme } = useTheme();
 
   const center = getMapCenter();
-  const mappableEvents = eventsList.filter(e => e.lat && e.lng);
+  const mappableEvents = eventsList.filter(e => e.lat != null && e.lng != null);
+
+  if (!MAPS_API_KEY) {
+    return (
+      <div className="text-center py-[60px] px-5">
+        <div className="text-[40px] mb-3">{'\u{1F5FA}\u{FE0F}'}</div>
+        <p className="text-text-secondary text-sm">Map view requires Google Maps API key</p>
+      </div>
+    );
+  }
 
   if (mappableEvents.length === 0) {
     return (
       <div className="text-center py-[60px] px-5">
-        <div className="text-[40px] mb-3">🗺️</div>
+        <div className="text-[40px] mb-3">{'\u{1F5FA}\u{FE0F}'}</div>
         <p className="text-text-secondary text-sm">No event locations available to map</p>
       </div>
     );
@@ -81,7 +99,7 @@ function EventsMapView({ eventsList }: { eventsList: EventItem[] }) {
                   <div className="text-[11px] text-[#78716C] mb-2">{event.venue}</div>
                   {event.url && (
                     <a href={event.url} target="_blank" rel="noopener noreferrer"
-                      className="block p-1.5 rounded-md bg-[#7C3AED] text-white text-[11px] font-semibold text-center no-underline">
+                      className="block p-1.5 rounded-md bg-[#C48A5A] text-white text-[11px] font-semibold text-center no-underline">
                       Get Tickets
                     </a>
                   )}
@@ -123,6 +141,9 @@ export default function EventsScreen() {
   } = useApp();
   const { theme } = useTheme();
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dateFilter, setDateFilter] = useState('all');
+
   // Filter: show events within current month, plus ticketed events further out
   const now = new Date();
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -134,6 +155,38 @@ export default function EventsScreen() {
       const threeMonths = new Date(now.getFullYear(), now.getMonth() + 3, 0);
       if (eventDate > threeMonths) return false;
     }
+
+    // Date filter
+    if (dateFilter !== 'all' && event.date) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStr = today.toISOString().split('T')[0];
+
+      if (dateFilter === 'today') {
+        if (event.date !== todayStr) return false;
+      } else if (dateFilter === 'weekend') {
+        const dayOfWeek = today.getDay();
+        const saturday = new Date(today);
+        saturday.setDate(today.getDate() + (6 - dayOfWeek));
+        const sunday = new Date(saturday);
+        sunday.setDate(saturday.getDate() + 1);
+        const satStr = saturday.toISOString().split('T')[0];
+        const sunStr = sunday.toISOString().split('T')[0];
+        if (event.date < todayStr || event.date > sunStr) return false;
+      } else if (dateFilter === 'month') {
+        const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        const monthEndStr = monthEnd.toISOString().split('T')[0];
+        if (event.date < todayStr || event.date > monthEndStr) return false;
+      }
+    }
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const searchable = `${event.name} ${event.venue} ${event.category}`.toLowerCase();
+      if (!searchable.includes(q)) return false;
+    }
+
     if (eventCategoryFilter !== 'all') {
       const catLower = (event.category || '').toLowerCase();
       const nameLower = (event.name || '').toLowerCase();
@@ -196,7 +249,7 @@ export default function EventsScreen() {
       <div className="mb-3 flex justify-between items-start">
         <div>
           <h1 className="text-xl font-bold mb-0.5">
-            Events {cityLabel ? `in ${cityLabel}` : ''} 🎫
+            Events {cityLabel ? `in ${cityLabel}` : ''} {'\u{1F3AB}'}
           </h1>
           <p className="text-text-tertiary text-[13px]">
             {eventsLoading ? 'Finding events...' : `${filteredEvents.length} upcoming events`}
@@ -220,6 +273,48 @@ export default function EventsScreen() {
         </div>
       </div>
 
+      {/* Search Bar */}
+      <div className="relative mb-3">
+        <input
+          type="text"
+          placeholder="Search events, venues..."
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          className="input-field w-full pl-10"
+        />
+        <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-tertiary" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 bg-transparent border-none text-text-tertiary cursor-pointer text-sm p-1"
+            aria-label="Clear search"
+          >
+            {'\u2715'}
+          </button>
+        )}
+      </div>
+
+      {/* Date Filters */}
+      <div className="flex gap-1.5 overflow-x-auto pb-2 mb-1.5 scroll-hidden">
+        {DATE_FILTERS.map(df => {
+          const isActive = dateFilter === df.id;
+          return (
+            <button key={df.id}
+              onClick={() => setDateFilter(isActive && df.id !== 'all' ? 'all' : df.id)}
+              className={`py-2.5 px-3.5 rounded-2xl text-xs font-medium cursor-pointer whitespace-nowrap shrink-0 min-h-[44px] ${
+                isActive
+                  ? 'border border-amber-tint-border30 bg-amber-tint-bg15 text-accent-amber'
+                  : 'border border-border-medium bg-transparent text-text-tertiary'
+              }`}>
+              {df.label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Event Category Filters */}
       <div className="flex gap-2 overflow-x-auto pb-3 mb-2 scroll-hidden">
         {EVENT_CATEGORIES.map(cat => {
@@ -227,7 +322,7 @@ export default function EventsScreen() {
           return (
             <button key={cat.id}
               onClick={() => setEventCategoryFilter(isActive && cat.id !== 'all' ? 'all' : cat.id)}
-              className={`py-1.5 px-3.5 rounded-2xl text-xs font-medium cursor-pointer whitespace-nowrap shrink-0 ${
+              className={`py-2.5 px-3.5 rounded-2xl text-xs font-medium cursor-pointer whitespace-nowrap shrink-0 min-h-[44px] ${
                 isActive
                   ? 'border border-purple-tint-border30 bg-purple-tint-bg12 text-events-active'
                   : 'border border-border-medium bg-transparent text-text-tertiary'
@@ -240,9 +335,10 @@ export default function EventsScreen() {
 
       {/* Events Content */}
       {eventsLoading ? (
-        <div className="text-center py-[60px]">
-          <div className="w-9 h-9 border-3 border-purple-tint-border20 border-t-events-active rounded-full mx-auto mb-4 animate-spin" />
-          <p className="text-text-tertiary text-sm">Finding events nearby...</p>
+        <div>
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
         </div>
       ) : eventsError ? (
         <div className="text-center pt-[60px]">
@@ -252,7 +348,7 @@ export default function EventsScreen() {
             Check your connection and try again.
           </p>
           <button onClick={fetchEventsData}
-            className="bg-none border border-events-active text-events-active rounded-[10px] py-2.5 px-5 text-[13px] font-semibold cursor-pointer">
+            className="bg-none border border-events-active text-events-active rounded-[10px] py-2.5 px-5 text-[13px] font-semibold cursor-pointer min-h-[44px]">
             Tap to Retry
           </button>
         </div>
@@ -263,8 +359,17 @@ export default function EventsScreen() {
           <p className="text-text-secondary text-sm leading-[1.5]">
             {!useGps && !selectedCity
               ? 'Select a city or use GPS to discover events nearby'
-              : 'No upcoming events found in this area. Check back soon!'}
+              : searchQuery || dateFilter !== 'all' || eventCategoryFilter !== 'all'
+                ? 'Try adjusting your filters or search.'
+                : 'No upcoming events found in this area. Check back soon!'}
           </p>
+          {(searchQuery || dateFilter !== 'all' || eventCategoryFilter !== 'all') && (
+            <button
+              onClick={() => { setSearchQuery(''); setDateFilter('all'); setEventCategoryFilter('all'); }}
+              className="mt-3 bg-none border border-events-active text-events-active rounded-[10px] py-2.5 px-5 text-[13px] font-semibold cursor-pointer min-h-[44px]">
+              Clear Filters
+            </button>
+          )}
         </div>
       ) : eventsViewMode === 'map' ? (
         <EventsMapView eventsList={filteredEvents} />

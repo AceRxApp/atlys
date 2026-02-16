@@ -301,31 +301,13 @@ export default function HomeScreen() {
         <p className="text-text-secondary text-sm">{getTimeSuggestion()}</p>
       </div>
 
-      {/* Weather Card */}
+      {/* Compact Weather Banner */}
       {weather && (
-        <div className="card mb-5 p-4 border border-blue-tint-border"
+        <div className="flex items-center gap-2.5 mb-5 py-2.5 px-3.5 rounded-xl border border-blue-tint-border"
           style={{ background: 'linear-gradient(135deg, var(--blue-tint-bg), var(--bg-subtle))' }}>
-          <div className="flex items-center gap-3 mb-3">
-            <span className="text-4xl">{weather.emoji}</span>
-            <div>
-              <div className="text-2xl font-bold text-text-primary">{weather.temp}°F</div>
-              <div className="text-xs text-text-secondary">{weather.description} · H: {weather.high}° L: {weather.low}°</div>
-            </div>
-          </div>
-          {weather.forecast.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto scroll-hidden pt-2 border-t border-border-subtle">
-              {weather.forecast.slice(0, 5).map((day, i) => (
-                <div key={day.date} className="text-center min-w-[52px] shrink-0 py-1.5">
-                  <div className="text-[10px] text-text-tertiary mb-0.5">
-                    {i === 0 ? 'Today' : new Date(day.date + 'T12:00:00').toLocaleDateString('en', { weekday: 'short' })}
-                  </div>
-                  <div className="text-lg mb-0.5">{day.emoji}</div>
-                  <div className="text-[11px] font-semibold text-text-primary">{day.high}°</div>
-                  <div className="text-[10px] text-text-tertiary">{day.low}°</div>
-                </div>
-              ))}
-            </div>
-          )}
+          <span className="text-2xl">{weather.emoji}</span>
+          <span className="text-base font-bold text-text-primary">{weather.temp}°F</span>
+          <span className="text-xs text-text-secondary flex-1">{weather.description} · H: {weather.high}° L: {weather.low}°</span>
         </div>
       )}
 
@@ -443,7 +425,7 @@ export default function HomeScreen() {
             ? 'cursor-pointer shadow-[0_4px_20px_var(--amber-tint-shadow)]'
             : 'opacity-40 cursor-not-allowed'
         }`}
-        style={{ background: 'linear-gradient(135deg, var(--accent-amber), #D97706)', color: '#0C0A09' }}
+        style={{ background: 'linear-gradient(135deg, var(--accent-amber), var(--accent-amber-dark))', color: '#0C0A09' }}
       >
         {'\u2728'} Plan My Day
       </button>
@@ -453,6 +435,7 @@ export default function HomeScreen() {
           Pick a city or enable GPS to get started
         </p>
       )}
+
     </div>
   );
 }

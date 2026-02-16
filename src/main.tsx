@@ -25,7 +25,7 @@ function ErrorFallback({ error }: { error: Error }) {
       <p style={{ fontSize: '14px', color: muted, marginBottom: '24px', textAlign: 'center', maxWidth: '300px' }}>
         {error?.message || 'An unexpected error occurred'}
       </p>
-      <button onClick={() => window.location.reload()} style={{ padding: '12px 32px', borderRadius: '12px', background: 'linear-gradient(135deg, #F59E0B, #D97706)', color: '#0C0A09', fontWeight: 700, fontSize: '15px', border: 'none', cursor: 'pointer', marginBottom: '12px' }}>
+      <button onClick={() => window.location.reload()} style={{ padding: '12px 32px', borderRadius: '12px', background: 'linear-gradient(135deg, #E8940A, #C47D08)', color: '#0C0A09', fontWeight: 700, fontSize: '15px', border: 'none', cursor: 'pointer', marginBottom: '12px' }}>
         Reload App
       </button>
       <button onClick={() => { localStorage.clear(); sessionStorage.clear(); window.location.reload(); }} style={{ padding: '10px 24px', borderRadius: '10px', background: 'transparent', color: '#78716C', fontSize: '13px', border: `1px solid ${borderColor}`, cursor: 'pointer' }}>

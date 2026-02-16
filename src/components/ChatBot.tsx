@@ -4,6 +4,7 @@ import { CloseIcon } from './icons';
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  error?: boolean;
 }
 
 const QUICK_PROMPTS = [
@@ -14,13 +15,73 @@ const QUICK_PROMPTS = [
   'Safety tips for solo travel',
 ];
 
-export default function ChatBot({ city, onClose }: { city: string | null; onClose: () => void }) {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: 'assistant', content: city
+const SESSION_KEY = 'nxstops_chat';
+
+function getInitialMessage(city: string | null): ChatMessage {
+  return {
+    role: 'assistant',
+    content: city
       ? `Hey! I'm your NxStops travel assistant. You're exploring ${city} — ask me anything about the city, restaurants, things to do, or trip planning!`
-      : `Hey! I'm your NxStops travel assistant. Pick a city first, then ask me anything about dining, activities, hidden gems, or trip planning!`
-    },
-  ]);
+      : `Hey! I'm your NxStops travel assistant. Pick a city first, then ask me anything about dining, activities, hidden gems, or trip planning!`,
+  };
+}
+
+function renderMarkdown(text: string) {
+  const lines = text.split('\n');
+  const elements: (string | JSX.Element)[] = [];
+
+  lines.forEach((line, li) => {
+    const numMatch = line.match(/^\d+\.\s+/);
+    const bulletMatch = line.match(/^[-*]\s+/);
+
+    let processed = line;
+    if (numMatch) processed = line.slice(numMatch[0].length);
+    else if (bulletMatch) processed = line.slice(bulletMatch[0].length);
+
+    // Inline formatting: **bold**, *italic*
+    const parts: (string | JSX.Element)[] = [];
+    const inlineRegex = /(\*\*(.+?)\*\*|\*(.+?)\*)/g;
+    let lastIndex = 0;
+    let match;
+    while ((match = inlineRegex.exec(processed)) !== null) {
+      if (match.index > lastIndex) parts.push(processed.slice(lastIndex, match.index));
+      if (match[2]) {
+        parts.push(<strong key={`${li}-b-${match.index}`}>{match[2]}</strong>);
+      } else if (match[3]) {
+        parts.push(<em key={`${li}-i-${match.index}`}>{match[3]}</em>);
+      }
+      lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < processed.length) parts.push(processed.slice(lastIndex));
+
+    if (numMatch || bulletMatch) {
+      elements.push(
+        <div key={`line-${li}`} className="flex gap-2 ml-1 mb-0.5">
+          <span className="shrink-0 text-accent-amber">{numMatch ? `${line.match(/^\d+/)![0]}.` : '\u2022'}</span>
+          <span>{parts}</span>
+        </div>
+      );
+    } else if (line.trim() === '') {
+      elements.push(<div key={`line-${li}`} className="h-2" />);
+    } else {
+      elements.push(<span key={`line-${li}`}>{parts}{li < lines.length - 1 ? '\n' : ''}</span>);
+    }
+  });
+
+  return elements;
+}
+
+export default function ChatBot({ city, onClose }: { city: string | null; onClose: () => void }) {
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = sessionStorage.getItem(SESSION_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as { city: string | null; messages: ChatMessage[] };
+        if (parsed.city === city && parsed.messages.length > 0) return parsed.messages;
+      }
+    } catch { /* ignore */ }
+    return [getInitialMessage(city)];
+  });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -33,6 +94,13 @@ export default function ChatBot({ city, onClose }: { city: string | null; onClos
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  // Persist to sessionStorage
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ city, messages }));
+    } catch { /* ignore */ }
+  }, [messages, city]);
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || loading) return;
@@ -60,17 +128,29 @@ export default function ChatBot({ city, onClose }: { city: string | null; onClos
         setMessages(prev => [...prev, {
           role: 'assistant',
           content: data.error || 'Sorry, something went wrong. Try again!',
+          error: true,
         }]);
       }
     } catch {
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: 'Couldn\'t reach the server. Check your connection and try again.',
+        error: true,
       }]);
     } finally {
       setLoading(false);
     }
   }, [messages, loading, city]);
+
+  const retryLastMessage = useCallback(() => {
+    const lastUserIdx = messages.map((m, i) => ({ m, i })).filter(x => x.m.role === 'user').pop();
+    if (!lastUserIdx) return;
+    setMessages(prev => prev.filter((_, i) => i < prev.length - 1));
+    sendMessage(lastUserIdx.m.content);
+  }, [messages, sendMessage]);
+
+  const lastMessage = messages[messages.length - 1];
+  const hasError = lastMessage?.error;
 
   return (
     <div
@@ -78,7 +158,7 @@ export default function ChatBot({ city, onClose }: { city: string | null; onClos
       onClick={onClose}
     >
       <div
-        className="modal-sheet bg-bg-surface rounded-t-3xl max-w-[430px] w-full h-[75vh] flex flex-col border border-border-subtle border-b-0"
+        className="modal-sheet bg-bg-surface rounded-t-3xl max-w-[430px] w-full h-[55vh] flex flex-col border border-border-subtle border-b-0"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -113,12 +193,24 @@ export default function ChatBot({ city, onClose }: { city: string | null; onClos
               <div className={`max-w-[80%] px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap break-words ${
                 msg.role === 'user'
                   ? 'rounded-[18px_18px_4px_18px] bg-accent-gradient text-text-on-accent border-none'
-                  : 'rounded-[18px_18px_18px_4px] bg-bg-elevated text-text-primary border border-border-subtle'
+                  : `rounded-[18px_18px_18px_4px] bg-bg-elevated text-text-primary border ${msg.error ? 'border-red-tint-border' : 'border-border-subtle'}`
               }`}>
-                {msg.content}
+                {msg.role === 'assistant' ? renderMarkdown(msg.content) : msg.content}
               </div>
             </div>
           ))}
+
+          {/* Retry button on error */}
+          {hasError && !loading && (
+            <div className="flex justify-start">
+              <button
+                onClick={retryLastMessage}
+                className="px-3.5 py-2.5 rounded-xl bg-red-tint-bg border border-red-tint-border text-status-red text-xs font-semibold cursor-pointer min-h-[44px]"
+              >
+                {'\u{1F504}'} Retry
+              </button>
+            </div>
+          )}
 
           {loading && (
             <div className="flex justify-start">
@@ -140,7 +232,7 @@ export default function ChatBot({ city, onClose }: { city: string | null; onClos
               <button
                 key={prompt}
                 onClick={() => sendMessage(prompt)}
-                className="py-2 px-3.5 rounded-[20px] bg-amber-tint-bg10 border border-amber-tint-border20 text-accent-amber text-xs font-medium cursor-pointer whitespace-nowrap"
+                className="py-2.5 px-3.5 rounded-[20px] bg-amber-tint-bg10 border border-amber-tint-border20 text-accent-amber text-xs font-medium cursor-pointer whitespace-nowrap min-h-[44px]"
               >
                 {prompt}
               </button>

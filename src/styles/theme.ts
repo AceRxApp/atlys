@@ -99,6 +99,7 @@ export interface ThemeTokens {
   };
 
   purpleTint: {
+    text: string;
     bg08: string;
     bg12: string;
     bg15: string;
@@ -133,28 +134,28 @@ export interface ThemeTokens {
 
 const sharedTokens = {
   accent: {
-    amber: '#F59E0B',
-    amberDark: '#D97706',
-    amberLight: '#FBBF24',
-    amberGradient: 'linear-gradient(135deg, #F59E0B, #D97706)',
-    amberTextGradient: 'linear-gradient(135deg, #F59E0B, #FBBF24)',
+    amber: '#E8940A',
+    amberDark: '#C47D08',
+    amberLight: '#F5A623',
+    amberGradient: 'linear-gradient(135deg, #E8940A, #C47D08)',
+    amberTextGradient: 'linear-gradient(135deg, #F5A623, #E8940A)',
   },
   status: {
     green: '#34D399',
     red: '#F87171',
-    blue: '#93C5FD',
+    blue: '#8CB8D4',
   },
   events: {
-    text: '#C084FC',
-    active: '#A855F7',
-    gradientStart: '#8B5CF6',
-    gradientEnd: '#7C3AED',
+    text: '#D4A07A',
+    active: '#C48A5A',
+    gradientStart: '#C48A5A',
+    gradientEnd: '#A06830',
   },
   community: {
     text: '#D4A574',
   },
   selection: {
-    bg: 'rgba(245,158,11,0.3)',
+    bg: 'rgba(232,148,10,0.3)',
   },
 };
 
@@ -166,7 +167,7 @@ export const darkTheme: ThemeTokens = {
     bodyGradient: 'linear-gradient(180deg, #0C0A09 0%, #1C1917 100%)',
     surface: '#1C1917',
     surfaceAlpha: 'rgba(28, 25, 23, 0.8)',
-    elevated: '#292524',
+    elevated: '#302924',
     nav: 'rgba(12,10,9,0.95)',
     toast: 'rgba(28,25,23,0.95)',
     input: '#0C0A09',
@@ -199,14 +200,14 @@ export const darkTheme: ThemeTokens = {
     nav: 'rgba(255,255,255,0.06)',
   },
   amberTint: {
-    bg06: 'rgba(245,158,11,0.06)',
-    bg10: 'rgba(245,158,11,0.1)',
-    bg15: 'rgba(245,158,11,0.15)',
-    border15: 'rgba(245,158,11,0.15)',
-    border20: 'rgba(245,158,11,0.2)',
-    border30: 'rgba(245,158,11,0.3)',
-    border40: 'rgba(245,158,11,0.4)',
-    shadow: 'rgba(245,158,11,0.3)',
+    bg06: 'rgba(232,148,10,0.06)',
+    bg10: 'rgba(232,148,10,0.1)',
+    bg15: 'rgba(232,148,10,0.15)',
+    border15: 'rgba(232,148,10,0.15)',
+    border20: 'rgba(232,148,10,0.2)',
+    border30: 'rgba(232,148,10,0.3)',
+    border40: 'rgba(232,148,10,0.4)',
+    shadow: 'rgba(232,148,10,0.3)',
   },
   greenTint: {
     bg: 'rgba(34,197,94,0.08)',
@@ -220,17 +221,18 @@ export const darkTheme: ThemeTokens = {
     borderStrong: 'rgba(239,68,68,0.2)',
   },
   blueTint: {
-    bg: 'rgba(59,130,246,0.08)',
-    border: 'rgba(59,130,246,0.12)',
+    bg: 'rgba(140,184,212,0.1)',
+    border: 'rgba(140,184,212,0.15)',
   },
   purpleTint: {
-    bg08: 'rgba(168,85,247,0.08)',
-    bg12: 'rgba(168,85,247,0.12)',
-    bg15: 'rgba(168,85,247,0.15)',
-    bg20: 'rgba(168,85,247,0.2)',
-    border15: 'rgba(168,85,247,0.15)',
-    border20: 'rgba(139,92,246,0.2)',
-    border30: 'rgba(168,85,247,0.3)',
+    text: '#D4A07A',
+    bg08: 'rgba(196,138,90,0.08)',
+    bg12: 'rgba(196,138,90,0.12)',
+    bg15: 'rgba(196,138,90,0.15)',
+    bg20: 'rgba(196,138,90,0.2)',
+    border15: 'rgba(196,138,90,0.15)',
+    border20: 'rgba(196,138,90,0.2)',
+    border30: 'rgba(196,138,90,0.3)',
   },
   communityTint: {
     bg: 'rgba(212,165,116,0.08)',
@@ -290,14 +292,14 @@ export const lightTheme: ThemeTokens = {
     nav: 'rgba(0,0,0,0.09)',
   },
   amberTint: {
-    bg06: 'rgba(245,158,11,0.06)',
-    bg10: 'rgba(245,158,11,0.08)',
-    bg15: 'rgba(245,158,11,0.12)',
-    border15: 'rgba(245,158,11,0.2)',
-    border20: 'rgba(245,158,11,0.25)',
-    border30: 'rgba(245,158,11,0.35)',
-    border40: 'rgba(245,158,11,0.45)',
-    shadow: 'rgba(245,158,11,0.15)',
+    bg06: 'rgba(232,148,10,0.06)',
+    bg10: 'rgba(232,148,10,0.08)',
+    bg15: 'rgba(232,148,10,0.12)',
+    border15: 'rgba(232,148,10,0.2)',
+    border20: 'rgba(232,148,10,0.25)',
+    border30: 'rgba(232,148,10,0.35)',
+    border40: 'rgba(232,148,10,0.45)',
+    shadow: 'rgba(232,148,10,0.15)',
   },
   greenTint: {
     bg: 'rgba(34,197,94,0.08)',
@@ -311,17 +313,18 @@ export const lightTheme: ThemeTokens = {
     borderStrong: 'rgba(239,68,68,0.25)',
   },
   blueTint: {
-    bg: 'rgba(59,130,246,0.06)',
-    border: 'rgba(59,130,246,0.15)',
+    bg: 'rgba(140,184,212,0.06)',
+    border: 'rgba(140,184,212,0.18)',
   },
   purpleTint: {
-    bg08: 'rgba(168,85,247,0.06)',
-    bg12: 'rgba(168,85,247,0.1)',
-    bg15: 'rgba(168,85,247,0.12)',
-    bg20: 'rgba(168,85,247,0.15)',
-    border15: 'rgba(168,85,247,0.15)',
-    border20: 'rgba(139,92,246,0.2)',
-    border30: 'rgba(168,85,247,0.25)',
+    text: '#A06830',
+    bg08: 'rgba(196,138,90,0.06)',
+    bg12: 'rgba(196,138,90,0.1)',
+    bg15: 'rgba(196,138,90,0.12)',
+    bg20: 'rgba(196,138,90,0.15)',
+    border15: 'rgba(196,138,90,0.15)',
+    border20: 'rgba(196,138,90,0.2)',
+    border30: 'rgba(196,138,90,0.25)',
   },
   communityTint: {
     bg: 'rgba(212,165,116,0.06)',
@@ -436,6 +439,7 @@ export const sunsetTheme: ThemeTokens = {
   },
   // Warm rose tints (replacing purple)
   purpleTint: {
+    text: '#E0A0C0',
     bg08: 'rgba(200, 100, 140, 0.1)',
     bg12: 'rgba(200, 100, 140, 0.14)',
     bg15: 'rgba(200, 100, 140, 0.17)',

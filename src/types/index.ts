@@ -51,7 +51,7 @@ export interface AdminSignup {
   signed_up_at: string;
 }
 
-export type Screen = 'home' | 'discover' | 'events' | 'plan';
+export type Screen = 'home' | 'discover' | 'events' | 'currency' | 'plan' | 'tastelens';
 export type Vibe = 'food' | 'stay' | 'todo' | 'hidden' | 'locals';
 export type QuickFilter = 'open' | 'walking' | 'topRated' | 'budget' | 'family' | 'solo' | 'chainBreaker' | '15min' | 'lateNight' | 'rainyDay' | 'goldenHour';
 export type TravelGroup = 'solo' | 'couple' | 'family' | 'friends' | 'girls' | 'boys' | 'bachelorette';

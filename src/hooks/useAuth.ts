@@ -18,6 +18,12 @@ function friendlyError(msg: string): string {
     return 'An account with this email already exists. Try signing in instead.';
   if (lower.includes('signup is not allowed') || lower.includes('signups not allowed'))
     return 'Sign-ups are currently paused. Please try again later.';
+  if (lower.includes('unable to validate email'))
+    return 'We couldn\'t verify that email address. Please check it and try again.';
+  if (lower.includes('password') && lower.includes('weak'))
+    return 'Password is too weak. Use a mix of letters, numbers, and symbols.';
+  if (lower.includes('network') || lower.includes('fetch'))
+    return 'Network error — please check your connection and try again.';
   return msg;
 }
 
@@ -27,6 +33,7 @@ export function useAuth(showToast: (msg: string) => void, onSignOut: () => void)
   const [authScreen, setAuthScreen] = useState<'signin' | 'signup' | 'reset' | 'verify'>('signin');
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
+  const [authConfirmPassword, setAuthConfirmPassword] = useState('');
   const [authName, setAuthName] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
   const [authSubmitting, setAuthSubmitting] = useState(false);
@@ -77,6 +84,10 @@ export function useAuth(showToast: (msg: string) => void, onSignOut: () => void)
     }
     if (authPassword.length < MIN_PASSWORD_LENGTH) {
       setAuthError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+      return;
+    }
+    if (authPassword !== authConfirmPassword) {
+      setAuthError('Passwords do not match');
       return;
     }
     setAuthError(null);
@@ -153,7 +164,7 @@ export function useAuth(showToast: (msg: string) => void, onSignOut: () => void)
   return {
     user, authLoading,
     authScreen, setAuthScreen, authEmail, setAuthEmail,
-    authPassword, setAuthPassword, authName, setAuthName,
+    authPassword, setAuthPassword, authConfirmPassword, setAuthConfirmPassword, authName, setAuthName,
     authError, authSubmitting, acceptedTerms, setAcceptedTerms,
     handleSignIn, handleSignUp, handleSignOut, handleResetPassword,
     handleResendVerification,

@@ -18,7 +18,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       const saved = localStorage.getItem('nxstops_theme');
       if (saved === 'light' || saved === 'dark' || saved === 'sunset') return saved;
     } catch { /* ignore */ }
-    return 'auto';
+    return 'dark';
   });
 
   const resolveMode = useCallback((): ThemeMode => {

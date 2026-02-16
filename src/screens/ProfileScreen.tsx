@@ -16,7 +16,7 @@ export default function ProfileScreen() {
     // Auth
     authScreen, setAuthScreen,
     authEmail, setAuthEmail,
-    authPassword, setAuthPassword,
+    authPassword, setAuthPassword, authConfirmPassword, setAuthConfirmPassword,
     authName, setAuthName,
     authError, authSubmitting,
     acceptedTerms, setAcceptedTerms,
@@ -39,6 +39,8 @@ export default function ProfileScreen() {
   const [biometricLoading, setBiometricLoading] = useState(false);
   const [showBiometricPasswordPrompt, setShowBiometricPasswordPrompt] = useState(false);
   const [biometricPassword, setBiometricPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleAvatarChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -146,8 +148,25 @@ export default function ProfileScreen() {
                   )}
                   <div className="flex flex-col gap-2.5">
                     <input type="email" placeholder="Email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} className="input-field" autoComplete="email" />
-                    <input type="password" placeholder="Password" value={authPassword} onChange={e => setAuthPassword(e.target.value)} className="input-field" autoComplete="current-password"
-                      onKeyDown={e => { if (e.key === 'Enter') handleSignIn(); }} />
+                    <div className="relative">
+                      <input type={showPassword ? 'text' : 'password'} placeholder="Password" value={authPassword} onChange={e => setAuthPassword(e.target.value)} className="input-field w-full pr-12" autoComplete="current-password"
+                        onKeyDown={e => { if (e.key === 'Enter') handleSignIn(); }} />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        className="absolute right-0 top-0 h-full px-3.5 bg-transparent border-none cursor-pointer text-text-tertiary flex items-center">
+                        {showPassword ? (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                            <line x1="1" y1="1" x2="23" y2="23" />
+                          </svg>
+                        ) : (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
                     <button onClick={handleSignIn} disabled={authSubmitting}
                       className="btn-primary w-full py-3.5 text-[15px]"
                       style={{ opacity: authSubmitting ? 0.7 : 1, cursor: authSubmitting ? 'wait' : 'pointer' }}>
@@ -188,11 +207,47 @@ export default function ProfileScreen() {
                   <div className="flex flex-col gap-2.5">
                     <input type="text" placeholder="Name (optional)" value={authName} onChange={e => setAuthName(e.target.value)} className="input-field" autoComplete="name" />
                     <input type="email" placeholder="Email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} className="input-field" autoComplete="email" />
-                    <input type="password" placeholder="Password (min 6 characters)" value={authPassword} onChange={e => setAuthPassword(e.target.value)} className="input-field" autoComplete="new-password" />
+                    <div className="relative">
+                      <input type={showPassword ? 'text' : 'password'} placeholder="Password (min 6 characters)" value={authPassword} onChange={e => setAuthPassword(e.target.value)} className="input-field w-full pr-12" autoComplete="new-password" />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        className="absolute right-0 top-0 h-full px-3.5 bg-transparent border-none cursor-pointer text-text-tertiary flex items-center">
+                        {showPassword ? (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                            <line x1="1" y1="1" x2="23" y2="23" />
+                          </svg>
+                        ) : (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <input type={showConfirmPassword ? 'text' : 'password'} placeholder="Confirm password" value={authConfirmPassword} onChange={e => setAuthConfirmPassword(e.target.value)} className="input-field w-full pr-12" autoComplete="new-password"
+                        onKeyDown={e => { if (e.key === 'Enter') handleSignUp(); }} />
+                      <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                        className="absolute right-0 top-0 h-full px-3.5 bg-transparent border-none cursor-pointer text-text-tertiary flex items-center">
+                        {showConfirmPassword ? (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                            <line x1="1" y1="1" x2="23" y2="23" />
+                          </svg>
+                        ) : (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
                     {/* Terms acceptance */}
                     <label className="flex items-start gap-2.5 cursor-pointer py-1">
                       <input type="checkbox" checked={acceptedTerms} onChange={e => setAcceptedTerms(e.target.checked)}
-                        className="w-[18px] h-[18px] mt-0.5 shrink-0" style={{ accentColor: '#F59E0B' }} />
+                        className="w-[18px] h-[18px] mt-0.5 shrink-0" style={{ accentColor: '#E8940A' }} />
                       <span className="text-xs text-text-secondary leading-[1.4]">
                         I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-accent-amber underline">Terms of Service</a> and <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-accent-amber underline">Privacy Policy</a>
                       </span>
