@@ -1,5 +1,5 @@
 // Vercel Serverless API Route — Multi-Source Events Proxy
-// Aggregates events from Ticketmaster + SeatGeek + PredictHQ + TheSportsDB + API-Football
+// Aggregates: Ticketmaster + SeatGeek + PredictHQ + TheSportsDB + API-Football + GetYourGuide
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors.js';
@@ -9,6 +9,7 @@ const SEATGEEK_CLIENT_ID = process.env.SEATGEEK_CLIENT_ID || '';
 const PREDICTHQ_TOKEN = process.env.PREDICTHQ_TOKEN || '';
 const GOOGLE_API_KEY = process.env.GOOGLE_PLACES_API_KEY || '';
 const API_FOOTBALL_KEY = process.env.API_FOOTBALL_KEY || '';
+const GETYOURGUIDE_KEY = process.env.GETYOURGUIDE_PARTNER_KEY || '';
 
 interface NormalizedEvent {
   id: string;
@@ -57,7 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Phase 1: Start reverse geocoding + non-geo fetchers in parallel
+    // Phase 1: Reverse geocode + location-based fetchers in parallel
     const geoPromise = GOOGLE_API_KEY
       ? reverseGeocode(latNum, lngNum)
       : Promise.resolve(null);
@@ -68,9 +69,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (SEATGEEK_CLIENT_ID) {
       nonGeoFetchers.push(fetchSeatGeek(latNum, lngNum, radius as string));
-    }
-    if (PREDICTHQ_TOKEN) {
-      nonGeoFetchers.push(fetchPredictHQ(latNum, lngNum, radius as string));
     }
 
     const [geoResult, ...nonGeoResults] = await Promise.all([
@@ -83,22 +81,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       allEvents = allEvents.concat(events);
     }
 
-    // Phase 2: Country-based sports fetchers (need reverse geocode result)
     const country = geoResult?.country || '';
+    const countryCode = geoResult?.countryCode || '';
+
+    // Phase 2: Country-aware fetchers (run in parallel)
+    const phase2Fetchers: Promise<NormalizedEvent[]>[] = [];
+
+    // PredictHQ — now with country filter to prevent foreign events
+    if (PREDICTHQ_TOKEN) {
+      phase2Fetchers.push(fetchPredictHQ(latNum, lngNum, radius as string, countryCode).catch(() => [] as NormalizedEvent[]));
+    }
+
+    // Sports APIs — country-based
     if (country) {
-      const sportsFetchers: Promise<NormalizedEvent[]>[] = [
-        fetchSportsDB(country).catch(() => [] as NormalizedEvent[]),
-      ];
+      phase2Fetchers.push(fetchSportsDB(country).catch(() => [] as NormalizedEvent[]));
       if (API_FOOTBALL_KEY) {
-        sportsFetchers.push(fetchFootballFixtures(country).catch(() => [] as NormalizedEvent[]));
+        phase2Fetchers.push(fetchFootballFixtures(country).catch(() => [] as NormalizedEvent[]));
       }
-      const sportsResults = await Promise.all(sportsFetchers);
-      for (const events of sportsResults) {
+    }
+
+    // GetYourGuide — tours & activities
+    if (GETYOURGUIDE_KEY) {
+      phase2Fetchers.push(fetchGetYourGuide(latNum, lngNum).catch(() => [] as NormalizedEvent[]));
+    }
+
+    if (phase2Fetchers.length > 0) {
+      const phase2Results = await Promise.all(phase2Fetchers);
+      for (const events of phase2Results) {
         allEvents = allEvents.concat(events);
       }
     }
 
-    // If no API keys are configured and no sports data found, return helpful message
+    // If nothing at all, return helpful message
     if (allEvents.length === 0 && !TICKETMASTER_API_KEY && !SEATGEEK_CLIENT_ID && !PREDICTHQ_TOKEN && !country) {
       return res.status(200).json({
         events: [],
@@ -116,7 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return true;
     });
 
-    // Geocode events missing coordinates (batch up to 15 to avoid excessive API calls)
+    // Geocode events missing coordinates (batch up to 15)
     if (GOOGLE_API_KEY) {
       const needsGeocode = deduped.filter(e => !e.lat && !e.lng && (e.venue || e.venueAddress));
       const toGeocode = needsGeocode.slice(0, 15);
@@ -133,8 +147,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // Sort by date
+    // Sort by date (dateless tours/activities go to end)
     deduped.sort((a, b) => {
+      if (!a.date && !b.date) return 0;
       if (!a.date) return 1;
       if (!b.date) return -1;
       return a.date.localeCompare(b.date);
@@ -150,6 +165,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         predicthq: !!PREDICTHQ_TOKEN,
         thesportsdb: true,
         apifootball: !!API_FOOTBALL_KEY,
+        getyourguide: !!GETYOURGUIDE_KEY,
       },
     });
   } catch (error) {
@@ -159,9 +175,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 }
 
 // --------------------------------------------------------------------------
-// Reverse geocode lat/lng to country name (for sports API lookups)
+// Reverse geocode lat/lng → country name + ISO code + city
 // --------------------------------------------------------------------------
-async function reverseGeocode(lat: number, lng: number): Promise<{ country: string; city: string } | null> {
+async function reverseGeocode(lat: number, lng: number): Promise<{ country: string; countryCode: string; city: string } | null> {
   try {
     const resp = await fetch(
       `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&result_type=country|locality&key=${GOOGLE_API_KEY}`
@@ -169,14 +185,18 @@ async function reverseGeocode(lat: number, lng: number): Promise<{ country: stri
     if (!resp.ok) return null;
     const data = await resp.json();
     let country = '';
+    let countryCode = '';
     let city = '';
     for (const result of data.results || []) {
-      for (const comp of (result.address_components || []) as { long_name: string; types: string[] }[]) {
-        if (comp.types?.includes('country') && !country) country = comp.long_name;
+      for (const comp of (result.address_components || []) as { long_name: string; short_name: string; types: string[] }[]) {
+        if (comp.types?.includes('country') && !country) {
+          country = comp.long_name;
+          countryCode = comp.short_name;  // ISO 3166-1 alpha-2 (e.g., "GH" for Ghana)
+        }
         if (comp.types?.includes('locality') && !city) city = comp.long_name;
       }
     }
-    return country ? { country, city } : null;
+    return country ? { country, countryCode, city } : null;
   } catch { return null; }
 }
 
@@ -268,9 +288,9 @@ async function fetchSeatGeek(lat: number, lng: number, radius: string): Promise<
 }
 
 // --------------------------------------------------------------------------
-// PredictHQ — expanded categories for broader global coverage
+// PredictHQ — now with country code filter to prevent foreign events
 // --------------------------------------------------------------------------
-async function fetchPredictHQ(lat: number, lng: number, radius: string): Promise<NormalizedEvent[]> {
+async function fetchPredictHQ(lat: number, lng: number, radius: string, countryCode?: string): Promise<NormalizedEvent[]> {
   const radiusKm = Math.round(parseFloat(radius) * 1.609);
   const today = new Date().toISOString().split('T')[0];
 
@@ -281,6 +301,11 @@ async function fetchPredictHQ(lat: number, lng: number, radius: string): Promise
     'limit': '50',
     'sort': 'start',
   });
+
+  // Filter by country to prevent foreign events (e.g., English Premier League in Ghana)
+  if (countryCode) {
+    params.set('country', countryCode);
+  }
 
   const response = await fetch(`https://api.predicthq.com/v1/events/?${params}`, {
     headers: { Authorization: `Bearer ${PREDICTHQ_TOKEN}` },
@@ -315,30 +340,32 @@ async function fetchPredictHQ(lat: number, lng: number, radius: string): Promise
 
 // --------------------------------------------------------------------------
 // TheSportsDB — Free global sports events (no API key needed)
-// Searches for sports leagues in the user's country, then fetches upcoming events
+// Now filters events to only include those in the target country
 // --------------------------------------------------------------------------
 async function fetchSportsDB(country: string): Promise<NormalizedEvent[]> {
   try {
-    // Step 1: Get all sports leagues for this country
     const leaguesResp = await fetch(
       `https://www.thesportsdb.com/api/v1/json/3/search_all_leagues.php?c=${encodeURIComponent(country)}`
     );
     if (!leaguesResp.ok) return [];
     const leaguesData = await leaguesResp.json();
 
-    // TheSportsDB response key varies: "countries" or "countrys" (API typo)
     const leagues = (leaguesData.countries || leaguesData.countrys || []) as {
       idLeague: string;
       strLeague: string;
       strSport: string;
-      strCurrentSeason?: string;
+      strCountry?: string;
     }[];
     if (leagues.length === 0) return [];
 
-    // Limit to top 8 leagues to avoid excessive API calls
-    const topLeagues = leagues.slice(0, 8);
+    // Only keep leagues that actually belong to the target country
+    const countryLower = country.toLowerCase();
+    const countryLeagues = leagues.filter(l =>
+      !l.strCountry || l.strCountry.toLowerCase() === countryLower
+    );
+    const topLeagues = countryLeagues.slice(0, 8);
+    if (topLeagues.length === 0) return [];
 
-    // Step 2: Get next upcoming events for each league (parallel)
     const eventPromises = topLeagues.map(league =>
       fetch(`https://www.thesportsdb.com/api/v1/json/3/eventsnextleague.php?id=${league.idLeague}`)
         .then(r => r.json())
@@ -375,6 +402,9 @@ async function fetchSportsDB(country: string): Promise<NormalizedEvent[]> {
           if (eventDate < now) continue;
         }
 
+        // Skip events explicitly in a different country
+        if (ev.strCountry && ev.strCountry.toLowerCase() !== countryLower) continue;
+
         events.push({
           id: `sdb_${ev.idEvent}`,
           name: ev.strEvent || `${ev.strHomeTeam || '?'} vs ${ev.strAwayTeam || '?'}`,
@@ -398,12 +428,10 @@ async function fetchSportsDB(country: string): Promise<NormalizedEvent[]> {
 
 // --------------------------------------------------------------------------
 // API-Football — Comprehensive football/soccer fixtures (needs API_FOOTBALL_KEY)
-// Covers 900+ leagues worldwide including Ghana Premier League, African leagues, etc.
 // --------------------------------------------------------------------------
 async function fetchFootballFixtures(country: string): Promise<NormalizedEvent[]> {
   if (!API_FOOTBALL_KEY) return [];
   try {
-    // Step 1: Get active leagues for this country
     const leaguesResp = await fetch(
       `https://v3.football.api-sports.io/leagues?country=${encodeURIComponent(country)}&current=true`,
       { headers: { 'x-apisports-key': API_FOOTBALL_KEY } }
@@ -413,14 +441,19 @@ async function fetchFootballFixtures(country: string): Promise<NormalizedEvent[]
 
     const leagues = (leaguesData.response || []) as {
       league: { id: number; name: string; logo?: string };
+      country: { name: string };
       seasons: { year: number }[];
     }[];
     if (leagues.length === 0) return [];
 
-    // Limit to top 5 leagues
-    const topLeagues = leagues.slice(0, 5);
+    // Only keep leagues from the target country
+    const countryLower = country.toLowerCase();
+    const countryLeagues = leagues.filter(l =>
+      !l.country?.name || l.country.name.toLowerCase() === countryLower
+    );
+    const topLeagues = countryLeagues.slice(0, 5);
+    if (topLeagues.length === 0) return [];
 
-    // Step 2: Get fixtures for the next 30 days (parallel)
     const today = new Date();
     const future = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
     const fromDate = today.toISOString().split('T')[0];
@@ -462,6 +495,71 @@ async function fetchFootballFixtures(country: string): Promise<NormalizedEvent[]
     }
 
     return events;
+  } catch { return []; }
+}
+
+// --------------------------------------------------------------------------
+// GetYourGuide — Tours, activities & experiences worldwide
+// --------------------------------------------------------------------------
+async function fetchGetYourGuide(lat: number, lng: number): Promise<NormalizedEvent[]> {
+  if (!GETYOURGUIDE_KEY) return [];
+  try {
+    const params = new URLSearchParams({
+      'coordinates[lat]': lat.toString(),
+      'coordinates[lng]': lng.toString(),
+      'limit': '20',
+      'sort_by': 'popularity',
+    });
+
+    const response = await fetch(`https://api.getyourguide.com/1/activities?${params}`, {
+      headers: {
+        'X-Access-Token': GETYOURGUIDE_KEY,
+        'Accept': 'application/json',
+      },
+    });
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    const activities = data.data?.activities || data.activities || [];
+
+    return activities.map((a: {
+      activity_id?: number;
+      id?: number;
+      title?: string;
+      abstract?: string;
+      url?: string;
+      pictures?: { url: string }[];
+      images?: { url: string }[];
+      price?: { values?: { amount?: number; currency?: string } };
+      coordinates?: { lat: number; lng: number };
+      location?: { name?: string; city?: string };
+      categories?: { name: string }[];
+      rating?: number;
+      reviews_count?: number;
+      duration?: { value: number; unit: string };
+    }) => {
+      const price = a.price?.values?.amount;
+      const currency = a.price?.values?.currency || 'USD';
+      const priceStr = price ? ` · From ${currency} ${price}` : '';
+      const rating = a.rating ? ` · ${a.rating}/5` : '';
+      const imgUrl = a.pictures?.[0]?.url || a.images?.[0]?.url || null;
+      const cat = a.categories?.[0]?.name || 'Tours & Activities';
+
+      return {
+        id: `gyg_${a.activity_id || a.id}`,
+        name: a.title || '',
+        date: '',  // Tours are ongoing — no specific date
+        time: '',
+        venue: a.location?.name || '',
+        venueAddress: `${cat}${priceStr}${rating}`,
+        imageUrl: imgUrl,
+        url: a.url || '',
+        category: 'Tours & Activities',
+        source: 'GetYourGuide',
+        lat: a.coordinates?.lat || null,
+        lng: a.coordinates?.lng || null,
+      };
+    });
   } catch { return []; }
 }
 
