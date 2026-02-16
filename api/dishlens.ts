@@ -211,7 +211,7 @@ When given a dish name${restaurant ? ` and a specific restaurant (${restaurant})
 - name: the dish name as it appears on ${restaurant ? `${restaurant}'s menu` : 'the menu'}
 - restaurant: "${restaurant || 'Unknown'}"
 - description: 2-3 sentence visual description — what it looks like on the plate, key ingredients, how it's served. Be specific${restaurant ? ` to ${restaurant}` : ''}.
-- imageSearchQuery: a specific search query to find a real photo of this exact dish${restaurant ? ` from ${restaurant}` : ''}. Example: "${restaurant || 'restaurant'} ${dishName} food photo". Make it specific enough to find the branded version.
+- imageSearchQuery: a search query to find a photo of this SPECIFIC DISH (not the restaurant). Use the dish's common/traditional name. Example: for "Big Mac" use "Big Mac hamburger", for "Pad Thai" use "Pad Thai noodles", for "Jollof Rice" use "Jollof Rice". Keep it short — just the dish name and its food type.
 - servingSize: serving description like "10-piece box", "Large plate", "12 oz cup", etc.${restaurant ? ` Specific to ${restaurant}'s portions.` : ''}
 - calories: estimated calorie count as a string like "540 cal" or "350-450 cal"${restaurant ? `. Use ${restaurant}'s actual published nutrition data if known.` : ''}
 - dietaryTags: array of applicable tags from: vegetarian, vegan, gluten-free, dairy-free, nut-free, halal, kosher, pescatarian, contains-alcohol

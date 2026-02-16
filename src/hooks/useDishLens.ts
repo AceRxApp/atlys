@@ -37,20 +37,15 @@ export function useTasteLens() {
     setImages([]);
 
     try {
-      // Build image API URL — pass restaurant + city for Google Places photos
-      const imageParams = new URLSearchParams();
-      imageParams.set('q', `${dishName} food dish`);
-      if (restaurant) imageParams.set('restaurant', restaurant);
-      if (city) imageParams.set('city', city);
-
+      // Fetch AI analysis + dish-specific images in parallel
+      // Use just the dish name for image search — we want photos of THE DISH, not the restaurant
       const [dishRes, imageRes] = await Promise.all([
         fetch('/api/dishlens', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dishName, restaurant, city }),
         }),
-        // Fetch real restaurant photos (Google Places) or dish photos (Wikipedia/Pexels)
-        fetch(`/api/dish-image?${imageParams}`).catch(() => null),
+        fetch(`/api/dish-image?q=${encodeURIComponent(dishName)}`).catch(() => null),
       ]);
 
       if (!dishRes.ok) {
