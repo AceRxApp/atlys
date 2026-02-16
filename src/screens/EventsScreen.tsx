@@ -204,7 +204,7 @@ export default function EventsScreen() {
       const combined = catLower + ' ' + nameLower;
       switch (eventCategoryFilter) {
         case 'music': if (!/\b(music|concert|live|band|dj|singer|tour|rap|hip.?hop|r&b|pop|rock|jazz|country|latin|reggae)\b/i.test(combined)) return false; break;
-        case 'sports': if (!/\b(sport|game|match|basketball|football|soccer|baseball|hockey|tennis|golf|boxing|mma|racing|nba|nfl|mlb|nhl)\b/i.test(combined)) return false; break;
+        case 'sports': if (!/\b(sport|game|match|basketball|football|soccer|baseball|hockey|tennis|golf|boxing|mma|racing|nba|nfl|mlb|nhl|premier.?league|league|fixture|cricket|rugby|volleyball)\b/i.test(combined)) return false; break;
         case 'comedy': if (!/\b(comedy|comedian|stand.?up|improv|funny|laugh)\b/i.test(combined)) return false; break;
         case 'arts': if (!/\b(art|theater|theatre|ballet|opera|dance|exhibit|museum|gallery|performing|symphony|orchestra)\b/i.test(combined)) return false; break;
         case 'family': if (!/\b(family|kids|children|disney|paw patrol|sesame|lego|circus|magic|puppet|nickelodeon)\b/i.test(combined)) return false; break;

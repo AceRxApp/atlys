@@ -35,7 +35,7 @@ export function useEvents(deps: {
     setEventsLoading(true);
     setEventsError(false);
     try {
-      const params = new URLSearchParams({ lat: lat.toString(), lng: lng.toString(), radius: '25' });
+      const params = new URLSearchParams({ lat: lat.toString(), lng: lng.toString(), radius: '50' });
       const response = await fetch(`/api/events?${params}`);
       if (response.ok) {
         const data = await response.json();
