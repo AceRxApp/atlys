@@ -10,6 +10,12 @@ const UNSPLASH_ACCESS_KEY = process.env.UNSPLASH_ACCESS_KEY || '';
 const GOOGLE_API_KEY = process.env.GOOGLE_PLACES_API_KEY || '';
 const GOOGLE_CSE_ID = process.env.GOOGLE_CSE_ID || '';
 
+// Wikipedia/Wikimedia APIs require a descriptive User-Agent or they return 403
+const WIKI_HEADERS = {
+  'User-Agent': 'NxStops/1.0 (https://nxstops.com; nxstops-app) node-fetch',
+  'Accept': 'application/json',
+};
+
 interface ImageResult {
   url: string;
   thumb: string;
@@ -25,7 +31,8 @@ async function searchWikipedia(query: string): Promise<ImageResult[]> {
   try {
     // Try exact dish name first
     const resp = await fetch(
-      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query.replace(/\s+/g, '_'))}`
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query.replace(/\s+/g, '_'))}`,
+      { headers: WIKI_HEADERS }
     );
     if (!resp.ok) return [];
     const data = await resp.json();
@@ -48,7 +55,8 @@ async function searchWikipedia(query: string): Promise<ImageResult[]> {
 async function searchWikipediaFuzzy(query: string): Promise<ImageResult[]> {
   try {
     const resp = await fetch(
-      `https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query + ' food')}&gsrlimit=3&prop=pageimages&piprop=thumbnail|original&pithumbsize=600&format=json&origin=*`
+      `https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query + ' food')}&gsrlimit=3&prop=pageimages&piprop=thumbnail|original&pithumbsize=600&format=json&origin=*`,
+      { headers: WIKI_HEADERS }
     );
     if (!resp.ok) return [];
     const data = await resp.json();
@@ -142,7 +150,8 @@ async function searchGoogle(query: string): Promise<ImageResult[]> {
 async function searchWikimedia(query: string): Promise<ImageResult[]> {
   try {
     const resp = await fetch(
-      `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query + ' food dish')}&gsrlimit=6&gsrnamespace=6&prop=imageinfo&iiprop=url|extmetadata|mime&iiurlwidth=800&format=json&origin=*`
+      `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query + ' food dish')}&gsrlimit=6&gsrnamespace=6&prop=imageinfo&iiprop=url|extmetadata|mime&iiurlwidth=800&format=json&origin=*`,
+      { headers: WIKI_HEADERS }
     );
     if (!resp.ok) return [];
     const data = await resp.json();
@@ -254,7 +263,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Expand query with synonyms (e.g. "peanut butter soup" → also try "groundnut soup")
   const queryVariants = expandDishQuery(dishName);
 
-  const queryWords = dishName.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  const stopWords = new Set(['and', 'with', 'the', 'for', 'from', 'this', 'that']);
+  const queryWords = dishName.toLowerCase().split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w));
   const minScore = Math.max(1, queryWords.length); // Must match ALL significant words
 
   let images: ImageResult[] = [];
@@ -296,9 +306,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     images.push(...goodWikimedia);
   }
 
-  // 4th: Pexels stock photos
+  // 4th: Pexels stock photos — filter strictly by relevance
+  // Must match ALL query words (same as Wikimedia) to avoid generic stock photos
   if (pexelsResults.length > 0) {
-    images.push(...pexelsResults);
+    const goodPexels = pexelsResults.filter(img => {
+      const altLower = (img.alt || '').toLowerCase();
+      const matchCount = queryWords.filter(w => altLower.includes(w)).length;
+      return matchCount >= minScore;
+    });
+    images.push(...goodPexels);
   }
 
   images = deduplicateImages(images).slice(0, 6);
