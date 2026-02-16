@@ -1,5 +1,5 @@
 // Vercel Serverless API Route — Dish Image Search
-// Priority: Wikimedia Commons + Wikipedia exact (parallel) → Pexels → Wikipedia fuzzy + Unsplash
+// Priority: Wikipedia exact → Google Images → Wikimedia Commons → Pexels → Unsplash
 // Focused on finding photos of the SPECIFIC DISH, not the restaurant
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -7,6 +7,8 @@ import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors.js';
 
 const PEXELS_API_KEY = process.env.PEXELS_API_KEY || '';
 const UNSPLASH_ACCESS_KEY = process.env.UNSPLASH_ACCESS_KEY || '';
+const GOOGLE_API_KEY = process.env.GOOGLE_PLACES_API_KEY || '';
+const GOOGLE_CSE_ID = process.env.GOOGLE_CSE_ID || '';
 
 interface ImageResult {
   url: string;
@@ -107,6 +109,29 @@ async function searchUnsplash(query: string): Promise<ImageResult[]> {
       alt: p.alt_description || query,
       source: 'Unsplash',
       photographer: p.user?.name,
+    }));
+  } catch { return []; }
+}
+
+// --------------------------------------------------------------------------
+// Google Custom Search — most reliable for specific dish photos
+// Requires GOOGLE_PLACES_API_KEY + GOOGLE_CSE_ID env vars
+// Free tier: 100 searches/day
+// --------------------------------------------------------------------------
+async function searchGoogle(query: string): Promise<ImageResult[]> {
+  if (!GOOGLE_API_KEY || !GOOGLE_CSE_ID) return [];
+  try {
+    const resp = await fetch(
+      `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CSE_ID}&q=${encodeURIComponent(query + ' food dish')}&searchType=image&num=4&imgType=photo&safe=active`
+    );
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    return (data.items || []).slice(0, 4).map((item: { link: string; image?: { thumbnailLink: string }; title: string; displayLink: string }) => ({
+      url: item.link,
+      thumb: item.image?.thumbnailLink || item.link,
+      alt: item.title || query,
+      source: 'Google',
+      photographer: item.displayLink,
     }));
   } catch { return []; }
 }
@@ -229,51 +254,56 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Expand query with synonyms (e.g. "peanut butter soup" → also try "groundnut soup")
   const queryVariants = expandDishQuery(dishName);
 
+  const queryWords = dishName.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  const minScore = Math.max(1, queryWords.length); // Must match ALL significant words
+
   let images: ImageResult[] = [];
 
-  // Step 1: Run Wikimedia Commons + Wikipedia exact + Pexels ALL in parallel
-  // Wikimedia Commons often has the most specific images (e.g. "Fufu_with_groundnut_soup.jpg")
+  // Step 1: All sources in parallel for speed
   const step1Promises: Promise<ImageResult[]>[] = [
-    searchWikimedia(dishName),
-    searchPexels(dishName),
+    searchGoogle(dishName),        // Google Images — most accurate
+    searchWikimedia(dishName),     // Wikimedia Commons — specific filenames
+    searchPexels(dishName),        // Pexels — stock food photos
   ];
-  // Try Wikipedia exact for the main query + all synonym variants
   for (const variant of queryVariants) {
-    step1Promises.push(searchWikipedia(variant));
+    step1Promises.push(searchWikipedia(variant));  // Wikipedia exact per variant
   }
 
   const step1Results = await Promise.all(step1Promises);
-  const [wikimediaResults, pexelsResults, ...wikiExactResults] = step1Results;
+  const [googleResults, wikimediaResults, pexelsResults, ...wikiExactResults] = step1Results;
 
-  // Wikipedia exact matches are highest confidence
+  // 1st: Wikipedia exact matches — always go first (most authoritative, always relevant)
   for (const wikiExact of wikiExactResults) {
     if (wikiExact.length > 0) {
-      images = [...images, ...wikiExact];
+      images.push(...wikiExact);
     }
   }
 
-  // Wikimedia Commons images are very specific — prioritize them highly
+  // 2nd: Google Images — very accurate, goes right after Wikipedia
+  if (googleResults.length > 0) {
+    images.push(...googleResults);
+  }
+
+  // 3rd: Wikimedia Commons — only keep images where filename matches MOST query words
+  // e.g. for "Jollof Rice", keep "Jollof_rice_and_tomato_stew" (2/2 words),
+  // reject "Red_beans_and_rice" (1/2 words — too generic)
   if (wikimediaResults.length > 0) {
-    // Score Wikimedia results by how well filename matches the full dish query
-    const queryWords = dishName.toLowerCase().split(/\s+/).filter(w => w.length > 2);
-    const scored = wikimediaResults.map(img => {
+    const goodWikimedia = wikimediaResults.filter(img => {
       const altLower = img.alt.toLowerCase();
       const matchCount = queryWords.filter(w => altLower.includes(w)).length;
-      return { img, score: matchCount };
+      return matchCount >= minScore;
     });
-    scored.sort((a, b) => b.score - a.score);
-    images = [...scored.map(s => s.img), ...images];
+    images.push(...goodWikimedia);
   }
 
-  // Add Pexels photos
+  // 4th: Pexels stock photos
   if (pexelsResults.length > 0) {
-    images = [...images, ...pexelsResults];
+    images.push(...pexelsResults);
   }
 
-  // Deduplicate and limit
   images = deduplicateImages(images).slice(0, 6);
 
-  // Step 2: If still nothing, try Wikipedia fuzzy + Unsplash with all variants
+  // Step 2: If nothing good yet, try Wikipedia fuzzy + Unsplash
   if (images.length === 0) {
     const step2Promises: Promise<ImageResult[]>[] = [
       searchUnsplash(dishName),
@@ -285,25 +315,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const step2Results = await Promise.all(step2Promises);
     const [unsplashResults, ...fuzzyResults] = step2Results;
 
-    // Collect all fuzzy results and score by relevance to full query
+    // Score fuzzy results — only keep high-relevance matches
     const allFuzzy: ImageResult[] = [];
-    for (const fuzzy of fuzzyResults) {
-      allFuzzy.push(...fuzzy);
-    }
+    for (const fuzzy of fuzzyResults) allFuzzy.push(...fuzzy);
     if (allFuzzy.length > 0) {
-      // Score fuzzy results: prefer titles that match more words from the full dish query
-      const queryWords = dishName.toLowerCase().split(/\s+/).filter(w => w.length > 2);
-      const scored = allFuzzy.map(img => {
-        const titleLower = img.alt.toLowerCase();
-        const matchCount = queryWords.filter(w => titleLower.includes(w)).length;
-        return { img, score: matchCount };
-      });
-      scored.sort((a, b) => b.score - a.score);
-      images = scored.map(s => s.img);
+      const scored = allFuzzy
+        .map(img => ({
+          img,
+          score: queryWords.filter(w => img.alt.toLowerCase().includes(w)).length,
+        }))
+        .filter(s => s.score >= Math.ceil(queryWords.length / 2))
+        .sort((a, b) => b.score - a.score);
+      images.push(...scored.map(s => s.img));
     }
 
     if (unsplashResults.length > 0) {
-      images = [...images, ...unsplashResults];
+      images.push(...unsplashResults);
     }
 
     images = deduplicateImages(images).slice(0, 6);
