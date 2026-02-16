@@ -88,13 +88,25 @@ const TAG_COLORS: Record<string, string> = {
   'contains-alcohol': 'bg-red-tint-bg text-status-red border-red-tint-border',
 };
 
-// ---------- Hero Image ----------
+// ---------- Hero Image Gallery (swipeable) ----------
 function DishHero({ images, name }: { images: DishImage[]; name: string }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [activeIdx, setActiveIdx] = useState(0);
-  const [imgError, setImgError] = useState(false);
-  const img = images[activeIdx];
+  const [failedUrls, setFailedUrls] = useState<Set<string>>(new Set());
 
-  if (images.length === 0 || imgError) {
+  const validImages = images.filter(img => !failedUrls.has(img.url));
+
+  // Track which image is in view via scroll position
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const scrollLeft = el.scrollLeft;
+    const itemWidth = el.offsetWidth;
+    const idx = Math.round(scrollLeft / itemWidth);
+    setActiveIdx(Math.min(idx, validImages.length - 1));
+  }, [validImages.length]);
+
+  if (validImages.length === 0) {
     return (
       <div className="w-full h-[220px] rounded-2xl bg-amber-tint-bg06 flex flex-col items-center justify-center mb-4">
         <span className="text-5xl mb-2">{'\u{1F37D}\u{FE0F}'}</span>
@@ -103,39 +115,87 @@ function DishHero({ images, name }: { images: DishImage[]; name: string }) {
     );
   }
 
+  // Single image — no scroll needed
+  if (validImages.length === 1) {
+    const img = validImages[0];
+    return (
+      <div className="relative mb-4">
+        <img
+          src={img.url}
+          alt={img.alt || name}
+          className="w-full h-[220px] rounded-2xl object-cover"
+          loading="eager"
+          referrerPolicy="no-referrer"
+          onError={() => setFailedUrls(prev => new Set(prev).add(img.url))}
+        />
+        <div className="absolute inset-0 rounded-2xl pointer-events-none"
+          style={{ background: 'linear-gradient(to bottom, transparent 60%, var(--bg-body))' }} />
+        {img.photographer && (
+          <div className="absolute top-3 right-3 text-[9px] text-white/70 bg-black/40 px-2 py-0.5 rounded-md backdrop-blur-sm">
+            {img.source} / {img.photographer}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="relative mb-4">
-      <img
-        src={img.url}
-        alt={img.alt || name}
-        className="w-full h-[220px] rounded-2xl object-cover"
-        loading="eager"
-        referrerPolicy="no-referrer"
-        onError={() => setImgError(true)}
-      />
+      {/* Scrollable image strip */}
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="dish-hero-scroll flex overflow-x-auto rounded-2xl"
+        style={{
+          scrollSnapType: 'x mandatory',
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+        }}
+      >
+        <style>{`.dish-hero-scroll::-webkit-scrollbar { display: none; }`}</style>
+        {validImages.map((img, i) => (
+          <div
+            key={img.url}
+            className="shrink-0 w-full relative"
+            style={{ scrollSnapAlign: 'start' }}
+          >
+            <img
+              src={img.url}
+              alt={img.alt || name}
+              className="w-full h-[220px] object-cover"
+              loading={i === 0 ? 'eager' : 'lazy'}
+              referrerPolicy="no-referrer"
+              onError={() => setFailedUrls(prev => new Set(prev).add(img.url))}
+            />
+            {/* Source attribution per image */}
+            {img.photographer && (
+              <div className="absolute top-3 right-3 text-[9px] text-white/70 bg-black/40 px-2 py-0.5 rounded-md backdrop-blur-sm">
+                {img.source} / {img.photographer}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
       {/* Gradient overlay */}
       <div className="absolute inset-0 rounded-2xl pointer-events-none"
-        style={{ background: 'linear-gradient(to bottom, transparent 50%, var(--bg-body))' }} />
+        style={{ background: 'linear-gradient(to bottom, transparent 60%, var(--bg-body))' }} />
 
-      {/* Photo dots */}
-      {images.length > 1 && (
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-[2]">
-          {images.map((_, i) => (
-            <button key={i} onClick={() => setActiveIdx(i)}
-              aria-label={`View photo ${i + 1}`}
-              className={`h-2 rounded-full border-none p-0 cursor-pointer transition-all ${
-                i === activeIdx ? 'w-4 bg-accent-amber' : 'w-2 bg-[rgba(255,255,255,0.5)]'
-              }`} />
-          ))}
-        </div>
-      )}
+      {/* Dot indicators */}
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-[2]">
+        {validImages.map((_, i) => (
+          <div key={i}
+            className={`h-2 rounded-full transition-all ${
+              i === activeIdx ? 'w-4 bg-accent-amber' : 'w-2 bg-[rgba(255,255,255,0.5)]'
+            }`} />
+        ))}
+      </div>
 
-      {/* Source attribution */}
-      {img.photographer && (
-        <div className="absolute top-3 right-3 text-[9px] text-white/70 bg-black/40 px-2 py-0.5 rounded-md backdrop-blur-sm">
-          {img.source} / {img.photographer}
-        </div>
-      )}
+      {/* Photo count badge */}
+      <div className="absolute top-3 left-3 text-[10px] text-white/80 bg-black/40 px-2 py-0.5 rounded-md backdrop-blur-sm z-[2]">
+        {activeIdx + 1} / {validImages.length}
+      </div>
     </div>
   );
 }
