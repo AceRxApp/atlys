@@ -37,10 +37,11 @@ export function useTasteLens() {
     setImages([]);
 
     try {
-      // Fetch dish analysis and images in parallel
-      const imageQuery = restaurant
-        ? `${dishName} ${restaurant} food plate`
-        : `${dishName} food dish plate`;
+      // Build image API URL — pass restaurant + city for Google Places photos
+      const imageParams = new URLSearchParams();
+      imageParams.set('q', `${dishName} food dish`);
+      if (restaurant) imageParams.set('restaurant', restaurant);
+      if (city) imageParams.set('city', city);
 
       const [dishRes, imageRes] = await Promise.all([
         fetch('/api/dishlens', {
@@ -48,8 +49,8 @@ export function useTasteLens() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dishName, restaurant, city }),
         }),
-        // Search for actual food photos by dish name
-        fetch(`/api/dish-image?q=${encodeURIComponent(imageQuery)}`).catch(() => null),
+        // Fetch real restaurant photos (Google Places) or dish photos (Wikipedia/Pexels)
+        fetch(`/api/dish-image?${imageParams}`).catch(() => null),
       ]);
 
       if (!dishRes.ok) {
@@ -67,7 +68,7 @@ export function useTasteLens() {
         imageList = imgData.images || [];
       }
 
-      // If AI suggested a more specific query and we got no images, try again
+      // If no images yet, retry with AI-suggested search query (no restaurant — generic dish image)
       if (imageList.length === 0 && dishData.imageSearchQuery) {
         try {
           const retryRes = await fetch(`/api/dish-image?q=${encodeURIComponent(dishData.imageSearchQuery)}`);

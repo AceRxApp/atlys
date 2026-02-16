@@ -156,26 +156,37 @@ export default function EventsScreen() {
       if (eventDate > threeMonths) return false;
     }
 
-    // Date filter
+    // Date filter (use local date formatting to avoid UTC timezone shifts)
     if (dateFilter !== 'all' && event.date) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const todayStr = today.toISOString().split('T')[0];
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      const toLocal = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      const todayStr = toLocal(today);
 
       if (dateFilter === 'today') {
         if (event.date !== todayStr) return false;
       } else if (dateFilter === 'weekend') {
-        const dayOfWeek = today.getDay();
+        const dayOfWeek = today.getDay(); // 0=Sun, 6=Sat
         const saturday = new Date(today);
-        saturday.setDate(today.getDate() + (6 - dayOfWeek));
-        const sunday = new Date(saturday);
-        sunday.setDate(saturday.getDate() + 1);
-        const satStr = saturday.toISOString().split('T')[0];
-        const sunStr = sunday.toISOString().split('T')[0];
-        if (event.date < todayStr || event.date > sunStr) return false;
+        const sunday = new Date(today);
+        if (dayOfWeek === 0) {
+          // Today is Sunday — show yesterday (Sat) + today (Sun)
+          saturday.setDate(today.getDate() - 1);
+        } else if (dayOfWeek === 6) {
+          // Today is Saturday — show today (Sat) + tomorrow (Sun)
+          sunday.setDate(today.getDate() + 1);
+        } else {
+          // Weekday — show upcoming Sat + Sun
+          saturday.setDate(today.getDate() + (6 - dayOfWeek));
+          sunday.setDate(today.getDate() + (7 - dayOfWeek));
+        }
+        const satStr = toLocal(saturday);
+        const sunStr = toLocal(sunday);
+        if (event.date < satStr || event.date > sunStr) return false;
       } else if (dateFilter === 'month') {
         const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-        const monthEndStr = monthEnd.toISOString().split('T')[0];
+        const monthEndStr = toLocal(monthEnd);
         if (event.date < todayStr || event.date > monthEndStr) return false;
       }
     }
