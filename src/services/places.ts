@@ -73,7 +73,7 @@ export const VIBE_TYPE_MAP: Record<string, string[]> = {
 };
 
 // Reverse map: Google type → vibe tag
-const TYPE_TO_VIBE: Record<string, string> = {};
+export const TYPE_TO_VIBE: Record<string, string> = {};
 for (const [vibe, types] of Object.entries(VIBE_TYPE_MAP)) {
   for (const type of types) {
     TYPE_TO_VIBE[type] = vibe;

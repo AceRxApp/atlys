@@ -3,7 +3,7 @@ import { track } from '@vercel/analytics';
 import { useApp } from '../context/AppContext';
 import { DirectionsIcon, ShareIcon, DragHandleIcon } from '../components/icons';
 import ContextHint from '../components/ContextHint';
-import { formatDistance, searchNearby } from '../services/places';
+import { formatDistance, searchNearby, TYPE_TO_VIBE } from '../services/places';
 import type { Place } from '../services/places';
 import { generatePackingList } from '../utils/packingList';
 import { findPivotAlternatives } from '../utils/surpriseFilter';
@@ -587,7 +587,7 @@ export default function PlanScreen() {
                           if (alternatives.length === 0) {
                             setPivotLoading(true);
                             try {
-                              const vibe = stop.place!.tags?.[0] || 'food';
+                              const vibe = TYPE_TO_VIBE[stop.place!.category] || stop.place!.tags?.[0] || 'food';
                               const googlePlaces = await searchNearby(
                                 stop.place!.lat, stop.place!.lng,
                                 [vibe],

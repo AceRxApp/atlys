@@ -132,8 +132,15 @@ function transformPlace(raw: Record<string, unknown>, userLat: number, userLng: 
 
   const vibeMap: Record<string, string> = {
     restaurant: 'food', cafe: 'food', bar: 'food', bakery: 'food', coffee_shop: 'food',
-    museum: 'todo', art_gallery: 'todo', tourist_attraction: 'todo', park: 'todo',
-    night_club: 'todo', hotel: 'stay', motel: 'stay',
+    steak_house: 'food', seafood_restaurant: 'food', pizza_restaurant: 'food',
+    sushi_restaurant: 'food', brunch_restaurant: 'food', breakfast_restaurant: 'food',
+    ice_cream_shop: 'food', fine_dining_restaurant: 'food', wine_bar: 'food',
+    museum: 'culture', art_gallery: 'culture', performing_arts_theater: 'culture',
+    historical_landmark: 'culture', movie_theater: 'culture',
+    tourist_attraction: 'outdoors', park: 'outdoors', hiking_area: 'outdoors',
+    zoo: 'outdoors', aquarium: 'outdoors', amusement_park: 'outdoors',
+    night_club: 'nightlife', casino: 'nightlife',
+    hotel: 'stay', motel: 'stay',
   };
   const tags: string[] = [];
   if (types) {
