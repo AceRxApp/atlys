@@ -53,32 +53,19 @@ const VIBE_CONFIG: Record<string, {
   activityTypes?: string[];
   aiHint: string;
 }> = {
+  nightout: {
+    fetchFood: true, fetchActivity: true,
+    foodTypes: BAR_TYPES,
+    activityTypes: ['night_club', 'performing_arts_theater', 'casino', 'movie_theater'],
+    aiHint: 'This is a NIGHT OUT. Pick nightlife spots — bars, lounges, clubs, live music venues, date-night restaurants. Avoid daytime-only places, museums, and parks.',
+  },
   food: {
     fetchFood: true, fetchActivity: false,
     aiHint: 'This is a FOOD-ONLY tour. Every stop MUST be a restaurant, cafe, bakery, or food spot. No museums, parks, landmarks, or tourist attractions.',
   },
-  bars: {
-    fetchFood: true, fetchActivity: false,
-    foodTypes: BAR_TYPES,
-    aiHint: 'This is a BAR HOPPING plan. Every stop MUST be a bar, lounge, pub, wine bar, brewery, or nightclub. No restaurants (unless they are primarily a bar), no museums, no parks.',
-  },
-  museum: {
+  adventure: {
     fetchFood: false, fetchActivity: true,
-    activityTypes: MUSEUM_TYPES,
-    aiHint: 'This is a MUSEUM/CULTURE day. Every stop MUST be a museum, gallery, theater, or cultural landmark. No restaurants, bars, or parks.',
-  },
-  date: {
-    fetchFood: true, fetchActivity: true,
-    aiHint: 'This is a DATE NIGHT. Pick romantic, intimate spots — nice restaurants, scenic locations, cozy bars. Avoid loud/crowded fast food joints.',
-  },
-  outdoor: {
-    fetchFood: false, fetchActivity: true,
-    activityTypes: OUTDOOR_TYPES,
-    aiHint: 'This is an OUTDOOR ADVENTURE. Every stop MUST be a park, garden, waterfront, hiking trail, zoo, or outdoor attraction. No indoor museums or restaurants.',
-  },
-  hidden: {
-    fetchFood: true, fetchActivity: true,
-    aiHint: 'Pick HIDDEN GEMS only — lesser-known spots with fewer reviews but great ratings. Avoid popular tourist traps and chain restaurants. Prioritize unique, local, off-the-beaten-path places.',
+    aiHint: 'This is an ADVENTURE day. Pick from outdoor spots, museums, galleries, landmarks, scenic viewpoints, and attractions. No restaurants or bars.',
   },
   surprise: {
     fetchFood: true, fetchActivity: true,
@@ -402,8 +389,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Build human-readable vibe description for the AI
     const vibeLabels: Record<string, string> = {
-      food: 'Food Tour', bars: 'Bar Hopping', museum: 'Museum Day',
-      date: 'Date Night', outdoor: 'Outdoor Adventure', hidden: 'Hidden Gems', surprise: 'Surprise Me',
+      nightout: 'Night Out', food: 'Food Tour',
+      adventure: 'Adventure', surprise: 'Surprise Me',
     };
     const vibeLabel = vibeLabels[vibeKey] || 'Surprise Me';
     const subVibeNote = subVibe && subVibe !== 'mix' ? ` (focus: ${subVibe})` : '';

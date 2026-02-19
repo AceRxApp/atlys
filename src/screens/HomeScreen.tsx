@@ -14,42 +14,26 @@ interface VibeOption {
 }
 
 const PLAN_VIBES: VibeOption[] = [
+  { id: 'nightout', emoji: '\u{1F319}', label: 'Night Out', subVibes: [
+    { id: 'date-night', label: 'Date Night' },
+    { id: 'clubs', label: 'Clubs' },
+    { id: 'bars', label: 'Bars & Lounges' },
+    { id: 'live-music', label: 'Live Music' },
+  ]},
   { id: 'food', emoji: '\u{1F37D}\u{FE0F}', label: 'Food Tour', subVibes: [
+    { id: 'restaurants', label: 'Restaurants' },
+    { id: 'bar-hopping', label: 'Bar Hopping' },
+    { id: 'desserts', label: 'Desserts' },
+    { id: 'quick-bites', label: 'Quick Bites' },
+    { id: 'sit-down', label: 'Sit-Down' },
     { id: 'mix', label: 'Mix of everything' },
-    { id: 'pizza', label: 'Pizza' },
-    { id: 'seafood', label: 'Seafood' },
-    { id: 'brunch', label: 'Brunch' },
-    { id: 'street-food', label: 'Street Food' },
-    { id: 'fine-dining', label: 'Fine Dining' },
   ]},
-  { id: 'bars', emoji: '\u{1F378}', label: 'Bar Hopping', subVibes: [
+  { id: 'adventure', emoji: '\u{1F33F}', label: 'Adventure', subVibes: [
+    { id: 'outdoor', label: 'Outdoor' },
+    { id: 'museums', label: 'Museums' },
+    { id: 'sightseeing', label: 'Sightseeing' },
     { id: 'mix', label: 'Mix' },
-    { id: 'cocktail', label: 'Cocktail Bars' },
-    { id: 'rooftop', label: 'Rooftop' },
-    { id: 'dive', label: 'Dive Bars' },
-    { id: 'wine', label: 'Wine Bars' },
-    { id: 'brewery', label: 'Breweries' },
   ]},
-  { id: 'museum', emoji: '\u{1F3DB}\u{FE0F}', label: 'Museum Day', subVibes: [
-    { id: 'mix', label: 'Mix' },
-    { id: 'art', label: 'Art' },
-    { id: 'history', label: 'History' },
-    { id: 'science', label: 'Science' },
-  ]},
-  { id: 'date', emoji: '\u{1F495}', label: 'Date Night', subVibes: [
-    { id: 'romantic-dinner', label: 'Romantic Dinner' },
-    { id: 'adventure', label: 'Adventure Date' },
-    { id: 'chill', label: 'Chill & Cozy' },
-    { id: 'fancy', label: 'Fancy Night Out' },
-  ]},
-  { id: 'outdoor', emoji: '\u{1F33F}', label: 'Outdoor Adventure', subVibes: [
-    { id: 'mix', label: 'Mix' },
-    { id: 'parks', label: 'Parks' },
-    { id: 'waterfront', label: 'Waterfront' },
-    { id: 'scenic', label: 'Scenic Views' },
-    { id: 'hiking', label: 'Hiking' },
-  ]},
-  { id: 'hidden', emoji: '\u{1F48E}', label: 'Hidden Gems', subVibes: [] },
   { id: 'surprise', emoji: '\u{1F3B2}', label: 'Surprise Me', subVibes: [] },
 ];
 
@@ -514,59 +498,6 @@ export default function HomeScreen() {
         </div>
       </div>
 
-      {/* ── Step 1: Pick your vibe ── */}
-      <div className="mb-5">
-        <label className="section-label block mb-2.5">What's the vibe?</label>
-        <div className="grid grid-cols-4 gap-2">
-          {PLAN_VIBES.slice(0, 4).map(v => (
-            <button key={v.id}
-              onClick={() => handleSelectVibe(v.id)}
-              className={`py-3 px-2 rounded-xl text-center cursor-pointer transition-all duration-150 ${
-                selectedVibe === v.id
-                  ? 'border-2 border-accent-amber bg-amber-tint-bg15 scale-[1.02]'
-                  : 'border border-border-medium bg-transparent'
-              }`}>
-              <div className="text-xl mb-1">{v.emoji}</div>
-              <div className={`text-[11px] font-semibold leading-tight ${selectedVibe === v.id ? 'text-accent-amber' : 'text-text-primary'}`}>{v.label}</div>
-            </button>
-          ))}
-        </div>
-        <div className="grid grid-cols-3 gap-2 mt-2">
-          {PLAN_VIBES.slice(4).map(v => (
-            <button key={v.id}
-              onClick={() => handleSelectVibe(v.id)}
-              className={`py-3 px-2 rounded-xl text-center cursor-pointer transition-all duration-150 ${
-                selectedVibe === v.id
-                  ? 'border-2 border-accent-amber bg-amber-tint-bg15 scale-[1.02]'
-                  : 'border border-border-medium bg-transparent'
-              }`}>
-              <div className="text-xl mb-1">{v.emoji}</div>
-              <div className={`text-[11px] font-semibold leading-tight ${selectedVibe === v.id ? 'text-accent-amber' : 'text-text-primary'}`}>{v.label}</div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Step 2: What kind? (sub-vibe pills) ── */}
-      {activeVibe && activeVibe.subVibes.length > 0 && (
-        <div className="mb-5 animate-[fadeSlideIn_0.2s_ease-out]">
-          <label className="section-label block mb-2">What kind of {activeVibe.label.toLowerCase()}?</label>
-          <div className="flex flex-wrap gap-2">
-            {activeVibe.subVibes.map(sv => (
-              <button key={sv.id}
-                onClick={() => setSelectedSubVibe(selectedSubVibe === sv.id ? null : sv.id)}
-                className={`py-2 px-3.5 rounded-full text-[12px] font-medium cursor-pointer transition-colors duration-150 border ${
-                  selectedSubVibe === sv.id
-                    ? 'border-accent-amber bg-amber-tint-bg15 text-accent-amber'
-                    : 'border-border-medium bg-transparent text-text-secondary hover:text-text-primary'
-                }`}>
-                {sv.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* ── How long? ── */}
       <div className="mb-5">
         <label className="section-label block mb-2.5">How long?</label>
@@ -586,6 +517,45 @@ export default function HomeScreen() {
           ))}
         </div>
       </div>
+
+      {/* ── I'm out for... ── */}
+      <div className="mb-5">
+        <label className="section-label block mb-2.5">I'm out for...</label>
+        <div className="grid grid-cols-4 gap-2">
+          {PLAN_VIBES.map(v => (
+            <button key={v.id}
+              onClick={() => handleSelectVibe(v.id)}
+              className={`py-3 px-2 rounded-xl text-center cursor-pointer transition-all duration-150 ${
+                selectedVibe === v.id
+                  ? 'border-2 border-accent-amber bg-amber-tint-bg15 scale-[1.02]'
+                  : 'border border-border-medium bg-transparent'
+              }`}>
+              <div className="text-xl mb-1">{v.emoji}</div>
+              <div className={`text-[11px] font-semibold leading-tight ${selectedVibe === v.id ? 'text-accent-amber' : 'text-text-primary'}`}>{v.label}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Sub-vibe pills ── */}
+      {activeVibe && activeVibe.subVibes.length > 0 && (
+        <div className="mb-5 animate-[fadeSlideIn_0.2s_ease-out]">
+          <label className="section-label block mb-2">What kind?</label>
+          <div className="flex flex-wrap gap-2">
+            {activeVibe.subVibes.map(sv => (
+              <button key={sv.id}
+                onClick={() => setSelectedSubVibe(selectedSubVibe === sv.id ? null : sv.id)}
+                className={`py-2 px-3.5 rounded-full text-[12px] font-medium cursor-pointer transition-colors duration-150 border ${
+                  selectedSubVibe === sv.id
+                    ? 'border-accent-amber bg-amber-tint-bg15 text-accent-amber'
+                    : 'border-border-medium bg-transparent text-text-secondary hover:text-text-primary'
+                }`}>
+                {sv.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Generate Button ── */}
       <button
