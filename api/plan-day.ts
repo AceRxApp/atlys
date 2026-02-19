@@ -341,10 +341,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const allRaw = rawResults.flat();
     const allTransformed = allRaw.map(p => transformPlace(p, lat, lng));
 
-    // 2. Deduplicate, sort by rating, take top 30
+    // 2. Filter out chains — NxStops is about culturally diverse, locally-owned spots
+    const CHAIN_KEYWORDS = [
+      'starbucks', 'mcdonald', 'subway', 'burger king', 'wendy', 'taco bell',
+      'chick-fil-a', 'chipotle', 'panera', 'dunkin', 'domino', 'pizza hut',
+      'papa john', 'kfc', 'popeye', 'five guys', 'shake shack', 'amc ',
+      'regal cinema', 'cinemark', 'applebee', 'chili\'s', 'olive garden',
+      'red lobster', 'outback', 'ihop', 'denny', 'cracker barrel',
+      'buffalo wild wings', 'wingstop', 'panda express', 'jack in the box',
+      'arby', 'sonic drive', 'whataburger', 'raising cane', 'in-n-out',
+      'cold stone', 'baskin-robbins', 'krispy kreme', 'tim horton',
+    ];
+    const filtered = allTransformed.filter(p => {
+      const nameLower = p.name.toLowerCase();
+      return !CHAIN_KEYWORDS.some(chain => nameLower.includes(chain));
+    });
+
+    // 3. Deduplicate, sort by rating, take top 30
     const seen = new Set<string>();
     const allPlaces: PlanPlace[] = [];
-    for (const p of allTransformed) {
+    for (const p of filtered) {
       if (p.placeId && !seen.has(p.placeId)) {
         seen.add(p.placeId);
         allPlaces.push(p);
