@@ -1,6 +1,6 @@
-const CACHE_NAME = 'nxstops-v7';
-const API_CACHE_NAME = 'nxstops-api-v4';
-const ASSETS_CACHE_NAME = 'nxstops-assets-v4';
+const CACHE_NAME = 'nxstops-v8';
+const API_CACHE_NAME = 'nxstops-api-v5';
+const ASSETS_CACHE_NAME = 'nxstops-assets-v5';
 const API_CACHE_MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours in ms
 const API_CACHE_MAX_ENTRIES = 50;
 const API_ROUTES = ['/api/places', '/api/events', '/api/weather', '/api/currency'];
