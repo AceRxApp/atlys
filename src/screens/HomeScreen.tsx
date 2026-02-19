@@ -300,8 +300,12 @@ export default function HomeScreen() {
   const togglePlanMood = (id: PlanMood) => {
     setPlanMoods(prev => {
       if (prev.includes(id)) {
+        // Can't deselect the last mood
         return prev.length > 1 ? prev.filter(m => m !== id) : prev;
       }
+      // If only the default 'sightseeing' is selected, replace it with the user's pick
+      if (prev.length === 1 && prev[0] === 'sightseeing') return [id];
+      // Max 2 moods: drop oldest, add new
       if (prev.length >= 2) return [prev[1], id];
       return [...prev, id];
     });
