@@ -2,16 +2,20 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { LocationIcon } from '../components/icons';
 import { formatDistance } from '../services/places';
-import type { PlanMood, PlanDuration } from '../types';
+import type { PlanDuration } from '../types';
 import ContextHint from '../components/ContextHint';
 
-const PLAN_MOODS: { id: PlanMood; emoji: string; label: string }[] = [
-  { id: 'sightseeing', emoji: '\u{1F5FA}\u{FE0F}', label: 'Sightseeing' },
-  { id: 'foodie', emoji: '\u{1F37D}\u{FE0F}', label: 'Foodie' },
-  { id: 'outdoors', emoji: '\u{1F33F}', label: 'Outdoors' },
-  { id: 'nightlife', emoji: '\u{1F319}', label: 'Nightlife' },
-  { id: 'culture', emoji: '\u{1F3AD}', label: 'Culture' },
-  { id: 'hidden-gems', emoji: '\u{1F48E}', label: 'Hidden Gems' },
+const VIBE_SUGGESTIONS = [
+  '\u{1F355} Pizza crawl',
+  '\u{1F3DB}\u{FE0F} Museums all day',
+  '\u{1F378} Rooftop bars',
+  '\u{1F33F} Parks & nature',
+  '\u{1F48E} Hidden gems only',
+  '\u{1F37D}\u{FE0F} Feed me everything',
+  '\u{1F3B6} Live music & nightlife',
+  '\u{1F3A8} Art & culture',
+  '\u{2615} Coffee shop hopping',
+  '\u{1F305} Scenic viewpoints',
 ];
 
 const PLAN_DURATIONS: { id: PlanDuration; emoji: string; label: string; desc: string }[] = [
@@ -282,7 +286,7 @@ export default function HomeScreen() {
     cityLabel,
   } = useApp();
 
-  const [planMoods, setPlanMoods] = useState<PlanMood[]>(['sightseeing']);
+  const [vibeText, setVibeText] = useState('');
   const [planDuration, setPlanDuration] = useState<PlanDuration>('full');
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
 
@@ -297,23 +301,9 @@ export default function HomeScreen() {
     return () => clearInterval(interval);
   }, [autoPlanLoading]);
 
-  const togglePlanMood = (id: PlanMood) => {
-    setPlanMoods(prev => {
-      if (prev.includes(id)) {
-        // Can't deselect the last mood
-        return prev.length > 1 ? prev.filter(m => m !== id) : prev;
-      }
-      // If only the default 'sightseeing' is selected, replace it with the user's pick
-      if (prev.length === 1 && prev[0] === 'sightseeing') return [id];
-      // Max 2 moods: drop oldest, add new
-      if (prev.length >= 2) return [prev[1], id];
-      return [...prev, id];
-    });
-  };
-
   const handlePlanMyDay = async () => {
-    const moodStr = planMoods.join(' + ');
-    const success = await planMyDay(moodStr, planDuration);
+    const mood = vibeText.trim() || 'surprise me — mix of the best food, sights, and experiences';
+    const success = await planMyDay(mood, planDuration);
     if (success) {
       setScreen('plan');
     }
@@ -476,24 +466,28 @@ export default function HomeScreen() {
 
       {/* ── What's the vibe? ── */}
       <div className="mb-5">
-        <label className="section-label block mb-2.5">
-          What&apos;s the vibe? <span className="text-text-tertiary font-normal text-xs">(pick up to 2)</span>
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {PLAN_MOODS.map(m => {
-            const selected = planMoods.includes(m.id);
-            return (
-              <button key={m.id}
-                onClick={() => togglePlanMood(m.id)}
-                className={`py-2 px-3.5 rounded-[20px] text-[13px] font-medium cursor-pointer transition-colors duration-150 ${
-                  selected
-                    ? 'border-2 border-accent-amber bg-amber-tint-bg15 text-accent-amber'
-                    : 'border border-border-medium bg-transparent text-text-secondary'
-                }`}>
-                {m.emoji} {m.label}
-              </button>
-            );
-          })}
+        <label className="section-label block mb-2.5">What are you in the mood for?</label>
+        <input
+          type="text"
+          value={vibeText}
+          onChange={e => setVibeText(e.target.value)}
+          placeholder="e.g. pizza crawl, museums, rooftop bars..."
+          maxLength={120}
+          className="w-full px-4 py-3 rounded-xl border border-border-medium bg-card-bg text-text-primary text-sm placeholder:text-text-tertiary focus:outline-none focus:border-accent-amber transition-colors"
+          onKeyDown={e => { if (e.key === 'Enter') handlePlanMyDay(); }}
+        />
+        <div className="flex flex-wrap gap-1.5 mt-2.5">
+          {VIBE_SUGGESTIONS.slice(0, 6).map(s => (
+            <button key={s}
+              onClick={() => setVibeText(s.replace(/^[^\w]+/, ''))}
+              className={`py-1.5 px-3 rounded-full text-[12px] font-medium cursor-pointer transition-colors duration-150 border ${
+                vibeText === s.replace(/^[^\w]+/, '')
+                  ? 'border-accent-amber bg-amber-tint-bg15 text-accent-amber'
+                  : 'border-border-medium bg-transparent text-text-tertiary hover:text-text-secondary'
+              }`}>
+              {s}
+            </button>
+          ))}
         </div>
       </div>
 

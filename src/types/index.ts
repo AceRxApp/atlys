@@ -41,7 +41,6 @@ export interface Stop {
   estimatedSpend?: number;
 }
 
-export type PlanMood = 'sightseeing' | 'foodie' | 'outdoors' | 'nightlife' | 'culture' | 'hidden-gems';
 export type PlanDuration = 'full' | 'morning' | 'afternoon' | 'evening';
 
 export interface AdminSignup {
