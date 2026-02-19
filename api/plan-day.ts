@@ -57,19 +57,19 @@ const VIBE_CONFIG: Record<string, {
     fetchFood: true, fetchActivity: true,
     foodTypes: BAR_TYPES,
     activityTypes: ['night_club', 'performing_arts_theater', 'casino', 'movie_theater'],
-    aiHint: 'This is a NIGHT OUT. Pick nightlife spots — bars, lounges, clubs, live music venues, date-night restaurants. Avoid daytime-only places, museums, and parks.',
+    aiHint: 'This is a NIGHT OUT. Pick nightlife spots — bars, lounges, clubs, live music venues, date-night restaurants. Avoid daytime-only places, museums, and parks. Prioritize culturally unique spots — Black-owned, Latino-owned, Asian-owned, Caribbean, LGBTQ+-friendly, or culturally themed venues over generic chains.',
   },
   food: {
     fetchFood: true, fetchActivity: false,
-    aiHint: 'This is a FOOD-ONLY tour. Every stop MUST be a restaurant, cafe, bakery, or food spot. No museums, parks, landmarks, or tourist attractions.',
+    aiHint: 'This is a FOOD-ONLY tour. Every stop MUST be a restaurant, cafe, bakery, or food spot. No museums, parks, landmarks, or tourist attractions. PRIORITIZE cultural diversity: mix cuisines from different cultures (Mexican, Ethiopian, Korean, Indian, Caribbean, Southern soul food, etc). Avoid chain restaurants. Prefer locally-owned, family-run, and culturally authentic spots over generic American restaurants.',
   },
   adventure: {
     fetchFood: false, fetchActivity: true,
-    aiHint: 'This is an ADVENTURE day. Pick from outdoor spots, museums, galleries, landmarks, scenic viewpoints, and attractions. No restaurants or bars.',
+    aiHint: 'This is an ADVENTURE day. Pick from outdoor spots, museums, galleries, landmarks, scenic viewpoints, and attractions. No restaurants or bars. Prioritize culturally significant spots — cultural centers, heritage sites, neighborhood-specific landmarks, and locally important places over generic tourist traps.',
   },
   surprise: {
     fetchFood: true, fetchActivity: true,
-    aiHint: 'Create a well-rounded mix of the best food, sights, and experiences. Include variety — a great meal, something cultural or scenic, and something fun.',
+    aiHint: 'Create a well-rounded mix of the best food, sights, and experiences. PRIORITIZE cultural diversity and authenticity: include spots from different cultural backgrounds (Black-owned, Hispanic-owned, Asian-owned, immigrant-run, etc). Mix cuisines and cultures. Avoid chain restaurants and generic tourist attractions. Give people an authentic, diverse feel for the city.',
   },
 };
 
@@ -409,17 +409,18 @@ ${JSON.stringify(condensed)}${eventsSection}
 RULES:
 1. Pick exactly ${stopCount} stops
 2. CRITICAL: ${config.aiHint}
-3. Time-logical ordering: earlier activities first, dinner/nightlife last
-4. Prefer places that are currently open and have 4.0+ ratings
-5. The "spend" field must be a realistic USD estimate for one person (e.g. coffee=$5, museum=$20, nice dinner=$45)
-6. Group adjustments: family=kid-friendly, no nightlife; couple=intimate/scenic; solo=flexible; friends=social/group-friendly
-7. Keep stops close together for walkability
-8. Variety: pick diverse options within the theme (different cuisines for food, different types for sightseeing, etc)${subVibe && subVibe !== 'mix' ? `\n9. SUB-THEME: Focus on "${subVibe}" specifically when choosing stops` : ''}${eventsSection ? `\n${subVibe && subVibe !== 'mix' ? '10' : '9'}. Include at most 1 event if it fits the vibe/timing` : ''}
+3. CULTURAL DIVERSITY IS CORE: NxStops is NOT a generic travel app. Always prioritize Black-owned, Hispanic-owned, Asian-owned, Indian-owned, Caribbean, Middle Eastern, African, and other culturally diverse businesses. Mix cultures in every plan. Avoid chains. Give travelers an authentic, multicultural experience they can't get from Google Maps or TripAdvisor.
+4. Time-logical ordering: earlier activities first, dinner/nightlife last
+5. Prefer places that are currently open and have 4.0+ ratings
+6. The "spend" field must be a realistic USD estimate for one person (e.g. coffee=$5, museum=$20, nice dinner=$45)
+7. Group adjustments: family=kid-friendly, no nightlife; couple=intimate/scenic; solo=flexible; friends=social/group-friendly
+8. Keep stops close together for walkability
+9. Variety: pick diverse CULTURES and options within the theme (different cultural cuisines for food, different cultural neighborhoods for sightseeing, etc)${subVibe && subVibe !== 'mix' ? `\n10. SUB-THEME: Focus on "${subVibe}" specifically when choosing stops` : ''}${eventsSection ? `\n${subVibe && subVibe !== 'mix' ? '11' : '10'}. Include at most 1 event if it fits the vibe/timing` : ''}
 
 Return ONLY this JSON:
 {"stops":[{"idx":0,"timeSlot":"9:00 AM","reason":"why this fits","spend":15}],"dayTitle":"Catchy 3-4 word title"}`;
 
-    const systemMsg = 'You are a JSON-only itinerary generator. Return ONLY valid JSON, no markdown, no explanation, no extra text.';
+    const systemMsg = 'You are NxStops, a culturally diverse itinerary generator. You prioritize authentic, locally-owned, and culturally diverse businesses — Black-owned, Hispanic-owned, Asian-owned, immigrant-run, and culturally unique spots. You avoid chain restaurants and generic tourist traps. Return ONLY valid JSON, no markdown, no explanation, no extra text.';
     const messages = [
       { role: 'system', content: systemMsg },
       { role: 'user', content: prompt },
