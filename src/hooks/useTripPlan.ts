@@ -385,7 +385,7 @@ export function useTripPlan(deps: {
   const [autoPlanError, setAutoPlanError] = useState<string | null>(null);
   const [lastPlanTitle, setLastPlanTitle] = useState<string | null>(null);
 
-  const planMyDay = useCallback(async (mood: string, duration: PlanDuration): Promise<boolean> => {
+  const planMyDay = useCallback(async (mood: string, duration: PlanDuration, vibe?: string, subVibe?: string): Promise<boolean> => {
     if (!lat || !lng) {
       showToast('Location needed — pick a city or enable GPS');
       return false;
@@ -412,6 +412,8 @@ export function useTripPlan(deps: {
         lat,
         lng,
         city: cityLabel || undefined,
+        vibe: vibe || undefined,
+        subVibe: subVibe || undefined,
         mood,
         travelGroup: travelGroup || undefined,
         duration,

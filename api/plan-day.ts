@@ -24,6 +24,19 @@ const FOOD_TYPES = [
   'wine_bar', 'fine_dining_restaurant',
 ];
 
+const BAR_TYPES = [
+  'bar', 'wine_bar', 'night_club', 'restaurant', 'cafe',
+];
+
+const MUSEUM_TYPES = [
+  'museum', 'art_gallery', 'performing_arts_theater', 'historical_landmark',
+];
+
+const OUTDOOR_TYPES = [
+  'park', 'hiking_area', 'zoo', 'aquarium', 'amusement_park',
+  'tourist_attraction',
+];
+
 const ACTIVITY_TYPES = [
   'museum', 'art_gallery', 'tourist_attraction', 'park',
   'performing_arts_theater', 'historical_landmark', 'zoo',
@@ -31,6 +44,47 @@ const ACTIVITY_TYPES = [
   'amusement_park', 'movie_theater', 'market', 'spa',
   'book_store', 'hiking_area',
 ];
+
+// Vibe → which place types to fetch + what the AI prompt should say
+const VIBE_CONFIG: Record<string, {
+  fetchFood: boolean;
+  fetchActivity: boolean;
+  foodTypes?: string[];
+  activityTypes?: string[];
+  aiHint: string;
+}> = {
+  food: {
+    fetchFood: true, fetchActivity: false,
+    aiHint: 'This is a FOOD-ONLY tour. Every stop MUST be a restaurant, cafe, bakery, or food spot. No museums, parks, landmarks, or tourist attractions.',
+  },
+  bars: {
+    fetchFood: true, fetchActivity: false,
+    foodTypes: BAR_TYPES,
+    aiHint: 'This is a BAR HOPPING plan. Every stop MUST be a bar, lounge, pub, wine bar, brewery, or nightclub. No restaurants (unless they are primarily a bar), no museums, no parks.',
+  },
+  museum: {
+    fetchFood: false, fetchActivity: true,
+    activityTypes: MUSEUM_TYPES,
+    aiHint: 'This is a MUSEUM/CULTURE day. Every stop MUST be a museum, gallery, theater, or cultural landmark. No restaurants, bars, or parks.',
+  },
+  date: {
+    fetchFood: true, fetchActivity: true,
+    aiHint: 'This is a DATE NIGHT. Pick romantic, intimate spots — nice restaurants, scenic locations, cozy bars. Avoid loud/crowded fast food joints.',
+  },
+  outdoor: {
+    fetchFood: false, fetchActivity: true,
+    activityTypes: OUTDOOR_TYPES,
+    aiHint: 'This is an OUTDOOR ADVENTURE. Every stop MUST be a park, garden, waterfront, hiking trail, zoo, or outdoor attraction. No indoor museums or restaurants.',
+  },
+  hidden: {
+    fetchFood: true, fetchActivity: true,
+    aiHint: 'Pick HIDDEN GEMS only — lesser-known spots with fewer reviews but great ratings. Avoid popular tourist traps and chain restaurants. Prioritize unique, local, off-the-beaten-path places.',
+  },
+  surprise: {
+    fetchFood: true, fetchActivity: true,
+    aiHint: 'Create a well-rounded mix of the best food, sights, and experiences. Include variety — a great meal, something cultural or scenic, and something fun.',
+  },
+};
 
 // --------------------------------------------------------------------------
 // Google Places fetch
@@ -263,10 +317,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const {
-      lat, lng, city, mood, travelGroup, duration,
+      lat, lng, city, vibe, subVibe, mood, travelGroup, duration,
       weather, preferences, events,
     } = req.body as {
-      lat: number; lng: number; city?: string; mood?: string;
+      lat: number; lng: number; city?: string;
+      vibe?: string; subVibe?: string; mood?: string;
       travelGroup?: string; duration?: string;
       weather?: string; preferences?: string;
       events?: { name: string; category: string; time: string; venue: string }[];
@@ -276,29 +331,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Location is required' });
     }
 
-    // 1. Fetch places in parallel (food + activities)
-    const [foodRaw, activityRaw] = await Promise.all([
-      fetchNearbyPlaces(lat, lng, FOOD_TYPES, 2500),
-      fetchNearbyPlaces(lat, lng, ACTIVITY_TYPES, 3000),
-    ]);
+    // Determine vibe config — use structured vibe if provided, fall back to 'surprise'
+    const vibeKey = vibe && VIBE_CONFIG[vibe] ? vibe : 'surprise';
+    const config = VIBE_CONFIG[vibeKey];
 
-    const foodPlaces = foodRaw.map(p => transformPlace(p, lat, lng));
-    const activityPlaces = activityRaw.map(p => transformPlace(p, lat, lng));
+    // 1. Fetch ONLY the place types relevant to this vibe
+    const fetches: Promise<Record<string, unknown>[]>[] = [];
+    let fetchLabels: string[] = [];
 
-    // 2. Deduplicate and merge all places — let the AI decide what fits the user's request
+    if (config.fetchFood) {
+      const types = config.foodTypes || FOOD_TYPES;
+      fetches.push(fetchNearbyPlaces(lat, lng, types, 2500));
+      fetchLabels.push('food');
+    }
+    if (config.fetchActivity) {
+      const types = config.activityTypes || ACTIVITY_TYPES;
+      fetches.push(fetchNearbyPlaces(lat, lng, types, 3000));
+      fetchLabels.push('activity');
+    }
+
+    const rawResults = await Promise.all(fetches);
+    const allRaw = rawResults.flat();
+    const allTransformed = allRaw.map(p => transformPlace(p, lat, lng));
+
+    // 2. Deduplicate, sort by rating, take top 30
     const seen = new Set<string>();
     const allPlaces: PlanPlace[] = [];
-    for (const p of [...foodPlaces, ...activityPlaces]) {
+    for (const p of allTransformed) {
       if (p.placeId && !seen.has(p.placeId)) {
         seen.add(p.placeId);
         allPlaces.push(p);
       }
     }
-    // Sort by rating, take top 30 for token efficiency
     allPlaces.sort((a, b) => (b.rating || 0) - (a.rating || 0));
     const topPlaces = allPlaces.slice(0, 30);
 
-    console.log(`[NxStops Plan] vibe="${mood}" duration="${duration}" totalPlaces=${topPlaces.length}`);
+    console.log(`[NxStops Plan] vibe="${vibeKey}" subVibe="${subVibe || ''}" fetched=[${fetchLabels}] totalPlaces=${topPlaces.length}`);
 
     if (topPlaces.length < 3) {
       return res.status(200).json({
@@ -325,34 +393,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       eventsSection = `\n\nTODAY'S EVENTS (can include 0-1 in the plan):\n${todayEvents.map((e, i) => `E${i}: ${e.name} at ${e.venue} (${e.time}) [${e.category}]`).join('\n')}`;
     }
 
-    // 4. Build AI prompt — user's free-text vibe drives everything
+    // 4. Build AI prompt — structured vibe drives place selection
     const durationLabel = duration || 'full day';
     const isFullDay = durationLabel === 'full day' || durationLabel === 'full';
     const stopCount = isFullDay ? 6 : 3;
     const now = new Date();
     const timeLabel = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
-    const userVibe = mood || 'surprise me — mix of the best food, sights, and experiences';
+
+    // Build human-readable vibe description for the AI
+    const vibeLabels: Record<string, string> = {
+      food: 'Food Tour', bars: 'Bar Hopping', museum: 'Museum Day',
+      date: 'Date Night', outdoor: 'Outdoor Adventure', hidden: 'Hidden Gems', surprise: 'Surprise Me',
+    };
+    const vibeLabel = vibeLabels[vibeKey] || 'Surprise Me';
+    const subVibeNote = subVibe && subVibe !== 'mix' ? ` (focus: ${subVibe})` : '';
 
     const prompt = `Create a ${durationLabel} itinerary from ONLY the numbered places below.
 
 CONTEXT:
 - City: ${city || 'nearby area'}
 - Current time: ${timeLabel}
-- The user wants: "${userVibe}"
+- Vibe: ${vibeLabel}${subVibeNote}
 - Group: ${travelGroup || 'solo'}${weather ? `\n- Weather: ${weather}` : ''}${preferences ? `\n- User preferences: ${preferences}` : ''}
 
 PLACES (pick from these only, reference by idx):
 ${JSON.stringify(condensed)}${eventsSection}
 
 RULES:
-1. Pick exactly ${stopCount} stops that BEST match what the user wants: "${userVibe}"
-2. CRITICAL: Match the user's intent precisely. If they want food — EVERY stop must be food/drink (restaurants, cafes, bakeries, desserts, etc). If they want museums — only pick museums and galleries. If they want bars — only pick bars, lounges, clubs. If they say "surprise me" or something vague — create a well-rounded mix.
+1. Pick exactly ${stopCount} stops
+2. CRITICAL: ${config.aiHint}
 3. Time-logical ordering: earlier activities first, dinner/nightlife last
 4. Prefer places that are currently open and have 4.0+ ratings
 5. The "spend" field must be a realistic USD estimate for one person (e.g. coffee=$5, museum=$20, nice dinner=$45)
 6. Group adjustments: family=kid-friendly, no nightlife; couple=intimate/scenic; solo=flexible; friends=social/group-friendly
 7. Keep stops close together for walkability
-8. Variety: pick diverse options within the user's requested theme (different cuisines for food, different types of attractions for sightseeing, etc)${eventsSection ? '\n9. Include at most 1 event if it fits the vibe/timing' : ''}
+8. Variety: pick diverse options within the theme (different cuisines for food, different types for sightseeing, etc)${subVibe && subVibe !== 'mix' ? `\n9. SUB-THEME: Focus on "${subVibe}" specifically when choosing stops` : ''}${eventsSection ? `\n${subVibe && subVibe !== 'mix' ? '10' : '9'}. Include at most 1 event if it fits the vibe/timing` : ''}
 
 Return ONLY this JSON:
 {"stops":[{"idx":0,"timeSlot":"9:00 AM","reason":"why this fits","spend":15}],"dayTitle":"Catchy 3-4 word title"}`;

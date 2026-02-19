@@ -5,17 +5,52 @@ import { formatDistance } from '../services/places';
 import type { PlanDuration } from '../types';
 import ContextHint from '../components/ContextHint';
 
-const VIBE_SUGGESTIONS = [
-  '\u{1F355} Pizza crawl',
-  '\u{1F3DB}\u{FE0F} Museums all day',
-  '\u{1F378} Rooftop bars',
-  '\u{1F33F} Parks & nature',
-  '\u{1F48E} Hidden gems only',
-  '\u{1F37D}\u{FE0F} Feed me everything',
-  '\u{1F3B6} Live music & nightlife',
-  '\u{1F3A8} Art & culture',
-  '\u{2615} Coffee shop hopping',
-  '\u{1F305} Scenic viewpoints',
+// ── Vibe Cards + Sub-Vibes ──
+interface VibeOption {
+  id: string;
+  emoji: string;
+  label: string;
+  subVibes: { id: string; label: string }[];
+}
+
+const PLAN_VIBES: VibeOption[] = [
+  { id: 'food', emoji: '\u{1F37D}\u{FE0F}', label: 'Food Tour', subVibes: [
+    { id: 'mix', label: 'Mix of everything' },
+    { id: 'pizza', label: 'Pizza' },
+    { id: 'seafood', label: 'Seafood' },
+    { id: 'brunch', label: 'Brunch' },
+    { id: 'street-food', label: 'Street Food' },
+    { id: 'fine-dining', label: 'Fine Dining' },
+  ]},
+  { id: 'bars', emoji: '\u{1F378}', label: 'Bar Hopping', subVibes: [
+    { id: 'mix', label: 'Mix' },
+    { id: 'cocktail', label: 'Cocktail Bars' },
+    { id: 'rooftop', label: 'Rooftop' },
+    { id: 'dive', label: 'Dive Bars' },
+    { id: 'wine', label: 'Wine Bars' },
+    { id: 'brewery', label: 'Breweries' },
+  ]},
+  { id: 'museum', emoji: '\u{1F3DB}\u{FE0F}', label: 'Museum Day', subVibes: [
+    { id: 'mix', label: 'Mix' },
+    { id: 'art', label: 'Art' },
+    { id: 'history', label: 'History' },
+    { id: 'science', label: 'Science' },
+  ]},
+  { id: 'date', emoji: '\u{1F495}', label: 'Date Night', subVibes: [
+    { id: 'romantic-dinner', label: 'Romantic Dinner' },
+    { id: 'adventure', label: 'Adventure Date' },
+    { id: 'chill', label: 'Chill & Cozy' },
+    { id: 'fancy', label: 'Fancy Night Out' },
+  ]},
+  { id: 'outdoor', emoji: '\u{1F33F}', label: 'Outdoor Adventure', subVibes: [
+    { id: 'mix', label: 'Mix' },
+    { id: 'parks', label: 'Parks' },
+    { id: 'waterfront', label: 'Waterfront' },
+    { id: 'scenic', label: 'Scenic Views' },
+    { id: 'hiking', label: 'Hiking' },
+  ]},
+  { id: 'hidden', emoji: '\u{1F48E}', label: 'Hidden Gems', subVibes: [] },
+  { id: 'surprise', emoji: '\u{1F3B2}', label: 'Surprise Me', subVibes: [] },
 ];
 
 const PLAN_DURATIONS: { id: PlanDuration; emoji: string; label: string; desc: string }[] = [
@@ -286,11 +321,13 @@ export default function HomeScreen() {
     cityLabel,
   } = useApp();
 
-  const [vibeText, setVibeText] = useState('');
+  const [selectedVibe, setSelectedVibe] = useState<string | null>(null);
+  const [selectedSubVibe, setSelectedSubVibe] = useState<string | null>(null);
   const [planDuration, setPlanDuration] = useState<PlanDuration>('full');
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
 
   const hasLocation = useGps || !!selectedCity;
+  const activeVibe = PLAN_VIBES.find(v => v.id === selectedVibe);
 
   // Rotate loading messages
   useEffect(() => {
@@ -301,9 +338,22 @@ export default function HomeScreen() {
     return () => clearInterval(interval);
   }, [autoPlanLoading]);
 
+  const handleSelectVibe = (vibeId: string) => {
+    if (selectedVibe === vibeId) {
+      setSelectedVibe(null);
+      setSelectedSubVibe(null);
+    } else {
+      setSelectedVibe(vibeId);
+      setSelectedSubVibe(null);
+    }
+  };
+
   const handlePlanMyDay = async () => {
-    const mood = vibeText.trim() || 'surprise me — mix of the best food, sights, and experiences';
-    const success = await planMyDay(mood, planDuration);
+    const vibe = selectedVibe || 'surprise';
+    const subVibe = selectedSubVibe || undefined;
+    const vibeLabel = PLAN_VIBES.find(v => v.id === vibe)?.label || 'Surprise Me';
+    const mood = subVibe && subVibe !== 'mix' ? `${vibeLabel} — ${subVibe}` : vibeLabel;
+    const success = await planMyDay(mood, planDuration, vibe, subVibe);
     if (success) {
       setScreen('plan');
     }
@@ -464,32 +514,58 @@ export default function HomeScreen() {
         </div>
       </div>
 
-      {/* ── What's the vibe? ── */}
+      {/* ── Step 1: Pick your vibe ── */}
       <div className="mb-5">
-        <label className="section-label block mb-2.5">What are you in the mood for?</label>
-        <input
-          type="text"
-          value={vibeText}
-          onChange={e => setVibeText(e.target.value)}
-          placeholder="e.g. pizza crawl, museums, rooftop bars..."
-          maxLength={120}
-          className="w-full px-4 py-3 rounded-xl border border-border-medium bg-card-bg text-text-primary text-sm placeholder:text-text-tertiary focus:outline-none focus:border-accent-amber transition-colors"
-          onKeyDown={e => { if (e.key === 'Enter') handlePlanMyDay(); }}
-        />
-        <div className="flex flex-wrap gap-1.5 mt-2.5">
-          {VIBE_SUGGESTIONS.slice(0, 6).map(s => (
-            <button key={s}
-              onClick={() => setVibeText(s.replace(/^[^\w]+/, ''))}
-              className={`py-1.5 px-3 rounded-full text-[12px] font-medium cursor-pointer transition-colors duration-150 border ${
-                vibeText === s.replace(/^[^\w]+/, '')
-                  ? 'border-accent-amber bg-amber-tint-bg15 text-accent-amber'
-                  : 'border-border-medium bg-transparent text-text-tertiary hover:text-text-secondary'
+        <label className="section-label block mb-2.5">What's the vibe?</label>
+        <div className="grid grid-cols-4 gap-2">
+          {PLAN_VIBES.slice(0, 4).map(v => (
+            <button key={v.id}
+              onClick={() => handleSelectVibe(v.id)}
+              className={`py-3 px-2 rounded-xl text-center cursor-pointer transition-all duration-150 ${
+                selectedVibe === v.id
+                  ? 'border-2 border-accent-amber bg-amber-tint-bg15 scale-[1.02]'
+                  : 'border border-border-medium bg-transparent'
               }`}>
-              {s}
+              <div className="text-xl mb-1">{v.emoji}</div>
+              <div className={`text-[11px] font-semibold leading-tight ${selectedVibe === v.id ? 'text-accent-amber' : 'text-text-primary'}`}>{v.label}</div>
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-3 gap-2 mt-2">
+          {PLAN_VIBES.slice(4).map(v => (
+            <button key={v.id}
+              onClick={() => handleSelectVibe(v.id)}
+              className={`py-3 px-2 rounded-xl text-center cursor-pointer transition-all duration-150 ${
+                selectedVibe === v.id
+                  ? 'border-2 border-accent-amber bg-amber-tint-bg15 scale-[1.02]'
+                  : 'border border-border-medium bg-transparent'
+              }`}>
+              <div className="text-xl mb-1">{v.emoji}</div>
+              <div className={`text-[11px] font-semibold leading-tight ${selectedVibe === v.id ? 'text-accent-amber' : 'text-text-primary'}`}>{v.label}</div>
             </button>
           ))}
         </div>
       </div>
+
+      {/* ── Step 2: What kind? (sub-vibe pills) ── */}
+      {activeVibe && activeVibe.subVibes.length > 0 && (
+        <div className="mb-5 animate-[fadeSlideIn_0.2s_ease-out]">
+          <label className="section-label block mb-2">What kind of {activeVibe.label.toLowerCase()}?</label>
+          <div className="flex flex-wrap gap-2">
+            {activeVibe.subVibes.map(sv => (
+              <button key={sv.id}
+                onClick={() => setSelectedSubVibe(selectedSubVibe === sv.id ? null : sv.id)}
+                className={`py-2 px-3.5 rounded-full text-[12px] font-medium cursor-pointer transition-colors duration-150 border ${
+                  selectedSubVibe === sv.id
+                    ? 'border-accent-amber bg-amber-tint-bg15 text-accent-amber'
+                    : 'border-border-medium bg-transparent text-text-secondary hover:text-text-primary'
+                }`}>
+                {sv.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── How long? ── */}
       <div className="mb-5">

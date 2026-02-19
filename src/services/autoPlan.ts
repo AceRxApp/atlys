@@ -20,6 +20,8 @@ export interface AutoPlanRequest {
   lat: number;
   lng: number;
   city?: string;
+  vibe?: string;
+  subVibe?: string;
   mood?: string;
   travelGroup?: string;
   duration?: string;

@@ -269,7 +269,7 @@ export interface AppContextType {
   autoPlanLoading: boolean;
   autoPlanError: string | null;
   lastPlanTitle: string | null;
-  planMyDay: (mood: string, duration: PlanDuration) => Promise<boolean>;
+  planMyDay: (mood: string, duration: PlanDuration, vibe?: string, subVibe?: string) => Promise<boolean>;
   tripStartDate: string | null;
   setTripStartDate: (date: string | null) => void;
 
