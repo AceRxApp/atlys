@@ -288,6 +288,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const uniqueActivities = dedupe(activityPlaces);
 
     // 2. Build mood-aware place list — single mood = 100% that category
+    console.log(`[NxStops Plan] mood="${mood}" duration="${duration}" food=${uniqueFood.length} activities=${uniqueActivities.length}`);
     // Parse mood string (can be "foodie" or "foodie + nightlife")
     const validMoods = ['foodie', 'nightlife', 'outdoors', 'culture', 'hidden-gems', 'sightseeing'];
     const moodParts = (mood || 'sightseeing').split(/\s*\+\s*/).filter(m => validMoods.includes(m));
@@ -345,6 +346,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const second = getPlacesForMood(moodParts[1], 12).filter(p => !firstIds.has(p.placeId));
       topPlaces = [...first.slice(0, 10), ...second.slice(0, 10)];
     }
+
+    console.log(`[NxStops Plan] resolved moodParts=[${moodParts}] topPlaces=${topPlaces.length} names=[${topPlaces.slice(0, 6).map(p => p.name).join(', ')}]`);
 
     if (topPlaces.length < 3) {
       return res.status(200).json({
@@ -526,6 +529,8 @@ Return ONLY this JSON:
       plan: planStops,
       dayTitle: aiPlan.dayTitle || 'Your Day Plan',
       totalPlaces: topPlaces.length,
+      _moodReceived: mood,
+      _moodResolved: moodParts.join(' + '),
     });
   } catch (err: unknown) {
     console.error('[NxStops Plan] Error:', err);
