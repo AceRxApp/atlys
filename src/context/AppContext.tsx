@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react';
 import type { City, EventItem, Stop, AdminSignup, Vibe, QuickFilter, TravelGroup, CommunityTag, PlanDuration } from '../types';
 import type { Place } from '../services/places';
-import type { Review, UserStop } from '../supabase';
+import type { Review } from '../supabase';
 import type { User } from '@supabase/supabase-js';
 
 // ============================================================================
@@ -75,14 +75,8 @@ export interface AppContextType {
   offlineSaved: boolean;
   offlineSaving: boolean;
 
-  // --- Budget ---
-  dayBudgets: Record<number, number>;
-  setDayBudget: (day: number, amount: number) => void;
-  activeDayBudget: number;
+  // --- Spend ---
   estimatedSpend: number;
-  budgetRemaining: number;
-  budgetPercentUsed: number;
-  isOverBudget: boolean;
 
   // --- Events ---
   events: EventItem[];
@@ -94,8 +88,9 @@ export interface AppContextType {
   setEventCategoryFilter: (filter: string) => void;
 
   // --- UI ---
-  selectedVibe: Vibe | null;
-  setSelectedVibe: (vibe: Vibe | null) => void;
+  selectedVibes: Vibe[];
+  toggleVibe: (vibe: Vibe) => void;
+  setSelectedVibes: (vibes: Vibe[]) => void;
   quickFilters: QuickFilter[];
   setQuickFilters: React.Dispatch<React.SetStateAction<QuickFilter[]>>;
   viewMode: 'list' | 'map';
@@ -136,6 +131,7 @@ export interface AppContextType {
   showSearch: boolean;
   setShowSearch: (show: boolean) => void;
   handleSearch: () => Promise<void>;
+  dismissSearch: () => void;
 
   // --- City info ---
   cityLabel: string;
@@ -201,19 +197,6 @@ export interface AppContextType {
   toggleSaved: (place: Place) => void;
   isSaved: (placeId: string) => boolean;
 
-  // --- Crew ---
-  crewMode: boolean;
-  crewCode: string | null;
-  crewSyncing: boolean;
-  joinCrewInput: string;
-  setJoinCrewInput: (input: string) => void;
-  showJoinCrew: boolean;
-  setShowJoinCrew: (show: boolean) => void;
-  startCrewMode: () => Promise<void>;
-  stopCrewMode: () => void;
-  joinCrew: () => Promise<void>;
-  shareCrewPlan: () => Promise<void>;
-
   // --- Modals ---
   showSafety: boolean;
   setShowSafety: (show: boolean) => void;
@@ -234,8 +217,8 @@ export interface AppContextType {
   adminSignups: AdminSignup[];
   adminCities: City[];
   adminLoading: boolean;
-  adminTab: 'dashboard' | 'signups' | 'cities' | 'reports' | 'stops';
-  setAdminTab: (tab: 'dashboard' | 'signups' | 'cities' | 'reports' | 'stops') => void;
+  adminTab: 'dashboard' | 'signups' | 'cities' | 'reports' | 'stops' | 'dish-images';
+  setAdminTab: (tab: 'dashboard' | 'signups' | 'cities' | 'reports' | 'stops' | 'dish-images') => void;
   openAdmin: () => Promise<void>;
   handleToggleCity: (cityId: string, isActive: boolean) => Promise<void>;
 
@@ -282,25 +265,13 @@ export interface AppContextType {
   acceptedTerms: boolean;
   setAcceptedTerms: (accepted: boolean) => void;
 
-  // --- Blind Date ---
-  blindDatePlace: Place | null;
-  blindDateRevealed: boolean;
-  spinBlindDate: () => void;
-  revealBlindDate: () => void;
-  dismissBlindDate: () => void;
-
-  // --- User Contributed Stops ---
-  userStops: UserStop[];
-  showPinStop: boolean;
-  setShowPinStop: (show: boolean) => void;
-  pinStopSubmitting: boolean;
-  submitPinStop: (stop: { name: string; description?: string; category: string; lat: number; lng: number }) => Promise<void>;
-
   // --- Auto Day Planner ---
   autoPlanLoading: boolean;
   autoPlanError: string | null;
   lastPlanTitle: string | null;
-  planMyDay: (mood: string, budget: number, duration: PlanDuration) => Promise<boolean>;
+  planMyDay: (mood: string, duration: PlanDuration) => Promise<boolean>;
+  tripStartDate: string | null;
+  setTripStartDate: (date: string | null) => void;
 
   // --- Fetch triggers ---
   fetchPlaces: () => Promise<void>;

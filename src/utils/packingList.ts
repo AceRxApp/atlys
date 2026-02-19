@@ -5,6 +5,7 @@ import {
   CATEGORY_PACK_ITEMS,
   WEATHER_PACK_RULES,
   GROUP_PACK_ITEMS,
+  CITY_PACK_ITEMS,
 } from '../data/packingItems';
 import type { PackingItem } from '../data/packingItems';
 
@@ -16,12 +17,13 @@ interface ForecastDay {
 }
 
 /**
- * Generate a deduplicated packing list based on trip stops, weather, and travel group.
+ * Generate a deduplicated packing list based on trip stops, weather, travel group, and city.
  */
 export function generatePackingList(
   stops: Stop[],
   forecast: ForecastDay[],
   travelGroup: TravelGroup | null,
+  city?: string,
 ): PackingItem[] {
   const seen = new Set<string>();
   const items: PackingItem[] = [];
@@ -35,7 +37,15 @@ export function generatePackingList(
   // 1. Essentials
   for (const item of ESSENTIALS) add(item);
 
-  // 2. Weather-based items (check all forecast days)
+  // 2. City-specific items
+  if (city) {
+    const cityKey = city.toLowerCase();
+    if (CITY_PACK_ITEMS[cityKey]) {
+      for (const item of CITY_PACK_ITEMS[cityKey]) add(item);
+    }
+  }
+
+  // 3. Weather-based items (check all forecast days)
   for (const day of forecast) {
     for (const rule of WEATHER_PACK_RULES) {
       if (rule.condition(day)) {
@@ -44,7 +54,7 @@ export function generatePackingList(
     }
   }
 
-  // 3. Activity-based items from stop categories
+  // 4. Activity-based items from stop categories
   for (const stop of stops) {
     const category = stop.type === 'place' ? stop.place?.category : null;
     if (category && CATEGORY_PACK_ITEMS[category]) {
@@ -52,7 +62,7 @@ export function generatePackingList(
     }
   }
 
-  // 4. Travel group items
+  // 5. Travel group items
   if (travelGroup && GROUP_PACK_ITEMS[travelGroup]) {
     for (const item of GROUP_PACK_ITEMS[travelGroup]!) add(item);
   }

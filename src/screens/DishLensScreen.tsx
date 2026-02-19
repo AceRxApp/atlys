@@ -14,61 +14,155 @@ function TasteLensIntro({ onDismiss }: { onDismiss: () => void }) {
       </button>
 
       {/* Title */}
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-2">
         <span className="text-2xl">{'\u{1F37D}\u{FE0F}'}</span>
         <div>
           <h3 className="text-base font-bold text-text-primary m-0">Welcome to TasteLens</h3>
-          <p className="text-[11px] text-text-tertiary m-0">Your AI food explorer</p>
+          <p className="text-xs text-text-tertiary m-0">Your AI-powered food explorer</p>
         </div>
       </div>
 
-      <p className="text-sm text-text-body leading-relaxed m-0 mb-4">
-        Curious about a dish? TasteLens tells you everything — what it looks like, calories, price, allergens, dietary info, and more.
+      <p className="text-[13px] text-text-body leading-relaxed m-0 mb-3">
+        Not sure what to order? Wondering what a dish actually looks like? TasteLens breaks down any food for you — photos, calories, allergens, spice level, dietary info, food pairings, and cultural background.
       </p>
 
-      {/* How to use */}
-      <div className="space-y-3">
+      {/* Section: How to use */}
+      <div className="text-[11px] text-accent-amber uppercase tracking-wider font-bold mb-2">How to use it</div>
+
+      <div className="space-y-3 mb-4">
+        {/* Mode 1: Take photo */}
         <div className="flex items-start gap-3">
           <div className="w-9 h-9 rounded-xl bg-accent-gradient flex items-center justify-center shrink-0">
             <span className="text-base">{'\u{1F4F7}'}</span>
           </div>
           <div>
-            <div className="text-sm font-semibold text-text-primary">Scan a menu</div>
+            <div className="text-[13px] font-semibold text-text-primary">Take a photo of a menu</div>
             <div className="text-xs text-text-tertiary leading-relaxed">
-              Take a photo of any restaurant menu or upload one from your gallery. We'll read every dish and let you tap to explore.
+              At a restaurant? Tap "Take Photo" and point your camera at the menu. Our AI will read every dish and show them as buttons — tap any dish to get the full breakdown.
             </div>
           </div>
         </div>
 
+        {/* Mode 2: Upload photo */}
         <div className="flex items-start gap-3">
           <div className="w-9 h-9 rounded-xl bg-amber-tint-bg15 border border-amber-tint-border20 flex items-center justify-center shrink-0">
-            <span className="text-base">{'\u{1F50D}'}</span>
+            <span className="text-base">{'\u{1F5BC}\u{FE0F}'}</span>
           </div>
           <div>
-            <div className="text-sm font-semibold text-text-primary">Type any dish</div>
+            <div className="text-[13px] font-semibold text-text-primary">Upload a menu photo</div>
             <div className="text-xs text-text-tertiary leading-relaxed">
-              Type a dish name like "Pad Thai" or "Big Mac" and get an instant breakdown — description, calories, price estimate, and dietary info.
+              Already saved a picture of a menu? Tap "Upload Photo" and pick it from your gallery. Works the same way — we'll scan it and list every dish for you to explore.
             </div>
           </div>
         </div>
 
+        {/* Mode 3: Type dish + restaurant */}
         <div className="flex items-start gap-3">
           <div className="w-9 h-9 rounded-xl bg-amber-tint-bg15 border border-amber-tint-border20 flex items-center justify-center shrink-0">
             <span className="text-base">{'\u{1F4CD}'}</span>
           </div>
           <div>
-            <div className="text-sm font-semibold text-text-primary">From any restaurant</div>
+            <div className="text-[13px] font-semibold text-text-primary">Type a dish from a specific restaurant</div>
             <div className="text-xs text-text-tertiary leading-relaxed">
-              Open TasteLens from a restaurant in your plan or on Discover — it'll automatically know where you're eating.
+              Know the restaurant? Open TasteLens from any restaurant in your Plan or on Discover — it'll automatically link to that restaurant. Then type the dish name (e.g. "Big Mac") and get a breakdown tailored to that spot.
+            </div>
+          </div>
+        </div>
+
+        {/* Mode 4: Explore any food */}
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-amber-tint-bg15 border border-amber-tint-border20 flex items-center justify-center shrink-0">
+            <span className="text-base">{'\u{1F50D}'}</span>
+          </div>
+          <div>
+            <div className="text-[13px] font-semibold text-text-primary">Search any food — no restaurant needed</div>
+            <div className="text-xs text-text-tertiary leading-relaxed">
+              Just curious about a food? Type any dish name — like "Pad Thai", "Croissant", or "Birria Tacos" — and get a full breakdown of what it is, what's in it, and what it looks like. No restaurant required.
             </div>
           </div>
         </div>
       </div>
 
+      {/* Section: What you'll get */}
+      <div className="text-[11px] text-accent-amber uppercase tracking-wider font-bold mb-2">What you'll get for every dish</div>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mb-4">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs">{'\u{1F4F8}'}</span>
+          <span className="text-xs text-text-secondary">Real photos of the dish</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs">{'\u{1F525}'}</span>
+          <span className="text-xs text-text-secondary">Calorie count</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs">{'\u{1F336}\u{FE0F}'}</span>
+          <span className="text-xs text-text-secondary">Spice level meter</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs">{'\u26A0\u{FE0F}'}</span>
+          <span className="text-xs text-text-secondary">Allergen warnings</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs">{'\u{1F33F}'}</span>
+          <span className="text-xs text-text-secondary">Dietary tags (vegan, etc.)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs">{'\u{1F37D}\u{FE0F}'}</span>
+          <span className="text-xs text-text-secondary">Food pairing suggestions</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs">{'\u{1F4D6}'}</span>
+          <span className="text-xs text-text-secondary">Description & serving size</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs">{'\u{1F4A1}'}</span>
+          <span className="text-xs text-text-secondary">Cultural background</span>
+        </div>
+      </div>
+
       <button onClick={onDismiss}
-        className="w-full mt-4 py-2.5 rounded-xl bg-accent-gradient text-text-on-accent text-sm font-semibold border-none cursor-pointer">
-        Got it, let's go
+        className="w-full py-2.5 rounded-xl bg-accent-gradient text-text-on-accent text-sm font-semibold border-none cursor-pointer">
+        Got it, let's explore
       </button>
+    </div>
+  );
+}
+
+// ---------- Persistent "How to use" hint ----------
+function HowToUseHint() {
+  return (
+    <div className="card p-3.5 mb-4 border border-border-subtle">
+      <div className="text-[11px] text-accent-amber uppercase tracking-wider font-bold mb-2.5">4 ways to use TasteLens</div>
+      <div className="space-y-2">
+        <div className="flex items-start gap-2.5">
+          <span className="text-sm shrink-0 mt-px">{'\u{1F4F7}'}</span>
+          <div>
+            <span className="text-xs font-semibold text-text-primary">Take a photo</span>
+            <span className="text-xs text-text-tertiary"> — point your camera at a restaurant menu</span>
+          </div>
+        </div>
+        <div className="flex items-start gap-2.5">
+          <span className="text-sm shrink-0 mt-px">{'\u{1F5BC}\u{FE0F}'}</span>
+          <div>
+            <span className="text-xs font-semibold text-text-primary">Upload a photo</span>
+            <span className="text-xs text-text-tertiary"> — pick a saved menu image from your gallery</span>
+          </div>
+        </div>
+        <div className="flex items-start gap-2.5">
+          <span className="text-sm shrink-0 mt-px">{'\u{1F4CD}'}</span>
+          <div>
+            <span className="text-xs font-semibold text-text-primary">Type a dish + restaurant</span>
+            <span className="text-xs text-text-tertiary"> — get a breakdown from a specific restaurant</span>
+          </div>
+        </div>
+        <div className="flex items-start gap-2.5">
+          <span className="text-sm shrink-0 mt-px">{'\u{1F50D}'}</span>
+          <div>
+            <span className="text-xs font-semibold text-text-primary">Search any food</span>
+            <span className="text-xs text-text-tertiary"> — type any dish to learn what it is</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -131,7 +225,7 @@ function DishHero({ images, name }: { images: DishImage[]; name: string }) {
         <div className="absolute inset-0 rounded-2xl pointer-events-none"
           style={{ background: 'linear-gradient(to bottom, transparent 60%, var(--bg-body))' }} />
         {img.photographer && (
-          <div className="absolute top-3 right-3 text-[9px] text-white/70 bg-black/40 px-2 py-0.5 rounded-md backdrop-blur-sm">
+          <div className="absolute top-3 right-3 text-[11px] text-white/70 bg-black/40 px-2 py-0.5 rounded-md backdrop-blur-sm">
             {img.source} / {img.photographer}
           </div>
         )}
@@ -170,7 +264,7 @@ function DishHero({ images, name }: { images: DishImage[]; name: string }) {
             />
             {/* Source attribution per image */}
             {img.photographer && (
-              <div className="absolute top-3 right-3 text-[9px] text-white/70 bg-black/40 px-2 py-0.5 rounded-md backdrop-blur-sm">
+              <div className="absolute top-3 right-3 text-[11px] text-white/70 bg-black/40 px-2 py-0.5 rounded-md backdrop-blur-sm">
                 {img.source} / {img.photographer}
               </div>
             )}
@@ -193,7 +287,7 @@ function DishHero({ images, name }: { images: DishImage[]; name: string }) {
       </div>
 
       {/* Photo count badge */}
-      <div className="absolute top-3 left-3 text-[10px] text-white/80 bg-black/40 px-2 py-0.5 rounded-md backdrop-blur-sm z-[2]">
+      <div className="absolute top-3 left-3 text-[11px] text-white/80 bg-black/40 px-2 py-0.5 rounded-md backdrop-blur-sm z-[2]">
         {activeIdx + 1} / {validImages.length}
       </div>
     </div>
@@ -252,11 +346,11 @@ function ResultCard({
       {/* Quick Stats Row */}
       <div className="grid grid-cols-2 gap-2">
         <div className="card p-3 text-center">
-          <div className="text-[10px] text-text-tertiary uppercase tracking-wider mb-1">Calories</div>
+          <div className="text-[11px] text-text-tertiary uppercase tracking-wider mb-1">Calories</div>
           <span className="text-base font-bold text-text-primary">{result.calories || 'N/A'}</span>
         </div>
         <div className="card p-3 text-center">
-          <div className="text-[10px] text-text-tertiary uppercase tracking-wider mb-1">Serving</div>
+          <div className="text-[11px] text-text-tertiary uppercase tracking-wider mb-1">Serving</div>
           <span className="text-xs font-semibold text-text-primary">{result.servingSize || 'Standard'}</span>
         </div>
       </div>
@@ -264,7 +358,7 @@ function ResultCard({
       {/* Spice Level */}
       {result.spiceLevel > 0 && (
         <div className="card p-3">
-          <div className="text-[10px] text-text-tertiary uppercase tracking-wider mb-1.5">Spice Level</div>
+          <div className="text-[11px] text-text-tertiary uppercase tracking-wider mb-1.5">Spice Level</div>
           <SpiceMeter level={result.spiceLevel} />
         </div>
       )}
@@ -293,7 +387,7 @@ function ResultCard({
           <div className="flex flex-wrap gap-1.5">
             {result.dietaryTags.map(tag => (
               <span key={tag}
-                className={`text-[11px] font-medium px-2.5 py-1 rounded-full border ${TAG_COLORS[tag] || 'bg-bg-subtle text-text-secondary border-border-subtle'}`}>
+                className={`text-xs font-medium px-2.5 py-1 rounded-full border ${TAG_COLORS[tag] || 'bg-bg-subtle text-text-secondary border-border-subtle'}`}>
                 {tag}
               </span>
             ))}
@@ -310,10 +404,25 @@ function ResultCard({
           </div>
           <div className="flex flex-wrap gap-1.5">
             {result.allergens.map(a => (
-              <span key={a} className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-red-tint-bg text-status-red border border-red-tint-border capitalize">
+              <span key={a} className="text-xs font-medium px-2.5 py-1 rounded-full bg-red-tint-bg text-status-red border border-red-tint-border capitalize">
                 {a}
               </span>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Translation */}
+      {result.translation && (
+        <div className="card p-4" style={{ background: 'linear-gradient(135deg, var(--purple-tint-bg08), var(--bg-subtle))' }}>
+          <div className="flex items-start gap-2">
+            <span className="text-base shrink-0">{'\u{1F30D}'}</span>
+            <div>
+              <div className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-1">Translation ({result.translation.language})</div>
+              <p className="text-sm text-text-body leading-relaxed m-0">
+                <span className="italic">{result.translation.original}</span> = <span className="font-semibold">{result.translation.english}</span>
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -349,7 +458,8 @@ export default function DishLensScreen() {
   const { loading, result, images, error, analyzeDish, reset } = useTasteLens();
   const [menuDishes, setMenuDishes] = useState<string[]>([]);
   const [scanning, setScanning] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const [scanError, setScanError] = useState<string | null>(null);
   const [showIntro, setShowIntro] = useState(() => !localStorage.getItem('nxstops_tastelens_seen'));
 
@@ -386,21 +496,38 @@ export default function DishLensScreen() {
     setScanError(null);
   };
 
-  // Resize image on canvas to keep upload small
+  // Resize image on canvas to keep upload small (iPad-safe with memory cleanup)
   const resizeImage = (file: File, maxWidth = 1200): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
         const img = new Image();
         img.onload = () => {
-          const scale = Math.min(1, maxWidth / img.width);
-          const canvas = document.createElement('canvas');
-          canvas.width = img.width * scale;
-          canvas.height = img.height * scale;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return reject(new Error('Canvas not supported'));
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          resolve(canvas.toDataURL('image/jpeg', 0.8));
+          try {
+            // Cap dimensions to avoid iPad WKWebView canvas memory limits
+            const maxPixels = 4096 * 4096;
+            let w = img.width;
+            let h = img.height;
+            if (w * h > maxPixels) {
+              const ratio = Math.sqrt(maxPixels / (w * h));
+              w = Math.floor(w * ratio);
+              h = Math.floor(h * ratio);
+            }
+            const scale = Math.min(1, maxWidth / w);
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.floor(w * scale);
+            canvas.height = Math.floor(h * scale);
+            const ctx = canvas.getContext('2d');
+            if (!ctx) { reject(new Error('Canvas not supported')); return; }
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+            // Free canvas memory immediately (critical on iPad)
+            canvas.width = 0;
+            canvas.height = 0;
+            resolve(dataUrl);
+          } catch (err) {
+            reject(new Error('Failed to process image. Try a smaller photo.'));
+          }
         };
         img.onerror = () => reject(new Error('Failed to load image'));
         img.src = reader.result as string;
@@ -439,10 +566,24 @@ export default function DishLensScreen() {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleMenuScan(file);
+    try {
+      const file = e.target.files?.[0];
+      if (file) handleMenuScan(file);
+    } catch (err) {
+      setScanError('Could not access the selected file. Please try again.');
+    }
     // Reset so the same file can be selected again
     e.target.value = '';
+  };
+
+  const openCamera = () => {
+    try { cameraInputRef.current?.click(); }
+    catch { setScanError('Camera is not available on this device.'); }
+  };
+
+  const openGallery = () => {
+    try { galleryInputRef.current?.click(); }
+    catch { setScanError('Could not open photo library.'); }
   };
 
   return (
@@ -456,12 +597,12 @@ export default function DishLensScreen() {
           {restaurant ? (
             <p className="text-xs text-accent-amber m-0 mt-0.5 font-medium">{restaurant}</p>
           ) : (
-            <p className="text-xs text-text-tertiary m-0 mt-0.5">Scan menus & explore any dish</p>
+            <p className="text-xs text-text-tertiary m-0 mt-0.5">Scan a menu, type a dish, or explore any food</p>
           )}
         </div>
         {restaurant && (
           <button onClick={handleClearContext}
-            className="text-[11px] text-text-tertiary bg-bg-subtle border border-border-subtle rounded-lg px-3 py-1.5 cursor-pointer">
+            className="text-xs text-text-tertiary bg-bg-subtle border border-border-subtle rounded-lg px-3 py-1.5 cursor-pointer">
             Clear restaurant
           </button>
         )}
@@ -471,6 +612,11 @@ export default function DishLensScreen() {
         {/* Intro guide for first-time users */}
         {showIntro && !result && !loading && (
           <TasteLensIntro onDismiss={dismissIntro} />
+        )}
+
+        {/* Persistent compact hint for returning users */}
+        {!showIntro && !result && !loading && !restaurant && menuDishes.length === 0 && (
+          <HowToUseHint />
         )}
 
         {result ? (
@@ -492,42 +638,85 @@ export default function DishLensScreen() {
                   <span className="text-lg">{'\u{1F4CD}'}</span>
                   <div>
                     <div className="text-sm font-semibold text-text-primary">{restaurant}</div>
-                    <div className="text-[11px] text-text-tertiary">Type any menu item to see it visually</div>
+                    <div className="text-xs text-text-tertiary">Type any menu item to see it visually</div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Scan Menu Button */}
+            {/* Scan Menu — Camera + Upload (separate inputs for iPad compatibility) */}
             <input
-              ref={fileInputRef}
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <input
+              ref={galleryInputRef}
               type="file"
               accept="image/*"
               onChange={handleFileChange}
               className="hidden"
             />
 
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={scanning || loading}
-              className="w-full card p-4 mb-3 border border-dashed border-amber-tint-border20 cursor-pointer flex items-center gap-3 text-left"
-              style={{ background: 'linear-gradient(135deg, var(--amber-tint-bg06), var(--bg-subtle))' }}
-            >
-              <div className="w-11 h-11 rounded-xl bg-accent-gradient flex items-center justify-center shrink-0">
-                <span className="text-xl">{'\u{1F4F7}'}</span>
+            <div className="mb-3">
+              <div className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2">
+                {'\u{1F4F7}'} Scan a menu
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-text-primary">
-                  {scanning ? 'Scanning menu...' : 'Scan a Menu'}
-                </div>
-                <div className="text-[11px] text-text-tertiary mt-0.5">
-                  Take a photo or upload from your gallery
-                </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={openCamera}
+                  disabled={scanning || loading}
+                  className="card p-3.5 border border-dashed border-amber-tint-border20 cursor-pointer flex flex-col items-center gap-2 text-center"
+                  style={{ background: 'linear-gradient(135deg, var(--amber-tint-bg06), var(--bg-subtle))' }}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-accent-gradient flex items-center justify-center">
+                    <span className="text-lg">{'\u{1F4F7}'}</span>
+                  </div>
+                  <div>
+                    <div className="text-[13px] font-semibold text-text-primary">
+                      {scanning ? 'Scanning...' : 'Take Photo'}
+                    </div>
+                    <div className="text-[11px] text-text-tertiary mt-0.5">
+                      Point at a menu
+                    </div>
+                  </div>
+                </button>
+                <button
+                  onClick={openGallery}
+                  disabled={scanning || loading}
+                  className="card p-3.5 border border-dashed border-amber-tint-border20 cursor-pointer flex flex-col items-center gap-2 text-center"
+                  style={{ background: 'linear-gradient(135deg, var(--amber-tint-bg06), var(--bg-subtle))' }}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-amber-tint-bg15 border border-amber-tint-border20 flex items-center justify-center">
+                    <span className="text-lg">{'\u{1F5BC}\u{FE0F}'}</span>
+                  </div>
+                  <div>
+                    <div className="text-[13px] font-semibold text-text-primary">
+                      {scanning ? 'Scanning...' : 'Upload Photo'}
+                    </div>
+                    <div className="text-[11px] text-text-tertiary mt-0.5">
+                      From your gallery
+                    </div>
+                  </div>
+                </button>
               </div>
               {scanning && (
-                <div className="w-5 h-5 border-2 border-accent-amber border-t-transparent rounded-full animate-spin shrink-0" />
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <div className="w-4 h-4 border-2 border-accent-amber border-t-transparent rounded-full animate-spin" />
+                  <span className="text-xs text-text-tertiary">Reading menu items...</span>
+                </div>
               )}
-            </button>
+            </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex-1 h-px bg-border-subtle" />
+              <span className="text-xs text-text-muted font-medium">OR TYPE A DISH</span>
+              <div className="flex-1 h-px bg-border-subtle" />
+            </div>
 
             {/* Scan Error */}
             {scanError && (
@@ -548,7 +737,7 @@ export default function DishLensScreen() {
                   </div>
                   <button
                     onClick={() => setMenuDishes([])}
-                    className="text-[11px] text-text-tertiary bg-transparent border-none cursor-pointer underline"
+                    className="text-xs text-text-tertiary bg-transparent border-none cursor-pointer underline"
                   >
                     Clear
                   </button>
@@ -566,11 +755,33 @@ export default function DishLensScreen() {
               </div>
             )}
 
-            {/* Or type manually */}
+            {/* Type a dish */}
             <div className="card p-4 mb-4">
-              <label className="text-xs text-text-tertiary mb-2 block">
-                {menuDishes.length > 0 ? 'Or type a dish name' : (restaurant ? `What are you ordering at ${restaurant}?` : 'What dish are you curious about?')}
-              </label>
+              {restaurant ? (
+                <div className="mb-2">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span className="text-sm">{'\u{1F4CD}'}</span>
+                    <span className="text-[13px] font-semibold text-text-primary">
+                      {menuDishes.length > 0 ? 'Or type a dish name' : `What are you ordering at ${restaurant}?`}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-text-tertiary m-0 ml-6">
+                    Type any item from their menu to see what it looks like, calories, allergens & more
+                  </p>
+                </div>
+              ) : (
+                <div className="mb-2">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span className="text-sm">{'\u{1F50D}'}</span>
+                    <span className="text-[13px] font-semibold text-text-primary">
+                      {menuDishes.length > 0 ? 'Or type a dish name' : 'Search any dish or food'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-text-tertiary m-0 ml-6">
+                    Type any food — like "Pad Thai" or "Croissant" — to see what it is, calories, dietary info & more
+                  </p>
+                </div>
+              )}
               <div className="flex gap-2">
                 <input
                   type="text"

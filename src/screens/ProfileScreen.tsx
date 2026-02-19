@@ -11,6 +11,7 @@ export default function ProfileScreen() {
     setShowProfile,
     savedPlaces,
     setSelectedPlace,
+    setScreen,
     tripDays,
     showToast,
     // Auth
@@ -136,7 +137,7 @@ export default function ProfileScreen() {
                       </button>
                       <div className="flex items-center gap-3 my-3">
                         <div className="flex-1 h-px bg-border-subtle" />
-                        <span className="text-[11px] text-text-tertiary">or use email</span>
+                        <span className="text-xs text-text-tertiary">or use email</span>
                         <div className="flex-1 h-px bg-border-subtle" />
                       </div>
                     </div>
@@ -369,7 +370,7 @@ export default function ProfileScreen() {
               {/* Divider */}
               <div className="flex items-center gap-3 my-6">
                 <div className="flex-1 h-px bg-border-subtle" />
-                <span className="text-[11px] text-text-tertiary">or continue without account</span>
+                <span className="text-xs text-text-tertiary">or continue without account</span>
                 <div className="flex-1 h-px bg-border-subtle" />
               </div>
             </div>
@@ -440,7 +441,7 @@ export default function ProfileScreen() {
                     <div className="text-[22px] font-bold bg-accent-text-gradient">
                       {stat.value}
                     </div>
-                    <div className="text-[11px] text-text-tertiary uppercase tracking-[0.06em] mt-1">
+                    <div className="text-xs text-text-tertiary uppercase tracking-[0.06em] mt-1">
                       {stat.label}
                     </div>
                   </div>
@@ -549,7 +550,7 @@ export default function ProfileScreen() {
                     </svg>
                     <div className="text-left">
                       <div className="text-sm font-medium text-text-primary">{biometricType} Login</div>
-                      <div className="text-[11px] text-text-tertiary">Sign in without typing your password</div>
+                      <div className="text-xs text-text-tertiary">Sign in without typing your password</div>
                     </div>
                   </div>
                   <div className={`w-[42px] h-[24px] rounded-full relative transition-colors ${
@@ -613,6 +614,41 @@ export default function ProfileScreen() {
             </div>
           )}
 
+          {/* Travel Tools Section */}
+          <div className="mb-6">
+            <div className="section-label">
+              Travel Tools
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => { setShowProfile(false); setScreen('currency'); }}
+                className="flex items-center gap-3 w-full p-3.5 rounded-xl bg-bg-subtle border border-border-subtle cursor-pointer text-left"
+              >
+                <div className="w-[40px] h-[40px] rounded-[10px] bg-amber-tint-bg10 flex items-center justify-center text-lg shrink-0">
+                  💱
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-text-primary">Currency Converter</div>
+                  <div className="text-xs text-text-tertiary">Live exchange rates & quick converter</div>
+                </div>
+                <span className="text-text-tertiary text-sm shrink-0">›</span>
+              </button>
+              <button
+                onClick={() => { setShowProfile(false); setScreen('tastelens'); }}
+                className="flex items-center gap-3 w-full p-3.5 rounded-xl bg-bg-subtle border border-border-subtle cursor-pointer text-left"
+              >
+                <div className="w-[40px] h-[40px] rounded-[10px] bg-amber-tint-bg10 flex items-center justify-center text-lg shrink-0">
+                  🍽️
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-text-primary">TasteLens</div>
+                  <div className="text-xs text-text-tertiary">AI-powered dish analyzer & menu scanner</div>
+                </div>
+                <span className="text-text-tertiary text-sm shrink-0">›</span>
+              </button>
+            </div>
+          </div>
+
           {/* Saved Places Section */}
           {savedPlaces.length > 0 && (
             <div className="mb-6">
@@ -649,7 +685,7 @@ export default function ProfileScreen() {
                           <span className="text-[11px] text-accent-amber">★ {place.rating.toFixed(1)}</span>
                         )}
                         {place.address && (
-                          <span className="text-[11px] text-text-tertiary whitespace-nowrap overflow-hidden text-ellipsis">
+                          <span className="text-xs text-text-tertiary whitespace-nowrap overflow-hidden text-ellipsis">
                             {place.address.split(',')[0]}
                           </span>
                         )}
@@ -680,7 +716,7 @@ export default function ProfileScreen() {
                       </div>
                       <div>
                         <div className="text-sm font-semibold text-text-primary">Day {day}</div>
-                        <div className="text-[11px] text-text-tertiary">
+                        <div className="text-xs text-text-tertiary">
                           {stops.length} {stops.length === 1 ? 'stop' : 'stops'}
                         </div>
                       </div>
@@ -701,7 +737,7 @@ export default function ProfileScreen() {
                         </div>
                       ))}
                       {stops.length > 3 && (
-                        <div className="w-6 h-6 rounded-md bg-bg-subtle-strong flex items-center justify-center text-[9px] text-text-tertiary font-semibold">
+                        <div className="w-6 h-6 rounded-md bg-bg-subtle-strong flex items-center justify-center text-xs text-text-tertiary font-semibold">
                           +{stops.length - 3}
                         </div>
                       )}

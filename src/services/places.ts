@@ -43,26 +43,32 @@ export const VIBE_TYPE_MAP: Record<string, string[]> = {
     'brunch_restaurant', 'breakfast_restaurant', 'fast_food_restaurant', 'sandwich_shop',
     'ice_cream_shop', 'meal_takeaway',
   ],
-  stay: [
-    'hotel', 'motel', 'resort_hotel', 'bed_and_breakfast', 'lodging',
-    'extended_stay_hotel', 'hostel',
+  nightlife: [
+    'bar', 'night_club', 'casino', 'wine_bar',
+    'event_venue', 'karaoke', 'comedy_club', 'restaurant',
   ],
-  todo: [
+  outdoors: [
+    'park', 'hiking_area', 'national_park', 'campground',
+    'tourist_attraction', 'zoo', 'aquarium', 'amusement_park',
+    'stadium', 'cafe', 'restaurant',
+  ],
+  culture: [
     'museum', 'art_gallery', 'tourist_attraction', 'performing_arts_theater',
-    'community_center', 'historical_landmark', 'church', 'library',
-    'night_club', 'casino', 'amusement_park', 'event_venue',
-    'aquarium', 'zoo', 'movie_theater', 'bowling_alley', 'stadium',
+    'historical_landmark', 'church', 'library', 'community_center',
+    'aquarium', 'zoo', 'movie_theater',
   ],
   hidden: [
     'cafe', 'restaurant', 'bar', 'bakery', 'book_store', 'spa',
     'market', 'art_gallery', 'park', 'hiking_area', 'national_park',
     'wine_bar', 'coffee_shop', 'ice_cream_shop', 'brunch_restaurant',
-    'performing_arts_theater', 'historical_landmark',
+    'performing_arts_theater', 'historical_landmark', 'movie_theater',
   ],
   locals: [
-    'bakery', 'florist', 'book_store', 'art_gallery', 'market',
-    'grocery_store', 'gift_shop', 'clothing_store', 'pet_store',
-    'beauty_salon',
+    'bakery', 'cafe', 'coffee_shop', 'restaurant', 'brunch_restaurant',
+    'florist', 'book_store', 'art_gallery', 'market', 'grocery_store',
+    'gift_shop', 'clothing_store', 'pet_store', 'beauty_salon',
+    'ice_cream_shop', 'bar', 'wine_bar', 'park', 'library',
+    'community_center', 'spa', 'performing_arts_theater', 'movie_theater',
   ],
 };
 
@@ -273,12 +279,11 @@ export function isChain(name: string): boolean {
 
 /** Hidden gem score: high rating + few reviews = more "hidden" */
 function hiddenGemScore(place: Place): number {
-  // Must have a decent rating (4.0+)
-  if (place.rating < 4.0) return -1;
-  // Ideal: rated 4.3+ with 10-200 reviews
-  const ratingBonus = (place.rating - 4.0) * 25; // 0-25 points
-  // Fewer reviews = more hidden (cap at 500)
-  const reviewPenalty = Math.min(place.reviewCount, 500) / 5; // 0-100 penalty
+  if (place.rating < 3.8) return -1;
+  // Ideal: rated 4.0+ with 10-300 reviews
+  const ratingBonus = (place.rating - 3.5) * 20; // 0-30 points
+  // Fewer reviews = more hidden (cap at 2000)
+  const reviewPenalty = Math.min(place.reviewCount, 2000) / 20; // 0-100 penalty
   // Bonus for editorial summary (unique places tend to have one)
   const editorialBonus = place.editorialSummary ? 15 : 0;
   // Bonus for having photos
@@ -331,17 +336,42 @@ export async function searchNearby(
   let places = (data.places || []).map((p: Record<string, unknown>) => transformPlace(p, lat, lng));
 
   // Filter results to match the requested vibe types (Google can return places with secondary type matches)
-  if (vibes.length > 0) {
+  if (vibes.length > 0 && !vibes.includes('nightlife')) {
     const allowedTypes = new Set(types);
     places = places.filter((p: Place) => allowedTypes.has(p.category));
   }
 
-  // Hidden Gems: filter out chains, require 4.0+ rating, sort by gem score
+  // Nightlife: supplement with text search for clubs, lounges, rooftops etc.
+  // Google's type system misses many nightlife venues (lounges, rooftop bars, hookah, karaoke)
+  if (vibes.includes('nightlife')) {
+    try {
+      const textResults = await textSearchPlaces(
+        'nightclub lounge rooftop bar hookah karaoke comedy club',
+        lat, lng, Math.max(radius, 3000),
+      );
+      // Merge: add text results that aren't already in the nearby results
+      const existingIds = new Set(places.map((p: Place) => p.placeId));
+      const newPlaces = textResults.filter(p => !existingIds.has(p.placeId));
+      places = [...places, ...newPlaces];
+    } catch { /* text search failed — use nearby results only */ }
+
+    // For nightlife, also allow restaurants/bars that came from text search
+    // but filter out clearly non-nightlife types
+    const nightlifeExclude = new Set([
+      'grocery_store', 'supermarket', 'gas_station', 'pharmacy', 'hospital',
+      'school', 'church', 'library', 'post_office', 'bank', 'atm',
+      'laundry', 'car_wash', 'car_repair', 'dentist', 'doctor',
+      'hardware_store', 'pet_store', 'veterinary_care',
+    ]);
+    places = places.filter((p: Place) => !nightlifeExclude.has(p.category));
+  }
+
+  // Hidden Gems: filter out chains, prefer high rating + fewer reviews, sort by gem score
   if (vibes.includes('hidden')) {
     places = places
       .filter((p: Place) => !isChain(p.name))
-      .filter((p: Place) => p.rating >= 4.0)
-      .filter((p: Place) => p.reviewCount < 500); // Skip mega-popular tourist traps
+      .filter((p: Place) => p.rating >= 3.8)
+      .filter((p: Place) => p.reviewCount < 2000); // Skip only mega-tourist traps
     places.sort((a: Place, b: Place) => hiddenGemScore(b) - hiddenGemScore(a));
     return places;
   }

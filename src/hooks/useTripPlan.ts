@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { track } from '@vercel/analytics';
-import type { RealtimeChannel } from '@supabase/supabase-js';
-import { createCrewTrip, loadCrewTrip, updateCrewTripDays, subscribeToCrewTrip, unsubscribeFromCrewTrip, createSharedPlan } from '../supabase';
+import { createSharedPlan } from '../supabase';
 import type { City, EventItem, Stop, PlanDuration } from '../types';
 import type { Place } from '../services/places';
 import { formatDistance } from '../services/places';
@@ -30,30 +29,12 @@ export function useTripPlan(deps: {
 
   const [tripDays, setTripDays] = useState<Record<number, Stop[]>>({ 1: [] });
   const [activeDay, setActiveDay] = useState(1);
-
-  // Crew mode state
-  const [crewMode, setCrewMode] = useState(() => sessionStorage.getItem('nxstops_crew_mode') === 'true');
-  const [crewCode, setCrewCode] = useState<string | null>(() => sessionStorage.getItem('nxstops_crew_code'));
-  const [crewSyncing, setCrewSyncing] = useState(false);
-  const [joinCrewInput, setJoinCrewInput] = useState('');
-  const [showJoinCrew, setShowJoinCrew] = useState(false);
-  const crewChannelRef = useRef<RealtimeChannel | null>(null);
-  const crewSyncLock = useRef(false);
-
-  // Budget per day: day number → dollar amount (-1 = unlimited)
-  const [dayBudgets, setDayBudgets] = useState<Record<number, number>>(() => {
-    try {
-      const key = `nxstops_budget_${citySlug}`;
-      const saved = localStorage.getItem(key);
-      return saved ? JSON.parse(saved) : {};
-    } catch { return {}; }
-  });
+  const [tripStartDate, setTripStartDate] = useState<string | null>(null);
 
   // Derived
   const dayPlan = tripDays[activeDay] || [];
   const totalStops = Object.values(tripDays).reduce((sum, stops) => sum + stops.length, 0);
   const dayCount = Object.keys(tripDays).length;
-  const activeDayBudget = dayBudgets[activeDay] ?? -1;
 
   const estimatedSpend = useMemo(() => {
     return dayPlan.reduce((total, stop) => {
@@ -64,10 +45,6 @@ export function useTripPlan(deps: {
       return total + (PRICE_LEVEL_ESTIMATE[pl] ?? 15);
     }, 0);
   }, [dayPlan]);
-
-  const budgetRemaining = activeDayBudget === -1 ? Infinity : activeDayBudget - estimatedSpend;
-  const budgetPercentUsed = activeDayBudget <= 0 ? 0 : Math.min(100, (estimatedSpend / activeDayBudget) * 100);
-  const isOverBudget = activeDayBudget > 0 && estimatedSpend > activeDayBudget;
 
   const setActiveDayStops = useCallback((updater: Stop[] | ((prev: Stop[]) => Stop[])) => {
     setTripDays(prev => ({
@@ -100,6 +77,7 @@ export function useTripPlan(deps: {
             const migrated = parsed.stops.map((s: Stop) => ({ ...s, type: s.type || 'place', addedAt: new Date(s.addedAt) }));
             setTripDays({ 1: migrated });
           }
+          setTripStartDate(parsed.tripStartDate || null);
           setActiveDay(1);
         } else {
           localStorage.removeItem(key);
@@ -115,56 +93,11 @@ export function useTripPlan(deps: {
   useEffect(() => {
     const key = getPlanKey();
     if (totalStops > 0) {
-      localStorage.setItem(key, JSON.stringify({ tripDays, expires: Date.now() + 7 * 24 * 60 * 60 * 1000 }));
+      localStorage.setItem(key, JSON.stringify({ tripDays, tripStartDate, expires: Date.now() + 7 * 24 * 60 * 60 * 1000 }));
     } else {
       localStorage.removeItem(key);
     }
-  }, [tripDays, totalStops, getPlanKey]);
-
-  // Persist budget
-  useEffect(() => {
-    const key = `nxstops_budget_${citySlug}`;
-    if (Object.keys(dayBudgets).length > 0) {
-      localStorage.setItem(key, JSON.stringify(dayBudgets));
-    } else {
-      localStorage.removeItem(key);
-    }
-  }, [dayBudgets, citySlug]);
-
-  const setDayBudget = useCallback((day: number, amount: number) => {
-    setDayBudgets(prev => ({ ...prev, [day]: amount }));
-    track('set_budget', { day: String(day), amount: String(amount) });
-  }, []);
-
-  // Crew mode: subscribe to realtime updates
-  useEffect(() => {
-    if (!crewMode || !crewCode) {
-      if (crewChannelRef.current) {
-        unsubscribeFromCrewTrip(crewChannelRef.current);
-        crewChannelRef.current = null;
-      }
-      return;
-    }
-    const channel = subscribeToCrewTrip(crewCode, (remoteDays) => {
-      if (crewSyncLock.current) return;
-      crewSyncLock.current = true;
-      const parsed: Record<number, Stop[]> = {};
-      for (const [day, stops] of Object.entries(remoteDays)) {
-        parsed[Number(day)] = (stops as Stop[]).map(s => ({ ...s, addedAt: new Date(s.addedAt) }));
-      }
-      setTripDays(parsed);
-      setTimeout(() => { crewSyncLock.current = false; }, 1000);
-    });
-    crewChannelRef.current = channel;
-    return () => { unsubscribeFromCrewTrip(channel); crewChannelRef.current = null; };
-  }, [crewMode, crewCode]);
-
-  // Crew mode: sync local changes to Supabase
-  useEffect(() => {
-    if (!crewMode || !crewCode || crewSyncLock.current) return;
-    const timer = setTimeout(() => { updateCrewTripDays(crewCode, tripDays); }, 500);
-    return () => clearTimeout(timer);
-  }, [tripDays, crewMode, crewCode]);
+  }, [tripDays, totalStops, getPlanKey, tripStartDate]);
 
   // --------------------------------------------------------------------------
   // Plan handlers
@@ -351,7 +284,7 @@ export function useTripPlan(deps: {
   };
 
   const shareAsLink = async (): Promise<string | null> => {
-    const slug = generateCrewCode();
+    const slug = generateShareCode();
     const success = await createSharedPlan(slug, citySlug, cityLabel, tripDays, lastPlanTitle || undefined);
     if (!success) { showToast('Failed to create share link', 'error'); return null; }
     const url = `${window.location.origin}/trip/${slug}`;
@@ -435,90 +368,13 @@ export function useTripPlan(deps: {
     return { totalKm, totalWalkMin, totalDriveMin, distance: formatDist(totalKm) };
   };
 
-  // --------------------------------------------------------------------------
-  // Crew mode handlers
-  // --------------------------------------------------------------------------
-
-  const generateCrewCode = () => {
+  const generateShareCode = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     const bytes = new Uint8Array(8);
     crypto.getRandomValues(bytes);
     let code = '';
     for (let i = 0; i < 8; i++) code += chars[bytes[i] % chars.length];
     return code;
-  };
-
-  const startCrewMode = async () => {
-    if (!requireAuth()) return;
-    const code = generateCrewCode();
-    setCrewSyncing(true);
-    const created = await createCrewTrip(code, citySlug, cityLabel, tripDays);
-    if (created) {
-      setCrewMode(true);
-      setCrewCode(code);
-      sessionStorage.setItem('nxstops_crew_code', code);
-      sessionStorage.setItem('nxstops_crew_mode', 'true');
-      showToast('Crew mode activated!');
-      track('start_crew', { city: cityLabel, code });
-    } else {
-      showToast('Failed to start crew mode. Try again.');
-    }
-    setCrewSyncing(false);
-  };
-
-  const stopCrewMode = () => {
-    setCrewMode(false);
-    setCrewCode(null);
-    sessionStorage.removeItem('nxstops_crew_code');
-    sessionStorage.removeItem('nxstops_crew_mode');
-  };
-
-  const joinCrew = async () => {
-    if (!requireAuth()) return;
-    const code = joinCrewInput.trim().toUpperCase();
-    if (code.length < 6) { showToast('Enter a valid crew code'); return; }
-    setCrewSyncing(true);
-    const trip = await loadCrewTrip(code);
-    if (trip) {
-      const parsed: Record<number, Stop[]> = {};
-      for (const [day, stops] of Object.entries(trip.trip_days)) {
-        parsed[Number(day)] = (stops as Stop[]).map(s => ({
-          ...s,
-          addedAt: new Date((s as Stop).addedAt),
-        }));
-      }
-      setTripDays(parsed);
-      setCrewMode(true);
-      setCrewCode(code);
-      sessionStorage.setItem('nxstops_crew_code', code);
-      sessionStorage.setItem('nxstops_crew_mode', 'true');
-      setShowJoinCrew(false);
-      setJoinCrewInput('');
-      showToast(`Joined crew ${code}!`);
-      track('join_crew', { code });
-    } else {
-      showToast('Crew not found. Check the code.');
-    }
-    setCrewSyncing(false);
-  };
-
-  const shareCrewPlan = async () => {
-    const allDays = Object.entries(tripDays).sort(([a], [b]) => Number(a) - Number(b));
-    const lines = allDays.map(([day, stops]) => {
-      if (stops.length === 0) return '';
-      const stopList = stops.map((s, i) => `  ${i + 1}. ${getStopName(s)} (${getStopCategory(s)})`).join('\n');
-      return `Day ${day}:\n${stopList}`;
-    }).filter(Boolean).join('\n\n');
-    const joinInstructions = crewCode
-      ? `\n\u{1F517} Join our crew on NxStops!\n\n1. Open https://nxstops.com\n2. Go to Plan tab \u{2192} tap "Join Crew"\n3. Enter code: ${crewCode}\n`
-      : '';
-    const summary = `${cityLabel} Trip Plan${joinInstructions}\n${lines}\n\nPlanned with NxStops \u{2728}`;
-    if (navigator.share) {
-      await navigator.share({ title: `${cityLabel} Trip Plan`, text: summary, url: 'https://nxstops.com' });
-    } else {
-      await navigator.clipboard.writeText(summary);
-      showToast('Plan copied \u{2014} share with your crew!');
-    }
   };
 
   // --------------------------------------------------------------------------
@@ -529,7 +385,7 @@ export function useTripPlan(deps: {
   const [autoPlanError, setAutoPlanError] = useState<string | null>(null);
   const [lastPlanTitle, setLastPlanTitle] = useState<string | null>(null);
 
-  const planMyDay = useCallback(async (mood: string, budget: number, duration: PlanDuration): Promise<boolean> => {
+  const planMyDay = useCallback(async (mood: string, duration: PlanDuration): Promise<boolean> => {
     if (!lat || !lng) {
       showToast('Location needed — pick a city or enable GPS');
       return false;
@@ -557,7 +413,6 @@ export function useTripPlan(deps: {
         lng,
         city: cityLabel || undefined,
         mood,
-        budget,
         travelGroup: travelGroup || undefined,
         duration,
         weather: weatherStr,
@@ -604,7 +459,7 @@ export function useTripPlan(deps: {
       hapticNotification('Success');
       showToast(`Day ${activeDay}: ${result.dayTitle} — ${stops.length} stops planned!`);
       track('auto_plan_generated', {
-        mood, duration, budget: String(budget),
+        mood, duration,
         stops: String(stops.length), city: cityLabel,
       });
       return true;
@@ -625,10 +480,8 @@ export function useTripPlan(deps: {
     addToPlan, addEventToPlan, removeFromPlan, isInPlan, isEventInPlan,
     clearPlan, movePlanStop, reorderStops, addDay, removeDay, moveStopToDay, pivotStop,
     getRouteUrl, getFullTripRouteUrl, sharePlan, shareAsLink, getTransportInfo, getDaySummary,
-    dayBudgets, setDayBudget, activeDayBudget,
-    estimatedSpend, budgetRemaining, budgetPercentUsed, isOverBudget,
-    crewMode, crewCode, crewSyncing, joinCrewInput, setJoinCrewInput,
-    showJoinCrew, setShowJoinCrew, startCrewMode, stopCrewMode, joinCrew, shareCrewPlan,
+    estimatedSpend,
     autoPlanLoading, autoPlanError, lastPlanTitle, planMyDay,
+    tripStartDate, setTripStartDate,
   };
 }

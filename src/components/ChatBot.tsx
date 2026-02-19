@@ -158,7 +158,7 @@ export default function ChatBot({ city, onClose }: { city: string | null; onClos
       onClick={onClose}
     >
       <div
-        className="modal-sheet bg-bg-surface rounded-t-3xl max-w-[430px] w-full h-[55vh] flex flex-col border border-border-subtle border-b-0"
+        className="modal-sheet bg-bg-surface rounded-t-3xl max-w-[430px] w-full h-[40vh] flex flex-col border border-border-subtle border-b-0"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}

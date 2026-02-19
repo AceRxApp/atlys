@@ -20,7 +20,7 @@ interface LocState {
 export function useLocationWeather(loc: LocState) {
   const [cities, setCities] = useState<City[]>([]);
   const [selectedCity, setSelectedCityRaw] = useState<City | null>(null);
-  const [useGps, setUseGpsRaw] = useState(() => sessionStorage.getItem('nxstops_use_gps') === 'true');
+  const [useGps, setUseGpsRaw] = useState(false);
   const [searchRadius, setSearchRadius] = useState(1500);
   const [loading, setLoading] = useState(true);
   const [weather, setWeather] = useState<{
@@ -60,29 +60,14 @@ export function useLocationWeather(loc: LocState) {
     return { lat: 40.7128, lng: -73.996 };
   }, [useGps, loc.lat, loc.lng, selectedCity]);
 
-  // Load cities + restore saved city
+  // Load cities (always start fresh — no auto-restore)
   useEffect(() => {
     (async () => {
       const data = await fetchCities();
       setCities(data);
-      try {
-        const savedCity = sessionStorage.getItem('nxstops_selected_city');
-        if (savedCity) {
-          const parsed = JSON.parse(savedCity);
-          const match = data.find((c: City) => c.id === parsed.id);
-          if (match) setSelectedCityRaw(match);
-        }
-      } catch { /* ignore */ }
       setLoading(false);
     })();
   }, []);
-
-  // Auto-GPS
-  useEffect(() => {
-    if (loc.hasLocation && !selectedCity && !sessionStorage.getItem('nxstops_selected_city') && !sessionStorage.getItem('nxstops_use_gps')) {
-      setUseGps(true);
-    }
-  }, [loc.hasLocation, selectedCity, setUseGps]);
 
   // Fetch weather
   useEffect(() => {

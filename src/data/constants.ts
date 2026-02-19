@@ -41,8 +41,9 @@ export const COMMUNITY_TAGS: { id: CommunityTag; emoji: string; label: string }[
 
 export const VIBES: { id: Vibe; emoji: string; label: string }[] = [
   { id: 'food', emoji: '🍽️', label: 'Food & Drinks' },
-  { id: 'stay', emoji: '🏨', label: 'Places to Stay' },
-  { id: 'todo', emoji: '🎭', label: 'Things to Do' },
+  { id: 'nightlife', emoji: '🌙', label: 'Nightlife' },
+  { id: 'outdoors', emoji: '🌿', label: 'Outdoors' },
+  { id: 'culture', emoji: '🏛️', label: 'Culture' },
   { id: 'hidden', emoji: '💎', label: 'Hidden Gems' },
   { id: 'locals', emoji: '🌻', label: 'Locals' },
 ];

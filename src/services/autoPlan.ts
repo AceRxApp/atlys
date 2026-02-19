@@ -21,7 +21,6 @@ export interface AutoPlanRequest {
   lng: number;
   city?: string;
   mood?: string;
-  budget?: number;
   travelGroup?: string;
   duration?: string;
   weather?: string;

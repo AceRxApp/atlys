@@ -44,10 +44,17 @@ export function usePlaces(deps: {
   const [places, setPlaces] = useState<Place[]>([]);
   const [placesLoading, setPlacesLoading] = useState(false);
   const [placesError, setPlacesError] = useState(false);
-  const [selectedVibe, setSelectedVibeRaw] = useState<Vibe | null>(null);
-  const setSelectedVibe = useCallback((vibe: Vibe | null) => {
-    setSelectedVibeRaw(vibe);
-    if (vibe) track('vibe_selected', { vibe });
+  const [selectedVibes, setSelectedVibesRaw] = useState<Vibe[]>([]);
+  const toggleVibe = useCallback((vibe: Vibe) => {
+    setSelectedVibesRaw(prev => {
+      const has = prev.includes(vibe);
+      const next = has ? prev.filter(v => v !== vibe) : [...prev, vibe];
+      if (!has) track('vibe_selected', { vibe });
+      return next;
+    });
+  }, []);
+  const setSelectedVibes = useCallback((vibes: Vibe[]) => {
+    setSelectedVibesRaw(vibes);
   }, []);
   const [quickFilters, setQuickFilters] = useState<QuickFilter[]>(['open']);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
@@ -73,15 +80,6 @@ export function usePlaces(deps: {
   const [searchResults, setSearchResults] = useState<Place[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
-
-  // --- Blind Date ---
-  const [blindDatePlace, setBlindDatePlace] = useState<Place | null>(null);
-  const [blindDateRevealed, setBlindDateRevealed] = useState(false);
-
-  // --- User Contributed Stops ---
-  const [userStops, setUserStops] = useState<UserStop[]>([]);
-  const [showPinStop, setShowPinStop] = useState(false);
-  const [pinStopSubmitting, setPinStopSubmitting] = useState(false);
 
   // --- Abort controller for race condition prevention ---
   const fetchAbortRef = useRef<AbortController | null>(null);
@@ -117,12 +115,11 @@ export function usePlaces(deps: {
     setPlacesLoading(true);
     setPlacesError(false);
     try {
-      const vibes = selectedVibe ? [selectedVibe] : [];
-      const results = await searchNearby(lat, lng, vibes, searchRadius);
+      const results = await searchNearby(lat, lng, selectedVibes, searchRadius);
       // Only update state if this request wasn't cancelled
       if (!controller.signal.aborted) {
         setPlaces(results);
-        if (results.length === 0 && !selectedVibe) setPlacesError(true);
+        if (results.length === 0 && selectedVibes.length === 0) setPlacesError(true);
         setPlacesLoading(false);
       }
     } catch {
@@ -131,7 +128,7 @@ export function usePlaces(deps: {
         setPlacesLoading(false);
       }
     }
-  }, [useGps, loc.lat, loc.lng, selectedCity, selectedVibe, searchRadius]);
+  }, [useGps, loc.lat, loc.lng, selectedCity, selectedVibes, searchRadius]);
 
   useEffect(() => {
     if (screen === 'discover' && (useGps || selectedCity)) fetchPlaces();
@@ -143,13 +140,6 @@ export function usePlaces(deps: {
     const ids = places.map(p => p.placeId);
     fetchPlaceTagCounts(ids).then(setPlaceTagsCache);
   }, [places]);
-
-  // Load user-contributed stops for current city
-  useEffect(() => {
-    const slug = selectedCity?.slug || (useGps && loc.city ? loc.city.toLowerCase().replace(/\s+/g, '-') : '');
-    if (!slug) return;
-    fetchUserStops(slug).then(setUserStops);
-  }, [selectedCity, useGps, loc.city]);
 
   // Load reviews when selectedPlace changes
   useEffect(() => {
@@ -342,6 +332,20 @@ export function usePlaces(deps: {
     setShowSearch(true);
   }, [searchQuery, useGps, loc.lat, loc.lng, selectedCity]);
 
+  // Dismiss search and merge results into the main Discover list
+  const dismissSearch = useCallback(() => {
+    if (searchResults.length > 0) {
+      setPlaces(prev => {
+        const existingIds = new Set(prev.map(p => p.placeId));
+        const newPlaces = searchResults.filter(p => !existingIds.has(p.placeId));
+        return [...newPlaces, ...prev];
+      });
+    }
+    setShowSearch(false);
+    setSearchQuery('');
+    setSearchResults([]);
+  }, [searchResults]);
+
   const isSaved = (placeId: string) => savedPlaces.some(p => p.placeId === placeId);
   const toggleSaved = (place: Place) => {
     hapticImpact(isSaved(place.placeId) ? 'Light' : 'Medium');
@@ -405,58 +409,6 @@ export function usePlaces(deps: {
     }
   };
 
-  // Blind Date: pick a random highly-rated nearby place
-  const spinBlindDate = useCallback(() => {
-    const candidates = places.filter(p => p.openNow && p.rating >= 4.0 && p.distance !== null && p.distance <= 0.5);
-    if (candidates.length === 0) {
-      // Widen to 1km if nothing within 500m
-      const wider = places.filter(p => p.openNow && p.rating >= 4.0 && p.distance !== null && p.distance <= 1);
-      if (wider.length === 0) { showToast('No nearby spots found — try a different area'); return; }
-      const pick = wider[Math.floor(Math.random() * wider.length)];
-      setBlindDatePlace(pick);
-    } else {
-      const pick = candidates[Math.floor(Math.random() * candidates.length)];
-      setBlindDatePlace(pick);
-    }
-    setBlindDateRevealed(false);
-    hapticImpact('Heavy');
-  }, [places, showToast]);
-
-  const revealBlindDate = useCallback(() => {
-    setBlindDateRevealed(true);
-    hapticNotification('Success');
-  }, []);
-
-  const dismissBlindDate = useCallback(() => {
-    setBlindDatePlace(null);
-    setBlindDateRevealed(false);
-  }, []);
-
-  // Submit a user-pinned stop
-  const submitPinStop = useCallback(async (stop: {
-    name: string;
-    description?: string;
-    category: string;
-    lat: number;
-    lng: number;
-  }) => {
-    const slug = selectedCity?.slug || (useGps && loc.city ? loc.city.toLowerCase().replace(/\s+/g, '-') : '');
-    if (!slug) { showToast('Select a city first'); return; }
-    setPinStopSubmitting(true);
-    const result = await createUserStop({ ...stop, city_slug: slug });
-    if (result.success) {
-      hapticNotification('Success');
-      showToast('Stop submitted for review!');
-      setShowPinStop(false);
-      // Refresh user stops
-      fetchUserStops(slug).then(setUserStops);
-      track('pin_stop', { name: stop.name, category: stop.category });
-    } else {
-      showToast(result.error || 'Failed to submit stop');
-    }
-    setPinStopSubmitting(false);
-  }, [selectedCity, useGps, loc.city, showToast]);
-
   // Helpers
   const isReservable = (place: Place): boolean => RESERVABLE_TYPES.includes(place.category);
   const isBookable = (place: Place): boolean => BOOKABLE_TYPES.includes(place.category);
@@ -489,17 +441,15 @@ export function usePlaces(deps: {
 
   return {
     places, setPlaces, filteredPlaces, forYouPlaces, placesLoading, placesError, fetchPlaces,
-    selectedVibe, setSelectedVibe, quickFilters, setQuickFilters,
+    selectedVibes, toggleVibe, setSelectedVibes, quickFilters, setQuickFilters,
     viewMode, setViewMode, activeMapPin, setActiveMapPin,
     communityFilters, setCommunityFilters, placeTagsCache, travelGroup, setTravelGroup,
     savedPlaces, toggleSaved, isSaved,
-    searchQuery, setSearchQuery, searchResults, isSearching, showSearch, setShowSearch, handleSearch,
+    searchQuery, setSearchQuery, searchResults, isSearching, showSearch, setShowSearch, handleSearch, dismissSearch,
     placeReviews, showReviewForm, setShowReviewForm,
     reviewRating, setReviewRating, reviewText, setReviewText, reviewTags, setReviewTags,
     reviewSubmitting, handleSubmitReview, reviewPhotos, setReviewPhotos,
     sharePlace,
     isReservable, isBookable, getBookingUrl, getBookingLabel, getSafetyIndicators,
-    blindDatePlace, blindDateRevealed, spinBlindDate, revealBlindDate, dismissBlindDate,
-    userStops, showPinStop, setShowPinStop, pinStopSubmitting, submitPinStop,
   };
 }

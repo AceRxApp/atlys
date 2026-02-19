@@ -4,7 +4,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors.js';
 
-const GOOGLE_API_KEY = process.env.GOOGLE_PLACES_API_KEY || '';
+const GOOGLE_API_KEY = (process.env.GOOGLE_PLACES_API_KEY || '').trim();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const corsOk = setCorsHeaders(res, req.headers.origin as string | undefined, 'GET, OPTIONS');

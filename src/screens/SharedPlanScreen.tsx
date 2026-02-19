@@ -159,7 +159,7 @@ export default function SharedPlanScreen() {
                       )}
                       <div className="flex-1 min-w-0">
                         {stop.timeSlot && (
-                          <div className="text-[10px] font-semibold text-accent-amber uppercase tracking-wide mb-0.5">
+                          <div className="text-[11px] font-semibold text-accent-amber uppercase tracking-wide mb-0.5">
                             {stop.timeSlot}
                           </div>
                         )}

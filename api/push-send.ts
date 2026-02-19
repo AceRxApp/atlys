@@ -4,12 +4,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
-const VAPID_PUBLIC_KEY = process.env.VITE_VAPID_PUBLIC_KEY || '';
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:hello@nxstops.com';
-const PUSH_CRON_SECRET = process.env.PUSH_CRON_SECRET || '';
+const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '').trim();
+const SUPABASE_SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+const VAPID_PRIVATE_KEY = (process.env.VAPID_PRIVATE_KEY || '').trim();
+const VAPID_PUBLIC_KEY = (process.env.VITE_VAPID_PUBLIC_KEY || '').trim();
+const VAPID_SUBJECT = (process.env.VAPID_SUBJECT || 'mailto:hello@nxstops.com').trim();
+const PUSH_CRON_SECRET = (process.env.PUSH_CRON_SECRET || '').trim();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Authenticate: either Vercel cron header or secret

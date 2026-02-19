@@ -4,7 +4,8 @@
   "framework": "vite",
   "functions": {
     "api/*.ts": {
-      "includeFiles": "api/_lib/**"
+      "includeFiles": "api/_lib/**",
+      "maxDuration": 60
     }
   },
   "headers": [
@@ -59,6 +60,7 @@
     { "source": "/api/currency", "destination": "/api/currency" },
     { "source": "/api/dishlens", "destination": "/api/dishlens" },
     { "source": "/api/dish-image", "destination": "/api/dish-image" },
+    { "source": "/api/plan-day", "destination": "/api/plan-day" },
     { "source": "/((?!api/|.well-known/).*)", "destination": "/index.html" }
   ],
   "crons": [

@@ -37,7 +37,7 @@ export default function BookingLinks({ cityName, category }: Props) {
                 <div className="text-[13px] font-semibold text-text-primary leading-tight">
                   {service.name}
                 </div>
-                <div className="text-[10px] text-text-tertiary mt-0.5 leading-tight">
+                <div className="text-[11px] text-text-tertiary mt-0.5 leading-tight">
                   {service.description}
                 </div>
               </div>
@@ -60,7 +60,7 @@ export default function BookingLinks({ cityName, category }: Props) {
                 href={openUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[12px] text-accent-amber font-medium no-underline px-2 py-1"
+                className="text-[13px] text-accent-amber font-medium no-underline px-2 py-1"
               >
                 Open in Browser
               </a>

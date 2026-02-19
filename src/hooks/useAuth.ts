@@ -22,6 +22,8 @@ function friendlyError(msg: string): string {
     return 'We couldn\'t verify that email address. Please check it and try again.';
   if (lower.includes('password') && lower.includes('weak'))
     return 'Password is too weak. Use a mix of letters, numbers, and symbols.';
+  if (lower.includes('sending confirmation') || lower.includes('sending email') || lower.includes('email provider'))
+    return 'Our email service is temporarily busy. Please wait a few minutes and try again, or try signing up with a different method.';
   if (lower.includes('network') || lower.includes('fetch'))
     return 'Network error — please check your connection and try again.';
   return msg;

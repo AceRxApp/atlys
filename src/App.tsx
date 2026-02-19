@@ -14,7 +14,7 @@ import type { AdminSignup } from './types';
 import { CITY_COORDS, EMERGENCY_BY_COUNTRY } from './data';
 
 import { AppContext } from './context/AppContext';
-import { HomeIcon, DiscoverIcon, EventsIcon, PlanIcon, TasteLensIcon, ShieldIcon, GearIcon, CloseIcon, SearchIcon } from './components/icons';
+import { HomeIcon, DiscoverIcon, EventsIcon, TasteLensIcon, PlanIcon, ShieldIcon, GearIcon, CloseIcon, SearchIcon } from './components/icons';
 import { SkeletonCard } from './components/ui';
 import Footer from './components/Footer';
 
@@ -28,6 +28,112 @@ import { useStopRatings } from './hooks/useStopRatings';
 import { useOfflineSave } from './hooks/useOfflineSave';
 
 type Screen = 'home' | 'discover' | 'events' | 'currency' | 'plan' | 'tastelens';
+
+// City-specific quick tips for the Travel Toolkit
+const CITY_TIPS: Record<string, { icon: string; tip: string }[]> = {
+  'new york': [
+    { icon: '\u{1F687}', tip: 'Get a MetroCard or use OMNY tap-to-pay \u{2014} the subway is the fastest way around' },
+    { icon: '\u{1F4B5}', tip: 'Tip 18-20% at restaurants and $1-2 per drink at bars' },
+    { icon: '\u{1F6B6}', tip: 'Walk with purpose and stay aware of your surroundings, especially in quieter areas at night' },
+    { icon: '\u{1F319}', tip: 'Avoid poorly lit side streets late at night \u{2014} stick to busy avenues like Broadway and 5th Ave' },
+    { icon: '\u{1F4F1}', tip: 'Download the MTA app for real-time subway arrivals' },
+    { icon: '\u{1F37D}\u{FE0F}', tip: 'Street food carts (halal, pretzels, hot dogs) are iconic and cheap \u{2014} try them' },
+  ],
+  'miami': [
+    { icon: '\u{2600}\u{FE0F}', tip: 'Wear sunscreen year-round \u{2014} Miami sun is intense even on cloudy days' },
+    { icon: '\u{1F697}', tip: 'A car is helpful outside South Beach \u{2014} rideshares can surge during events' },
+    { icon: '\u{1F4B5}', tip: 'Many restaurants in tourist areas add automatic 18% gratuity' },
+    { icon: '\u{1F319}', tip: 'South Beach and Wynwood are generally safe at night; be cautious in Overtown and Little Haiti late' },
+    { icon: '\u{1F30A}', tip: 'Rip currents are real \u{2014} swim near lifeguard stations' },
+    { icon: '\u{1F37D}\u{FE0F}', tip: 'Try Cuban coffee (colada) at a ventanita \u{2014} it\'s a local ritual' },
+  ],
+  'los angeles': [
+    { icon: '\u{1F697}', tip: 'You need a car in LA \u{2014} distances between areas are huge. Budget for parking.' },
+    { icon: '\u{1F319}', tip: 'Avoid walking alone at night in Downtown LA, Skid Row area, and parts of Hollywood Blvd' },
+    { icon: '\u{2600}\u{FE0F}', tip: 'Bring layers \u{2014} coastal mornings can be foggy and cool, afternoons are warm' },
+    { icon: '\u{1F37D}\u{FE0F}', tip: 'LA has the best tacos in the US \u{2014} street taco trucks are often better than restaurants' },
+    { icon: '\u{1F4B5}', tip: 'Expect to pay $15-30 for parking in popular areas like Santa Monica and Hollywood' },
+    { icon: '\u{1F3D6}\u{FE0F}', tip: 'Venice Beach boardwalk is lively but watch your belongings in crowded areas' },
+  ],
+  'london': [
+    { icon: '\u{1F687}', tip: 'Get an Oyster card or use contactless payment on the Tube \u{2014} it\'s capped daily' },
+    { icon: '\u{2614}', tip: 'Always carry an umbrella \u{2014} London weather changes fast' },
+    { icon: '\u{1F4B7}', tip: 'Tipping isn\'t mandatory but 10-12.5% at restaurants is appreciated' },
+    { icon: '\u{1F319}', tip: 'Central London is very safe at night; be more cautious in outer boroughs after dark' },
+    { icon: '\u{1F6B6}', tip: 'Look RIGHT first when crossing streets \u{2014} traffic drives on the left' },
+    { icon: '\u{1F37D}\u{FE0F}', tip: 'Borough Market and Camden Market have incredible street food at good prices' },
+  ],
+  'paris': [
+    { icon: '\u{1F687}', tip: 'The M\u{00E9}tro is fast and cheap \u{2014} get a Navigo card for unlimited rides' },
+    { icon: '\u{1F4B6}', tip: 'Service is included in restaurant bills (service compris) \u{2014} extra tip is optional' },
+    { icon: '\u{1F319}', tip: 'Avoid the area around Gare du Nord and Ch\u{00E2}telet late at night; stay alert for pickpockets at tourist spots' },
+    { icon: '\u{1F6B6}', tip: 'Walk as much as you can \u{2014} Paris is beautiful on foot and most arrondissements are walkable' },
+    { icon: '\u{1F37D}\u{FE0F}', tip: 'Lunch menus (prix fixe) at restaurants are much cheaper than dinner \u{2014} eat your big meal at noon' },
+    { icon: '\u{1F5E3}\u{FE0F}', tip: 'Start with "Bonjour" \u{2014} it goes a long way with locals' },
+  ],
+  'tokyo': [
+    { icon: '\u{1F685}', tip: 'Get a Suica or Pasmo IC card for trains, buses, and even vending machines' },
+    { icon: '\u{1F319}', tip: 'Tokyo is one of the safest major cities \u{2014} you can walk almost anywhere at night' },
+    { icon: '\u{1F4B4}', tip: 'Japan is still cash-heavy \u{2014} carry yen, especially for small restaurants and shrines' },
+    { icon: '\u{1F37D}\u{FE0F}', tip: 'Convenience store (konbini) food is surprisingly delicious and cheap' },
+    { icon: '\u{1F6B6}', tip: 'Tipping is not customary and can be considered rude' },
+    { icon: '\u{1F3E9}', tip: 'Remove shoes when entering homes, some restaurants, and temples' },
+  ],
+  'sarasota': [
+    { icon: '\u{1F3D6}\u{FE0F}', tip: 'Siesta Key Beach is ranked #1 in the US \u{2014} go early to get parking' },
+    { icon: '\u{1F697}', tip: 'A car is essential \u{2014} attractions are spread across the coast and mainland' },
+    { icon: '\u{2600}\u{FE0F}', tip: 'Afternoon thunderstorms are common in summer \u{2014} plan outdoor activities for mornings' },
+    { icon: '\u{1F37D}\u{FE0F}', tip: 'St. Armands Circle has upscale dining; downtown has great affordable spots too' },
+    { icon: '\u{1F40A}', tip: 'Watch for wildlife \u{2014} alligators live in freshwater ponds and canals throughout Florida' },
+    { icon: '\u{1F3A8}', tip: 'The Ringling Museum is a must-see and the grounds are stunning at sunset' },
+  ],
+  'atlanta': [
+    { icon: '\u{1F697}', tip: 'Atlanta traffic is notorious \u{2014} use MARTA rail when possible and avoid rush hours' },
+    { icon: '\u{1F37D}\u{FE0F}', tip: 'Don\'t miss the soul food \u{2014} fried chicken, collard greens, and peach cobbler are must-tries' },
+    { icon: '\u{1F319}', tip: 'Midtown, Buckhead, and Virginia-Highland are safe for nightlife; be cautious in less-busy areas' },
+    { icon: '\u{1F4B5}', tip: 'Tip 18-20% at restaurants \u{2014} Southern hospitality goes both ways' },
+    { icon: '\u{1F333}', tip: 'The BeltLine is perfect for walking \u{2014} connects parks, art, and restaurants' },
+    { icon: '\u{2600}\u{FE0F}', tip: 'Summers are hot and humid \u{2014} stay hydrated and plan indoor activities midday' },
+  ],
+  'chicago': [
+    { icon: '\u{1F32C}\u{FE0F}', tip: 'It\'s called the Windy City for a reason \u{2014} dress in layers, especially near the lake' },
+    { icon: '\u{1F687}', tip: 'The L train covers most of the city \u{2014} use the Ventra app for fares' },
+    { icon: '\u{1F319}', tip: 'Stick to the Loop, River North, Lincoln Park, and Wicker Park at night; avoid the South and West sides after dark' },
+    { icon: '\u{1F37D}\u{FE0F}', tip: 'Deep dish is iconic but locals actually eat more tavern-style thin crust pizza' },
+    { icon: '\u{1F4B5}', tip: 'Architecture boat tours are worth every penny \u{2014} book in advance' },
+    { icon: '\u{1F3D6}\u{FE0F}', tip: 'The lakefront trail is stunning \u{2014} 18 miles of free beaches, paths, and parks' },
+  ],
+  'accra': [
+    { icon: '\u{1F695}', tip: 'Use Uber or Bolt \u{2014} negotiate taxi fares in advance as meters aren\'t common' },
+    { icon: '\u{1F4B5}', tip: 'Carry Ghanaian cedis \u{2014} many local spots don\'t accept cards' },
+    { icon: '\u{1F319}', tip: 'Osu and East Legon are vibrant at night; avoid isolated areas and be aware of your surroundings' },
+    { icon: '\u{1F37D}\u{FE0F}', tip: 'Try waakye, jollof rice, and kelewele from local chop bars \u{2014} incredible flavors at low prices' },
+    { icon: '\u{1F4A7}', tip: 'Drink bottled or filtered water only \u{2014} sachet water (pure water) is also safe' },
+    { icon: '\u{1F30D}', tip: 'Ghanaians are warm and welcoming \u{2014} greetings matter, so always say hello first' },
+  ],
+  'dubai': [
+    { icon: '\u{1F687}', tip: 'The Dubai Metro is clean, air-conditioned, and covers most tourist areas' },
+    { icon: '\u{1F321}\u{FE0F}', tip: 'Summer temps hit 45\u{00B0}C+ \u{2014} plan outdoor activities for early morning or after sunset' },
+    { icon: '\u{1F4B5}', tip: 'Tipping isn\'t expected but 10% at restaurants is appreciated' },
+    { icon: '\u{1F319}', tip: 'Dubai is extremely safe at night \u{2014} crime rates are very low' },
+    { icon: '\u{1F457}', tip: 'Dress modestly in malls and public areas \u{2014} cover shoulders and knees outside beach/pool areas' },
+    { icon: '\u{1F37D}\u{FE0F}', tip: 'Al Dhiyafah Road in Satwa has incredible affordable food from every cuisine' },
+  ],
+};
+
+const DEFAULT_TIPS: { icon: string; tip: string }[] = [
+  { icon: '\u{1F50B}', tip: 'Keep your phone charged \u{2014} you\'ll need it for maps & rides' },
+  { icon: '\u{1F4F1}', tip: 'Download offline maps before heading out' },
+  { icon: '\u{1F3E8}', tip: 'Save your accommodation address \u{2014} show it to taxi drivers' },
+  { icon: '\u{1F4B3}', tip: 'Keep a small amount of local cash for emergencies' },
+  { icon: '\u{1F319}', tip: 'Stick to well-lit, busy streets at night and be aware of your surroundings' },
+  { icon: '\u{1F465}', tip: 'Look for places with lots of reviews \u{2014} popular spots are usually welcoming' },
+];
+
+function getQuickTips(cityLabel: string): { icon: string; tip: string }[] {
+  const key = cityLabel.toLowerCase().trim();
+  return CITY_TIPS[key] || DEFAULT_TIPS;
+}
 
 // Lazy-loaded screens & modals
 const HomeScreen = lazy(() => import('./screens/HomeScreen'));
@@ -173,7 +279,7 @@ export default function App() {
   const [adminSignups, setAdminSignups] = useState<AdminSignup[]>([]);
   const [adminCities, setAdminCities] = useState<import('./types').City[]>([]);
   const [adminLoading, setAdminLoading] = useState(false);
-  const [adminTab, setAdminTab] = useState<'dashboard' | 'signups' | 'cities' | 'reports' | 'stops'>('dashboard');
+  const [adminTab, setAdminTab] = useState<'dashboard' | 'signups' | 'cities' | 'reports' | 'stops' | 'dish-images'>('dashboard');
 
   // Check admin status server-side when user changes
   useEffect(() => {
@@ -230,6 +336,8 @@ export default function App() {
     trip.tripDays, location.citySlug,
     location.useGps ? loc.lat : (location.selectedCity ? (location.selectedCity.lat ?? CITY_COORDS[location.selectedCity.name.toLowerCase()]?.lat ?? null) : null),
     location.useGps ? loc.lng : (location.selectedCity ? (location.selectedCity.lng ?? CITY_COORDS[location.selectedCity.name.toLowerCase()]?.lng ?? null) : null),
+    places.places,
+    events.events,
   );
 
   // --- Reset photo index when selectedPlace changes ---
@@ -454,25 +562,50 @@ export default function App() {
   // ==========================================================================
 
   if (showOnboarding) {
+    const onboardingSteps = [
+      { emoji: '\u{1F30D}', title: 'Discover Any City', desc: 'Find restaurants, attractions, and hidden gems \u{2014} wherever you are in the world.' },
+      { emoji: '\u{1F4CB}', title: 'Plan Your Day', desc: 'AI builds a personalized itinerary based on your vibe \u{2014} sightseeing, foodie, nightlife, and more.' },
+      { emoji: '\u{1F37D}\u{FE0F}', title: 'TasteLens', desc: 'Scan any menu or type a dish name \u{2014} get instant info, dietary tags, allergens, and cultural context.' },
+      { emoji: '\u{1F4B1}', title: 'Currency Converter', desc: 'Check live exchange rates and convert currencies on the go. Perfect for travel budgeting.' },
+      { emoji: '\u{1F3AB}', title: 'Local Events', desc: 'Concerts, sports, festivals, and more \u{2014} happening near you or wherever you\u{2019}re headed.' },
+    ];
+    const step = onboardingSteps[onboardingStep] || onboardingSteps[0];
+    const isLast = onboardingStep >= onboardingSteps.length - 1;
+
     return (
       <div className="font-['DM_Sans',system-ui,sans-serif] bg-bg-body min-h-screen text-text-primary flex flex-col items-center justify-center max-w-[430px] mx-auto px-6 py-10">
         <div className="flex-1 flex flex-col items-center justify-center text-center">
           <div className="text-4xl font-bold mb-1 bg-accent-text-gradient bg-clip-text text-transparent">
             NxStops
           </div>
-          <div className="text-[11px] text-text-tertiary tracking-[0.1em] uppercase mb-8">
+          <div className="text-[11px] text-text-tertiary tracking-[0.1em] uppercase mb-10">
             by Nav&eacute;
           </div>
-          <p className="text-[17px] text-text-secondary leading-relaxed max-w-[300px] mb-2">
-            Discover places, plan trips, and explore cities — wherever you are.
-          </p>
+          <div className="text-[56px] mb-4">{step.emoji}</div>
+          <h2 className="text-[22px] font-bold text-text-primary mb-2">{step.title}</h2>
+          <p className="text-[15px] text-text-secondary leading-relaxed max-w-[300px] mb-6">{step.desc}</p>
+          <div className="flex gap-2 mb-6">
+            {onboardingSteps.map((_, i) => (
+              <div key={i} className={`h-2 rounded-full transition-all ${i === onboardingStep ? 'bg-accent-amber w-5' : 'bg-border-medium w-2'}`} />
+            ))}
+          </div>
         </div>
-        <div className="w-full">
+        <div className="w-full flex flex-col gap-2.5">
           <button
-            onClick={() => { localStorage.setItem('nxstops_onboarded', 'true'); setShowOnboarding(false); track('onboarding_complete'); }}
+            onClick={() => {
+              if (isLast) { localStorage.setItem('nxstops_onboarded', 'true'); setShowOnboarding(false); track('onboarding_complete'); }
+              else { setOnboardingStep(onboardingStep + 1); }
+            }}
             className="w-full p-4 rounded-[14px] border-none bg-accent-gradient text-text-on-accent text-base font-semibold cursor-pointer shadow-[0_4px_20px_var(--amber-tint-shadow)]">
-            Get Started
+            {isLast ? 'Get Started' : 'Next'}
           </button>
+          {!isLast && (
+            <button
+              onClick={() => { localStorage.setItem('nxstops_onboarded', 'true'); setShowOnboarding(false); track('onboarding_skipped'); }}
+              className="w-full p-3 rounded-[14px] border border-border-subtle bg-transparent text-text-tertiary text-sm cursor-pointer">
+              Skip
+            </button>
+          )}
         </div>
       </div>
     );
@@ -490,8 +623,11 @@ export default function App() {
 
         {/* Offline banner */}
         {isOffline && (
-          <div className="fixed top-0 left-0 right-0 bg-[#78716C] text-white text-xs text-center p-1.5 z-[9999] animate-offline-banner">
-            You're offline — showing cached data
+          <div className="fixed top-0 left-0 right-0 z-[9999] animate-offline-banner">
+            <div className="bg-[#78350F] text-[#FDE68A] text-[13px] text-center py-2.5 px-4 flex items-center justify-center gap-2 font-medium">
+              <span className="w-2 h-2 rounded-full bg-[#F59E0B] animate-pulse shrink-0" />
+              You're offline — showing cached data
+            </div>
           </div>
         )}
 
@@ -505,7 +641,7 @@ export default function App() {
                 <div className="text-[22px] font-bold leading-tight bg-accent-text-gradient bg-clip-text text-transparent">
                   NxStops
                 </div>
-                <div className="text-[9px] text-text-tertiary tracking-[0.12em] uppercase leading-none mt-0.5">
+                <div className="text-[10px] text-text-tertiary tracking-[0.12em] uppercase leading-none mt-0.5">
                   by Nav&eacute;
                 </div>
               </div>
@@ -514,7 +650,7 @@ export default function App() {
                 <div className="text-[13px] font-medium text-text-primary leading-tight">
                   {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
-                <div className="text-[9px] text-text-tertiary leading-none mt-0.5">
+                <div className="text-[10px] text-text-tertiary leading-none mt-0.5">
                   {currentTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
                 </div>
               </div>
@@ -610,7 +746,7 @@ export default function App() {
                 key={tab.id}
                 aria-label={tab.label}
                 aria-current={isActive ? 'page' : undefined}
-                className={`flex flex-col items-center gap-1 bg-transparent border-none text-[10px] font-medium px-5 py-2 rounded-xl relative min-h-[48px] ${isActive ? 'text-text-primary' : canNavigate ? 'text-text-tertiary' : 'text-text-disabled'} ${canNavigate ? 'cursor-pointer opacity-100' : 'cursor-default opacity-40'}`}
+                className={`flex flex-col items-center gap-1 bg-transparent border-none text-[11px] font-medium px-5 py-2 rounded-xl relative min-h-[48px] ${isActive ? 'text-text-primary' : canNavigate ? 'text-text-tertiary' : 'text-text-disabled'} ${canNavigate ? 'cursor-pointer opacity-100' : 'cursor-default opacity-40'}`}
                 onClick={() => { if (canNavigate) { hapticSelection(); setScreen(tab.id); } }}
               >
                 {isActive && (
@@ -625,7 +761,7 @@ export default function App() {
                   {tab.label}
                 </span>
                 {tab.id === 'plan' && trip.totalStops > 0 && (
-                  <span className="absolute top-0.5 right-2 bg-accent-gradient text-[#0C0A09] text-[9px] font-bold px-[5px] py-0.5 rounded-lg">
+                  <span className="absolute top-0.5 right-2 bg-accent-gradient text-[#0C0A09] text-[10px] font-bold px-[5px] py-0.5 rounded-lg">
                     {trip.totalStops}
                   </span>
                 )}
@@ -763,7 +899,7 @@ export default function App() {
             <button
               onClick={() => setShowChat(true)}
               aria-label="Open AI travel assistant"
-              className="w-[52px] h-[52px] rounded-full border-none cursor-pointer text-white text-[22px] flex items-center justify-center shadow-[0_4px_20px_rgba(196,138,90,0.4)]"
+              className="w-[42px] h-[42px] rounded-full border-none cursor-pointer text-white text-[17px] flex items-center justify-center shadow-[0_4px_16px_rgba(196,138,90,0.35)]"
               style={{ background: 'linear-gradient(135deg, #C48A5A, #A06830)' }}
               title="AI Travel Assistant"
             >
@@ -867,17 +1003,10 @@ export default function App() {
                 {/* Travel Tips */}
                 <div className="card mt-1">
                   <div className="section-label">
-                    Quick Tips
+                    Quick Tips {location.cityLabel ? `\u{2014} ${location.cityLabel}` : ''}
                   </div>
-                  {[
-                    { icon: '\u{1F50B}', tip: 'Keep your phone charged \u{2014} you\'ll need it for maps & rides' },
-                    { icon: '\u{1F4F1}', tip: 'Download offline maps before heading out' },
-                    { icon: '\u{1F3E8}', tip: 'Save your accommodation address \u{2014} show it to taxi drivers' },
-                    { icon: '\u{1F4B3}', tip: 'Keep a small amount of local cash for emergencies' },
-                    { icon: '\u{1F319}', tip: 'Stick to well-lit, busy streets at night' },
-                    { icon: '\u{1F465}', tip: 'Look for places with lots of reviews \u{2014} popular spots are usually welcoming' },
-                  ].map((item, i) => (
-                    <div key={i} className="flex gap-2.5 py-2" style={{ borderBottom: i < 5 ? '1px solid var(--bg-subtle-medium)' : 'none' }}>
+                  {getQuickTips(location.cityLabel || '').map((item, i, arr) => (
+                    <div key={i} className="flex gap-2.5 py-2" style={{ borderBottom: i < arr.length - 1 ? '1px solid var(--bg-subtle-medium)' : 'none' }}>
                       <span className="text-base shrink-0">{item.icon}</span>
                       <span className="text-[13px] text-text-body leading-snug">{item.tip}</span>
                     </div>

@@ -97,7 +97,7 @@ export default function CurrencyWidget({ cityName }: Props) {
                 }`}
               >
                 <span>${amt}</span>
-                <span className="text-[10px] opacity-70">{formatConverted(amt)}</span>
+                <span className="text-[11px] opacity-70">{formatConverted(amt)}</span>
               </button>
             ))}
           </div>

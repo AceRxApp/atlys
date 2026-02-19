@@ -12,12 +12,30 @@ export async function fetchCities() {
     .select('*')
     .eq('is_active', true)
     .order('name');
-  
+
   if (error) {
     console.error('Error fetching cities:', error);
     return [];
   }
-  return data || [];
+
+  // Map center_lat/center_lng to lat/lng for fallback coordinate resolution
+  const cities = (data || []).map((c: Record<string, unknown>) => ({
+    ...c,
+    lat: c.center_lat ?? c.lat ?? null,
+    lng: c.center_lng ?? c.lng ?? null,
+  }));
+
+  // Deduplicate: if "Washington" and "Washington D.C." both exist, keep the more specific one
+  const names = new Set(cities.map((c: Record<string, unknown>) => (c.name as string).toLowerCase()));
+  return cities.filter((c: Record<string, unknown>) => {
+    const name = (c.name as string).toLowerCase();
+    for (const other of names) {
+      if (other !== name && other.startsWith(name) && other.length > name.length) {
+        return false; // a more specific version exists
+      }
+    }
+    return true;
+  });
 }
 
 export async function fetchPlacesByCity(cityId: string) {
@@ -746,5 +764,88 @@ export async function scheduleNotification(
     city_slug: citySlug, payload,
   });
   if (error) { console.error('Error scheduling notification:', error); return false; }
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Admin Dish Images — custom photos for niche dishes
+// ---------------------------------------------------------------------------
+
+export interface DishImageRecord {
+  id: string;
+  dish_name: string;
+  restaurant: string | null;
+  image_url: string;
+  uploaded_by: string | null;
+  created_at: string;
+}
+
+export async function uploadDishImage(
+  dishName: string, file: File, restaurant?: string,
+): Promise<{ url: string | null; error: string | null }> {
+  const compressed = await compressImage(file, 800, 0.85);
+  const slug = dishName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const restSlug = restaurant ? restaurant.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : 'general';
+  const path = `${restSlug}/${slug}/${Date.now()}.jpg`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('dish-images')
+    .upload(path, compressed, { upsert: false, contentType: 'image/jpeg' });
+
+  if (uploadError) {
+    console.error('Dish image upload error:', uploadError);
+    return { url: null, error: uploadError.message };
+  }
+
+  const { data: urlData } = supabase.storage.from('dish-images').getPublicUrl(path);
+  const publicUrl = urlData.publicUrl;
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { error: insertError } = await supabase.from('dish_images').insert({
+    dish_name: dishName.toLowerCase().trim(),
+    restaurant: restaurant?.trim() || null,
+    image_url: publicUrl,
+    uploaded_by: user?.id || null,
+  });
+
+  if (insertError) {
+    console.error('Dish image metadata insert error:', insertError);
+    return { url: publicUrl, error: insertError.message };
+  }
+
+  return { url: publicUrl, error: null };
+}
+
+export async function fetchDishImages(): Promise<DishImageRecord[]> {
+  const { data, error } = await supabase
+    .from('dish_images')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (error) {
+    console.error('Error fetching dish images:', error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function deleteDishImage(id: string, imageUrl: string): Promise<boolean> {
+  // Extract storage path from URL
+  const match = imageUrl.match(/dish-images\/(.+)$/);
+  if (match) {
+    await supabase.storage.from('dish-images').remove([match[1]]);
+  }
+
+  const { error } = await supabase
+    .from('dish_images')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error deleting dish image:', error);
+    return false;
+  }
   return true;
 }

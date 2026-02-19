@@ -48,7 +48,6 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
     setDishLensContext,
     setScreen,
     cityLabel,
-    setShowPinStop,
   } = useApp();
   const closeModal = useCallback(() => setSelectedPlace(null), [setSelectedPlace]);
   const modalRef = useModalA11y(true, closeModal);
@@ -214,7 +213,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
               {hoursStatus.text}
             </span>
             {hoursStatus.urgent && (
-              <span className="text-[11px] text-status-red font-semibold">Hurry!</span>
+              <span className="text-xs text-status-red font-semibold">Hurry!</span>
             )}
           </div>
 
@@ -222,28 +221,28 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
           <div className="grid grid-cols-4 gap-2 mb-5">
             {place.googleMapsUrl && (
               <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
-                className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-bg-subtle-medium text-text-secondary no-underline text-[11px]">
+                className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-bg-subtle-medium text-text-secondary no-underline text-xs">
                 <DirectionsIcon />
                 Directions
               </a>
             )}
             {place.phone && (
               <a href={`tel:${place.phone}`}
-                className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-bg-subtle-medium text-text-secondary no-underline text-[11px]">
+                className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-bg-subtle-medium text-text-secondary no-underline text-xs">
                 <PhoneIcon />
                 Call
               </a>
             )}
             {place.website && (
               <a href={place.website} target="_blank" rel="noopener noreferrer"
-                className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-bg-subtle-medium text-text-secondary no-underline text-[11px]">
+                className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-bg-subtle-medium text-text-secondary no-underline text-xs">
                 <WebsiteIcon />
                 Website
               </a>
             )}
             <button onClick={() => toggleSaved(place)}
               aria-label={isSaved(place.placeId) ? 'Remove from saved' : 'Save place'}
-              className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl min-h-[44px] border-none cursor-pointer text-[11px] ${
+              className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl min-h-[44px] border-none cursor-pointer text-xs ${
                 isSaved(place.placeId)
                   ? 'bg-amber-tint-bg15 text-accent-amber'
                   : 'bg-bg-subtle-medium text-text-secondary'
@@ -253,13 +252,13 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
             </button>
             <button onClick={() => sharePlace(place)}
               aria-label="Share place"
-              className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-bg-subtle-medium text-text-secondary border-none cursor-pointer text-[11px] min-h-[44px]">
+              className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-bg-subtle-medium text-text-secondary border-none cursor-pointer text-xs min-h-[44px]">
               <ShareIcon />
               Share
             </button>
             <button onClick={() => setShowCurrencyConverter(!showCurrencyConverter)}
               aria-label="Currency converter"
-              className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border-none cursor-pointer text-[11px] min-h-[44px] ${
+              className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border-none cursor-pointer text-xs min-h-[44px] ${
                 showCurrencyConverter ? 'bg-amber-tint-bg15 text-accent-amber' : 'bg-bg-subtle-medium text-text-secondary'
               }`}>
               <span className="text-base">{'\u{1F4B1}'}</span>
@@ -272,27 +271,17 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                 setScreen('tastelens');
               }}
                 aria-label="Open TasteLens for this restaurant"
-                className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-amber-tint-bg10 text-accent-amber border-none cursor-pointer text-[11px] min-h-[44px]">
+                className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-amber-tint-bg10 text-accent-amber border-none cursor-pointer text-xs min-h-[44px]">
                 <span className="text-base">{'\u{1F37D}\u{FE0F}'}</span>
                 TasteLens
               </button>
             )}
             <button onClick={() => {
               if (!requireAuth()) return;
-              setSelectedPlace(null);
-              setShowPinStop(true);
-            }}
-              aria-label="Pin a new stop"
-              className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-bg-subtle-medium text-text-secondary border-none cursor-pointer text-[11px] min-h-[44px]">
-              <span className="text-base">{'\u{1F4CC}'}</span>
-              Pin a Stop
-            </button>
-            <button onClick={() => {
-              if (!requireAuth()) return;
               setShowReportForm(true);
             }}
               aria-label="Report place"
-              className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-bg-subtle-medium text-text-secondary border-none cursor-pointer text-[11px] min-h-[44px]">
+              className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-bg-subtle-medium text-text-secondary border-none cursor-pointer text-xs min-h-[44px]">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
                 <line x1="4" y1="22" x2="4" y2="15" />
@@ -375,7 +364,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                 return (
                   <div key={i} className={`text-[13px] py-1 ${isToday ? 'text-text-primary font-semibold' : 'text-text-tertiary font-normal'}`}>
                     {h}
-                    {isToday && <span className="text-accent-amber ml-2 text-[11px]">Today</span>}
+                    {isToday && <span className="text-accent-amber ml-2 text-xs">Today</span>}
                   </div>
                 );
               })}
@@ -427,7 +416,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
               <div className="section-label !mb-0">Community Reviews</div>
               {!showReviewForm && (
                 <button onClick={() => { if (!requireAuth()) return; setShowReviewForm(true); }}
-                  className="bg-transparent border border-amber-tint-border30 text-accent-amber rounded-lg px-3 py-[5px] text-[11px] cursor-pointer">
+                  className="bg-transparent border border-amber-tint-border30 text-accent-amber rounded-lg px-3 py-[5px] text-xs cursor-pointer">
                   Leave a Review
                 </button>
               )}
@@ -459,14 +448,14 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
 
                 {/* Photo Upload */}
                 <div className="mt-2.5 mb-2.5">
-                  <div className="text-[11px] text-text-tertiary mb-1.5">Add photos (up to 3):</div>
+                  <div className="text-xs text-text-tertiary mb-1.5">Add photos (up to 3):</div>
                   <div className="flex gap-2 flex-wrap">
                     {reviewPhotos.map((file, i) => (
                       <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-border-medium">
                         <img src={URL.createObjectURL(file)} alt={`Review photo ${i + 1}`} className="w-full h-full object-cover" />
                         <button
                           onClick={() => setReviewPhotos(prev => prev.filter((_, idx) => idx !== i))}
-                          className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-[rgba(0,0,0,0.6)] border-none text-white text-[10px] cursor-pointer flex items-center justify-center"
+                          className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-[rgba(0,0,0,0.6)] border-none text-white text-[11px] cursor-pointer flex items-center justify-center"
                           aria-label={`Remove photo ${i + 1}`}
                         >
                           &#10005;
@@ -480,7 +469,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                           <circle cx="8.5" cy="8.5" r="1.5" />
                           <polyline points="21 15 16 10 5 21" />
                         </svg>
-                        <span className="text-[9px] mt-0.5">Add</span>
+                        <span className="text-[11px] mt-0.5">Add</span>
                         <input
                           type="file"
                           accept="image/*"
@@ -501,14 +490,14 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
 
                 {/* Community Tags */}
                 <div className="mt-2.5 mb-2.5">
-                  <div className="text-[11px] text-text-tertiary mb-1.5">Tag this place:</div>
+                  <div className="text-xs text-text-tertiary mb-1.5">Tag this place:</div>
                   <div className="flex flex-wrap gap-1.5">
                     {COMMUNITY_TAGS.map(tag => {
                       const selected = reviewTags.includes(tag.id);
                       return (
                         <button key={tag.id}
                           onClick={() => setReviewTags(selected ? reviewTags.filter(t => t !== tag.id) : [...reviewTags, tag.id])}
-                          className={`px-2.5 py-1 rounded-xl text-[11px] cursor-pointer ${
+                          className={`px-2.5 py-1 rounded-xl text-xs cursor-pointer ${
                             selected
                               ? 'border border-community-tint-border40 bg-community-tint-bg12 text-community-text'
                               : 'border border-border-medium bg-transparent text-text-tertiary'
@@ -547,7 +536,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                     <span className="text-accent-amber text-[13px]">
                       {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
                     </span>
-                    <span className="text-text-muted text-[11px]">
+                    <span className="text-text-muted text-xs">
                       {new Date(review.created_at).toLocaleDateString()}
                     </span>
                   </div>
@@ -572,7 +561,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                       {review.tags.map(tag => {
                         const tagInfo = COMMUNITY_TAGS.find(t => t.id === tag);
                         return tagInfo ? (
-                          <span key={tag} className="text-[10px] text-community-text px-1.5 py-0.5 bg-community-tint-bg rounded-[4px]">
+                          <span key={tag} className="text-[11px] text-community-text px-1.5 py-0.5 bg-community-tint-bg rounded-[4px]">
                             {tagInfo.emoji} {tagInfo.label}
                           </span>
                         ) : null;

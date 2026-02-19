@@ -46,11 +46,11 @@ export default memo(function PlaceCard({ place }: { place: Place }) {
             onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
             className="w-full h-full object-cover block" />
           <div className="absolute inset-0" style={{ background: `linear-gradient(to bottom, transparent 60%, var(--bg-image-overlay))` }} />
-          <div className={`absolute top-2.5 left-2.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold backdrop-blur-[8px] ${place.openNow ? 'bg-[rgba(34,197,94,0.2)] text-status-green' : 'bg-[rgba(239,68,68,0.2)] text-status-red'}`}>
+          <div className={`absolute top-2.5 left-2.5 px-2.5 py-1 rounded-lg text-xs font-semibold backdrop-blur-[8px] ${place.openNow ? 'bg-[rgba(34,197,94,0.2)] text-status-green' : 'bg-[rgba(239,68,68,0.2)] text-status-red'}`}>
             {hoursStatus.text}
           </div>
           {place.distance != null && (
-            <div className="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-bg-photo-button text-text-primary backdrop-blur-[8px]">
+            <div className="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-bg-photo-button text-text-primary backdrop-blur-[8px]">
               {formatDistance(place.distance, useMiles)} {getDistanceReference()}
             </div>
           )}
@@ -65,21 +65,21 @@ export default memo(function PlaceCard({ place }: { place: Place }) {
 
         <div className="flex items-center gap-1.5 mb-2 flex-wrap">
           {place.categoryDisplay && (
-            <span className="px-2 py-[3px] bg-amber-tint-bg15 text-accent-amber rounded-[6px] text-[11px] font-medium">
+            <span className="px-2 py-[3px] bg-amber-tint-bg15 text-accent-amber rounded-[6px] text-xs font-medium">
               {place.categoryDisplay}
             </span>
           )}
           {place.reviewCount >= 200 && (
-            <span className="px-2 py-[3px] bg-green-tint-bg text-status-green rounded-[6px] text-[10px] font-semibold">
+            <span className="px-2 py-[3px] bg-green-tint-bg text-status-green rounded-[6px] text-[11px] font-semibold">
               Popular
             </span>
           )}
           <PriceDots level={place.priceLevel} />
           {!place.photoUrl && place.distance != null && (
-            <span className="text-[11px] text-text-secondary">{formatDistance(place.distance, useMiles)} {getDistanceReference()}</span>
+            <span className="text-xs text-text-secondary">{formatDistance(place.distance, useMiles)} {getDistanceReference()}</span>
           )}
           {!place.photoUrl && (
-            <span className={`text-[11px] ${place.openNow ? 'text-status-green' : 'text-status-red'}`}>{hoursStatus.text}</span>
+            <span className={`text-xs ${place.openNow ? 'text-status-green' : 'text-status-red'}`}>{hoursStatus.text}</span>
           )}
         </div>
 
@@ -87,7 +87,7 @@ export default memo(function PlaceCard({ place }: { place: Place }) {
         {getSafetyIndicators(place).length > 0 && (
           <div className="flex gap-1 flex-wrap mb-1.5">
             {getSafetyIndicators(place).map(ind => (
-              <span key={ind} className="text-[10px] text-text-tertiary px-1.5 py-0.5 bg-bg-subtle rounded-[4px]">
+              <span key={ind} className="text-[11px] text-text-tertiary px-1.5 py-0.5 bg-bg-subtle rounded-[4px]">
                 {ind}
               </span>
             ))}
@@ -99,13 +99,13 @@ export default memo(function PlaceCard({ place }: { place: Place }) {
           const risk = getNightRisk(place.category, place.rating, place.reviewCount, place.openNow);
           return (
             <div className="flex items-center gap-1 mb-1.5">
-              <span className="text-[10px]">{risk.emoji}</span>
-              <span className={`text-[10px] font-medium ${
+              <span className="text-[11px]">{risk.emoji}</span>
+              <span className={`text-[11px] font-medium ${
                 risk.level === 'low' ? 'text-status-green' : risk.level === 'moderate' ? 'text-accent-amber' : 'text-status-red'
               }`}>
                 {risk.label}
               </span>
-              <span className="text-[9px] text-text-muted">{'\u00B7'} {risk.tip}</span>
+              <span className="text-[11px] text-text-muted">{'\u00B7'} {risk.tip}</span>
             </div>
           );
         })()}
@@ -116,7 +116,7 @@ export default memo(function PlaceCard({ place }: { place: Place }) {
             {Object.entries(placeTagsCache[place.placeId]).filter(([, count]) => count >= 3).map(([tag]) => {
               const tagInfo = COMMUNITY_TAGS.find(t => t.id === tag);
               return tagInfo ? (
-                <span key={tag} className="text-[10px] text-community-text px-1.5 py-0.5 bg-community-tint-bg rounded-[4px]">
+                <span key={tag} className="text-[11px] text-community-text px-1.5 py-0.5 bg-community-tint-bg rounded-[4px]">
                   {tagInfo.emoji} {tagInfo.label}
                 </span>
               ) : null;
@@ -152,7 +152,7 @@ export default memo(function PlaceCard({ place }: { place: Place }) {
           )}
           {(isReservable(place) || isBookable(place)) && (
             <a href={getBookingUrl(place)} target="_blank" rel="noopener noreferrer"
-              className={`px-4 py-3 rounded-[10px] flex items-center justify-center no-underline text-[11px] font-semibold min-h-[44px] ${
+              className={`px-4 py-3 rounded-[10px] flex items-center justify-center no-underline text-xs font-semibold min-h-[44px] ${
                 isReservable(place)
                   ? 'bg-[rgba(218,55,67,0.12)] text-[#DA3743] border border-[rgba(218,55,67,0.25)]'
                   : 'bg-green-tint-bg text-status-green border border-green-tint-border'

@@ -132,7 +132,7 @@ export default function CurrencyMiniConverter({
       {/* Amount input + result */}
       <div className="flex items-stretch gap-2 mb-2">
         <div className="flex-1">
-          <div className="text-[10px] text-text-tertiary mb-1">{from}</div>
+          <div className="text-[11px] text-text-tertiary mb-1">{from}</div>
           <input
             type="number"
             inputMode="decimal"
@@ -144,7 +144,7 @@ export default function CurrencyMiniConverter({
         </div>
         <div className="flex items-center text-text-tertiary text-lg pt-4">=</div>
         <div className="flex-1">
-          <div className="text-[10px] text-text-tertiary mb-1">{to}</div>
+          <div className="text-[11px] text-text-tertiary mb-1">{to}</div>
           <div className="px-3 py-2 rounded-xl border border-border-medium bg-bg-subtle text-base font-bold text-accent-amber min-h-[42px] flex items-center">
             {loading ? (
               <div className="w-4 h-4 border-2 border-accent-amber border-t-transparent rounded-full animate-spin" />

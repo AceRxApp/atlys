@@ -16,7 +16,7 @@ export {
   QUICK_FILTERS,
   SMART_FILTERS,
 } from './constants';
-export { ESSENTIALS, CATEGORY_PACK_ITEMS, WEATHER_PACK_RULES, GROUP_PACK_ITEMS } from './packingItems';
+export { ESSENTIALS, CATEGORY_PACK_ITEMS, WEATHER_PACK_RULES, GROUP_PACK_ITEMS, CITY_PACK_ITEMS } from './packingItems';
 export type { PackingItem } from './packingItems';
 export { BOOKING_SERVICES } from './bookingLinks';
 export type { BookingService } from './bookingLinks';

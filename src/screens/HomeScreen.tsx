@@ -1,15 +1,17 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { LocationIcon } from '../components/icons';
+import { formatDistance } from '../services/places';
 import type { PlanMood, PlanDuration } from '../types';
+import ContextHint from '../components/ContextHint';
 
 const PLAN_MOODS: { id: PlanMood; emoji: string; label: string }[] = [
-  { id: 'adventurous', emoji: '\u{1F525}', label: 'Adventurous' },
-  { id: 'chill', emoji: '\u{1F33F}', label: 'Chill' },
-  { id: 'cultural', emoji: '\u{1F3DB}\u{FE0F}', label: 'Cultural' },
+  { id: 'sightseeing', emoji: '\u{1F5FA}\u{FE0F}', label: 'Sightseeing' },
   { id: 'foodie', emoji: '\u{1F37D}\u{FE0F}', label: 'Foodie' },
-  { id: 'nightlife', emoji: '\u{1F378}', label: 'Nightlife' },
-  { id: 'romantic', emoji: '\u{1F495}', label: 'Romantic' },
+  { id: 'outdoors', emoji: '\u{1F33F}', label: 'Outdoors' },
+  { id: 'nightlife', emoji: '\u{1F319}', label: 'Nightlife' },
+  { id: 'culture', emoji: '\u{1F3AD}', label: 'Culture' },
+  { id: 'hidden-gems', emoji: '\u{1F48E}', label: 'Hidden Gems' },
 ];
 
 const PLAN_DURATIONS: { id: PlanDuration; emoji: string; label: string; desc: string }[] = [
@@ -19,19 +21,48 @@ const PLAN_DURATIONS: { id: PlanDuration; emoji: string; label: string; desc: st
   { id: 'evening', emoji: '\u{1F319}', label: 'Evening', desc: '3 stops' },
 ];
 
-const PLAN_BUDGETS = [
-  { value: 1, label: '$', desc: 'Budget' },
-  { value: 2, label: '$$', desc: 'Moderate' },
-  { value: 3, label: '$$$', desc: 'Splurge' },
-  { value: -1, label: '\u{1F680}', desc: 'No Limit' },
-];
-
 const LOADING_MESSAGES = [
   'Finding the best spots nearby...',
   'Checking what\'s open right now...',
   'Building your perfect day...',
   'Curating hidden gems...',
   'Almost there...',
+];
+
+// 8 major tourist attractions across all continents
+const FEATURED_DESTINATIONS = [
+  {
+    city: 'Paris', country: 'France', landmark: 'Eiffel Tower', continent: 'Europe',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Tour_Eiffel_Wikimedia_Commons_%28cropped%29.jpg/600px-Tour_Eiffel_Wikimedia_Commons_%28cropped%29.jpg',
+  },
+  {
+    city: 'Tokyo', country: 'Japan', landmark: 'Senso-ji Temple', continent: 'Asia',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Sensoji_2023.jpg/600px-Sensoji_2023.jpg',
+  },
+  {
+    city: 'New York', country: 'USA', landmark: 'Statue of Liberty', continent: 'N. America',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Front_view_of_Statue_of_Liberty_%28cropped%29.jpg/600px-Front_view_of_Statue_of_Liberty_%28cropped%29.jpg',
+  },
+  {
+    city: 'Rio de Janeiro', country: 'Brazil', landmark: 'Christ the Redeemer', continent: 'S. America',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/Christ_the_Redeemer_-_Cristo_Redentor.jpg/600px-Christ_the_Redeemer_-_Cristo_Redentor.jpg',
+  },
+  {
+    city: 'Accra', country: 'Ghana', landmark: 'Independence Arch', continent: 'Africa',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Independence_Arch_Accra_Ghana.jpg/600px-Independence_Arch_Accra_Ghana.jpg',
+  },
+  {
+    city: 'Sydney', country: 'Australia', landmark: 'Opera House', continent: 'Oceania',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Sydney_Australia._%2821339175489%29.jpg/600px-Sydney_Australia._%2821339175489%29.jpg',
+  },
+  {
+    city: 'Dubai', country: 'UAE', landmark: 'Burj Khalifa', continent: 'Middle East',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Burj_Khalifa_%28worlds_tallest_building%29_and_the_Dubai_skyline_%2825781049892%29.jpg/600px-Burj_Khalifa_%28worlds_tallest_building%29_and_the_Dubai_skyline_%2825781049892%29.jpg',
+  },
+  {
+    city: 'Cartagena', country: 'Colombia', landmark: 'Castillo San Felipe', continent: 'S. America',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/62_-_Carthag%C3%A8ne_-_D%C3%A9cembre_2008.jpg/600px-62_-_Carthag%C3%A8ne_-_D%C3%A9cembre_2008.jpg',
+  },
 ];
 
 // ============================================================================
@@ -183,7 +214,7 @@ function CitySearch({ cities, selectedCity, loading, onSelect }: CitySearchProps
           ) : (
             regionOrder.map(region => (
               <div key={region}>
-                <div className="px-3.5 pt-2 pb-1 text-[10px] font-bold text-text-tertiary uppercase tracking-[0.08em] sticky top-0 bg-bg-surface z-[1]">
+                <div className="px-3.5 pt-2 pb-1 text-[11px] font-bold text-text-tertiary uppercase tracking-[0.08em] sticky top-0 bg-bg-surface z-[1]">
                   {region}
                 </div>
                 {grouped[region].map(city => {
@@ -204,7 +235,7 @@ function CitySearch({ cities, selectedCity, loading, onSelect }: CitySearchProps
                         <div className={`text-sm truncate ${isSelected ? 'font-bold text-accent-amber' : 'font-medium text-text-primary'}`}>
                           {city.name}
                         </div>
-                        <div className="text-[11px] text-text-tertiary">
+                        <div className="text-xs text-text-tertiary">
                           {city.country}
                         </div>
                       </div>
@@ -242,10 +273,16 @@ export default function HomeScreen() {
     autoPlanLoading,
     planMyDay,
     weather,
+    forYouPlaces,
+    filteredPlaces,
+    placesLoading,
+    setSelectedPlace,
+    useMiles,
+    setDishLensContext,
+    cityLabel,
   } = useApp();
 
   const [planMoods, setPlanMoods] = useState<PlanMood[]>(['adventurous']);
-  const [planBudget, setPlanBudget] = useState(2);
   const [planDuration, setPlanDuration] = useState<PlanDuration>('full');
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
 
@@ -272,7 +309,7 @@ export default function HomeScreen() {
 
   const handlePlanMyDay = async () => {
     const moodStr = planMoods.join(' + ');
-    const success = await planMyDay(moodStr, planBudget, planDuration);
+    const success = await planMyDay(moodStr, planDuration);
     if (success) {
       setScreen('plan');
     }
@@ -291,6 +328,110 @@ export default function HomeScreen() {
     );
   }
 
+  // ================================================================
+  // PREVIEW PAGE — no city selected yet
+  // ================================================================
+  if (!hasLocation) {
+    return (
+      <div>
+        {/* First-visit hint */}
+        <ContextHint
+          storageKey="home"
+          title="Welcome to NxStops"
+          subtitle="Your all-in-one travel companion. Here's how to get started:"
+          hints={[
+            { emoji: '\u{1F4CD}', title: 'Pick your destination', description: 'Search for any city or tap "Use my location" to explore where you are right now.' },
+            { emoji: '\u{1F3AF}', title: 'Choose your vibe', description: 'Select moods like Foodie, Nightlife, or Hidden Gems — then pick Full Day, Morning, Afternoon, or Evening.' },
+            { emoji: '\u{2728}', title: 'Auto-plan your day', description: 'Tap "Plan My Day" and our AI builds a complete itinerary with the best stops for your mood and time.' },
+            { emoji: '\u{1F30D}', title: 'Explore featured cities', description: 'Scroll through popular destinations worldwide for trip inspiration.' },
+          ]}
+        />
+
+        {/* Hero */}
+        <div className="text-center mb-5">
+          <h1 className="text-[30px] font-extrabold tracking-tight text-text-primary mb-1.5">
+            WHERE TO NEXT?
+          </h1>
+          <p className="text-text-tertiary text-[13px]">Pick a destination and we'll plan your perfect day</p>
+        </div>
+
+        {/* City Search */}
+        <div className="mb-2">
+          <CitySearch
+            cities={cities}
+            selectedCity={selectedCity}
+            loading={loading}
+            onSelect={(city) => { setSelectedCity(city); setUseGps(false); }}
+          />
+        </div>
+
+        {/* Use current location */}
+        <div className="flex justify-center mb-5">
+          <button
+            onClick={() => { setUseGps(true); setSelectedCity(null); }}
+            className="flex items-center gap-1.5 text-[13px] text-accent-amber font-semibold bg-amber-tint-bg10 border border-amber-tint-border20 rounded-full px-4 py-2.5 cursor-pointer"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+            Use my current location
+          </button>
+        </div>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex-1 h-px bg-border-subtle" />
+          <span className="text-xs text-text-tertiary">or explore a destination</span>
+          <div className="flex-1 h-px bg-border-subtle" />
+        </div>
+
+        {/* Featured Destinations */}
+        <div className="grid grid-cols-2 gap-2.5">
+          {FEATURED_DESTINATIONS.map(dest => {
+            const matchedCity = cities.find(c => c.name.toLowerCase() === dest.city.toLowerCase());
+            return (
+              <div
+                key={dest.city}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  if (matchedCity) {
+                    setSelectedCity(matchedCity);
+                    setUseGps(false);
+                  }
+                }}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (matchedCity) { setSelectedCity(matchedCity); setUseGps(false); } } }}
+                className="relative overflow-hidden rounded-xl border border-border-subtle cursor-pointer h-[130px]"
+              >
+                <img
+                  src={dest.image}
+                  alt={`${dest.landmark}, ${dest.city}`}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.2) 50%, transparent 100%)' }} />
+                <div className="absolute bottom-0 left-0 right-0 p-2.5">
+                  <div className="text-sm font-bold text-white leading-tight">{dest.city}</div>
+                  <div className="text-xs text-white/80 mt-0.5">{dest.landmark}</div>
+                  <div className="text-[11px] text-white/60 mt-0.5">{dest.country} {'\u00B7'} {dest.continent}</div>
+                </div>
+                {!matchedCity && (
+                  <div className="absolute top-1.5 right-1.5 text-[10px] text-white/50 bg-black/30 px-1.5 py-0.5 rounded-full">
+                    Coming soon
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // ================================================================
+  // PLANNER — city selected, show full planning UI
+  // ================================================================
   return (
     <div>
       {/* Greeting */}
@@ -311,53 +452,28 @@ export default function HomeScreen() {
         </div>
       )}
 
-      {/* ── Where are you going? ── */}
+      {/* ── Selected City ── */}
       <div className="mb-5">
-        <label className="section-label block mb-3">Where are you going?</label>
-
-        {/* GPS Card */}
-        {loc.hasLocation && (
-          <button
-            onClick={() => { setUseGps(true); setSelectedCity(null); }}
-            className={`w-full cursor-pointer text-left flex items-center gap-3.5 p-3.5 rounded-xl mb-3 ${
-              useGps
-                ? 'border-2 border-accent-amber bg-amber-tint-bg10'
-                : 'border border-border-medium bg-bg-surface-alpha'
-            }`}
-          >
-            <div className="w-10 h-10 rounded-xl bg-accent-gradient flex items-center justify-center shrink-0">
-              <LocationIcon />
-            </div>
-            <div className="flex-1">
-              <div className="font-semibold text-[14px] text-text-primary">{loc.city || 'Near You'}</div>
-              <div className="text-[11px] text-text-secondary">Use your current location</div>
-            </div>
-            {useGps && <span className="text-accent-amber text-sm shrink-0">{'\u2713'}</span>}
-          </button>
-        )}
-
-        {/* Divider */}
-        {loc.hasLocation && (
-          <div className="flex items-center gap-3 mb-3">
-            <div className="flex-1 h-px bg-border-subtle" />
-            <span className="text-[11px] text-text-tertiary">or pick a city</span>
-            <div className="flex-1 h-px bg-border-subtle" />
+        <div className="flex items-center gap-2.5 py-2.5 px-3.5 rounded-xl border border-accent-amber bg-amber-tint-bg10">
+          <div className="w-8 h-8 rounded-lg bg-accent-gradient flex items-center justify-center shrink-0">
+            <LocationIcon />
           </div>
-        )}
-
-        {/* City Search */}
-        <CitySearch
-          cities={cities}
-          selectedCity={selectedCity}
-          loading={loading}
-          onSelect={(city) => { setSelectedCity(city); setUseGps(false); }}
-        />
+          <div className="flex-1 min-w-0">
+            <div className="text-[14px] font-semibold text-text-primary truncate">{cityLabel || loc.city || 'Your Location'}</div>
+          </div>
+          <button
+            onClick={() => { setSelectedCity(null); setUseGps(false); }}
+            className="text-xs text-accent-amber bg-transparent border-none cursor-pointer font-medium px-2 py-1"
+          >
+            Change
+          </button>
+        </div>
       </div>
 
       {/* ── What's the vibe? ── */}
       <div className="mb-5">
         <label className="section-label block mb-2.5">
-          What&apos;s the vibe? <span className="text-text-tertiary font-normal text-[11px]">(pick up to 2)</span>
+          What&apos;s the vibe? <span className="text-text-tertiary font-normal text-xs">(pick up to 2)</span>
         </label>
         <div className="flex flex-wrap gap-2">
           {PLAN_MOODS.map(m => {
@@ -390,27 +506,8 @@ export default function HomeScreen() {
                   : 'border border-border-medium bg-transparent'
               }`}>
               <div className="text-lg mb-0.5">{d.emoji}</div>
-              <div className={`text-[11px] font-semibold ${planDuration === d.id ? 'text-accent-amber' : 'text-text-primary'}`}>{d.label}</div>
-              <div className="text-[10px] text-text-tertiary">{d.desc}</div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Budget ── */}
-      <div className="mb-6">
-        <label className="section-label block mb-2.5">Budget</label>
-        <div className="flex gap-2">
-          {PLAN_BUDGETS.map(b => (
-            <button key={b.value}
-              onClick={() => setPlanBudget(b.value)}
-              className={`flex-1 py-3 rounded-xl text-center cursor-pointer transition-colors duration-150 ${
-                planBudget === b.value
-                  ? 'border-2 border-accent-amber bg-amber-tint-bg15'
-                  : 'border border-border-medium bg-transparent'
-              }`}>
-              <div className={`text-lg font-bold mb-0.5 ${planBudget === b.value ? 'text-accent-amber' : 'text-text-primary'}`}>{b.label}</div>
-              <div className="text-[10px] text-text-tertiary">{b.desc}</div>
+              <div className={`text-xs font-semibold ${planDuration === d.id ? 'text-accent-amber' : 'text-text-primary'}`}>{d.label}</div>
+              <div className="text-[11px] text-text-tertiary">{d.desc}</div>
             </button>
           ))}
         </div>
@@ -419,22 +516,91 @@ export default function HomeScreen() {
       {/* ── Generate Button ── */}
       <button
         onClick={handlePlanMyDay}
-        disabled={!hasLocation}
-        className={`w-full p-4 rounded-[14px] border-none text-base font-bold transition-opacity duration-150 ${
-          hasLocation
-            ? 'cursor-pointer shadow-[0_4px_20px_var(--amber-tint-shadow)]'
-            : 'opacity-40 cursor-not-allowed'
-        }`}
+        className="w-full p-4 rounded-[14px] border-none text-base font-bold cursor-pointer shadow-[0_4px_20px_var(--amber-tint-shadow)]"
         style={{ background: 'linear-gradient(135deg, var(--accent-amber), var(--accent-amber-dark))', color: '#0C0A09' }}
       >
         {'\u2728'} Plan My Day
       </button>
 
-      {!hasLocation && (
-        <p className="text-center text-[12px] text-text-tertiary mt-2.5">
-          Pick a city or enable GPS to get started
-        </p>
-      )}
+      {/* ── Discover First: Nearby Picks ── */}
+      {!placesLoading && (() => {
+        const picks = forYouPlaces.length >= 3
+          ? forYouPlaces.slice(0, 6)
+          : filteredPlaces.filter(p => p.rating >= 4.0 && p.photoUrl).slice(0, 6);
+        if (picks.length < 2) return null;
+        return (
+          <div className="mt-6">
+            <div className="flex justify-between items-center mb-2.5">
+              <h3 className="text-[15px] font-semibold flex items-center gap-1.5">
+                {'\u2728'} Nearby Picks
+              </h3>
+              <button
+                onClick={() => setScreen('discover')}
+                className="text-xs text-accent-amber bg-transparent border-none cursor-pointer font-medium">
+                See all {'\u2192'}
+              </button>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-2 scroll-hidden">
+              {picks.map(place => (
+                <div key={place.placeId}
+                  onClick={() => setSelectedPlace(place)}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`View details for ${place.name}`}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPlace(place); } }}
+                  className="card !p-0 overflow-hidden min-w-[160px] max-w-[180px] shrink-0 cursor-pointer border border-amber-tint-border15">
+                  {place.photoUrl ? (
+                    <div className="h-[100px] w-full bg-cover bg-center"
+                      style={{
+                        background: `linear-gradient(to bottom, transparent 40%, var(--bg-image-overlay)), url(${place.photoUrl})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                      }} />
+                  ) : (
+                    <div className="h-[100px] w-full bg-amber-tint-bg06 flex items-center justify-center text-2xl">{'\u2728'}</div>
+                  )}
+                  <div className="py-2.5 px-3">
+                    <div className="text-[13px] font-semibold text-text-primary mb-[3px] overflow-hidden text-ellipsis whitespace-nowrap">{place.name}</div>
+                    <div className="text-xs text-text-tertiary flex items-center gap-1">
+                      <span className="text-accent-amber">{'\u2605'}</span> {place.rating.toFixed(1)}
+                      <span className="mx-0.5">{'\u00B7'}</span>
+                      {place.categoryDisplay}
+                    </div>
+                    {place.distance != null && (
+                      <div className="text-[11px] text-text-muted mt-0.5">{formatDistance(place.distance, useMiles)}</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Quick Actions ── */}
+      <div className="mt-5 flex gap-2.5">
+        <button
+          onClick={() => setScreen('tastelens')}
+          className="flex-1 card !p-3 flex items-center gap-2.5 cursor-pointer border border-amber-tint-border15"
+          style={{ background: 'linear-gradient(135deg, var(--amber-tint-bg06), var(--bg-subtle))' }}>
+          <span className="text-xl">{'\u{1F37D}\u{FE0F}'}</span>
+          <div>
+            <div className="text-[13px] font-semibold text-text-primary">TasteLens</div>
+            <div className="text-[11px] text-text-tertiary">Scan any menu</div>
+          </div>
+        </button>
+        <button
+          onClick={() => setScreen('events')}
+          className="flex-1 card !p-3 flex items-center gap-2.5 cursor-pointer border border-purple-tint-border15"
+          style={{ background: 'linear-gradient(135deg, var(--purple-tint-bg08), var(--bg-subtle))' }}>
+          <span className="text-xl">{'\u{1F3AB}'}</span>
+          <div>
+            <div className="text-[13px] font-semibold text-text-primary">Events</div>
+            <div className="text-[11px] text-text-tertiary">What's happening</div>
+          </div>
+        </button>
+      </div>
+
 
     </div>
   );

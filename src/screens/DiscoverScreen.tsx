@@ -7,21 +7,7 @@ import { SkeletonCard } from '../components/ui';
 import PlaceCard from '../components/PlaceCard';
 import { APIProvider, Map, Marker, InfoWindow } from '@vis.gl/react-google-maps';
 import type { Place } from '../services/places';
-
-const STOP_CATEGORIES = [
-  { id: 'cafe', emoji: '\u{2615}', label: 'Cafe' },
-  { id: 'restaurant', emoji: '\u{1F37D}\u{FE0F}', label: 'Restaurant' },
-  { id: 'bar', emoji: '\u{1F378}', label: 'Bar' },
-  { id: 'park', emoji: '\u{1F333}', label: 'Park' },
-  { id: 'viewpoint', emoji: '\u{1F304}', label: 'Viewpoint' },
-  { id: 'market', emoji: '\u{1F6D2}', label: 'Market' },
-  { id: 'art', emoji: '\u{1F3A8}', label: 'Art / Gallery' },
-  { id: 'shop', emoji: '\u{1F6CD}\u{FE0F}', label: 'Shop' },
-  { id: 'landmark', emoji: '\u{1F3DB}\u{FE0F}', label: 'Landmark' },
-  { id: 'food_truck', emoji: '\u{1F69A}', label: 'Food Truck' },
-  { id: 'street_art', emoji: '\u{1F5BC}\u{FE0F}', label: 'Street Art' },
-  { id: 'other', emoji: '\u{2728}', label: 'Other' },
-];
+import ContextHint from '../components/ContextHint';
 
 // ---------------------------------------------------------------------------
 // PlacesMapView (local component -- only used within DiscoverScreen)
@@ -89,13 +75,13 @@ function PlacesMapView({ places: mapPlaces }: { places: Place[] }) {
                   <div className="flex gap-1.5 mt-2">
                     <button
                       onClick={() => { setSelectedPlace(place); setActiveMapPin(null); }}
-                      className="flex-1 p-1.5 rounded-md border-none bg-[#E8940A] text-[#0C0A09] text-[11px] font-semibold cursor-pointer"
+                      className="flex-1 p-1.5 rounded-md border-none bg-[#E8940A] text-[#0C0A09] text-xs font-semibold cursor-pointer"
                     >
                       Details
                     </button>
                     <button
                       onClick={() => { addToPlan(place); setActiveMapPin(null); }}
-                      className="flex-1 p-1.5 rounded-md border border-[#D6D3D1] bg-white text-[#1C1917] text-[11px] font-semibold cursor-pointer"
+                      className="flex-1 p-1.5 rounded-md border border-[#D6D3D1] bg-white text-[#1C1917] text-xs font-semibold cursor-pointer"
                     >
                       + Plan
                     </button>
@@ -131,9 +117,10 @@ export default function DiscoverScreen() {
     isSearching,
     showSearch,
     setShowSearch,
+    dismissSearch,
     searchResults,
-    selectedVibe,
-    setSelectedVibe,
+    selectedVibes,
+    toggleVibe,
     setSearchRadius,
     quickFilters,
     setQuickFilters,
@@ -154,27 +141,10 @@ export default function DiscoverScreen() {
     fetchPlaces,
     weather,
     forYouPlaces,
-    blindDatePlace,
-    blindDateRevealed,
-    spinBlindDate,
-    revealBlindDate,
-    dismissBlindDate,
-    userStops,
-    showPinStop,
-    setShowPinStop,
-    pinStopSubmitting,
-    submitPinStop,
     user,
     requireAuth,
     setScreen,
   } = useApp();
-
-  // Pin a Stop form state
-  const [pinName, setPinName] = useState('');
-  const [pinDescription, setPinDescription] = useState('');
-  const [pinCategory, setPinCategory] = useState('cafe');
-  const [pinLat, setPinLat] = useState('');
-  const [pinLng, setPinLng] = useState('');
 
   const { theme } = useTheme();
   const [showFilters, setShowFilters] = useState(false);
@@ -232,11 +202,24 @@ export default function DiscoverScreen() {
             <span className="text-sm font-semibold text-text-primary">{weather.temp}°F</span>
             <span className="text-xs text-text-secondary ml-1.5">{weather.description}</span>
           </div>
-          <div className="text-[11px] text-text-tertiary shrink-0">
+          <div className="text-xs text-text-tertiary shrink-0">
             H: {weather.high}° L: {weather.low}°
           </div>
         </div>
       )}
+
+      {/* First-visit hint */}
+      <ContextHint
+        storageKey="discover"
+        title="Discover places"
+        subtitle="Browse restaurants, attractions, and hidden gems in your city."
+        hints={[
+          { emoji: '\u{1F50D}', title: 'Search & filter', description: 'Search by name or use vibe filters like Coffee, Brunch, Romantic, or Late Night to find the perfect spot.' },
+          { emoji: '\u{1F5FA}\u{FE0F}', title: 'List or Map view', description: 'Switch between a scrollable list and an interactive map to see places around you.' },
+          { emoji: '\u2B50', title: 'Tap for details', description: 'Tap any place to see hours, reviews, directions, phone, and website — then add it to your plan.' },
+          { emoji: '\u2764\u{FE0F}', title: 'Save favorites', description: 'Heart a place to save it for later. Find your saved places in your Profile.' },
+        ]}
+      />
 
       {/* Header */}
       <div className="mb-3 flex justify-between items-start">
@@ -272,7 +255,7 @@ export default function DiscoverScreen() {
           type="text"
           placeholder="Search for a place..."
           value={searchQuery}
-          onChange={e => { setSearchQuery(e.target.value); if (!e.target.value.trim()) { setShowSearch(false); } }}
+          onChange={e => { setSearchQuery(e.target.value); if (!e.target.value.trim() && showSearch) { dismissSearch(); } }}
           onKeyDown={e => e.key === 'Enter' && handleSearch()}
           className="input-field flex-1"
         />
@@ -289,11 +272,11 @@ export default function DiscoverScreen() {
       {showSearch && (
         <div className="flex justify-between items-center mb-3 px-3.5 py-2.5 rounded-[10px] bg-amber-tint-bg10 border border-amber-tint-border15">
           <span className="text-[13px] text-accent-amber font-medium">
-            {searchResults.length} results for "{searchQuery}"
+            {searchResults.length} results for &ldquo;{searchQuery}&rdquo;
           </span>
-          <button onClick={() => { setShowSearch(false); setSearchQuery(''); }}
+          <button onClick={dismissSearch}
             className="bg-none border-none text-text-tertiary cursor-pointer text-[13px]">
-            Clear
+            Done
           </button>
         </div>
       )}
@@ -302,13 +285,13 @@ export default function DiscoverScreen() {
       {!showSearch && (
       <div className="flex gap-2 overflow-x-auto pb-2.5 mb-1.5 scroll-hidden">
         {VIBES.map(vibe => {
-          const active = selectedVibe === vibe.id;
+          const active = selectedVibes.includes(vibe.id);
           return (
             <button
               key={vibe.id}
               aria-pressed={active}
               onClick={() => {
-                setSelectedVibe(active ? null : vibe.id);
+                toggleVibe(vibe.id);
                 setSearchRadius(1500);
               }}
               className={`chip ${
@@ -345,12 +328,6 @@ export default function DiscoverScreen() {
 
         {showFilters && (
         <div className="flex gap-1.5 overflow-x-auto pb-3 scroll-hidden">
-          <button
-            onClick={spinBlindDate}
-            className="py-2.5 px-3.5 rounded-2xl text-[11px] font-semibold cursor-pointer whitespace-nowrap shrink-0 min-h-[44px] border border-purple-tint-border20 bg-purple-tint-bg08 text-purple-tint-text"
-          >
-            {'\u{1F3B2}'} Blind Date
-          </button>
           {visibleSmartFilters.map(filter => {
             const active = quickFilters.includes(filter.id);
             return (
@@ -358,10 +335,9 @@ export default function DiscoverScreen() {
                 key={filter.id}
                 aria-pressed={active}
                 onClick={() => {
-                  if (!active) dismissBlindDate();
                   setQuickFilters(active ? quickFilters.filter(f => f !== filter.id) : [...quickFilters, filter.id]);
                 }}
-                className={`py-2.5 px-3.5 rounded-2xl text-[11px] font-semibold cursor-pointer whitespace-nowrap shrink-0 min-h-[44px] ${
+                className={`py-2.5 px-3.5 rounded-2xl text-xs font-semibold cursor-pointer whitespace-nowrap shrink-0 min-h-[44px] ${
                   active
                     ? 'border border-purple-tint-border30 bg-purple-tint-bg15 text-purple-tint-text'
                     : 'border border-purple-tint-border20 bg-purple-tint-bg08 text-purple-tint-text'
@@ -378,10 +354,9 @@ export default function DiscoverScreen() {
                 key={filter.id}
                 aria-pressed={active}
                 onClick={() => {
-                  if (!active) dismissBlindDate();
                   setQuickFilters(active ? quickFilters.filter(f => f !== filter.id) : [...quickFilters, filter.id]);
                 }}
-                className={`py-2.5 px-3.5 rounded-2xl text-[11px] font-medium cursor-pointer whitespace-nowrap shrink-0 min-h-[44px] ${
+                className={`py-2.5 px-3.5 rounded-2xl text-xs font-medium cursor-pointer whitespace-nowrap shrink-0 min-h-[44px] ${
                   active
                     ? 'border border-amber-tint-border30 bg-amber-tint-bg15 text-accent-amber'
                     : 'border border-border-medium bg-transparent text-text-tertiary'
@@ -398,7 +373,7 @@ export default function DiscoverScreen() {
                 aria-pressed={active}
                 aria-label={`Filter by ${tag.label}`}
                 onClick={() => setCommunityFilters(active ? communityFilters.filter(f => f !== tag.id) : [...communityFilters, tag.id])}
-                className={`py-2.5 px-3.5 rounded-2xl text-[11px] font-medium cursor-pointer whitespace-nowrap shrink-0 min-h-[44px] ${
+                className={`py-2.5 px-3.5 rounded-2xl text-xs font-medium cursor-pointer whitespace-nowrap shrink-0 min-h-[44px] ${
                   active
                     ? 'border border-community-tint-border40 bg-community-tint-bg12 text-community-text'
                     : 'border border-border-subtle bg-transparent text-text-muted'
@@ -422,86 +397,6 @@ export default function DiscoverScreen() {
         </div>
       )}
 
-      {/* Blind Date Mystery Card */}
-      {blindDatePlace && (
-        <div className="card mb-3 px-[18px] py-4 relative overflow-hidden" style={{ background: `linear-gradient(135deg, var(--purple-tint-bg08), rgba(139,92,246,0.04))`, border: `1px solid var(--purple-tint-border15)` }}>
-          <button
-            onClick={dismissBlindDate}
-            className="absolute top-2 right-2 bg-none border-none text-text-tertiary cursor-pointer text-base p-2 leading-none"
-            aria-label="Dismiss blind date"
-          >
-            {'\u2715'}
-          </button>
-          <div className="flex items-center gap-2.5 mb-2">
-            <span className="text-xl">{'\u{1F3B2}'}</span>
-            <span className="font-semibold text-[15px] text-text-primary">Blind Date Stop</span>
-          </div>
-          {!blindDateRevealed ? (
-            <>
-              <div className="flex items-center gap-4 mb-3">
-                <div className="w-16 h-16 rounded-xl bg-purple-tint-bg15 flex items-center justify-center text-2xl">?</div>
-                <div>
-                  <div className="text-sm text-text-secondary mb-1">{blindDatePlace.categoryDisplay}</div>
-                  <div className="flex items-center gap-2 text-xs text-text-tertiary">
-                    <span className="text-accent-amber">{'\u2605'} {blindDatePlace.rating.toFixed(1)}</span>
-                    <span>{'\u00B7'}</span>
-                    <span>{formatDistance(blindDatePlace.distance ?? 0, useMiles)}</span>
-                    {blindDatePlace.priceLevel > 0 && (
-                      <><span>{'\u00B7'}</span><span>{'$'.repeat(blindDatePlace.priceLevel)}</span></>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={revealBlindDate}
-                  className="flex-1 py-2.5 rounded-xl border-none bg-accent-gradient text-text-on-accent text-sm font-semibold cursor-pointer"
-                >
-                  Reveal & Go
-                </button>
-                <button
-                  onClick={spinBlindDate}
-                  className="py-2.5 px-4 rounded-xl border border-border-medium bg-transparent text-text-secondary text-sm cursor-pointer"
-                >
-                  Re-spin
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center gap-4 mb-3">
-                {blindDatePlace.photoUrl && (
-                  <div className="w-16 h-16 rounded-xl bg-cover bg-center shrink-0"
-                    style={{ backgroundImage: `url(${blindDatePlace.photoUrl})` }} />
-                )}
-                <div>
-                  <div className="text-[15px] font-bold text-text-primary mb-0.5">{blindDatePlace.name}</div>
-                  <div className="text-sm text-text-secondary">{blindDatePlace.categoryDisplay}</div>
-                  <div className="flex items-center gap-2 text-xs text-text-tertiary mt-0.5">
-                    <span className="text-accent-amber">{'\u2605'} {blindDatePlace.rating.toFixed(1)}</span>
-                    <span>{'\u00B7'}</span>
-                    <span>{formatDistance(blindDatePlace.distance ?? 0, useMiles)}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => { setSelectedPlace(blindDatePlace); dismissBlindDate(); }}
-                  className="flex-1 py-2.5 rounded-xl border-none bg-accent-gradient text-text-on-accent text-sm font-semibold cursor-pointer"
-                >
-                  View Details
-                </button>
-                <button
-                  onClick={() => { addToPlan(blindDatePlace); dismissBlindDate(); }}
-                  className="py-2.5 px-4 rounded-xl border border-border-medium bg-transparent text-text-secondary text-sm cursor-pointer"
-                >
-                  + Plan
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      )}
 
       {/* Map View */}
       {viewMode === 'map' ? (
@@ -525,7 +420,7 @@ export default function DiscoverScreen() {
           ) : (
             <>
               {/* Hidden Gems banner */}
-              {selectedVibe === 'hidden' && !placesLoading && filteredPlaces.length > 0 && (
+              {selectedVibes.includes('hidden') && !placesLoading && filteredPlaces.length > 0 && (
                 <div className="card mb-3 px-[18px] py-4" style={{ background: `linear-gradient(135deg, var(--purple-tint-bg08), rgba(139,92,246,0.04))`, border: `1px solid var(--purple-tint-border15)` }}>
                   <div className="flex items-center gap-2.5 mb-1.5">
                     <span className="text-xl">💎</span>
@@ -538,7 +433,7 @@ export default function DiscoverScreen() {
               )}
 
               {/* Locals banner */}
-              {selectedVibe === 'locals' && !placesLoading && filteredPlaces.length > 0 && (
+              {selectedVibes.includes('locals') && !placesLoading && filteredPlaces.length > 0 && (
                 <div className="card mb-3 px-[18px] py-4" style={{ background: `linear-gradient(135deg, var(--green-tint-bg), rgba(34,197,94,0.04))`, border: `1px solid var(--green-tint-border)` }}>
                   <div className="flex items-center gap-2.5 mb-1.5">
                     <span className="text-xl">🌻</span>
@@ -619,7 +514,7 @@ export default function DiscoverScreen() {
                         )}
                         <div className="py-2.5 px-3">
                           <div className="text-[13px] font-semibold text-text-primary mb-[3px] overflow-hidden text-ellipsis whitespace-nowrap">{place.name}</div>
-                          <div className="text-[11px] text-text-tertiary flex items-center gap-1">
+                          <div className="text-xs text-text-tertiary flex items-center gap-1">
                             <span className="text-accent-amber">{'\u2605'}</span> {place.rating.toFixed(1)}
                             <span className="mx-0.5">{'\u00B7'}</span>
                             {place.categoryDisplay}
@@ -636,41 +531,6 @@ export default function DiscoverScreen() {
                 <PlaceCard key={place.placeId} place={place} />
               ))}
 
-              {/* Community Stops */}
-              {!placesLoading && userStops.filter(s => s.status === 'approved').length > 0 && (
-                <div className="mb-4 mt-2">
-                  <div className="flex justify-between items-center mb-2.5">
-                    <h3 className="text-[15px] font-semibold flex items-center gap-1.5">
-                      {'\u{1F4CD}'} Community Stops
-                    </h3>
-                    <span className="text-xs text-text-tertiary">{userStops.filter(s => s.status === 'approved').length} spots</span>
-                  </div>
-                  <div className="flex gap-3 overflow-x-auto pb-2 scroll-hidden">
-                    {userStops.filter(s => s.status === 'approved').map(stop => {
-                      const catInfo = STOP_CATEGORIES.find(c => c.id === stop.category);
-                      return (
-                        <div key={stop.id}
-                          className="card !p-0 overflow-hidden min-w-[180px] max-w-[200px] shrink-0">
-                          <div className="h-[60px] w-full bg-purple-tint-bg15 flex items-center justify-center text-2xl">
-                            {catInfo?.emoji || '\u{2728}'}
-                          </div>
-                          <div className="py-2.5 px-3">
-                            <div className="flex items-center gap-1.5 mb-1">
-                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-tint-bg15 text-purple-tint-text font-medium">Community</span>
-                            </div>
-                            <div className="text-[13px] font-semibold text-text-primary mb-[3px] overflow-hidden text-ellipsis whitespace-nowrap">{stop.name}</div>
-                            <div className="text-[11px] text-text-tertiary">{catInfo?.label || stop.category}</div>
-                            {stop.description && (
-                              <div className="text-[11px] text-text-muted mt-1 line-clamp-2">{stop.description}</div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
               {/* Expand Radius */}
               {!placesLoading && filteredPlaces.length > 0 && (
                 <button onClick={() => setSearchRadius(prev => prev + 1500)}
@@ -683,114 +543,6 @@ export default function DiscoverScreen() {
         </>
       )}
 
-      {/* Pin a Stop Modal */}
-      {showPinStop && (
-        <div className="fixed inset-0 z-[200] flex items-end justify-center">
-          <div className="absolute inset-0 bg-bg-modal-overlay" onClick={() => setShowPinStop(false)} />
-          <div className="relative w-full max-w-[430px] bg-bg-surface rounded-t-2xl p-5 pb-8 max-h-[80vh] overflow-y-auto animate-slide-up">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold">{'\u{1F4CC}'} Pin a Stop</h3>
-              <button onClick={() => setShowPinStop(false)} className="bg-none border-none text-text-tertiary cursor-pointer text-xl p-2">{'\u2715'}</button>
-            </div>
-            <p className="text-xs text-text-secondary mb-4">Found a hidden gem that isn't on the map? Pin it for the community!</p>
-
-            <label className="block text-[13px] font-medium text-text-secondary mb-1.5">Name *</label>
-            <input
-              type="text"
-              placeholder="e.g. Mama Rosa's Empanadas"
-              value={pinName}
-              onChange={e => setPinName(e.target.value)}
-              maxLength={100}
-              className="input-field w-full mb-3"
-            />
-
-            <label className="block text-[13px] font-medium text-text-secondary mb-1.5">Category *</label>
-            <div className="flex gap-2 flex-wrap mb-3">
-              {STOP_CATEGORIES.map(cat => (
-                <button
-                  key={cat.id}
-                  onClick={() => setPinCategory(cat.id)}
-                  className={`py-1.5 px-3 rounded-2xl text-[11px] font-medium cursor-pointer whitespace-nowrap ${
-                    pinCategory === cat.id
-                      ? 'border border-amber-tint-border30 bg-amber-tint-bg15 text-accent-amber'
-                      : 'border border-border-medium bg-transparent text-text-tertiary'
-                  }`}
-                >
-                  {cat.emoji} {cat.label}
-                </button>
-              ))}
-            </div>
-
-            <label className="block text-[13px] font-medium text-text-secondary mb-1.5">Description</label>
-            <textarea
-              placeholder="What makes this place special?"
-              value={pinDescription}
-              onChange={e => setPinDescription(e.target.value)}
-              maxLength={500}
-              rows={3}
-              className="input-field w-full mb-3 resize-none"
-            />
-
-            <label className="block text-[13px] font-medium text-text-secondary mb-1.5">Location *</label>
-            <div className="flex gap-2 mb-1.5">
-              <input
-                type="number"
-                placeholder="Latitude"
-                value={pinLat}
-                onChange={e => setPinLat(e.target.value)}
-                step="any"
-                className="input-field flex-1"
-              />
-              <input
-                type="number"
-                placeholder="Longitude"
-                value={pinLng}
-                onChange={e => setPinLng(e.target.value)}
-                step="any"
-                className="input-field flex-1"
-              />
-            </div>
-            <button
-              onClick={() => {
-                if (navigator.geolocation) {
-                  navigator.geolocation.getCurrentPosition(
-                    pos => { setPinLat(pos.coords.latitude.toFixed(6)); setPinLng(pos.coords.longitude.toFixed(6)); },
-                    () => {}
-                  );
-                }
-              }}
-              className="text-xs text-accent-amber bg-none border-none cursor-pointer mb-4 underline"
-            >
-              Use my current location
-            </button>
-
-            <button
-              disabled={!pinName.trim() || !pinLat || !pinLng || pinStopSubmitting}
-              onClick={() => {
-                submitPinStop({
-                  name: pinName,
-                  description: pinDescription || undefined,
-                  category: pinCategory,
-                  lat: parseFloat(pinLat),
-                  lng: parseFloat(pinLng),
-                });
-                setPinName('');
-                setPinDescription('');
-                setPinCategory('cafe');
-                setPinLat('');
-                setPinLng('');
-              }}
-              className={`w-full py-3.5 rounded-xl border-none text-sm font-semibold cursor-pointer ${
-                pinName.trim() && pinLat && pinLng && !pinStopSubmitting
-                  ? 'bg-accent-gradient text-text-on-accent'
-                  : 'bg-bg-subtle-strong text-text-tertiary'
-              }`}
-            >
-              {pinStopSubmitting ? 'Submitting...' : 'Submit for Review'}
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

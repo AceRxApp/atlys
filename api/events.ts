@@ -4,12 +4,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors.js';
 
-const TICKETMASTER_API_KEY = process.env.TICKETMASTER_API_KEY || '';
-const SEATGEEK_CLIENT_ID = process.env.SEATGEEK_CLIENT_ID || '';
-const PREDICTHQ_TOKEN = process.env.PREDICTHQ_TOKEN || '';
-const GOOGLE_API_KEY = process.env.GOOGLE_PLACES_API_KEY || '';
-const API_FOOTBALL_KEY = process.env.API_FOOTBALL_KEY || '';
-const GETYOURGUIDE_KEY = process.env.GETYOURGUIDE_PARTNER_KEY || '';
+const TICKETMASTER_API_KEY = (process.env.TICKETMASTER_API_KEY || '').trim();
+const SEATGEEK_CLIENT_ID = (process.env.SEATGEEK_CLIENT_ID || '').trim();
+const PREDICTHQ_TOKEN = (process.env.PREDICTHQ_TOKEN || '').trim();
+const GOOGLE_API_KEY = (process.env.GOOGLE_PLACES_API_KEY || '').trim();
+const API_FOOTBALL_KEY = (process.env.API_FOOTBALL_KEY || '').trim();
+const GETYOURGUIDE_KEY = (process.env.GETYOURGUIDE_PARTNER_KEY || '').trim();
 
 interface NormalizedEvent {
   id: string;

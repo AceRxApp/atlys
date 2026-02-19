@@ -1,11 +1,15 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { Stop } from '../types';
+import type { Place } from '../services/places';
+import type { EventItem } from '../types';
 
 export function useOfflineSave(
   tripDays: Record<number, Stop[]>,
   citySlug: string,
   lat: number | null,
   lng: number | null,
+  places?: Place[],
+  events?: EventItem[],
 ) {
   const storageKey = `nxstops_offline_${citySlug}`;
   const [isSaved, setIsSaved] = useState(() => localStorage.getItem(storageKey) === 'true');
@@ -30,10 +34,16 @@ export function useOfflineSave(
 
     const allStops = Object.values(tripDays).flat();
 
-    // Collect photo URLs
+    // Collect photo URLs — trip photos + gallery photos (photoNames)
     const photoUrls: string[] = [];
     for (const stop of allStops) {
       if (stop.place?.photoUrl) photoUrls.push(stop.place.photoUrl);
+      // Also cache gallery photos for place detail view
+      if (stop.place?.photoNames) {
+        for (const name of stop.place.photoNames.slice(0, 5)) {
+          photoUrls.push(`/api/places?action=photo&name=${encodeURIComponent(name)}&maxWidth=800`);
+        }
+      }
       if (stop.event?.imageUrl) photoUrls.push(stop.event.imageUrl);
     }
 
@@ -43,6 +53,18 @@ export function useOfflineSave(
       apiUrls.push(`/api/weather?lat=${lat}&lng=${lng}`);
     }
 
+    // Save places + events data to localStorage for full offline access
+    try {
+      if (places && places.length > 0) {
+        localStorage.setItem(`nxstops_places_${citySlug}`, JSON.stringify(places));
+      }
+      if (events && events.length > 0) {
+        localStorage.setItem(`nxstops_events_${citySlug}`, JSON.stringify(events));
+      }
+      // Save trip data explicitly too (in case auto-save doesn't cover it)
+      localStorage.setItem(`nxstops_trip_offline_${citySlug}`, JSON.stringify(tripDays));
+    } catch { /* localStorage full — non-critical */ }
+
     try {
       const reg = await navigator.serviceWorker.ready;
       if (photoUrls.length > 0) {
@@ -51,7 +73,7 @@ export function useOfflineSave(
       if (apiUrls.length > 0) {
         reg.active?.postMessage({ type: 'CACHE_API', urls: apiUrls });
       }
-      // If nothing to cache, mark as saved immediately
+      // If nothing to cache via SW, mark as saved immediately
       if (photoUrls.length === 0 && apiUrls.length === 0) {
         setIsSaving(false);
         setIsSaved(true);
@@ -60,7 +82,7 @@ export function useOfflineSave(
     } catch {
       setIsSaving(false);
     }
-  }, [tripDays, lat, lng, storageKey]);
+  }, [tripDays, lat, lng, storageKey, places, events, citySlug]);
 
   // Clear saved flag when citySlug changes
   useEffect(() => {

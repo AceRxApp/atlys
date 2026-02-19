@@ -24,6 +24,7 @@ const CITY_META: Record<string, { name: string; country: string; tagline: string
   'kingston': { name: 'Kingston', country: 'Jamaica', tagline: 'Reggae, rum, and real vibes', description: 'Bob Marley Museum, jerk chicken spots, Blue Mountain coffee, and Kingston\'s pulsing nightlife.' },
   'mexico-city': { name: 'Mexico City', country: 'Mexico', tagline: 'A feast for every sense', description: 'Street tacos, ancient ruins, Frida Kahlo\'s house, and mezcal bars — Mexico City is unforgettable.' },
   'san-juan': { name: 'San Juan', country: 'Puerto Rico', tagline: 'Color, rhythm, and ocean breeze', description: 'Old San Juan\'s cobblestone streets, mofongo spots, rooftop bars, and stunning beaches.' },
+  'sarasota': { name: 'Sarasota', country: 'USA', tagline: 'Gulf Coast charm and culture', description: 'Sarasota\'s stunning beaches, world-class dining from rooftop steakhouses to waterfront seafood, Ringling Museum, and vibrant arts scene on Florida\'s Gulf Coast.' },
 };
 
 export default function CityScreen() {

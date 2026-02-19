@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import EventCard from '../components/EventCard';
 import BookingLinks from '../components/BookingLinks';
+import ContextHint from '../components/ContextHint';
 import { SkeletonCard } from '../components/ui';
 import { APIProvider, Map, Marker, InfoWindow } from '@vis.gl/react-google-maps';
 import type { EventItem } from '../types';
@@ -201,14 +202,15 @@ export default function EventsScreen() {
     if (eventCategoryFilter !== 'all') {
       const catLower = (event.category || '').toLowerCase();
       const nameLower = (event.name || '').toLowerCase();
-      const combined = catLower + ' ' + nameLower;
+      const venueLower = (event.venue || '').toLowerCase();
+      const combined = catLower + ' ' + nameLower + ' ' + venueLower;
       switch (eventCategoryFilter) {
-        case 'music': if (!/\b(music|concert|live|band|dj|singer|tour|rap|hip.?hop|r&b|pop|rock|jazz|country|latin|reggae)\b/i.test(combined)) return false; break;
-        case 'sports': if (!/\b(sport|game|match|basketball|football|soccer|baseball|hockey|tennis|golf|boxing|mma|racing|nba|nfl|mlb|nhl|premier.?league|league|fixture|cricket|rugby|volleyball)\b/i.test(combined)) return false; break;
-        case 'comedy': if (!/\b(comedy|comedian|stand.?up|improv|funny|laugh)\b/i.test(combined)) return false; break;
-        case 'arts': if (!/\b(art|theater|theatre|ballet|opera|dance|exhibit|museum|gallery|performing|symphony|orchestra)\b/i.test(combined)) return false; break;
-        case 'family': if (!/\b(family|kids|children|disney|paw patrol|sesame|lego|circus|magic|puppet|nickelodeon)\b/i.test(combined)) return false; break;
-        case 'festivals': if (!/\b(festival|fair|carnival|expo|convention|conference|parade|celebration)\b/i.test(combined)) return false; break;
+        case 'music': if (!/\b(music|concerts?|live|bands?|dj|singer|rap|hip.?hop|r&b|pop|rock|jazz|country|latin|reggae|acoustic|karaoke|open mic)\b/i.test(combined)) return false; break;
+        case 'sports': if (!/\b(sports?|games?|match|basketball|football|soccer|baseball|hockey|tennis|golf|boxing|mma|racing|nba|nfl|mlb|nhl|premier.?league|leagues?|fixtures?|cricket|rugby|volleyball|wrestling|athletics)\b/i.test(combined)) return false; break;
+        case 'comedy': if (!/\b(comedy|comedians?|stand.?up|improv|funny|laugh|humor|humour|comic)\b/i.test(combined)) return false; break;
+        case 'arts': if (!/\b(arts?|theaters?|theatres?|ballet|opera|dance|exhibits?|exhibitions?|museums?|gallery|galleries|performing|symphony|orchestra|visual|sculpture|painting)\b/i.test(combined)) return false; break;
+        case 'family': if (!/\b(family|kids|children|disney|paw patrol|sesame|lego|circus|magic|puppet|nickelodeon|junior|youth)\b/i.test(combined)) return false; break;
+        case 'festivals': if (!/\b(festivals?|fairs?|carnivals?|expos?|conventions?|conferences?|parades?|celebrations?|block.?party|food.?fest|cultural)\b/i.test(combined)) return false; break;
       }
     }
     if (travelGroup) {
@@ -241,6 +243,18 @@ export default function EventsScreen() {
 
   return (
     <div>
+      <ContextHint
+        storageKey="events"
+        title="Events Near You"
+        subtitle="Find concerts, games, shows, and more happening in your destination."
+        hints={[
+          { emoji: '\u{1F50D}', title: 'Search events', description: 'Search by event name, venue, or keyword to find exactly what you\'re looking for.' },
+          { emoji: '\u{1F4C5}', title: 'Filter by date & category', description: 'Use Today, This Weekend, or This Month filters. Filter by Music, Sports, Comedy, Arts, Family, or Festivals.' },
+          { emoji: '\u{1F5FA}\u{FE0F}', title: 'List or Map view', description: 'Switch between list view and an interactive map to see event locations.' },
+          { emoji: '\u{1F3AB}', title: 'Get tickets & add to plan', description: 'Tap any event for details. Get tickets directly, or add events to your trip plan.' },
+        ]}
+      />
+
       {/* Weather Banner */}
       {weather && (
         <div className="flex items-center gap-2.5 mb-3 px-3.5 py-2.5 rounded-xl border border-blue-tint-border"

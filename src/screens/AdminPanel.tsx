@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { CloseIcon } from '../components/icons';
-import { fetchReports, updateReportStatus, deleteReviewById, fetchPendingStops, updateStopStatus, deleteUserStop } from '../supabase';
-import type { UserStop } from '../supabase';
+import { fetchReports, updateReportStatus, deleteReviewById, fetchPendingStops, updateStopStatus, deleteUserStop, uploadDishImage, fetchDishImages, deleteDishImage } from '../supabase';
+import type { UserStop, DishImageRecord } from '../supabase';
 
 export default function AdminPanel() {
   const {
@@ -17,10 +17,17 @@ export default function AdminPanel() {
 
   const [adminReports, setAdminReports] = useState<{ id: string; reporter_id: string; content_type: string; content_id: string; reason: string; details: string | null; status: string; created_at: string }[]>([]);
   const [pendingStops, setPendingStops] = useState<UserStop[]>([]);
+  const [dishImages, setDishImages] = useState<DishImageRecord[]>([]);
+  const [dishName, setDishName] = useState('');
+  const [dishRestaurant, setDishRestaurant] = useState('');
+  const [dishUploading, setDishUploading] = useState(false);
+  const [dishMsg, setDishMsg] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchReports().then(setAdminReports);
     fetchPendingStops().then(setPendingStops);
+    fetchDishImages().then(setDishImages);
   }, []);
 
   const handleResolveReport = useCallback(async (reportId: string, status: 'resolved' | 'dismissed') => {
@@ -36,6 +43,33 @@ export default function AdminPanel() {
       await updateReportStatus(reportId, 'resolved');
       setAdminReports(prev => prev.map(r => r.id === reportId ? { ...r, status: 'resolved' } : r));
     }
+  }, []);
+
+  const handleDishImageUpload = useCallback(async () => {
+    const file = fileInputRef.current?.files?.[0];
+    if (!file || !dishName.trim()) {
+      setDishMsg('Enter a dish name and select an image.');
+      return;
+    }
+    setDishUploading(true);
+    setDishMsg(null);
+    const { url, error } = await uploadDishImage(dishName.trim(), file, dishRestaurant.trim() || undefined);
+    if (error) {
+      setDishMsg(`Error: ${error}`);
+    } else if (url) {
+      const label = dishRestaurant.trim() ? `"${dishName.trim()}" at ${dishRestaurant.trim()}` : `"${dishName.trim()}"`;
+      setDishMsg(`Uploaded ${label} successfully.`);
+      setDishName('');
+      setDishRestaurant('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      fetchDishImages().then(setDishImages);
+    }
+    setDishUploading(false);
+  }, [dishName, dishRestaurant]);
+
+  const handleDeleteDishImage = useCallback(async (id: string, imageUrl: string) => {
+    const ok = await deleteDishImage(id, imageUrl);
+    if (ok) setDishImages(prev => prev.filter(d => d.id !== id));
   }, []);
 
   return (
@@ -55,11 +89,11 @@ export default function AdminPanel() {
 
       {/* Admin Tabs */}
       <div className="flex border-b border-border-subtle overflow-x-auto scroll-hidden">
-        {(['dashboard', 'signups', 'cities', 'reports', 'stops'] as const).map(tab => (
+        {(['dashboard', 'signups', 'cities', 'reports', 'stops', 'dish-images'] as const).map(tab => (
           <button key={tab}
             onClick={() => setAdminTab(tab)}
             className={`flex-1 p-3 text-[13px] font-medium bg-transparent border-none cursor-pointer border-b-2 whitespace-nowrap ${adminTab === tab ? 'text-accent-amber border-b-accent-amber' : 'text-text-tertiary border-b-transparent'}`}>
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {tab === 'dish-images' ? 'Dishes' : tab.charAt(0).toUpperCase() + tab.slice(1)}
           </button>
         ))}
       </div>
@@ -206,6 +240,92 @@ export default function AdminPanel() {
                           Delete
                         </button>
                       </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Dish Images Tab */}
+            {adminTab === 'dish-images' && (
+              <div>
+                <h3 className="text-base font-semibold mb-4">Custom Dish Photos</h3>
+                <p className="text-xs text-text-tertiary mb-4">
+                  Upload photos for niche dishes that stock APIs can't find (e.g. Chofi, Tatale, Tuo Zaafi).
+                  These appear first in TasteLens results.
+                </p>
+
+                {/* Upload form */}
+                <div className="card !border-amber-tint-border20 mb-5">
+                  <label className="text-[11px] text-text-tertiary uppercase tracking-wider block mb-1.5">Restaurant</label>
+                  <input
+                    type="text"
+                    value={dishRestaurant}
+                    onChange={e => setDishRestaurant(e.target.value)}
+                    placeholder="e.g. Buka Restaurant, The Chop Bar"
+                    className="w-full p-2.5 rounded-lg border border-border-medium bg-bg-body text-text-primary text-sm mb-3"
+                  />
+                  <label className="text-[11px] text-text-tertiary uppercase tracking-wider block mb-1.5">Dish Name</label>
+                  <input
+                    type="text"
+                    value={dishName}
+                    onChange={e => setDishName(e.target.value)}
+                    placeholder="e.g. Chofi, Tuo Zaafi, Tatale"
+                    className="w-full p-2.5 rounded-lg border border-border-medium bg-bg-body text-text-primary text-sm mb-3"
+                  />
+                  <label className="text-[11px] text-text-tertiary uppercase tracking-wider block mb-1.5">Photo</label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="w-full text-sm text-text-secondary mb-3"
+                  />
+                  <button
+                    onClick={handleDishImageUpload}
+                    disabled={dishUploading || !dishName.trim()}
+                    className={`w-full py-2.5 rounded-lg text-sm font-semibold border-none cursor-pointer ${
+                      dishUploading || !dishName.trim()
+                        ? 'bg-bg-subtle-strong text-text-tertiary opacity-50'
+                        : 'bg-accent-amber text-bg-body'
+                    }`}
+                  >
+                    {dishUploading ? 'Uploading...' : 'Upload Dish Photo'}
+                  </button>
+                  {dishMsg && (
+                    <p className={`text-xs mt-2 ${dishMsg.startsWith('Error') ? 'text-status-red' : 'text-status-green'}`}>
+                      {dishMsg}
+                    </p>
+                  )}
+                </div>
+
+                {/* Existing images */}
+                <h4 className="text-sm font-semibold mb-3 text-text-secondary">
+                  Uploaded ({dishImages.length})
+                </h4>
+                {dishImages.length === 0 ? (
+                  <p className="text-text-tertiary text-sm text-center p-10">No custom dish images yet.</p>
+                ) : (
+                  dishImages.map(img => (
+                    <div key={img.id} className="card flex gap-3 items-center">
+                      <img
+                        src={img.image_url}
+                        alt={img.dish_name}
+                        className="w-16 h-16 rounded-lg object-cover shrink-0"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm text-text-primary capitalize">{img.dish_name}</div>
+                        <div className="text-[11px] text-text-tertiary">
+                          {img.restaurant && <span className="text-accent-amber">{img.restaurant} · </span>}
+                          {new Date(img.created_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteDishImage(img.id, img.image_url)}
+                        className="px-3 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer border-none bg-red-tint-bg text-status-red shrink-0"
+                      >
+                        Delete
+                      </button>
                     </div>
                   ))
                 )}

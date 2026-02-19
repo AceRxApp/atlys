@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { track } from '@vercel/analytics';
 import { useApp } from '../context/AppContext';
 import { DirectionsIcon, ShareIcon, DragHandleIcon } from '../components/icons';
+import ContextHint from '../components/ContextHint';
 import { formatDistance, searchNearby } from '../services/places';
 import type { Place } from '../services/places';
 import { generatePackingList } from '../utils/packingList';
@@ -9,6 +10,7 @@ import { findPivotAlternatives } from '../utils/surpriseFilter';
 import type { PackingItem } from '../data/packingItems';
 import { getNightRisk, isNightTime } from '../utils/safetyEngine';
 import type { Stop } from '../types';
+import { BOOKING_SERVICES } from '../data/bookingLinks';
 import {
   DndContext,
   closestCenter,
@@ -158,19 +160,8 @@ export default function PlanScreen() {
     getTransportInfo,
     showToast,
     weather,
-    crewMode,
-    crewCode,
-    crewSyncing,
-    joinCrewInput,
-    setJoinCrewInput,
-    showJoinCrew,
-    setShowJoinCrew,
     formatEventDate,
     formatEventTime,
-    startCrewMode,
-    stopCrewMode,
-    joinCrew,
-    shareCrewPlan,
     user,
     getDaySummary,
     travelGroup,
@@ -184,10 +175,24 @@ export default function PlanScreen() {
     offlineSaving,
     setDishLensContext,
     setSelectedPlace,
+    tripStartDate,
+    setTripStartDate,
   } = useApp();
 
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const sortedDays = Object.keys(tripDays).map(Number).sort((a, b) => a - b);
+
+  /** Format a day number as a real date string when tripStartDate is set */
+  const formatDayLabel = (day: number): string => {
+    if (!tripStartDate) return `Day ${day}`;
+    const start = new Date(tripStartDate + 'T00:00:00');
+    start.setDate(start.getDate() + (day - 1));
+    const weekday = start.toLocaleDateString('en-US', { weekday: 'short' });
+    const month = start.toLocaleDateString('en-US', { month: 'short' });
+    const date = start.getDate();
+    return `${weekday}, ${month} ${date}`;
+  };
 
   // --- Pack This state ---
   const allStops = Object.values(tripDays).flat();
@@ -195,6 +200,7 @@ export default function PlanScreen() {
     allStops,
     weather?.forecast.slice(0, dayCount) || [],
     travelGroup,
+    cityLabel,
   );
   const packStorageKey = `nxstops_pack_${citySlug}`;
   const [checkedItems, setCheckedItems] = useState<Set<string>>(() => {
@@ -205,6 +211,7 @@ export default function PlanScreen() {
   });
   const [showPackList, setShowPackList] = useState(false);
   const [showWeatherForecast, setShowWeatherForecast] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   // --- Drag & drop sensors ---
   const dndSensors = useSensors(
@@ -254,7 +261,7 @@ export default function PlanScreen() {
 
   const daySummary = getDaySummary();
 
-  if (totalStops === 0 && !crewMode) {
+  if (totalStops === 0) {
     return (
       <div className="text-center pt-[60px]">
         <div className="text-[64px] mb-4 opacity-60">&#x1f5fa;&#xfe0f;</div>
@@ -269,44 +276,7 @@ export default function PlanScreen() {
           >
             Start Exploring →
           </button>
-          <button
-            onClick={() => setShowJoinCrew(true)}
-            className="bg-transparent border border-border-strong text-text-secondary rounded-[14px] py-3 px-6 text-sm cursor-pointer"
-          >
-            &#x1f465; Join a Crew
-          </button>
         </div>
-        {/* Inline Join Crew */}
-        {showJoinCrew && (
-          <div className="card mt-5 p-4 text-left">
-            <div className="text-sm font-semibold mb-2 text-text-primary">Enter Crew Code</div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="e.g. X7K3NP"
-                value={joinCrewInput}
-                onChange={e => setJoinCrewInput(e.target.value.toUpperCase())}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && joinCrewInput.length >= 4) {
-                    joinCrew();
-                  }
-                }}
-                maxLength={6}
-                className="flex-1 p-3 rounded-[10px] border border-border-strong bg-bg-input text-text-primary text-lg font-bold tracking-[4px] text-center outline-none"
-              />
-              <button
-                onClick={() => joinCrew()}
-                disabled={crewSyncing || joinCrewInput.length < 4}
-                className={`py-3 px-5 rounded-[10px] border-none cursor-pointer text-sm font-semibold ${
-                  joinCrewInput.length >= 4
-                    ? 'bg-accent-amber text-text-on-accent'
-                    : 'bg-border-subtle text-text-tertiary'
-                }`}>
-                {crewSyncing ? '...' : 'Join'}
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
@@ -319,85 +289,46 @@ export default function PlanScreen() {
           <h1 className="text-[22px] font-bold mb-1">
             {lastPlanTitle || 'Your Trip Plan'}
           </h1>
-          {/* Crew Toggle */}
-          <div className="flex gap-1.5">
-            {!crewMode && (
-              <button onClick={() => setShowJoinCrew(true)}
-                className="py-1.5 px-3 rounded-[20px] text-[11px] font-semibold border border-border-strong bg-transparent text-text-tertiary cursor-pointer">
-                Join Crew
-              </button>
-            )}
-            <button
-              onClick={crewMode ? stopCrewMode : startCrewMode}
-              disabled={crewSyncing}
-              className={`flex items-center gap-1.5 py-1.5 px-3.5 rounded-[20px] text-xs font-semibold cursor-pointer ${
-                crewMode
-                  ? 'border border-amber-tint-border30 bg-amber-tint-bg15 text-accent-amber'
-                  : 'border border-border-strong bg-transparent text-text-tertiary'
-              } ${crewSyncing ? 'opacity-50 cursor-default' : ''}`}>
-              {crewSyncing ? '...' : crewMode ? '\u{1F465} Crew On' : '\u{1F464} Solo'}
-            </button>
-          </div>
         </div>
         <p className="text-text-tertiary text-[13px]">
           {cityLabel} · {totalStops} stop{totalStops !== 1 ? 's' : ''} · {dayCount} day{dayCount !== 1 ? 's' : ''}
         </p>
+        {/* Trip date picker */}
+        <button
+          onClick={() => dateInputRef.current?.showPicker()}
+          className="mt-2 flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-border-medium bg-bg-subtle text-text-secondary text-xs font-medium cursor-pointer"
+        >
+          <span>{'\u{1F4C5}'}</span>
+          {tripStartDate
+            ? <>Trip starts {new Date(tripStartDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+              <span
+                onClick={e => { e.stopPropagation(); setTripStartDate(null); }}
+                className="ml-1 text-text-tertiary"
+              >{'\u2715'}</span>
+            </>
+            : 'Set trip date'}
+        </button>
+        <input
+          ref={dateInputRef}
+          type="date"
+          className="sr-only"
+          value={tripStartDate || ''}
+          onChange={e => setTripStartDate(e.target.value || null)}
+        />
       </div>
 
-      {/* Join Crew Modal */}
-      {showJoinCrew && (
-        <div className="card mb-3 p-4 bg-bg-toast border border-amber-tint-border15">
-          <div className="text-sm font-semibold mb-2.5 text-text-primary">Join a Crew</div>
-          <p className="text-xs text-text-secondary mb-3">Enter the crew code shared with you</p>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="e.g. X7K3NP"
-              value={joinCrewInput}
-              onChange={e => setJoinCrewInput(e.target.value.toUpperCase())}
-              onKeyDown={e => e.key === 'Enter' && joinCrew()}
-              maxLength={6}
-              className="flex-1 py-3 px-3.5 rounded-[10px] border border-border-strong bg-bg-input text-text-primary text-lg font-bold tracking-[4px] text-center outline-none uppercase"
-            />
-            <button onClick={joinCrew} disabled={crewSyncing || joinCrewInput.length < 4}
-              className={`py-3 px-5 rounded-[10px] border-none cursor-pointer text-sm font-semibold ${
-                joinCrewInput.length >= 4
-                  ? 'bg-accent-gradient text-text-on-accent'
-                  : 'bg-border-subtle text-text-tertiary'
-              }`}>
-              {crewSyncing ? '...' : 'Join'}
-            </button>
-          </div>
-          <button onClick={() => { setShowJoinCrew(false); setJoinCrewInput(''); }}
-            className="w-full p-2 mt-2 bg-transparent border-none text-text-tertiary text-xs cursor-pointer">
-            Cancel
-          </button>
-        </div>
-      )}
-
-      {/* Crew Mode Banner */}
-      {crewMode && crewCode && (
-        <div className="card mb-3 p-4 border border-amber-tint-border20"
-          style={{ background: `linear-gradient(135deg, var(--amber-tint-bg10), var(--amber-tint-bg06))` }}>
-          <div className="text-[11px] text-text-tertiary uppercase tracking-[0.08em] mb-1.5">Share this code with your crew</div>
-          <div className="flex items-center gap-2.5 mb-2.5">
-            <div className="flex-1 text-[28px] font-bold tracking-[6px] text-accent-amber bg-bg-photo-counter rounded-[10px] py-2.5 px-4 text-center font-mono">
-              {crewCode}
-            </div>
-            <button onClick={() => { navigator.clipboard.writeText(crewCode); showToast('Code copied!'); }}
-              className="py-3 px-3.5 rounded-[10px] border border-amber-tint-border30 bg-amber-tint-bg10 text-accent-amber cursor-pointer text-[13px] font-semibold whitespace-nowrap">
-              Copy
-            </button>
-          </div>
-          <button onClick={shareCrewPlan}
-            className="w-full p-3 rounded-xl border-none cursor-pointer bg-accent-gradient text-text-on-accent text-sm font-semibold flex items-center justify-center gap-1.5">
-            &#x1f4e4; Share Plan with Crew
-          </button>
-          <p className="text-[11px] text-text-secondary mt-2 leading-snug text-center">
-            Your crew opens the app → Plan tab → &quot;Join Crew&quot; → enters the code above
-          </p>
-        </div>
-      )}
+      <ContextHint
+        storageKey="plan"
+        title="Your Trip Plan"
+        subtitle="Organize your perfect itinerary day by day."
+        hints={[
+          { emoji: '\u{2630}', title: 'Drag to reorder', description: 'Hold the drag handle on any stop and drag it to rearrange your route.' },
+          { emoji: '\u{1F4C5}', title: 'Set trip date', description: 'Tap "Set trip date" to see real calendar dates on your day tabs instead of Day 1, Day 2.' },
+          { emoji: '\u{1F504}', title: 'Pivot to alternatives', description: 'Tap "Pivot" on any stop to see similar nearby alternatives and swap them in.' },
+          { emoji: '\u{1F392}', title: 'Pack This checklist', description: 'Auto-generated packing list based on your stops, weather, and travel group.' },
+          { emoji: '\u{1F4F8}', title: 'Share & export', description: 'Share your plan as a link, text it to friends, or export as a shareable image.' },
+        ]}
+      />
 
       {/* Trip Weather Forecast (collapsed by default) */}
       {weather && weather.forecast.length > 0 && dayCount > 0 && (
@@ -414,7 +345,7 @@ export default function PlanScreen() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-text-tertiary">{dayCount}-day forecast</span>
+              <span className="text-xs text-text-tertiary">{dayCount}-day forecast</span>
               <span className="text-text-tertiary text-sm" style={{ transform: showWeatherForecast ? 'rotate(180deg)' : 'rotate(0deg)' }}>
                 {'\u{25BC}'}
               </span>
@@ -425,12 +356,12 @@ export default function PlanScreen() {
               <div className="flex gap-2 overflow-x-auto scroll-hidden">
                 {weather.forecast.slice(0, dayCount).map((day, i) => (
                   <div key={day.date} className="text-center min-w-[60px] shrink-0 p-1.5 rounded-[10px] bg-bg-subtle">
-                    <div className="text-[10px] text-text-tertiary mb-0.5">Day {i + 1}</div>
+                    <div className="text-[11px] text-text-tertiary mb-0.5">{formatDayLabel(i + 1)}</div>
                     <div className="text-xl mb-0.5">{day.emoji}</div>
                     <div className="text-xs font-semibold text-text-primary">{day.high}°</div>
-                    <div className="text-[10px] text-text-tertiary">{day.low}°</div>
+                    <div className="text-[11px] text-text-tertiary">{day.low}°</div>
                     {day.precipChance > 30 && (
-                      <div className="text-[9px] text-status-blue mt-0.5">&#x1f4a7; {day.precipChance}%</div>
+                      <div className="text-[11px] text-status-blue mt-0.5">&#x1f4a7; {day.precipChance}%</div>
                     )}
                   </div>
                 ))}
@@ -452,7 +383,7 @@ export default function PlanScreen() {
                   ? 'bg-accent-gradient text-text-on-accent'
                   : 'bg-bg-subtle-strong text-text-secondary'
               }`}>
-              Day {day} ({stops.length})
+              {formatDayLabel(day)} ({stops.length})
             </button>
           );
         })}
@@ -471,7 +402,7 @@ export default function PlanScreen() {
         {dayPlan.length > 1 && (
           <div className="flex items-center gap-1.5 mb-2 py-1.5 px-2.5 rounded-lg bg-amber-tint-bg06">
             <span className="text-xs">{'\u2630'}</span>
-            <span className="text-[11px] text-accent-amber-dark font-medium">Hold and drag to reorder your stops</span>
+            <span className="text-xs text-accent-amber-dark font-medium">Hold and drag to reorder your stops</span>
           </div>
         )}
         <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -526,7 +457,7 @@ export default function PlanScreen() {
                       )}
                       <div className="flex-1 min-w-0">
                         {stop.timeSlot && (
-                          <div className="text-[10px] font-semibold text-accent-amber uppercase tracking-[0.04em] mb-0.5">
+                          <div className="text-[11px] font-semibold text-accent-amber uppercase tracking-[0.04em] mb-0.5">
                             {stop.timeSlot}
                           </div>
                         )}
@@ -551,14 +482,14 @@ export default function PlanScreen() {
                               </div>
                             )}
                             {stop.reason && (
-                              <p className="text-[11px] text-text-tertiary mt-1 italic leading-snug">{'\u2728'} {stop.reason}</p>
+                              <p className="text-xs text-text-tertiary mt-1 italic leading-snug">{'\u2728'} {stop.reason}</p>
                             )}
                             {isNightTime(weather?.sunset) && (() => {
                               const risk = getNightRisk(stop.place.category, stop.place.rating, stop.place.reviewCount, stop.place.openNow);
                               return (
                                 <div className="flex items-center gap-1 mt-1">
-                                  <span className="text-[10px]">{risk.emoji}</span>
-                                  <span className={`text-[10px] font-medium ${
+                                  <span className="text-[11px]">{risk.emoji}</span>
+                                  <span className={`text-[11px] font-medium ${
                                     risk.level === 'low' ? 'text-status-green' : risk.level === 'moderate' ? 'text-accent-amber' : 'text-status-red'
                                   }`}>
                                     {risk.label}
@@ -600,13 +531,13 @@ export default function PlanScreen() {
                   <div className="flex gap-1.5 mt-2 flex-wrap">
                     {stop.type === 'place' && stop.place?.googleMapsUrl && (
                       <a href={stop.place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
-                        className="py-[5px] px-2.5 rounded-lg text-[11px] bg-amber-tint-bg10 text-accent-amber no-underline flex items-center gap-1">
+                        className="py-[5px] px-2.5 rounded-lg text-xs bg-amber-tint-bg10 text-accent-amber no-underline flex items-center gap-1">
                         <DirectionsIcon /> Go
                       </a>
                     )}
                     {stop.type === 'event' && stop.event?.url && (
                       <a href={stop.event.url} target="_blank" rel="noopener noreferrer"
-                        className="py-[5px] px-2.5 rounded-lg text-[11px] bg-purple-tint-bg08 text-events-text no-underline flex items-center gap-1">
+                        className="py-[5px] px-2.5 rounded-lg text-xs bg-purple-tint-bg08 text-events-text no-underline flex items-center gap-1">
                         &#x1f3ab; Tickets
                       </a>
                     )}
@@ -614,7 +545,7 @@ export default function PlanScreen() {
                       <select
                         value=""
                         onChange={e => { if (e.target.value) moveStopToDay(stop.id, activeDay, Number(e.target.value)); }}
-                        className="py-[5px] px-2 rounded-lg text-[11px] bg-bg-subtle-medium text-text-tertiary border border-border-medium cursor-pointer">
+                        className="py-[5px] px-2 rounded-lg text-xs bg-bg-subtle-medium text-text-tertiary border border-border-medium cursor-pointer">
                         <option value="">Move to...</option>
                         {sortedDays.filter(d => d !== activeDay).map(d => (
                           <option key={d} value={d}>Day {d}</option>
@@ -627,7 +558,7 @@ export default function PlanScreen() {
                           setDishLensContext({ dish: undefined, city: cityLabel, restaurant: stop.place!.name });
                           setScreen('tastelens');
                         }}
-                        className="py-[5px] px-2.5 rounded-lg text-[11px] bg-amber-tint-bg10 text-accent-amber border border-amber-tint-border20 cursor-pointer flex items-center gap-1"
+                        className="py-[5px] px-2.5 rounded-lg text-xs bg-amber-tint-bg10 text-accent-amber border border-amber-tint-border20 cursor-pointer flex items-center gap-1"
                       >
                         {'\u{1F37D}\u{FE0F}'} TasteLens
                       </button>
@@ -677,7 +608,7 @@ export default function PlanScreen() {
                           }
                           track('pivot_initiated', { place: stop.place!.name, day: String(activeDay) });
                         }}
-                        className={`py-[5px] px-2.5 rounded-lg text-[11px] border cursor-pointer flex items-center gap-1 ${
+                        className={`py-[5px] px-2.5 rounded-lg text-xs border cursor-pointer flex items-center gap-1 ${
                           pivotStopId === stop.id
                             ? 'bg-accent-amber text-text-on-accent border-accent-amber'
                             : 'bg-amber-tint-bg10 text-accent-amber border-amber-tint-border20'
@@ -696,7 +627,7 @@ export default function PlanScreen() {
                       <div className="mt-2 p-3 rounded-xl border border-amber-tint-border30 bg-amber-tint-bg06">
                         <div className="flex items-center gap-2 mb-2">
                           <span className="text-xs font-semibold text-accent-amber">{'\u{1F504}'} Plan B</span>
-                          <span className="text-[10px] text-text-muted ml-auto">{pivotIndex + 1} of {pivotAlternatives.length}</span>
+                          <span className="text-[11px] text-text-muted ml-auto">{pivotIndex + 1} of {pivotAlternatives.length}</span>
                         </div>
                         <div className="flex gap-3 items-center">
                           {/* Photo */}
@@ -713,13 +644,13 @@ export default function PlanScreen() {
                             <div className="text-xs text-text-secondary mt-0.5">{alt.categoryDisplay || alt.category}</div>
                             <div className="flex items-center gap-2 mt-0.5">
                               {alt.rating > 0 && (
-                                <span className="text-[11px] text-accent-amber font-semibold">{'\u{2B50}'} {alt.rating.toFixed(1)}</span>
+                                <span className="text-xs text-accent-amber font-semibold">{'\u{2B50}'} {alt.rating.toFixed(1)}</span>
                               )}
                               {alt.priceLevel > 0 && (
-                                <span className="text-[11px] text-text-tertiary">{'$'.repeat(alt.priceLevel)}</span>
+                                <span className="text-xs text-text-tertiary">{'$'.repeat(alt.priceLevel)}</span>
                               )}
                               {alt.distance != null && (
-                                <span className="text-[10px] text-text-muted">{formatDistance(alt.distance)}</span>
+                                <span className="text-[11px] text-text-muted">{formatDistance(alt.distance)}</span>
                               )}
                             </div>
                           </div>
@@ -769,16 +700,16 @@ export default function PlanScreen() {
                       <span className="text-base">{transport.emoji}</span>
                       <div className="flex-1">
                         <div className="text-xs text-text-secondary">{transport.text}</div>
-                        <div className="text-[11px] text-text-muted">{transport.distance}</div>
+                        <div className="text-xs text-text-muted">{transport.distance}</div>
                       </div>
                     </div>
                     <div className="flex gap-2">
                       <a href={transport.walkMapsUrl} target="_blank" rel="noopener noreferrer"
-                        className="flex-1 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold bg-amber-tint-bg10 text-accent-amber no-underline text-center flex items-center justify-center gap-1">
+                        className="flex-1 py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-amber-tint-bg10 text-accent-amber no-underline text-center flex items-center justify-center gap-1">
                         {'\u{1F6B6}'} Walk {transport.walkMinutes}m
                       </a>
                       <a href={transport.driveMapsUrl} target="_blank" rel="noopener noreferrer"
-                        className="flex-1 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold bg-bg-subtle-medium text-text-secondary no-underline text-center flex items-center justify-center gap-1">
+                        className="flex-1 py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-bg-subtle-medium text-text-secondary no-underline text-center flex items-center justify-center gap-1">
                         {'\u{1F697}'} Drive {transport.driveMinutes}m
                       </a>
                     </div>
@@ -798,17 +729,17 @@ export default function PlanScreen() {
         <div className="card mt-3 p-3.5 border border-amber-tint-border15 flex justify-around text-center"
           style={{ background: `linear-gradient(135deg, var(--amber-tint-bg06), var(--bg-subtle))` }}>
           <div>
-            <div className="text-[11px] text-text-tertiary mb-0.5">Total Distance</div>
+            <div className="text-xs text-text-tertiary mb-0.5">Total Distance</div>
             <div className="text-base font-bold text-text-primary">{daySummary.distance}</div>
           </div>
           <div className="w-px bg-border-subtle" />
           <div>
-            <div className="text-[11px] text-text-tertiary mb-0.5">{'\u{1F6B6}'} Walking</div>
+            <div className="text-xs text-text-tertiary mb-0.5">{'\u{1F6B6}'} Walking</div>
             <div className="text-base font-bold text-text-primary">{daySummary.totalWalkMin}m</div>
           </div>
           <div className="w-px bg-border-subtle" />
           <div>
-            <div className="text-[11px] text-text-tertiary mb-0.5">{'\u{1F697}'} Driving</div>
+            <div className="text-xs text-text-tertiary mb-0.5">{'\u{1F697}'} Driving</div>
             <div className="text-base font-bold text-text-primary">{daySummary.totalDriveMin}m</div>
           </div>
         </div>
@@ -825,7 +756,7 @@ export default function PlanScreen() {
               <span className="text-sm font-semibold text-text-primary">Pack This</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className={`text-[11px] font-semibold py-0.5 px-2 rounded-[10px] ${
+              <span className={`text-xs font-semibold py-0.5 px-2 rounded-[10px] ${
                 checkedItems.size === packingItems.length
                   ? 'bg-green-tint-bg text-status-green'
                   : 'bg-amber-tint-bg10 text-accent-amber'
@@ -843,7 +774,7 @@ export default function PlanScreen() {
             <div className="px-4 pb-4">
               {Object.entries(groupedPackItems).map(([cat, items]) => (
                 <div key={cat} className="mb-3">
-                  <div className="text-[11px] text-text-tertiary font-semibold mb-1.5 uppercase tracking-[0.05em]">
+                  <div className="text-xs text-text-tertiary font-semibold mb-1.5 uppercase tracking-[0.05em]">
                     {categoryLabels[cat] || cat}
                   </div>
                   {items.map(item => {
@@ -912,15 +843,17 @@ export default function PlanScreen() {
           {totalStops > 0 && (
             <button
               onClick={saveForOffline}
-              disabled={offlineSaving || offlineSaved}
+              disabled={offlineSaving}
               aria-label={offlineSaved ? 'Plan saved for offline use' : 'Save plan for offline use'}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl cursor-pointer border text-[13px] font-medium ${
-                offlineSaved
-                  ? 'bg-green-tint-bg border-green-tint-border text-status-green'
-                  : 'bg-bg-subtle border-border-medium text-text-secondary'
+              className={`flex-1 flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl border text-[13px] font-semibold min-h-[52px] transition-all duration-200 ${
+                offlineSaving
+                  ? 'bg-bg-subtle border-border-medium text-text-tertiary cursor-wait animate-pulse'
+                  : offlineSaved
+                    ? 'bg-green-tint-bg border-green-tint-border text-status-green cursor-pointer active:scale-[0.96]'
+                    : 'bg-bg-subtle border-border-medium text-text-secondary cursor-pointer active:scale-[0.96] hover:border-accent-amber'
               }`}
             >
-              {offlineSaved ? '\u{2705} Saved' : '\u{1F4E5} Offline'}
+              {offlineSaving ? '\u{23F3} Saving...' : offlineSaved ? '\u{2705} Saved Offline' : '\u{1F4E5} Save Offline'}
             </button>
           )}
         </div>
@@ -933,21 +866,53 @@ export default function PlanScreen() {
           </a>
         )}
 
+        {/* Book Your Trip — affiliate links */}
+        {totalStops > 0 && (
+          <div className="mt-2 p-4 rounded-2xl bg-bg-elevated border border-border-subtle">
+            <div className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.05em] mb-3">Book Your Trip</div>
+            <div className="flex gap-2 overflow-x-auto scroll-hidden pb-1">
+              {BOOKING_SERVICES.map(s => (
+                <a key={s.id} href={s.buildUrl(cityLabel)} target="_blank" rel="noopener noreferrer"
+                  onClick={() => track('plan_booking_click', { service: s.id, city: cityLabel })}
+                  className="flex flex-col items-center gap-1.5 min-w-[90px] shrink-0 py-3 px-2 rounded-xl bg-bg-subtle border border-border-subtle no-underline text-center">
+                  <span className="text-xl">{s.emoji}</span>
+                  <span className="text-xs font-semibold text-text-primary">{s.name}</span>
+                  <span className="text-[11px] text-text-tertiary leading-tight">{s.description}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Danger zone */}
         <div className="flex items-center justify-center gap-4 pt-1">
           {dayCount > 1 && (
             <button onClick={() => removeDay(activeDay)}
               aria-label={`Delete day ${activeDay} from trip`}
-              className="bg-transparent border-none text-status-red text-[12px] cursor-pointer p-1.5">
+              className="bg-transparent border-none text-status-red text-[13px] cursor-pointer p-1.5">
               Delete Day {activeDay}
             </button>
           )}
           {dayCount > 1 && <span className="text-border-subtle">|</span>}
-          <button onClick={clearPlan}
-            aria-label="Clear all stops from plan"
-            className="bg-transparent border-none text-text-tertiary text-[12px] cursor-pointer p-1.5">
-            Clear all stops
-          </button>
+          {showClearConfirm ? (
+            <span className="flex items-center gap-2">
+              <span className="text-[13px] text-status-red font-medium">Clear all stops?</span>
+              <button onClick={() => { clearPlan(); setShowClearConfirm(false); }}
+                className="bg-status-red text-white border-none text-[12px] font-semibold cursor-pointer py-1 px-2.5 rounded-lg">
+                Yes, clear
+              </button>
+              <button onClick={() => setShowClearConfirm(false)}
+                className="bg-transparent border border-border-medium text-text-secondary text-[12px] cursor-pointer py-1 px-2.5 rounded-lg">
+                Cancel
+              </button>
+            </span>
+          ) : (
+            <button onClick={() => setShowClearConfirm(true)}
+              aria-label="Clear all stops from plan"
+              className="bg-transparent border-none text-text-tertiary text-[13px] cursor-pointer p-1.5">
+              Clear all stops
+            </button>
+          )}
         </div>
       </div>
     </div>

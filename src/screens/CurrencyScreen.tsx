@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useCurrencyList } from '../hooks/useCurrencyList';
 import { CURRENCY_NAMES, CURRENCY_FLAGS, CURRENCY_SEARCH_TERMS } from '../utils/currency';
 import { DragHandleIcon } from '../components/icons';
+import ContextHint from '../components/ContextHint';
 import {
   DndContext,
   closestCenter,
@@ -305,9 +306,9 @@ export default function CurrencyScreen() {
         <div>
           <h1 className="text-xl font-bold text-text-primary m-0">Currencies</h1>
           {lastUpdated && (
-            <p className="text-[10px] text-text-tertiary m-0 mt-0.5">
+            <p className="text-[11px] text-text-tertiary m-0 mt-0.5">
               Updated {lastUpdated}
-              <button onClick={refreshRates} className="ml-1 text-accent-amber bg-transparent border-none cursor-pointer text-[10px] underline p-0">
+              <button onClick={refreshRates} className="ml-1 text-accent-amber bg-transparent border-none cursor-pointer text-[11px] underline p-0">
                 Refresh
               </button>
             </p>
@@ -318,6 +319,18 @@ export default function CurrencyScreen() {
           +
         </button>
       </div>
+
+      <ContextHint
+        storageKey="currency"
+        title="Currency Converter"
+        subtitle="Track exchange rates and convert currencies for your trip."
+        hints={[
+          { emoji: '\u{1F4B1}', title: 'Set your base currency', description: 'Tap "Base" to change your home currency. All rates are shown relative to it.' },
+          { emoji: '\u{1F4B0}', title: 'Tap to convert', description: 'Tap any currency to open the full converter with quick amounts ($1, $10, $50, $100, $500).' },
+          { emoji: '\u{2795}', title: 'Add currencies', description: 'Tap the + button to add any world currency. Search by country, city, or currency name.' },
+          { emoji: '\u{2630}', title: 'Drag to reorder', description: 'Hold the drag handle to rearrange currencies. Remove any currency with the X button.' },
+        ]}
+      />
 
       {/* Base currency selector */}
       <button onClick={() => setShowBasePicker(true)}

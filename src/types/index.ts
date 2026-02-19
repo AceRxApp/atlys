@@ -41,7 +41,7 @@ export interface Stop {
   estimatedSpend?: number;
 }
 
-export type PlanMood = 'adventurous' | 'chill' | 'cultural' | 'foodie' | 'nightlife' | 'romantic';
+export type PlanMood = 'sightseeing' | 'foodie' | 'outdoors' | 'nightlife' | 'culture' | 'hidden-gems';
 export type PlanDuration = 'full' | 'morning' | 'afternoon' | 'evening';
 
 export interface AdminSignup {
@@ -52,7 +52,7 @@ export interface AdminSignup {
 }
 
 export type Screen = 'home' | 'discover' | 'events' | 'currency' | 'plan' | 'tastelens';
-export type Vibe = 'food' | 'stay' | 'todo' | 'hidden' | 'locals';
+export type Vibe = 'food' | 'nightlife' | 'outdoors' | 'culture' | 'hidden' | 'locals';
 export type QuickFilter = 'open' | 'walking' | 'topRated' | 'budget' | 'family' | 'solo' | 'chainBreaker' | '15min' | 'lateNight' | 'rainyDay' | 'goldenHour';
 export type TravelGroup = 'solo' | 'couple' | 'family' | 'friends' | 'girls' | 'boys' | 'bachelorette';
 export type CommunityTag = 'black-owned' | 'women-owned' | 'hispanic-owned' | 'asian-owned' | 'lgbtq-friendly' | 'kid-friendly' | 'baby-friendly' | 'wheelchair-accessible' | 'solo-friendly';

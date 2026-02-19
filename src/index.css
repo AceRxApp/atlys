@@ -320,7 +320,7 @@
   }
 
   input, textarea, select { font-size: 16px; }
-  #root { min-height: 100vh; }
+  #root { min-height: 100vh; zoom: 1.08; }
 
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: var(--scrollbar-track, #1C1917); }

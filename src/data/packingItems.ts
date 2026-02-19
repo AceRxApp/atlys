@@ -142,6 +142,152 @@ export const WEATHER_PACK_RULES: {
   },
 ];
 
+/** City-specific packing items — things you need for specific destinations */
+export const CITY_PACK_ITEMS: Record<string, PackingItem[]> = {
+  // International destinations — passport & adapter
+  london: [
+    { label: 'Passport', category: 'essentials' },
+    { label: 'UK power adapter (Type G)', category: 'essentials' },
+    { label: 'Oyster card or contactless card', category: 'comfort' },
+    { label: 'Compact umbrella', category: 'weather' },
+    { label: 'Layered outfits', category: 'weather' },
+  ],
+  paris: [
+    { label: 'Passport', category: 'essentials' },
+    { label: 'EU power adapter (Type C/E)', category: 'essentials' },
+    { label: 'Comfortable walking shoes (cobblestones)', category: 'activities' },
+    { label: 'Chic dinner outfit', category: 'activities' },
+    { label: 'Phrasebook or translation app', category: 'comfort' },
+  ],
+  tokyo: [
+    { label: 'Passport', category: 'essentials' },
+    { label: 'Japan power adapter (Type A/B)', category: 'essentials' },
+    { label: 'Pocket Wi-Fi or SIM card', category: 'essentials' },
+    { label: 'Cash (many places are cash-only)', category: 'essentials' },
+    { label: 'Comfortable walking shoes', category: 'activities' },
+    { label: 'Compact day bag', category: 'activities' },
+  ],
+  dubai: [
+    { label: 'Passport', category: 'essentials' },
+    { label: 'UAE power adapter (Type G)', category: 'essentials' },
+    { label: 'Modest clothing for mosques & malls', category: 'activities' },
+    { label: 'High SPF sunscreen', category: 'weather' },
+    { label: 'Light breathable fabrics', category: 'weather' },
+    { label: 'Swimsuit for beach & pool', category: 'activities' },
+  ],
+  barcelona: [
+    { label: 'Passport', category: 'essentials' },
+    { label: 'EU power adapter (Type C/F)', category: 'essentials' },
+    { label: 'Comfortable walking shoes', category: 'activities' },
+    { label: 'Swimsuit', category: 'activities' },
+    { label: 'Anti-theft crossbody bag', category: 'comfort' },
+  ],
+  amsterdam: [
+    { label: 'Passport', category: 'essentials' },
+    { label: 'EU power adapter (Type C/F)', category: 'essentials' },
+    { label: 'Rain jacket', category: 'weather' },
+    { label: 'Comfortable walking shoes', category: 'activities' },
+    { label: 'Layers for changing weather', category: 'weather' },
+  ],
+  accra: [
+    { label: 'Passport', category: 'essentials' },
+    { label: 'Ghana power adapter (Type D/G)', category: 'essentials' },
+    { label: 'Mosquito repellent', category: 'essentials' },
+    { label: 'Yellow fever vaccination card', category: 'essentials' },
+    { label: 'Light breathable clothes', category: 'weather' },
+    { label: 'Cash (cedis)', category: 'essentials' },
+  ],
+  lagos: [
+    { label: 'Passport', category: 'essentials' },
+    { label: 'Nigeria power adapter (Type G)', category: 'essentials' },
+    { label: 'Mosquito repellent', category: 'essentials' },
+    { label: 'Light breathable clothes', category: 'weather' },
+    { label: 'Cash (naira)', category: 'essentials' },
+  ],
+  'cape town': [
+    { label: 'Passport', category: 'essentials' },
+    { label: 'South Africa power adapter (Type M)', category: 'essentials' },
+    { label: 'Windbreaker', category: 'weather' },
+    { label: 'Hiking shoes for Table Mountain', category: 'activities' },
+    { label: 'Swimsuit', category: 'activities' },
+    { label: 'Layers (weather changes fast)', category: 'weather' },
+  ],
+  nairobi: [
+    { label: 'Passport', category: 'essentials' },
+    { label: 'Kenya power adapter (Type G)', category: 'essentials' },
+    { label: 'Mosquito repellent', category: 'essentials' },
+    { label: 'Neutral-colored safari clothes', category: 'activities' },
+    { label: 'Binoculars', category: 'activities' },
+    { label: 'Light jacket for evenings', category: 'weather' },
+  ],
+  toronto: [
+    { label: 'Passport', category: 'essentials' },
+    { label: 'Comfortable walking shoes', category: 'activities' },
+  ],
+  'mexico city': [
+    { label: 'Passport', category: 'essentials' },
+    { label: 'Comfortable walking shoes (cobblestones)', category: 'activities' },
+    { label: 'Stomach meds (adjust to street food)', category: 'comfort' },
+    { label: 'Light jacket for evenings', category: 'weather' },
+  ],
+  kingston: [
+    { label: 'Passport', category: 'essentials' },
+    { label: 'Mosquito repellent', category: 'essentials' },
+    { label: 'Swimsuit', category: 'activities' },
+    { label: 'Sunscreen', category: 'weather' },
+    { label: 'Cash (Jamaican dollars)', category: 'essentials' },
+  ],
+  'san juan': [
+    { label: 'Comfortable walking shoes (cobblestones)', category: 'activities' },
+    { label: 'Swimsuit', category: 'activities' },
+    { label: 'Sunscreen', category: 'weather' },
+    { label: 'Bug spray', category: 'comfort' },
+  ],
+  // US domestic cities — no passport needed
+  'new york': [
+    { label: 'Comfortable walking shoes', category: 'activities' },
+    { label: 'MetroCard or OMNY-ready phone', category: 'comfort' },
+    { label: 'Compact umbrella', category: 'weather' },
+    { label: 'Dressy dinner outfit', category: 'activities' },
+  ],
+  'los angeles': [
+    { label: 'Sunscreen', category: 'weather' },
+    { label: 'Sunglasses', category: 'weather' },
+    { label: 'Swimsuit', category: 'activities' },
+    { label: 'Light jacket for evenings', category: 'weather' },
+  ],
+  miami: [
+    { label: 'Swimsuit', category: 'activities' },
+    { label: 'Sunscreen SPF 50+', category: 'weather' },
+    { label: 'Going-out outfit', category: 'activities' },
+    { label: 'Bug spray', category: 'comfort' },
+    { label: 'Light breathable clothes', category: 'weather' },
+  ],
+  chicago: [
+    { label: 'Warm layers', category: 'weather' },
+    { label: 'Windproof jacket', category: 'weather' },
+    { label: 'Comfortable walking shoes', category: 'activities' },
+  ],
+  atlanta: [
+    { label: 'Comfortable walking shoes', category: 'activities' },
+    { label: 'Light breathable clothes', category: 'weather' },
+    { label: 'Umbrella (afternoon showers)', category: 'weather' },
+  ],
+  houston: [
+    { label: 'Sunscreen', category: 'weather' },
+    { label: 'Light breathable clothes', category: 'weather' },
+    { label: 'Umbrella', category: 'weather' },
+  ],
+  sarasota: [
+    { label: 'Swimsuit', category: 'activities' },
+    { label: 'Sunscreen SPF 50+', category: 'weather' },
+    { label: 'Beach towel', category: 'activities' },
+    { label: 'Sunglasses', category: 'weather' },
+    { label: 'Dressy outfit for waterfront dining', category: 'activities' },
+    { label: 'Bug spray', category: 'comfort' },
+  ],
+};
+
 /** Travel group → specific packing items */
 export const GROUP_PACK_ITEMS: Partial<Record<TravelGroup, PackingItem[]>> = {
   family: [

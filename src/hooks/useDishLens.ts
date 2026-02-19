@@ -14,6 +14,7 @@ export interface TasteLensResult {
   pairings: string[];
   category: string;
   culturalNote: string;
+  translation: { original: string; english: string; language: string } | null;
 }
 
 export interface DishImage {
@@ -45,7 +46,7 @@ export function useTasteLens() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dishName, restaurant, city }),
         }),
-        fetch(`/api/dish-image?q=${encodeURIComponent(dishName)}`).catch(() => null),
+        fetch(`/api/dish-image?q=${encodeURIComponent(dishName)}${restaurant ? `&restaurant=${encodeURIComponent(restaurant)}` : ''}`).catch(() => null),
       ]);
 
       if (!dishRes.ok) {

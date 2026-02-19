@@ -6,7 +6,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors.js';
 
-const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
+const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 const GROQ_VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 
@@ -220,6 +220,7 @@ When given a dish name${restaurant ? ` and a specific restaurant (${restaurant})
 - pairings: array of 2-3 recommended sides, drinks, or sauces that go well with this dish${restaurant ? ` from ${restaurant}'s menu` : ''}. Each item is a string like "Large Fries", "Sweet Tea", "Ranch Sauce".
 - category: one of: appetizer, main, side, dessert, drink, snack, soup, salad
 - culturalNote: a brief 1-sentence note — for chain restaurants, this can be a fun fact about the dish's origin or popularity
+- translation: if the dish name is NOT in English, provide an object { original: "original name", english: "English translation", language: "source language" }. If the dish name IS already English, set to null. This helps travelers understand foreign menus.
 ${restaurantContext}
 ${cityContext}
 Respond ONLY with valid JSON. No markdown, no code blocks, no explanation.`;
