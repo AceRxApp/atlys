@@ -1,14 +1,12 @@
 // Vercel Serverless API Route — Auto Day Planner
-// Uses Groq AI + Google Places to generate personalized day itineraries
+// Uses GPT-4o-mini + Google Places to generate personalized day itineraries
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors.js';
 
-const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
+const OPENAI_API_KEY = (process.env.OPENAI_API_KEY || '').trim();
 const GOOGLE_API_KEY = (process.env.GOOGLE_PLACES_API_KEY || '').trim();
 const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || '').trim();
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
-const GROQ_FALLBACK_MODEL = 'llama-3.1-8b-instant';
 
 const FIELD_MASK = [
   'places.id', 'places.displayName', 'places.formattedAddress',
@@ -178,26 +176,36 @@ function transformPlace(raw: Record<string, unknown>, userLat: number, userLng: 
 }
 
 // --------------------------------------------------------------------------
-// Groq call with retry
+// OpenAI GPT-4o-mini call
 // --------------------------------------------------------------------------
 
-async function callGroq(body: object): Promise<Response> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+async function callOpenAI(messages: { role: string; content: string }[]): Promise<string | null> {
+  if (!OPENAI_API_KEY) return null;
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${GROQ_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages,
+        temperature: 0.8,
+        max_tokens: 500,
+        response_format: { type: 'json_object' },
+      }),
     });
-    if (response.status === 429 && attempt < 2) {
-      await new Promise(r => setTimeout(r, (attempt + 1) * 2000));
-      continue;
+    if (!response.ok) {
+      console.error('[NxStops Plan] OpenAI error:', response.status);
+      return null;
     }
-    return response;
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || null;
+  } catch (e) {
+    console.error('[NxStops Plan] OpenAI exception:', e);
+    return null;
   }
-  throw new Error('Max retries exceeded');
 }
 
 // --------------------------------------------------------------------------
@@ -249,7 +257,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(429).json({ error: 'Too many plan requests. Please wait a moment.' });
   }
 
-  if (!GROQ_API_KEY || !GOOGLE_API_KEY) {
+  if ((!OPENAI_API_KEY && !GEMINI_API_KEY) || !GOOGLE_API_KEY) {
     return res.status(500).json({ error: 'Plan service not configured.' });
   }
 
@@ -350,35 +358,20 @@ Return ONLY this JSON:
 {"stops":[{"idx":0,"timeSlot":"9:00 AM","reason":"why this fits","spend":15}],"dayTitle":"Catchy 3-4 word title"}`;
 
     const systemMsg = 'You are a JSON-only itinerary generator. Return ONLY valid JSON, no markdown, no explanation, no extra text.';
-    const groqMessages = [
-      { role: 'system' as const, content: systemMsg },
-      { role: 'user' as const, content: prompt },
+    const messages = [
+      { role: 'system', content: systemMsg },
+      { role: 'user', content: prompt },
     ];
 
-    // Fallback chain: Groq 70B → Groq 8B → Gemini Flash
+    // Fallback chain: GPT-4o-mini → Gemini 2.0 Flash
     let aiContent: string | null = null;
 
-    // 1. Try primary Groq model
-    let groqResponse = await callGroq({
-      model: GROQ_MODEL, messages: groqMessages,
-      temperature: 0.8, max_tokens: 500, response_format: { type: 'json_object' },
-    });
+    // 1. Try GPT-4o-mini (primary)
+    aiContent = await callOpenAI(messages);
 
-    if (groqResponse.status === 429) {
-      // 2. Rate limited — try lighter Groq model
-      console.log('[NxStops Plan] Primary model rate limited, trying Groq fallback');
-      groqResponse = await callGroq({
-        model: GROQ_FALLBACK_MODEL, messages: groqMessages,
-        temperature: 0.7, max_tokens: 500, response_format: { type: 'json_object' },
-      });
-    }
-
-    if (groqResponse.ok) {
-      const groqData = await groqResponse.json();
-      aiContent = groqData.choices?.[0]?.message?.content || null;
-    } else {
-      // 3. Both Groq models failed — try Gemini as free backup
-      console.log('[NxStops Plan] Groq unavailable, trying Gemini fallback');
+    if (!aiContent) {
+      // 2. OpenAI failed — try Gemini as free backup
+      console.log('[NxStops Plan] OpenAI unavailable, trying Gemini fallback');
       aiContent = await callGemini(systemMsg, prompt);
     }
 
