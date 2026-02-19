@@ -287,55 +287,63 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const uniqueFood = dedupe(foodPlaces);
     const uniqueActivities = dedupe(activityPlaces);
 
-    // 2. Build mood-aware place list — prioritize the right category
-    // Handle multi-mood strings like "foodie + nightlife" — prefer the most specific mood (not sightseeing)
+    // 2. Build mood-aware place list — single mood = 100% that category
+    // Parse mood string (can be "foodie" or "foodie + nightlife")
     const validMoods = ['foodie', 'nightlife', 'outdoors', 'culture', 'hidden-gems', 'sightseeing'];
     const moodParts = (mood || 'sightseeing').split(/\s*\+\s*/).filter(m => validMoods.includes(m));
-    const moodKey = moodParts.find(m => m !== 'sightseeing') || moodParts[0] || 'sightseeing';
-    let topPlaces: PlanPlace[];
+    if (moodParts.length === 0) moodParts.push('sightseeing');
 
-    if (moodKey === 'foodie') {
-      // Foodie: ONLY food places — no attractions, parks, museums
-      topPlaces = uniqueFood.sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 20);
-    } else if (moodKey === 'nightlife') {
-      // Nightlife: bars, clubs, restaurants — filter to nightlife-relevant
-      const nightlifeTypes = new Set(['bar', 'night_club', 'casino', 'wine_bar', 'restaurant', 'fine_dining_restaurant', 'steak_house']);
-      const nightFood = uniqueFood.filter(p => nightlifeTypes.has(p.category));
-      const nightAct = uniqueActivities.filter(p => nightlifeTypes.has(p.category) || p.category === 'night_club' || p.category === 'casino');
-      topPlaces = [...nightFood, ...nightAct].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 20);
-      // Fallback: if not enough nightlife spots, add top-rated food
-      if (topPlaces.length < 8) {
-        const remaining = uniqueFood.filter(p => !topPlaces.some(tp => tp.placeId === p.placeId));
-        topPlaces.push(...remaining.sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 20 - topPlaces.length));
+    // Helper: get places for a single mood (pure — no mixing)
+    const nightlifeTypes = new Set(['bar', 'night_club', 'casino', 'wine_bar', 'fine_dining_restaurant', 'steak_house', 'restaurant']);
+    const outdoorTypes = new Set(['park', 'hiking_area', 'national_park', 'zoo', 'aquarium', 'amusement_park', 'tourist_attraction', 'stadium']);
+    const cultureTypes = new Set(['museum', 'art_gallery', 'performing_arts_theater', 'historical_landmark', 'movie_theater', 'book_store', 'market']);
+
+    function getPlacesForMood(m: string, limit: number): PlanPlace[] {
+      if (m === 'foodie') {
+        return uniqueFood.sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, limit);
       }
-    } else if (moodKey === 'outdoors') {
-      // Outdoors: parks, hikes, outdoor spots + a few food for meals
-      const outdoorTypes = new Set(['park', 'hiking_area', 'national_park', 'zoo', 'aquarium', 'amusement_park', 'tourist_attraction', 'stadium']);
-      const outdoor = uniqueActivities.filter(p => outdoorTypes.has(p.category)).sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 12);
-      const meals = uniqueFood.sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 8);
-      topPlaces = [...outdoor, ...meals];
-    } else if (moodKey === 'culture') {
-      // Culture: museums, galleries, landmarks + a few food
-      const cultureTypes = new Set(['museum', 'art_gallery', 'performing_arts_theater', 'historical_landmark', 'movie_theater', 'book_store', 'market']);
-      const cultural = uniqueActivities.filter(p => cultureTypes.has(p.category)).sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 12);
-      const meals = uniqueFood.sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 8);
-      topPlaces = [...cultural, ...meals];
-    } else if (moodKey === 'hidden-gems') {
-      // Hidden gems: lower review count, high rating
-      const allUnique = [...uniqueFood, ...uniqueActivities];
-      topPlaces = allUnique
-        .filter(p => p.reviewCount < 2000 && p.rating >= 3.8)
-        .sort((a, b) => {
-          const scoreA = (a.rating || 0) * 2 - Math.log10(Math.max(a.reviewCount, 1));
-          const scoreB = (b.rating || 0) * 2 - Math.log10(Math.max(b.reviewCount, 1));
-          return scoreB - scoreA;
-        })
-        .slice(0, 20);
+      if (m === 'nightlife') {
+        const nightFood = uniqueFood.filter(p => nightlifeTypes.has(p.category));
+        const nightAct = uniqueActivities.filter(p => nightlifeTypes.has(p.category) || p.category === 'night_club' || p.category === 'casino');
+        const spots = [...nightFood, ...nightAct].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, limit);
+        // Fallback: if sparse, add bars/restaurants
+        if (spots.length < 6) {
+          const remaining = uniqueFood.filter(p => !spots.some(tp => tp.placeId === p.placeId));
+          spots.push(...remaining.sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, limit - spots.length));
+        }
+        return spots;
+      }
+      if (m === 'outdoors') {
+        return uniqueActivities.filter(p => outdoorTypes.has(p.category)).sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, limit);
+      }
+      if (m === 'culture') {
+        return uniqueActivities.filter(p => cultureTypes.has(p.category)).sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, limit);
+      }
+      if (m === 'hidden-gems') {
+        const all = [...uniqueFood, ...uniqueActivities];
+        return all
+          .filter(p => p.reviewCount < 2000 && p.rating >= 3.8)
+          .sort((a, b) => {
+            const scoreA = (a.rating || 0) * 2 - Math.log10(Math.max(a.reviewCount, 1));
+            const scoreB = (b.rating || 0) * 2 - Math.log10(Math.max(b.reviewCount, 1));
+            return scoreB - scoreA;
+          })
+          .slice(0, limit);
+      }
+      // sightseeing: wow-factor activities ONLY — no food
+      return uniqueActivities.sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, limit);
+    }
+
+    let topPlaces: PlanPlace[];
+    if (moodParts.length === 1) {
+      // Single mood: 100% that category
+      topPlaces = getPlacesForMood(moodParts[0], 20);
     } else {
-      // Sightseeing (default): balanced mix — more activities, some food
-      const sortedAct = uniqueActivities.sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 12);
-      const sortedFood = uniqueFood.sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 8);
-      topPlaces = [...sortedAct, ...sortedFood];
+      // Two moods: split evenly (10 each), deduplicate
+      const first = getPlacesForMood(moodParts[0], 12);
+      const firstIds = new Set(first.map(p => p.placeId));
+      const second = getPlacesForMood(moodParts[1], 12).filter(p => !firstIds.has(p.placeId));
+      topPlaces = [...first.slice(0, 10), ...second.slice(0, 10)];
     }
 
     if (topPlaces.length < 3) {
@@ -369,49 +377,70 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const now = new Date();
     const timeLabel = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-    // Mood-specific structure rules — each vibe controls the food-to-activity ratio
+    // Mood-specific structure rules — single mood = ALL stops are that category
     const moodStructures: Record<string, { full: string; half: string; desc: string }> = {
       sightseeing: {
-        full: 'Pick exactly 6 stops: coffee/breakfast → landmark/attraction → landmark/viewpoint → lunch → museum/attraction → scenic dinner spot. Max 2 food stops, prioritize iconic sights.',
-        half: 'Pick 3 stops: 1 food + 2 landmarks/attractions.',
-        desc: 'iconic landmarks, viewpoints, famous attractions, must-see sights',
+        full: 'Pick exactly 6 stops: ALL must be sightseeing/attractions. landmark → viewpoint → iconic attraction → famous site → scenic spot → must-see landmark. NO food stops. Only "wow" moments and iconic places.',
+        half: 'Pick 3 stops: all sightseeing — landmarks, viewpoints, iconic attractions. NO food.',
+        desc: 'iconic landmarks, viewpoints, famous attractions, must-see sights, "wow" moments',
       },
       foodie: {
-        full: 'Pick exactly 6 stops: brunch/breakfast → food market/bakery → lunch (local cuisine) → dessert/cafe → dinner (best-rated) → cocktail bar/late dessert. Prioritize diverse cuisines and best-rated food spots.',
-        half: 'Pick 3 stops: all food/drink — different cuisines and vibes.',
-        desc: 'best-rated restaurants, diverse cuisines, food markets, local specialties, hidden food gems',
+        full: 'Pick exactly 6 stops: ALL must be food/drink. breakfast/brunch → bakery/snack/cookies → lunch (local cuisine) → dessert/ice cream/cafe → dinner (best-rated) → late-night treat/cocktail bar. Every single stop must be edible: restaurants, cafes, bakeries, ice cream, snacks, desserts, food markets. Diverse cuisines required.',
+        half: 'Pick 3 stops: ALL food/drink — breakfast/brunch, lunch, dinner OR dessert. Every stop is a meal or snack.',
+        desc: 'restaurants, cafes, bakeries, ice cream shops, dessert spots, food markets, snack shops, brunch spots, fine dining, street food',
       },
       outdoors: {
-        full: 'Pick exactly 6 stops: coffee → park/garden → hiking/trail/outdoor activity → casual lunch → waterfront/nature spot → sunset dinner. Max 2 food stops, prioritize outdoor/nature experiences.',
-        half: 'Pick 3 stops: 1 food + 2 outdoor/nature spots.',
-        desc: 'parks, gardens, hiking, waterfront, nature, outdoor activities',
+        full: 'Pick exactly 6 stops: ALL must be outdoor/nature. park → trail/hike → nature area → zoo/garden → waterfront/scenic → sunset viewpoint. NO food stops. Only outdoor and nature experiences.',
+        half: 'Pick 3 stops: all outdoor/nature — parks, hikes, waterfront, gardens. NO food.',
+        desc: 'parks, gardens, hiking trails, waterfront, nature reserves, zoos, outdoor recreation, scenic spots',
       },
       nightlife: {
-        full: 'Pick exactly 6 stops: late lunch/brunch → afternoon activity → pre-dinner drinks → dinner → bar/lounge → nightclub/late-night spot. Start afternoon, build to night.',
-        half: 'Pick 3 stops: dinner → bar → late-night venue.',
-        desc: 'bars, clubs, lounges, rooftop bars, live music venues, late-night food',
+        full: 'Pick exactly 6 stops: ALL must be nightlife/bars/clubs. cocktail bar → wine bar → dinner at trendy restaurant → rooftop bar/lounge → live music/club → late-night spot. Every stop should have a nightlife atmosphere.',
+        half: 'Pick 3 stops: all nightlife — bar → restaurant/lounge → club or late-night venue.',
+        desc: 'bars, clubs, lounges, rooftop bars, wine bars, casinos, live music venues, cocktail spots',
       },
       culture: {
-        full: 'Pick exactly 6 stops: cafe → museum → gallery/historic site → lunch → performing arts/cultural landmark → dinner at culturally-rich restaurant. Max 2 food stops, prioritize museums/galleries/cultural landmarks.',
-        half: 'Pick 3 stops: 1 food + 2 cultural venues (museum, gallery, historic site).',
-        desc: 'museums, art galleries, historic sites, cultural landmarks, performing arts, theaters',
+        full: 'Pick exactly 6 stops: ALL must be cultural. museum → art gallery → historic landmark → cultural site → performing arts/theater → architectural landmark. NO food stops. Only museums, galleries, landmarks, and cultural experiences.',
+        half: 'Pick 3 stops: all cultural — museums, galleries, historic sites. NO food.',
+        desc: 'museums, art galleries, historic landmarks, cultural sites, performing arts, theaters, architecture',
       },
       'hidden-gems': {
-        full: 'Pick exactly 6 stops: local-favorite cafe → off-the-beaten-path attraction → unique shop/market → local lunch spot → underrated attraction/park → neighborhood dinner spot. Avoid tourist traps. Prioritize places with fewer reviews but high ratings.',
-        half: 'Pick 3 stops: mix of unknown food spots and underrated attractions. Avoid popular tourist picks.',
+        full: 'Pick exactly 6 stops: ALL must be hidden gems — underrated, low review count, unique. off-the-beaten-path spots locals love. Avoid anything with 5000+ reviews. Prioritize places with fewer reviews but high ratings. Mix of food and activities is OK but all must be "hidden" gems.',
+        half: 'Pick 3 stops: all hidden gems — underrated and unique. Avoid popular tourist spots.',
         desc: 'underrated spots, local favorites, off-the-beaten-path, unique finds, low review count but high rating',
       },
     };
 
-    const moodConfig = moodStructures[moodKey] || moodStructures.sightseeing;
-    const structureRule = isFullDay ? moodConfig.full : moodConfig.half;
+    // For multi-mood, build a combined prompt
+    const primaryMood = moodParts[0];
+    const secondaryMood = moodParts.length > 1 ? moodParts[1] : null;
+    const primaryConfig = moodStructures[primaryMood] || moodStructures.sightseeing;
+
+    let structureRule: string;
+    let moodDesc: string;
+    let moodLabel: string;
+
+    if (secondaryMood) {
+      const secondaryConfig = moodStructures[secondaryMood] || moodStructures.sightseeing;
+      moodLabel = `${primaryMood} + ${secondaryMood}`;
+      moodDesc = `${primaryConfig.desc}, ${secondaryConfig.desc}`;
+      if (isFullDay) {
+        structureRule = `Pick exactly 6 stops: 3 from the "${primaryMood}" category (${primaryConfig.desc}) and 3 from the "${secondaryMood}" category (${secondaryConfig.desc}). Alternate between the two categories for variety.`;
+      } else {
+        structureRule = `Pick 3 stops: mix of "${primaryMood}" and "${secondaryMood}" — at least 1 from each category.`;
+      }
+    } else {
+      moodLabel = primaryMood;
+      moodDesc = primaryConfig.desc;
+      structureRule = isFullDay ? primaryConfig.full : primaryConfig.half;
+    }
 
     const prompt = `Create a ${durationLabel} itinerary from ONLY the numbered places below.
 
 CONTEXT:
 - City: ${city || 'nearby area'}
 - Current time: ${timeLabel}
-- Mood: ${moodKey} (focus on: ${moodConfig.desc})
+- Mood: ${moodLabel} (focus on: ${moodDesc})
 - Group: ${travelGroup || 'solo'}${weather ? `\n- Weather: ${weather}` : ''}${preferences ? `\n- User preferences: ${preferences}` : ''}
 
 PLACES (pick from these only, reference by idx):
@@ -419,14 +448,14 @@ ${JSON.stringify(condensed)}${eventsSection}
 
 RULES:
 1. ${structureRule}
-2. Never pick 2 restaurants in a row (unless mood is "foodie")
-3. Time-logical: morning food first, activities mid-day, dinner/nightlife last
+2. CRITICAL: If mood is a single category, EVERY stop must be that category. Foodie = all food. Sightseeing = all sightseeing (no food). Culture = all culture (no food). Outdoors = all outdoors (no food). Do NOT add food stops unless the mood is "foodie" or includes food.
+3. Time-logical ordering: earlier activities first, dinner/nightlife last
 4. Prefer open places and 4.0+ ratings
 5. The "spend" field must be a realistic USD estimate for one person at that specific stop (e.g. coffee=$5, museum=$20, nice dinner=$45).
 6. Group adjustments: family=kid-friendly, no nightlife; couple=intimate/scenic; solo=flexible; friends=social/group-friendly; girls=aesthetic/brunch; boys=casual/sports; bachelorette=festive/fun
 7. Keep stops close together for walkability
-8. MIX PRICE RANGES: include at least one upscale/high-end spot (steakhouses, rooftop dining, fine dining — $$$+), one mid-range spot ($$), and one affordable spot ($). Variety in dining tiers makes the day interesting.
-9. VARIETY: Never recommend the same combination of places twice. Prioritize places you haven't seen in recent plans. Include diverse cuisine types and unique experiences (rooftops, waterfront, hidden alleys, etc.).${eventsSection ? '\n10. Include at most 1 event if it fits the mood/timing' : ''}
+8. MIX PRICE RANGES when applicable: variety makes the day interesting.
+9. VARIETY: diverse types within the mood category. For foodie: different cuisines. For sightseeing: different types of attractions.${eventsSection ? '\n10. Include at most 1 event if it fits the mood/timing' : ''}
 
 Return ONLY this JSON:
 {"stops":[{"idx":0,"timeSlot":"9:00 AM","reason":"why this fits","spend":15}],"dayTitle":"Catchy 3-4 word title"}`;
