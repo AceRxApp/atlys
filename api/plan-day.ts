@@ -288,7 +288,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const uniqueActivities = dedupe(activityPlaces);
 
     // 2. Build mood-aware place list — prioritize the right category
-    const moodKey = mood || 'sightseeing';
+    // Handle multi-mood strings like "foodie + nightlife" — use the first valid mood
+    const validMoods = ['foodie', 'nightlife', 'outdoors', 'culture', 'hidden-gems', 'sightseeing'];
+    const moodKey = (mood || 'sightseeing').split(/\s*\+\s*/).find(m => validMoods.includes(m)) || 'sightseeing';
     let topPlaces: PlanPlace[];
 
     if (moodKey === 'foodie') {

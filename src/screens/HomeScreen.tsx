@@ -282,7 +282,7 @@ export default function HomeScreen() {
     cityLabel,
   } = useApp();
 
-  const [planMoods, setPlanMoods] = useState<PlanMood[]>(['adventurous']);
+  const [planMoods, setPlanMoods] = useState<PlanMood[]>(['sightseeing']);
   const [planDuration, setPlanDuration] = useState<PlanDuration>('full');
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
 
