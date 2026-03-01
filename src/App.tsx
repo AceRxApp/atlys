@@ -662,7 +662,7 @@ export default function App() {
 
   return (
     <AppContext.Provider value={contextValue}>
-      <div className="font-['DM_Sans',system-ui,sans-serif] bg-body-gradient min-h-screen text-text-primary max-w-[430px] md:max-w-[768px] lg:max-w-[1024px] mx-auto relative overflow-x-hidden">
+      <div className="font-['DM_Sans',system-ui,sans-serif] bg-body-gradient min-h-screen text-text-primary max-w-[430px] md:max-w-[768px] lg:max-w-[1024px] mx-auto relative">
         {/* Skip to content link for keyboard users */}
         <a href="#main-content" className="skip-link">Skip to content</a>
 
@@ -741,7 +741,7 @@ export default function App() {
         )}
 
         {/* Content — routed screens */}
-        <main id="main-content" className={isInfoPage ? 'p-0' : 'px-5 md:px-8 lg:px-10 pb-[100px]'} style={!isInfoPage ? { paddingTop: 'calc(env(safe-area-inset-top, 0px) + 64px)' } : undefined}>
+        <main id="main-content" className={isInfoPage ? 'p-0' : 'px-5 md:px-8 lg:px-10 pb-[100px] overflow-x-hidden'} style={!isInfoPage ? { paddingTop: 'calc(env(safe-area-inset-top, 0px) + 64px)' } : undefined}>
           <Suspense fallback={<><SkeletonCard /><SkeletonCard /><SkeletonCard /></>}>
             <div key={routerLocation.pathname} className="page-enter">
               <Routes>
