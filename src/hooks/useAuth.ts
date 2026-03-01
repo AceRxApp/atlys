@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { authSignUp, authSignIn, authSignOut, authGetSession, authOnStateChange, authResetPassword, authResendVerification } from '../supabase';
+import { supabase, authSignUp, authSignIn, authSignOut, authGetSession, authOnStateChange, authResetPassword, authResendVerification } from '../supabase';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 6;
@@ -155,6 +155,11 @@ export function useAuth(showToast: (msg: string) => void, onSignOut: () => void)
     setAuthSubmitting(false);
   };
 
+  const refreshUser = async () => {
+    const { data } = await supabase.auth.getUser();
+    if (data.user) setUser(data.user);
+  };
+
   const handleSignOut = async () => {
     try {
       await authSignOut();
@@ -164,7 +169,7 @@ export function useAuth(showToast: (msg: string) => void, onSignOut: () => void)
   };
 
   return {
-    user, authLoading,
+    user, authLoading, refreshUser,
     authScreen, setAuthScreen, authEmail, setAuthEmail,
     authPassword, setAuthPassword, authConfirmPassword, setAuthConfirmPassword, authName, setAuthName,
     authError, authSubmitting, acceptedTerms, setAcceptedTerms,

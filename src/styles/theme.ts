@@ -346,35 +346,35 @@ export const lightTheme: ThemeTokens = {
 export const sunsetTheme: ThemeTokens = {
   mode: 'sunset',
   mapColorScheme: 'DARK',
-  // Warm coral-red ember glow
+  // Warm golden-hour twilight — halfway between day and night
   bg: {
-    body: '#1A0E0B',
-    bodyGradient: 'linear-gradient(180deg, #1A0E0B 0%, #261412 100%)',
-    surface: '#281614',
-    surfaceAlpha: 'rgba(40, 22, 20, 0.85)',
-    elevated: '#351E1A',
-    nav: 'rgba(26, 14, 11, 0.95)',
-    toast: 'rgba(40, 22, 20, 0.95)',
-    input: '#1A0E0B',
-    modalOverlay: 'rgba(10, 4, 3, 0.85)',
-    modalOverlayDeep: 'rgba(10, 4, 3, 0.9)',
-    subtle: 'rgba(255, 140, 110, 0.04)',
-    subtleMedium: 'rgba(255, 140, 110, 0.06)',
-    subtleStrong: 'rgba(255, 140, 110, 0.08)',
-    subtleButton: 'rgba(255, 140, 110, 0.1)',
-    imageOverlay: 'rgba(26, 14, 11, 0.9)',
-    photoButton: 'rgba(10, 4, 3, 0.5)',
-    photoCounter: 'rgba(10, 4, 3, 0.4)',
+    body: '#352420',
+    bodyGradient: 'linear-gradient(180deg, #352420 0%, #3E2C26 100%)',
+    surface: '#3E2C26',
+    surfaceAlpha: 'rgba(62, 44, 38, 0.88)',
+    elevated: '#4A3830',
+    nav: 'rgba(53, 36, 32, 0.95)',
+    toast: 'rgba(62, 44, 38, 0.95)',
+    input: '#352420',
+    modalOverlay: 'rgba(20, 12, 10, 0.8)',
+    modalOverlayDeep: 'rgba(20, 12, 10, 0.85)',
+    subtle: 'rgba(255, 160, 120, 0.05)',
+    subtleMedium: 'rgba(255, 160, 120, 0.07)',
+    subtleStrong: 'rgba(255, 160, 120, 0.09)',
+    subtleButton: 'rgba(255, 160, 120, 0.12)',
+    imageOverlay: 'rgba(53, 36, 32, 0.88)',
+    photoButton: 'rgba(20, 12, 10, 0.5)',
+    photoCounter: 'rgba(20, 12, 10, 0.4)',
   },
-  // Peachy cream text, dusty rose secondaries
+  // Peachy cream text, warm dusty secondaries
   text: {
     primary: '#FFE8E0',
-    secondary: '#CC9A90',
-    tertiary: '#8E6862',
-    muted: '#6B504A',
-    disabled: '#4A3835',
-    body: '#E4BBB0',
-    light: '#CC9A90',
+    secondary: '#D4A89E',
+    tertiary: '#9A7068',
+    muted: '#7A5850',
+    disabled: '#5A4440',
+    body: '#E8C4B8',
+    light: '#D4A89E',
     onAccent: '#1A0E0B',
   },
   // Coral-orange to warm red accent
@@ -403,13 +403,13 @@ export const sunsetTheme: ThemeTokens = {
   selection: {
     bg: 'rgba(240, 96, 64, 0.35)',
   },
-  // Coral glow borders
+  // Warm coral borders — slightly more visible against lighter bg
   border: {
-    subtle: 'rgba(255, 140, 110, 0.08)',
-    medium: 'rgba(255, 140, 110, 0.1)',
-    strong: 'rgba(255, 140, 110, 0.14)',
-    dashed: 'rgba(255, 140, 110, 0.18)',
-    nav: 'rgba(255, 140, 110, 0.08)',
+    subtle: 'rgba(255, 160, 120, 0.1)',
+    medium: 'rgba(255, 160, 120, 0.14)',
+    strong: 'rgba(255, 160, 120, 0.18)',
+    dashed: 'rgba(255, 160, 120, 0.22)',
+    nav: 'rgba(255, 160, 120, 0.1)',
   },
   // Coral-orange tints
   amberTint: {
@@ -437,7 +437,7 @@ export const sunsetTheme: ThemeTokens = {
     bg: 'rgba(59, 130, 246, 0.08)',
     border: 'rgba(59, 130, 246, 0.14)',
   },
-  // Warm rose tints (replacing purple)
+  // Warm rose tints
   purpleTint: {
     text: '#E0A0C0',
     bg08: 'rgba(200, 100, 140, 0.1)',
@@ -455,13 +455,13 @@ export const sunsetTheme: ThemeTokens = {
     border40: 'rgba(232, 176, 152, 0.44)',
   },
   skeleton: {
-    bg: 'rgba(255, 140, 110, 0.04)',
-    shimmer: 'rgba(255, 140, 110, 0.08)',
+    bg: 'rgba(255, 160, 120, 0.06)',
+    shimmer: 'rgba(255, 160, 120, 0.1)',
   },
   scrollbar: {
-    track: '#281614',
-    thumb: '#8E6862',
-    thumbHover: '#CC9A90',
+    track: '#3E2C26',
+    thumb: '#9A7068',
+    thumbHover: '#D4A89E',
   },
 };
 

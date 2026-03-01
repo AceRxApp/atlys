@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { track } from '@vercel/analytics';
 import { useApp } from '../context/AppContext';
+import { tagEventUrl } from '../data/bookingLinks';
 import type { EventItem } from '../types';
 
 const CATEGORY_EMOJI: Record<string, string> = {
@@ -24,7 +26,7 @@ export default function EventCard({ event }: { event: EventItem }) {
   return (
     <div className="card p-0 overflow-hidden">
       {showImage ? (
-        <div className="h-[140px] w-full relative overflow-hidden">
+        <div className="h-[140px] md:h-[180px] w-full relative overflow-hidden">
           <img
             src={event.imageUrl!}
             alt={event.name}
@@ -87,10 +89,11 @@ export default function EventCard({ event }: { event: EventItem }) {
           </button>
           {event.url && (
             <a
-              href={event.url}
+              href={tagEventUrl(event.url, event.source)}
               target="_blank"
               rel="noopener noreferrer"
               aria-label={`Get tickets for ${event.name}`}
+              onClick={() => track('event_ticket_click', { event: event.name, source: event.source || '', category: event.category || '' })}
               className="flex-1 py-2.5 px-2.5 rounded-[10px] bg-purple-tint-bg08 border border-purple-tint-border20 text-events-text text-[13px] font-semibold text-center no-underline box-border"
             >
               Get Tickets

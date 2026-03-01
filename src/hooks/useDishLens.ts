@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { API_URL } from '../utils/api';
 
 export interface TasteLensResult {
   name: string;
@@ -41,12 +42,12 @@ export function useTasteLens() {
       // Fetch AI analysis + dish-specific images in parallel
       // Use just the dish name for image search — we want photos of THE DISH, not the restaurant
       const [dishRes, imageRes] = await Promise.all([
-        fetch('/api/dishlens', {
+        fetch(`${API_URL}/api/dishlens`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dishName, restaurant, city }),
         }),
-        fetch(`/api/dish-image?q=${encodeURIComponent(dishName)}${restaurant ? `&restaurant=${encodeURIComponent(restaurant)}` : ''}`).catch(() => null),
+        fetch(`${API_URL}/api/dish-image?q=${encodeURIComponent(dishName)}${restaurant ? `&restaurant=${encodeURIComponent(restaurant)}` : ''}`).catch(() => null),
       ]);
 
       if (!dishRes.ok) {
@@ -67,7 +68,7 @@ export function useTasteLens() {
       // If no images yet, retry with AI-suggested search query (no restaurant — generic dish image)
       if (imageList.length === 0 && dishData.imageSearchQuery) {
         try {
-          const retryRes = await fetch(`/api/dish-image?q=${encodeURIComponent(dishData.imageSearchQuery)}`);
+          const retryRes = await fetch(`${API_URL}/api/dish-image?q=${encodeURIComponent(dishData.imageSearchQuery)}`);
           if (retryRes.ok) {
             const retryData = await retryRes.json();
             imageList = retryData.images || [];

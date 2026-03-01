@@ -106,6 +106,7 @@ async function handleNearbySearch(req: VercelRequest, res: VercelResponse) {
         'places.photos',
         'places.editorialSummary',
         'places.regularOpeningHours',
+        'places.businessStatus',
       ].join(','),
     },
     body: JSON.stringify(body),
@@ -118,6 +119,10 @@ async function handleNearbySearch(req: VercelRequest, res: VercelResponse) {
   }
 
   const data = await response.json();
+  // Filter out closed, not-yet-open, and non-venue places (junctions, event halls, etc.)
+  if (data.places) {
+    data.places = data.places.filter((p: Record<string, unknown>) => !isNotYetOpen(p) && !isNonVenue(p));
+  }
   return res.status(200).json(data);
 }
 
@@ -154,10 +159,14 @@ async function handleTextSearch(req: VercelRequest, res: VercelResponse) {
     if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
       return res.status(400).json({ error: 'lng must be between -180 and 180' });
     }
-    body.locationBias = {
-      circle: {
-        center: { latitude: latNum, longitude: lngNum },
-        radius: radiusNum,
+    // Use locationRestriction (rectangle) to STRICTLY limit results to the city area
+    // locationBias only hints — Google can still return results from other cities/countries
+    const deltaLat = radiusNum / 111111;
+    const deltaLng = radiusNum / (111111 * Math.cos(latNum * Math.PI / 180));
+    body.locationRestriction = {
+      rectangle: {
+        low: { latitude: latNum - deltaLat, longitude: lngNum - deltaLng },
+        high: { latitude: latNum + deltaLat, longitude: lngNum + deltaLng },
       },
     };
   }
@@ -184,6 +193,7 @@ async function handleTextSearch(req: VercelRequest, res: VercelResponse) {
         'places.googleMapsUri',
         'places.photos',
         'places.editorialSummary',
+        'places.businessStatus',
       ].join(','),
     },
     body: JSON.stringify(body),
@@ -196,7 +206,69 @@ async function handleTextSearch(req: VercelRequest, res: VercelResponse) {
   }
 
   const data = await response.json();
+  if (data.places) {
+    const centerLat = lat ? parseFloat(lat as string) : null;
+    const centerLng = lng ? parseFloat(lng as string) : null;
+    data.places = data.places.filter((p: Record<string, unknown>) => {
+      // Filter out closed, not-yet-open, and non-venue places
+      if (isNotYetOpen(p) || isNonVenue(p)) return false;
+      // Safety net: filter out places too far from the city center (>50km)
+      if (centerLat !== null && centerLng !== null) {
+        const loc = p.location as { latitude: number; longitude: number } | undefined;
+        if (loc) {
+          const dist = haversineKm(centerLat, centerLng, loc.latitude, loc.longitude);
+          if (dist > 50) return false;
+        }
+      }
+      return true;
+    });
+  }
   return res.status(200).json(data);
+}
+
+/** Types that are never useful for NxStops discovery */
+const EXCLUDED_PRIMARY_TYPES = new Set([
+  'event_venue', 'wedding_venue', 'banquet_hall',
+  'condominium_complex', 'apartment_complex', 'residential_area',
+  'lodging', 'hotel', 'motel', 'resort_hotel',
+]);
+
+/** Check if a place is a non-venue (junction, street, event hall, etc.) */
+function isNonVenue(p: Record<string, unknown>): boolean {
+  const primaryType = p.primaryType as string | undefined;
+  // No primaryType = generic POI (junctions, streets, interchanges)
+  if (!primaryType) return true;
+  if (EXCLUDED_PRIMARY_TYPES.has(primaryType)) return true;
+  // Catch junctions/interchanges by name
+  const name = (p.displayName as { text?: string } | undefined)?.text || '';
+  if (/\b(junction|interchange|roundabout|overpass|flyover|intersection|highway|motorway)\b/i.test(name)) return true;
+  return false;
+}
+
+/** Keywords that indicate a place isn't open to the public yet */
+const NOT_OPEN_KEYWORDS = /\b(coming soon|opening soon|under construction|not yet open|grand opening|pre-opening|opening \d{4}|opens? in|currently closed|permanently closed|temporarily closed|reopening|closed for renovation|under renovation)\b/i;
+
+/** Check if a Google Places (New) result looks like a place not yet open */
+function isNotYetOpen(p: Record<string, unknown>): boolean {
+  // Check businessStatus — only OPERATIONAL should pass
+  const status = p.businessStatus as string | undefined;
+  if (status === 'CLOSED_PERMANENTLY' || status === 'CLOSED_TEMPORARILY') return true;
+  // Check editorial summary for "coming soon" etc.
+  const summary = p.editorialSummary as { text?: string } | undefined;
+  if (summary?.text && NOT_OPEN_KEYWORDS.test(summary.text)) return true;
+  // Check display name
+  const displayName = p.displayName as { text?: string } | undefined;
+  if (displayName?.text && NOT_OPEN_KEYWORDS.test(displayName.text)) return true;
+  return false;
+}
+
+/** Haversine distance in km between two points */
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 // --------------------------------------------------------------------------

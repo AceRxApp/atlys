@@ -73,7 +73,7 @@ export default function AdminPanel() {
   }, []);
 
   return (
-    <div className="fixed inset-0 bg-bg-body z-[200] overflow-auto max-w-[430px] mx-auto">
+    <div className="fixed inset-0 bg-bg-body z-[200] overflow-auto max-w-[430px] md:max-w-[768px] lg:max-w-[1024px] mx-auto">
       {/* Admin Header */}
       <div className="px-5 py-4 flex justify-between items-center border-b border-border-subtle">
         <div>

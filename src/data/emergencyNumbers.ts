@@ -51,7 +51,7 @@ export const EMERGENCY_BY_COUNTRY: Record<string, { police: string; emergency: s
   'Suriname': { police: '115', emergency: '115' },
   'Uruguay': { police: '911', emergency: '911' },
 
-  // Europe
+  // Europe - Western
   'UK': { police: '999', emergency: '112' },
   'France': { police: '17', emergency: '112' },
   'Spain': { police: '091', emergency: '112' },
@@ -63,16 +63,48 @@ export const EMERGENCY_BY_COUNTRY: Record<string, { police: string; emergency: s
   'Belgium': { police: '101', emergency: '112' },
   'Austria': { police: '133', emergency: '112' },
   'Switzerland': { police: '117', emergency: '112' },
+  'Luxembourg': { police: '113', emergency: '112' },
+  'Iceland': { police: '112', emergency: '112' },
+  'Monaco': { police: '17', emergency: '112' },
+  'Andorra': { police: '110', emergency: '112' },
+  'Liechtenstein': { police: '117', emergency: '112' },
+  'San Marino': { police: '113', emergency: '112' },
+
+  // Europe - Central & Eastern
   'Czech Republic': { police: '158', emergency: '112' },
   'Poland': { police: '997', emergency: '112' },
   'Hungary': { police: '107', emergency: '112' },
-  'Greece': { police: '100', emergency: '112' },
+  'Slovakia': { police: '158', emergency: '112' },
+  'Slovenia': { police: '113', emergency: '112' },
+  'Croatia': { police: '192', emergency: '112' },
+  'Romania': { police: '112', emergency: '112' },
+  'Bulgaria': { police: '166', emergency: '112' },
+  'Serbia': { police: '192', emergency: '112' },
+  'Bosnia and Herzegovina': { police: '122', emergency: '112' },
+  'Montenegro': { police: '122', emergency: '112' },
+  'North Macedonia': { police: '192', emergency: '112' },
+  'Albania': { police: '129', emergency: '112' },
+  'Kosovo': { police: '192', emergency: '112' },
+  'Moldova': { police: '902', emergency: '112' },
+  'Ukraine': { police: '102', emergency: '112' },
+  'Belarus': { police: '102', emergency: '103' },
+  'Russia': { police: '102', emergency: '112' },
+
+  // Europe - Nordic & Baltic
   'Sweden': { police: '114', emergency: '112' },
   'Norway': { police: '112', emergency: '113' },
   'Denmark': { police: '114', emergency: '112' },
   'Finland': { police: '112', emergency: '112' },
+  'Lithuania': { police: '112', emergency: '112' },
+  'Latvia': { police: '110', emergency: '112' },
+  'Estonia': { police: '110', emergency: '112' },
+  'Greenland': { police: '112', emergency: '112' },
+
+  // Europe - Mediterranean
+  'Greece': { police: '100', emergency: '112' },
   'Malta': { police: '191', emergency: '112' },
   'Cyprus': { police: '199', emergency: '112' },
+  'Gibraltar': { police: '199', emergency: '112' },
 
   // Middle East
   'UAE': { police: '999', emergency: '998' },
@@ -84,12 +116,19 @@ export const EMERGENCY_BY_COUNTRY: Record<string, { police: string; emergency: s
   'Jordan': { police: '911', emergency: '911' },
   'Lebanon': { police: '112', emergency: '140' },
   'Israel': { police: '100', emergency: '101' },
+  'Palestine': { police: '100', emergency: '101' },
   'Turkey': { police: '155', emergency: '112' },
+  'Iraq': { police: '104', emergency: '115' },
+  'Iran': { police: '110', emergency: '115' },
+  'Syria': { police: '112', emergency: '110' },
+  'Yemen': { police: '199', emergency: '191' },
 
   // East Asia
   'Japan': { police: '110', emergency: '119' },
   'South Korea': { police: '112', emergency: '119' },
   'China': { police: '110', emergency: '120' },
+  'Hong Kong': { police: '999', emergency: '999' },
+  'Macau': { police: '999', emergency: '999' },
   'Taiwan': { police: '110', emergency: '119' },
   'Mongolia': { police: '102', emergency: '103' },
 
@@ -103,13 +142,18 @@ export const EMERGENCY_BY_COUNTRY: Record<string, { police: string; emergency: s
   'Cambodia': { police: '117', emergency: '119' },
   'Myanmar': { police: '199', emergency: '191' },
   'Laos': { police: '1191', emergency: '1195' },
+  'Brunei': { police: '993', emergency: '991' },
+  'Timor-Leste': { police: '112', emergency: '112' },
 
   // South Asia
   'India': { police: '100', emergency: '112' },
+  'Pakistan': { police: '15', emergency: '115' },
+  'Bangladesh': { police: '999', emergency: '999' },
   'Sri Lanka': { police: '119', emergency: '110' },
   'Nepal': { police: '100', emergency: '102' },
   'Maldives': { police: '119', emergency: '102' },
   'Bhutan': { police: '113', emergency: '110' },
+  'Afghanistan': { police: '119', emergency: '112' },
 
   // Central Asia & Caucasus
   'Georgia': { police: '112', emergency: '112' },
@@ -118,46 +162,71 @@ export const EMERGENCY_BY_COUNTRY: Record<string, { police: string; emergency: s
   'Uzbekistan': { police: '102', emergency: '103' },
   'Kazakhstan': { police: '102', emergency: '103' },
   'Kyrgyzstan': { police: '102', emergency: '103' },
+  'Tajikistan': { police: '02', emergency: '03' },
+  'Turkmenistan': { police: '02', emergency: '03' },
 
   // Africa - North
-  'Nigeria': { police: '199', emergency: '112' },
-  'Ghana': { police: '191', emergency: '112' },
-  'South Africa': { police: '10111', emergency: '112' },
-  'Kenya': { police: '999', emergency: '112' },
   'Morocco': { police: '19', emergency: '15' },
   'Egypt': { police: '122', emergency: '123' },
   'Tunisia': { police: '197', emergency: '190' },
   'Algeria': { police: '17', emergency: '14' },
+  'Libya': { police: '193', emergency: '191' },
+  'Sudan': { police: '999', emergency: '999' },
+  'South Sudan': { police: '777', emergency: '999' },
 
   // Africa - West
+  'Nigeria': { police: '199', emergency: '112' },
+  'Ghana': { police: '191', emergency: '112' },
   'Senegal': { police: '17', emergency: '1515' },
   'Mali': { police: '17', emergency: '15' },
   'Benin': { police: '117', emergency: '112' },
   'Togo': { police: '117', emergency: '118' },
+  'Ivory Coast': { police: '111', emergency: '185' },
+  'Burkina Faso': { police: '17', emergency: '112' },
+  'Guinea': { police: '117', emergency: '112' },
+  'Guinea-Bissau': { police: '117', emergency: '119' },
+  'Sierra Leone': { police: '019', emergency: '999' },
+  'Liberia': { police: '911', emergency: '911' },
+  'Niger': { police: '17', emergency: '15' },
+  'Gambia': { police: '117', emergency: '116' },
+  'Cape Verde': { police: '132', emergency: '131' },
+
+  // Africa - Central
   'Cameroon': { police: '117', emergency: '112' },
+  'DRC': { police: '112', emergency: '112' },
+  'Republic of Congo': { police: '117', emergency: '118' },
+  'Gabon': { police: '1730', emergency: '1300' },
+  'Chad': { police: '17', emergency: '112' },
+  'Central African Republic': { police: '117', emergency: '112' },
+  'Equatorial Guinea': { police: '114', emergency: '112' },
+  'Sao Tome and Principe': { police: '222', emergency: '112' },
 
   // Africa - East
+  'Kenya': { police: '999', emergency: '112' },
   'Tanzania': { police: '112', emergency: '114' },
   'Uganda': { police: '999', emergency: '112' },
   'Rwanda': { police: '112', emergency: '112' },
+  'Burundi': { police: '117', emergency: '112' },
   'Ethiopia': { police: '991', emergency: '907' },
-  'Madagascar': { police: '117', emergency: '118' },
-  'Seychelles': { police: '999', emergency: '151' },
+  'Somalia': { police: '888', emergency: '999' },
   'Djibouti': { police: '17', emergency: '18' },
   'Eritrea': { police: '113', emergency: '114' },
-
-  // Africa - Central
-  'DRC': { police: '112', emergency: '112' },
-  'Gabon': { police: '1730', emergency: '1300' },
-  'Angola': { police: '113', emergency: '112' },
-  'Mozambique': { police: '119', emergency: '117' },
+  'Madagascar': { police: '117', emergency: '118' },
+  'Seychelles': { police: '999', emergency: '151' },
+  'Comoros': { police: '17', emergency: '112' },
+  'Mauritius': { police: '999', emergency: '114' },
 
   // Africa - Southern
+  'South Africa': { police: '10111', emergency: '112' },
+  'Angola': { police: '113', emergency: '112' },
+  'Mozambique': { police: '119', emergency: '117' },
   'Botswana': { police: '999', emergency: '997' },
   'Namibia': { police: '10111', emergency: '211' },
   'Zimbabwe': { police: '995', emergency: '999' },
   'Zambia': { police: '999', emergency: '999' },
-  'Mauritius': { police: '999', emergency: '114' },
+  'Malawi': { police: '997', emergency: '998' },
+  'Lesotho': { police: '123', emergency: '121' },
+  'Eswatini': { police: '999', emergency: '977' },
 
   // Australia & Oceania
   'Australia': { police: '000', emergency: '000' },
@@ -168,9 +237,17 @@ export const EMERGENCY_BY_COUNTRY: Record<string, { police: string; emergency: s
   'Vanuatu': { police: '112', emergency: '112' },
   'Papua New Guinea': { police: '112', emergency: '000' },
   'Palau': { police: '911', emergency: '911' },
+  'Solomon Islands': { police: '999', emergency: '911' },
+  'Kiribati': { police: '192', emergency: '994' },
+  'Micronesia': { police: '911', emergency: '911' },
+  'Marshall Islands': { police: '911', emergency: '911' },
+  'Nauru': { police: '110', emergency: '111' },
+  'Tuvalu': { police: '911', emergency: '911' },
   'French Polynesia': { police: '17', emergency: '15' },
   'New Caledonia': { police: '17', emergency: '15' },
   'Cook Islands': { police: '999', emergency: '998' },
-  'Cape Verde': { police: '132', emergency: '131' },
   'Reunion': { police: '17', emergency: '15' },
+
+  // South America (missing)
+  'Venezuela': { police: '171', emergency: '911' },
 };

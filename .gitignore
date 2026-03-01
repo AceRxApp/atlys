@@ -24,6 +24,8 @@ dist-ssr
 *.sw?
 .vercel
 PROJECT_SECRETS.md
+.env*
+!.env.example
 
 # Android signing (never commit secrets)
 *.keystore

@@ -14,6 +14,16 @@ export const ALLOWED_ORIGINS = [
   'http://localhost:4173',
 ];
 
+/** Check if origin is from a Capacitor native app (any scheme://localhost) */
+function isNativeAppOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    return url.hostname === 'localhost';
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Set CORS headers. Returns false if origin is not allowed (reject the request).
  */
@@ -22,13 +32,13 @@ export function setCorsHeaders(
   origin: string | undefined,
   methods: string = 'GET, OPTIONS',
 ): boolean {
-  const isAllowed = ALLOWED_ORIGINS.includes(origin || '');
-  if (!isAllowed && origin) {
+  const isAllowed = !origin || ALLOWED_ORIGINS.includes(origin) || isNativeAppOrigin(origin);
+  if (!isAllowed) {
     res.setHeader('Vary', 'Origin');
     return false;
   }
-  if (isAllowed) {
-    res.setHeader('Access-Control-Allow-Origin', origin!);
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
   }
   res.setHeader('Access-Control-Allow-Methods', methods);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');

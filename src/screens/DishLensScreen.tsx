@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTasteLens, type TasteLensResult, type DishImage } from '../hooks/useDishLens';
 import { useApp } from '../context/AppContext';
+import { API_URL } from '../utils/api';
+import { useSubscription } from '../hooks/useSubscription';
+import PaywallModal from '../components/PaywallModal';
 
 // ---------- Intro Guide (first-time users) ----------
 function TasteLensIntro({ onDismiss }: { onDismiss: () => void }) {
@@ -448,7 +451,8 @@ function ResultCard({
 
 // ---------- Main TasteLens Screen (Tab) ----------
 export default function DishLensScreen() {
-  const { dishLensContext, setDishLensContext, cityLabel } = useApp();
+  const { dishLensContext, setDishLensContext, cityLabel, user, setShowProfile, setAuthScreen } = useApp();
+  const subscription = useSubscription(user);
 
   const restaurant = dishLensContext.restaurant;
   const city = dishLensContext.city || cityLabel || undefined;
@@ -462,6 +466,7 @@ export default function DishLensScreen() {
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const [scanError, setScanError] = useState<string | null>(null);
   const [showIntro, setShowIntro] = useState(() => !localStorage.getItem('nxstops_tastelens_seen'));
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const dismissIntro = useCallback(() => {
     setShowIntro(false);
@@ -478,7 +483,36 @@ export default function DishLensScreen() {
   const handleAnalyze = () => {
     const name = dishName.trim();
     if (!name) return;
+    // Require sign-in
+    if (!user) {
+      setShowProfile(true);
+      setAuthScreen('signup');
+      return;
+    }
+    // Check free tier usage
+    if (!subscription.canUseFeature('tastelens')) {
+      setShowPaywall(true);
+      return;
+    }
+    subscription.useFeature('tastelens');
     analyzeDish(name, restaurant, city);
+  };
+
+  // Gated version for dish buttons (menu scan results)
+  const handleAnalyzeDish = (dish: string) => {
+    // Require sign-in
+    if (!user) {
+      setShowProfile(true);
+      setAuthScreen('signup');
+      return;
+    }
+    if (!subscription.canUseFeature('tastelens')) {
+      setShowPaywall(true);
+      return;
+    }
+    subscription.useFeature('tastelens');
+    setDishName(dish);
+    analyzeDish(dish, restaurant, city);
   };
 
   const handleReset = () => {
@@ -543,7 +577,7 @@ export default function DishLensScreen() {
     setMenuDishes([]);
     try {
       const base64 = await resizeImage(file);
-      const res = await fetch('/api/dishlens', {
+      const res = await fetch(`${API_URL}/api/dishlens`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: base64 }),
@@ -745,7 +779,7 @@ export default function DishLensScreen() {
                 <div className="flex flex-wrap gap-2">
                   {menuDishes.map(dish => (
                     <button key={dish}
-                      onClick={() => { setDishName(dish); analyzeDish(dish, restaurant, city); }}
+                      onClick={() => handleAnalyzeDish(dish)}
                       className="px-3 py-2 rounded-xl text-xs font-medium border border-amber-tint-border20 bg-amber-tint-bg06 text-text-primary cursor-pointer transition-all active:scale-95"
                     >
                       {dish}
@@ -821,7 +855,7 @@ export default function DishLensScreen() {
             {error && (
               <div className="card p-4 border border-red-tint-border bg-red-tint-bg">
                 <p className="text-sm text-status-red m-0">{error}</p>
-                <button onClick={() => analyzeDish(dishName.trim(), restaurant, city)}
+                <button onClick={handleAnalyze}
                   className="mt-2 text-xs text-accent-amber bg-transparent border-none cursor-pointer underline">
                   Try Again
                 </button>
@@ -840,7 +874,7 @@ export default function DishLensScreen() {
                     : ['Pad Thai', 'Ramen', 'Croissant', 'Tacos al Pastor', 'Biryani', 'Pho']
                   ).map(dish => (
                     <button key={dish}
-                      onClick={() => { setDishName(dish); analyzeDish(dish, restaurant, city); }}
+                      onClick={() => handleAnalyzeDish(dish)}
                       className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border-subtle bg-bg-subtle text-text-secondary cursor-pointer">
                       {dish}
                     </button>
@@ -851,6 +885,19 @@ export default function DishLensScreen() {
           </div>
         )}
       </div>
+
+      {/* Paywall Modal */}
+      {showPaywall && (
+        <PaywallModal
+          feature="tastelens"
+          remaining={subscription.getRemainingUses('tastelens')}
+          limit={subscription.getLimit('tastelens')}
+          onClose={() => setShowPaywall(false)}
+          onUpgrade={subscription.startCheckout}
+          requiresAuth={!user}
+          onSignIn={() => { setShowPaywall(false); setShowProfile(true); setAuthScreen('signup'); }}
+        />
+      )}
     </div>
   );
 }

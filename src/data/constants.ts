@@ -39,13 +39,12 @@ export const COMMUNITY_TAGS: { id: CommunityTag; emoji: string; label: string }[
   { id: 'solo-friendly', emoji: '🧭', label: 'Solo-friendly' },
 ];
 
-export const VIBES: { id: Vibe; emoji: string; label: string }[] = [
-  { id: 'food', emoji: '🍽️', label: 'Food & Drinks' },
-  { id: 'nightlife', emoji: '🌙', label: 'Nightlife' },
-  { id: 'outdoors', emoji: '🌿', label: 'Outdoors' },
-  { id: 'culture', emoji: '🏛️', label: 'Culture' },
-  { id: 'hidden', emoji: '💎', label: 'Hidden Gems' },
-  { id: 'locals', emoji: '🌻', label: 'Locals' },
+export const VIBES: { id: Vibe; emoji: string; label: string; desc: string }[] = [
+  { id: 'thespot', emoji: '📍', label: 'The Spot', desc: 'Lounges, scenic spots, tourist attractions, hangout places' },
+  { id: 'eatsip', emoji: '🍽️', label: 'Eat & Sip', desc: 'Hole-in-the-wall eats, mom & pop spots' },
+  { id: 'nightlife', emoji: '🍸', label: 'Nightlife', desc: 'Bars, clubs, live music, speakeasies, open mic' },
+  { id: 'cultureart', emoji: '🎨', label: 'Culture & Art', desc: 'Galleries, murals, cultural districts' },
+  { id: 'neighborhood', emoji: '🏘️', label: 'The Neighborhood', desc: 'Walkable areas, shops, boutiques, markets, ethnic enclaves' },
 ];
 
 export const QUICK_FILTERS: { id: QuickFilter; label: string }[] = [

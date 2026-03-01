@@ -62,6 +62,7 @@ export interface AppContextType {
   getFullTripRouteUrl: () => string;
   sharePlan: () => Promise<void>;
   addEventToPlan: (event: EventItem) => void;
+  addEventToPlanOnDay: (event: EventItem, day: number) => void;
   isEventInPlan: (eventId: string) => boolean;
   pivotStop: (oldStopId: string, newPlace: Place) => void;
   shareAsLink: () => Promise<string | null>;
@@ -122,6 +123,7 @@ export interface AppContextType {
   // --- Auth ---
   user: User | null;
   authLoading: boolean;
+  refreshUser: () => Promise<void>;
 
   // --- Search ---
   searchQuery: string;
@@ -207,6 +209,10 @@ export interface AppContextType {
   showCulture: boolean;
   setShowCulture: (show: boolean) => void;
 
+  // --- Avatar ---
+  avatarUrl: string | null;
+  setAvatarUrl: (url: string | null) => void;
+
   // --- Notifications ---
   showNotificationPrompt: boolean;
   notificationPermission: NotificationPermission;
@@ -269,6 +275,7 @@ export interface AppContextType {
   autoPlanLoading: boolean;
   autoPlanError: string | null;
   lastPlanTitle: string | null;
+  lastPlanVibe: string | null;
   planMyDay: (mood: string, duration: PlanDuration, vibe?: string, subVibe?: string) => Promise<boolean>;
   tripStartDate: string | null;
   setTripStartDate: (date: string | null) => void;

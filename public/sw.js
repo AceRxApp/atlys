@@ -1,7 +1,7 @@
-const CACHE_NAME = 'nxstops-v8';
-const API_CACHE_NAME = 'nxstops-api-v5';
-const ASSETS_CACHE_NAME = 'nxstops-assets-v5';
-const API_CACHE_MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours in ms
+const CACHE_NAME = 'nxstops-v12';
+const API_CACHE_NAME = 'nxstops-api-v8';
+const ASSETS_CACHE_NAME = 'nxstops-assets-v8';
+const API_CACHE_MAX_AGE = 4 * 60 * 60 * 1000; // 4 hours in ms (reduced from 24h to prevent stale city data)
 const API_CACHE_MAX_ENTRIES = 50;
 const API_ROUTES = ['/api/places', '/api/events', '/api/weather', '/api/currency'];
 const STATIC_ASSETS = [
@@ -127,7 +127,8 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   // Skip cross-origin requests — let the browser handle external images, fonts, etc. natively
-  const requestUrl = new URL(event.request.url);
+  let requestUrl;
+  try { requestUrl = new URL(event.request.url); } catch { return; }
   if (requestUrl.origin !== self.location.origin) return;
 
   // Handle API requests with separate cache + timeout
@@ -165,8 +166,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Hashed build assets (JS/CSS with hash in filename) — cache-first (immutable)
-  const url = new URL(event.request.url);
-  const isHashedAsset = /\/assets\/.*\.[a-f0-9]{8,}\.(js|css|woff2?)$/.test(url.pathname);
+  const isHashedAsset = /\/assets\/.*\.[a-f0-9]{8,}\.(js|css|woff2?)$/.test(requestUrl.pathname);
   if (isHashedAsset) {
     event.respondWith(
       caches.open(ASSETS_CACHE_NAME).then((cache) =>

@@ -1,4 +1,5 @@
 import { CITY_CULTURE } from '../data/cityCulture';
+import { API_URL } from './api';
 
 /** Extract 3-letter ISO currency code from CITY_CULTURE currency field */
 export function extractCurrencyCode(currencyField: string): string | null {
@@ -39,7 +40,7 @@ export async function fetchAllRates(base: string): Promise<Record<string, number
   } catch { /* ignore */ }
 
   try {
-    const res = await fetch(`/api/currency?from=${base}`);
+    const res = await fetch(`${API_URL}/api/currency?from=${base}`);
     if (!res.ok) return null;
     const data = await res.json();
     const rates = data.rates as Record<string, number>;

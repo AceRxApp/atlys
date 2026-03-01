@@ -3,6 +3,7 @@ import { track } from '@vercel/analytics';
 import { fetchCities } from '../supabase';
 import type { City } from '../types';
 import { CITY_COORDS, WEATHER_CODES } from '../data';
+import { API_URL } from '../utils/api';
 
 export const MAPS_API_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || '';
 
@@ -33,16 +34,16 @@ export function useLocationWeather(loc: LocState) {
   const setSelectedCity = useCallback((city: City | null) => {
     setSelectedCityRaw(city);
     if (city) {
-      sessionStorage.setItem('nxstops_selected_city', JSON.stringify(city));
+      localStorage.setItem('nxstops_selected_city', JSON.stringify(city));
       track('city_selected', { city: city.name, country: city.country });
     } else {
-      sessionStorage.removeItem('nxstops_selected_city');
+      localStorage.removeItem('nxstops_selected_city');
     }
   }, []);
 
   const setUseGps = useCallback((v: boolean) => {
     setUseGpsRaw(v);
-    sessionStorage.setItem('nxstops_use_gps', String(v));
+    localStorage.setItem('nxstops_use_gps', String(v));
   }, []);
 
   // Derived
@@ -60,11 +61,28 @@ export function useLocationWeather(loc: LocState) {
     return { lat: 40.7128, lng: -73.996 };
   }, [useGps, loc.lat, loc.lng, selectedCity]);
 
-  // Load cities (always start fresh — no auto-restore)
+  // Load cities and restore last session
   useEffect(() => {
     (async () => {
       const data = await fetchCities();
       setCities(data);
+
+      // Restore last city/GPS from localStorage
+      const savedGps = localStorage.getItem('nxstops_use_gps');
+      if (savedGps === 'true') {
+        setUseGpsRaw(true);
+      } else {
+        try {
+          const saved = localStorage.getItem('nxstops_selected_city');
+          if (saved) {
+            const parsed = JSON.parse(saved) as City;
+            // Match against freshly loaded cities to ensure it's still valid
+            const match = data.find(c => c.slug === parsed.slug) || parsed;
+            setSelectedCityRaw(match);
+          }
+        } catch { /* ignore corrupt data */ }
+      }
+
       setLoading(false);
     })();
   }, []);
@@ -81,7 +99,7 @@ export function useLocationWeather(loc: LocState) {
     if (!lat || !lng) { setWeather(null); return; }
     const fetchWeather = async () => {
       try {
-        const resp = await fetch(`/api/weather?lat=${lat}&lng=${lng}`);
+        const resp = await fetch(`${API_URL}/api/weather?lat=${lat}&lng=${lng}`);
         if (!resp.ok) return;
         const data = await resp.json();
         const code = data.current?.weathercode ?? 0;

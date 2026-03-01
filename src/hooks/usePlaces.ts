@@ -12,6 +12,7 @@ import {
 } from '../data';
 import { hapticImpact, hapticNotification } from '../utils/haptics';
 import { scorePlaceByPreference, getPreferences } from '../utils/preferences';
+import { getRestaurantBookingUrl } from '../data/bookingLinks';
 
 interface LocState {
   lat: number | null;
@@ -174,6 +175,21 @@ export function usePlaces(deps: {
     }).catch(() => { /* silently fail — local still works */ });
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // RESET all places + search state when city changes — prevents cross-city contamination
+  const prevCityRef = useRef<string | null>(null);
+  useEffect(() => {
+    const cityKey = selectedCity?.name || null;
+    if (prevCityRef.current !== null && prevCityRef.current !== cityKey) {
+      // City changed — wipe everything from the old city
+      setPlaces([]);
+      setSearchResults([]);
+      setSearchQuery('');
+      setShowSearch(false);
+      setPlaceTagsCache({});
+    }
+    prevCityRef.current = cityKey;
+  }, [selectedCity]);
+
   // Persist travel group
   useEffect(() => {
     if (travelGroup) sessionStorage.setItem('nxstops_travel_group', travelGroup);
@@ -188,7 +204,9 @@ export function usePlaces(deps: {
   const OUTDOOR_SCENIC_TYPES = ['park', 'hiking_area', 'national_park', 'tourist_attraction', 'garden', 'zoo', 'beach', 'campground', 'playground'];
   const QUICK_VISIT_TYPES = ['cafe', 'coffee_shop', 'bakery', 'ice_cream_shop', 'park', 'art_gallery', 'book_store', 'market', 'bar', 'restaurant', 'museum', 'florist', 'gift_shop', 'sandwich_shop', 'tourist_attraction', 'library', 'spa', 'brunch_restaurant', 'breakfast_restaurant', 'juice_shop', 'dessert_shop'];
 
-  const filteredPlaces = useMemo(() => places.filter(place => {
+  const filteredPlaces = useMemo(() => {
+    // First apply all filters, then deduplicate by name
+    const filtered = places.filter(place => {
     for (const f of quickFilters) {
       switch (f) {
         case 'open': if (!place.openNow) return false; break;
@@ -287,7 +305,20 @@ export function usePlaces(deps: {
       }
     }
     return true;
-  }), [places, quickFilters, travelGroup, communityFilters, placeTagsCache]);
+  });
+
+    // Deduplicate by normalized name — same restaurant with different placeIds shows only once
+    const seenNames = new Set<string>();
+    return filtered.filter(place => {
+      const normalized = place.name.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+      const baseWords = normalized.split(' ').slice(0, 3).join(' ');
+      if (seenNames.has(normalized)) return false;
+      // Also check base name (first 3 words) to catch variants like "Ramen San" vs "Ramen San Whiskey Bar"
+      if (baseWords.length >= 5 && [...seenNames].some(n => n.startsWith(baseWords) || baseWords.startsWith(n))) return false;
+      seenNames.add(normalized);
+      return true;
+    });
+  }, [places, quickFilters, travelGroup, communityFilters, placeTagsCache]);
 
   // --------------------------------------------------------------------------
   // Personalized "For You" picks based on preference learning
@@ -332,19 +363,12 @@ export function usePlaces(deps: {
     setShowSearch(true);
   }, [searchQuery, useGps, loc.lat, loc.lng, selectedCity]);
 
-  // Dismiss search and merge results into the main Discover list
+  // Dismiss search — clear results without merging into Discover (prevents cross-city contamination)
   const dismissSearch = useCallback(() => {
-    if (searchResults.length > 0) {
-      setPlaces(prev => {
-        const existingIds = new Set(prev.map(p => p.placeId));
-        const newPlaces = searchResults.filter(p => !existingIds.has(p.placeId));
-        return [...newPlaces, ...prev];
-      });
-    }
     setShowSearch(false);
     setSearchQuery('');
     setSearchResults([]);
-  }, [searchResults]);
+  }, []);
 
   const isSaved = (placeId: string) => savedPlaces.some(p => p.placeId === placeId);
   const toggleSaved = (place: Place) => {
@@ -414,11 +438,10 @@ export function usePlaces(deps: {
   const isBookable = (place: Place): boolean => BOOKABLE_TYPES.includes(place.category);
 
   const getBookingUrl = (place: Place): string => {
-    // For restaurants, link to OpenTable search
+    // For restaurants, link to OpenTable with affiliate tracking
     if (RESERVABLE_TYPES.includes(place.category)) {
-      const term = encodeURIComponent(place.name);
-      const city = place.address ? encodeURIComponent(place.address.split(',').slice(-2).join(',').trim()) : '';
-      return `https://www.opentable.com/s?term=${term}&covers=2${city ? `&queryUnderstandingType=location&rawQuery=${term}+${city}` : ''}`;
+      const cityHint = place.address ? place.address.split(',').slice(-2).join(',').trim() : '';
+      return getRestaurantBookingUrl(place.name, cityHint).url;
     }
     if (place.website) return place.website;
     const q = encodeURIComponent(`${place.name} ${place.address ? place.address.split(',')[0] : ''} tickets`);
@@ -432,10 +455,11 @@ export function usePlaces(deps: {
 
   const getSafetyIndicators = (place: Place): string[] => {
     const indicators: string[] = [];
-    if (place.rating >= 4.3 && place.reviewCount >= 100) indicators.push('Well-reviewed');
-    if (place.reviewCount >= 500) indicators.push('Popular spot');
-    if (NIGHTLIFE_TYPES.includes(place.category)) indicators.push('Night venue');
-    if ((isReservable(place) || isBookable(place)) && place.rating >= 4.0) indicators.push('Reserve ahead');
+    if (place.rating >= 4.3 && place.reviewCount >= 100) indicators.push('\u{2705} Well-reviewed');
+    if (place.reviewCount >= 500) indicators.push('\u{1F465} Popular spot');
+    if (place.rating >= 4.0 && place.reviewCount >= 50) indicators.push('\u{1F6E1}\u{FE0F} Trusted');
+    if (NIGHTLIFE_TYPES.includes(place.category)) indicators.push('\u{1F319} Night venue');
+    if ((isReservable(place) || isBookable(place)) && place.rating >= 4.0) indicators.push('\u{1F4C5} Reserve ahead');
     return indicators;
   };
 

@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'NxStops',
   webDir: 'dist',
   ios: {
-    contentInset: 'automatic',
+    contentInset: 'never',
     preferredContentMode: 'mobile',
     scheme: 'NxStops',
   },

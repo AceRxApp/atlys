@@ -11,6 +11,8 @@ export default function Footer() {
         <Link to="/terms" className="text-text-tertiary no-underline text-xs py-1 px-0.5">Terms</Link>
         <span className="text-text-muted text-xs">&middot;</span>
         <Link to="/contact" className="text-text-tertiary no-underline text-xs py-1 px-0.5">Contact</Link>
+        <span className="text-text-muted text-xs">&middot;</span>
+        <Link to="/brands" className="text-text-tertiary no-underline text-xs py-1 px-0.5">For Brands</Link>
       </nav>
       <div className="text-xs text-text-muted">
         &copy; {new Date().getFullYear()} NxStops

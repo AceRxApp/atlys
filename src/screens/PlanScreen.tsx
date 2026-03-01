@@ -3,14 +3,17 @@ import { track } from '@vercel/analytics';
 import { useApp } from '../context/AppContext';
 import { DirectionsIcon, ShareIcon, DragHandleIcon } from '../components/icons';
 import ContextHint from '../components/ContextHint';
-import { formatDistance, searchNearby, TYPE_TO_VIBE } from '../services/places';
+import { formatDistance, getHoursStatus, searchNearby, TYPE_TO_VIBE } from '../services/places';
 import type { Place } from '../services/places';
 import { generatePackingList } from '../utils/packingList';
 import { findPivotAlternatives } from '../utils/surpriseFilter';
 import type { PackingItem } from '../data/packingItems';
-import { getNightRisk, isNightTime } from '../utils/safetyEngine';
+import { getNightRisk, getPlaceSafety, isNightTime } from '../utils/safetyEngine';
+import { fetchTravelAdvisory, getAdvisoryDisplay } from '../services/travelAdvisory';
+import type { TravelAdvisory } from '../services/travelAdvisory';
 import type { Stop } from '../types';
 import { BOOKING_SERVICES } from '../data/bookingLinks';
+import { API_URL } from '../utils/api';
 import {
   DndContext,
   closestCenter,
@@ -25,6 +28,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import SortableStopCard from '../components/SortableStopCard';
+import AddFromLinkModal from '../components/AddFromLinkModal';
 
 // Local helpers (not on context)
 const getStopName = (stop: Stop) =>
@@ -169,6 +173,7 @@ export default function PlanScreen() {
     places: allPlaces,
     requireAuth,
     lastPlanTitle,
+    lastPlanVibe,
     shareAsLink,
     saveForOffline,
     offlineSaved,
@@ -177,9 +182,11 @@ export default function PlanScreen() {
     setSelectedPlace,
     tripStartDate,
     setTripStartDate,
+    selectedCity,
   } = useApp();
 
   const dateInputRef = useRef<HTMLInputElement>(null);
+  const [showAddLinkModal, setShowAddLinkModal] = useState(false);
 
   const sortedDays = Object.keys(tripDays).map(Number).sort((a, b) => a - b);
 
@@ -212,6 +219,13 @@ export default function PlanScreen() {
   const [showPackList, setShowPackList] = useState(false);
   const [showWeatherForecast, setShowWeatherForecast] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  // Travel advisory state
+  const [advisory, setAdvisory] = useState<TravelAdvisory | null>(null);
+  useEffect(() => {
+    if (!selectedCity?.country) { setAdvisory(null); return; }
+    fetchTravelAdvisory(selectedCity.country).then(a => setAdvisory(a));
+  }, [selectedCity?.country]);
 
   // --- Drag & drop sensors ---
   const dndSensors = useSensors(
@@ -276,7 +290,14 @@ export default function PlanScreen() {
           >
             Start Exploring →
           </button>
+          <button
+            onClick={() => { if (!requireAuth()) return; setShowAddLinkModal(true); }}
+            className="flex items-center gap-2 py-2.5 px-5 rounded-xl border border-dashed border-accent-amber text-accent-amber text-[13px] font-semibold cursor-pointer bg-transparent"
+          >
+            {'\u2795'} Quick Add
+          </button>
         </div>
+        {showAddLinkModal && <AddFromLinkModal onClose={() => setShowAddLinkModal(false)} />}
       </div>
     );
   }
@@ -294,27 +315,53 @@ export default function PlanScreen() {
           {cityLabel} · {totalStops} stop{totalStops !== 1 ? 's' : ''} · {dayCount} day{dayCount !== 1 ? 's' : ''}
         </p>
         {/* Trip date picker */}
-        <button
-          onClick={() => dateInputRef.current?.showPicker()}
-          className="mt-2 flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-border-medium bg-bg-subtle text-text-secondary text-xs font-medium cursor-pointer"
-        >
+        <div className="relative mt-2 inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-border-medium bg-bg-subtle text-text-secondary text-xs font-medium cursor-pointer">
           <span>{'\u{1F4C5}'}</span>
           {tripStartDate
             ? <>Trip starts {new Date(tripStartDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
               <span
                 onClick={e => { e.stopPropagation(); setTripStartDate(null); }}
-                className="ml-1 text-text-tertiary"
+                className="ml-1 text-text-tertiary relative z-10"
               >{'\u2715'}</span>
             </>
             : 'Set trip date'}
-        </button>
-        <input
-          ref={dateInputRef}
-          type="date"
-          className="sr-only"
-          value={tripStartDate || ''}
-          onChange={e => setTripStartDate(e.target.value || null)}
-        />
+          <input
+            ref={dateInputRef}
+            type="date"
+            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+            value={tripStartDate || ''}
+            onChange={e => setTripStartDate(e.target.value || null)}
+          />
+        </div>
+
+        {/* Trip countdown */}
+        {tripStartDate && (() => {
+          const start = new Date(tripStartDate + 'T00:00:00');
+          const today = new Date(); today.setHours(0, 0, 0, 0);
+          const daysUntil = Math.floor((start.getTime() - today.getTime()) / 86400000);
+          if (daysUntil > 0) return (
+            <div className="mt-2 py-2 px-3 rounded-xl bg-amber-tint-bg10 border border-amber-tint-border20 text-center">
+              <span className="text-sm font-semibold text-accent-amber">
+                {'\u2708\uFE0F'} {daysUntil} {daysUntil === 1 ? 'day' : 'days'} until your trip!
+              </span>
+            </div>
+          );
+          if (daysUntil === 0) return (
+            <div className="mt-2 py-2 px-3 rounded-xl bg-green-tint-bg border border-green-tint-border text-center">
+              <span className="text-sm font-semibold text-status-green">{'\u{1F389}'} Your trip starts today!</span>
+            </div>
+          );
+          return null;
+        })()}
+      </div>
+
+      {/* Quick Add — add events, restaurants, or places manually */}
+      <div
+        onClick={() => { if (!requireAuth()) return; setShowAddLinkModal(true); }}
+        className="mt-1 mb-3 inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-dashed border-accent-amber bg-amber-tint-bg06 text-accent-amber text-xs font-medium cursor-pointer"
+      >
+        <span>{'\u2795'}</span>
+        Quick Add
       </div>
 
       <ContextHint
@@ -371,6 +418,29 @@ export default function PlanScreen() {
         </div>
       )}
 
+      {/* Travel Advisory Banner */}
+      {advisory && (() => {
+        const display = getAdvisoryDisplay(advisory);
+        if (!display) return null;
+        return (
+          <a
+            href={advisory.url || '#'}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`flex items-start gap-2.5 mb-3 p-3 rounded-xl border no-underline ${display.bgClass} ${display.borderClass}`}
+          >
+            <span className="text-lg shrink-0 mt-0.5">{display.emoji}</span>
+            <div className="flex-1 min-w-0">
+              <div className={`text-[13px] font-semibold ${display.color}`}>{display.label}</div>
+              {advisory.summary && (
+                <p className="text-[11px] text-text-secondary mt-0.5 leading-[1.4] line-clamp-2">{advisory.summary}</p>
+              )}
+              <span className="text-[11px] text-text-tertiary mt-1 inline-block">View full advisory →</span>
+            </div>
+          </a>
+        );
+      })()}
+
       {/* Day Tabs */}
       <div className="flex gap-2 overflow-x-auto pb-3 mb-3 scroll-hidden">
         {sortedDays.map(day => {
@@ -392,6 +462,30 @@ export default function PlanScreen() {
           + Day
         </button>
       </div>
+
+      {/* Day-of events banner */}
+      {tripStartDate && (() => {
+        const start = new Date(tripStartDate + 'T00:00:00');
+        start.setDate(start.getDate() + (activeDay - 1));
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const isToday = start.getTime() === today.getTime();
+        if (!isToday) return null;
+        const todayEvents = dayPlan.filter(s => s.type === 'event' && s.event?.date);
+        if (todayEvents.length === 0) return null;
+        return (
+          <div className="mb-3 p-3 rounded-xl bg-purple-tint-bg08 border border-purple-tint-border15">
+            <div className="text-[13px] font-semibold text-events-text mb-1">
+              {'\u{1F3AF}'} {todayEvents.length} event{todayEvents.length !== 1 ? 's' : ''} today
+            </div>
+            {todayEvents.map(s => (
+              <div key={s.id} className="text-[12px] text-text-secondary">
+                {s.event!.name}{s.event!.time && s.event!.time !== 'TBD' ? ` — ${s.event!.time}` : ''}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Active day stops */}
       {dayPlan.length === 0 ? (
@@ -448,11 +542,13 @@ export default function PlanScreen() {
                       aria-label={stop.type === 'place' ? `View details for ${getStopName(stop)}` : undefined}
                     >
                       {stop.type === 'place' && stop.place?.photoUrl && (
-                        <img src={stop.place.photoUrl} alt={stop.place.name} loading="lazy" decoding="async"
+                        <img src={stop.place.photoUrl.startsWith('/api/') ? `${API_URL}${stop.place.photoUrl}` : stop.place.photoUrl} alt={stop.place.name} loading="lazy" decoding="async"
                           className="w-20 h-20 rounded-xl shrink-0 object-cover" />
                       )}
                       {stop.type === 'event' && stop.event?.imageUrl && (
                         <img src={stop.event.imageUrl} alt={stop.event.name} loading="lazy" decoding="async"
+                          referrerPolicy="no-referrer"
+                          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
                           className="w-20 h-20 rounded-xl shrink-0 object-cover" />
                       )}
                       <div className="flex-1 min-w-0">
@@ -481,21 +577,60 @@ export default function PlanScreen() {
                                 <span className="text-text-tertiary"> ({stop.place.reviewCount})</span>
                               </div>
                             )}
+                            {/* Hours status */}
+                            {(() => {
+                              const hs = getHoursStatus(stop.place.hours, stop.place.openNow);
+                              return (
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  <div className={`w-1.5 h-1.5 rounded-full ${stop.place.openNow ? 'bg-status-green' : 'bg-status-red'}`} />
+                                  <span className={`text-[11px] font-medium ${
+                                    hs.urgent ? 'text-status-red' : stop.place.openNow ? 'text-status-green' : 'text-status-red'
+                                  }`}>
+                                    {hs.text}
+                                  </span>
+                                  {hs.urgent && <span className="text-[10px] text-status-red font-semibold">Hurry!</span>}
+                                </div>
+                              );
+                            })()}
                             {stop.reason && (
                               <p className="text-xs text-text-tertiary mt-1 italic leading-snug">{'\u2728'} {stop.reason}</p>
                             )}
-                            {isNightTime(weather?.sunset) && (() => {
-                              const risk = getNightRisk(stop.place.category, stop.place.rating, stop.place.reviewCount, stop.place.openNow);
-                              return (
-                                <div className="flex items-center gap-1 mt-1">
-                                  <span className="text-[11px]">{risk.emoji}</span>
-                                  <span className={`text-[11px] font-medium ${
-                                    risk.level === 'low' ? 'text-status-green' : risk.level === 'moderate' ? 'text-accent-amber' : 'text-status-red'
-                                  }`}>
-                                    {risk.label}
-                                  </span>
-                                </div>
-                              );
+                            {/* Safety indicator — always visible */}
+                            {(() => {
+                              const night = isNightTime(weather?.sunset);
+                              const warning = getPlaceSafety(stop.place.category, stop.place.rating, stop.place.reviewCount, stop.place.openNow, night);
+                              if (warning) {
+                                return (
+                                  <div className="flex items-center gap-1 mt-1">
+                                    <span className="text-[11px]">{warning.emoji}</span>
+                                    <span className={`text-[11px] font-medium ${warning.level === 'warning' ? 'text-status-red' : 'text-accent-amber'}`}>
+                                      {warning.label}
+                                    </span>
+                                  </div>
+                                );
+                              }
+                              if (night) {
+                                const risk = getNightRisk(stop.place.category, stop.place.rating, stop.place.reviewCount, stop.place.openNow);
+                                return (
+                                  <div className="flex items-center gap-1 mt-1">
+                                    <span className="text-[11px]">{risk.emoji}</span>
+                                    <span className={`text-[11px] font-medium ${
+                                      risk.level === 'low' ? 'text-status-green' : risk.level === 'moderate' ? 'text-accent-amber' : 'text-status-red'
+                                    }`}>
+                                      {risk.label}
+                                    </span>
+                                  </div>
+                                );
+                              }
+                              if (stop.place.rating >= 4.0 && stop.place.reviewCount >= 50) {
+                                return (
+                                  <div className="flex items-center gap-1 mt-1">
+                                    <span className="text-[11px]">{'\u{1F6E1}\u{FE0F}'}</span>
+                                    <span className="text-[11px] font-medium text-status-green">Well-reviewed</span>
+                                  </div>
+                                );
+                              }
+                              return null;
                             })()}
                           </>
                         )}
@@ -582,12 +717,14 @@ export default function PlanScreen() {
                             placeId: stop.place!.placeId,
                           };
                           // Try local alternatives first (instant, free)
-                          let alternatives = findPivotAlternatives(allPlaces, stopData, excludeIds);
+                          let alternatives = findPivotAlternatives(allPlaces, stopData, excludeIds, 3, lastPlanVibe || undefined, stop.timeSlot);
                           // If none found locally, search Google Places for nearby similar places
                           if (alternatives.length === 0) {
                             setPivotLoading(true);
                             try {
-                              const vibe = TYPE_TO_VIBE[stop.place!.category] || stop.place!.tags?.[0] || 'food';
+                              // For food/stacked vibes, always search for food places
+                              const isFoodPlan = lastPlanVibe === 'food' || lastPlanVibe === 'stacked';
+                              const vibe = isFoodPlan ? 'eatsip' : (TYPE_TO_VIBE[stop.place!.category] || stop.place!.tags?.[0] || 'eatsip');
                               const googlePlaces = await searchNearby(
                                 stop.place!.lat, stop.place!.lng,
                                 [vibe],
@@ -914,7 +1051,17 @@ export default function PlanScreen() {
             </button>
           )}
         </div>
+
+        {/* Safety Disclaimer */}
+        <div className="mt-6 mb-2 px-1">
+          <p className="text-[11px] text-text-tertiary leading-[1.5] text-center">
+            NxStops recommendations are for informational purposes only. Hours, safety data, and travel advisories may not be current. Always verify with venues directly and use your own judgment.
+          </p>
+        </div>
       </div>
+
+      {/* Add from Link modal */}
+      {showAddLinkModal && <AddFromLinkModal onClose={() => setShowAddLinkModal(false)} />}
     </div>
   );
 }

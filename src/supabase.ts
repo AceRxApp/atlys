@@ -1,10 +1,21 @@
 import { createClient, RealtimeChannel } from '@supabase/supabase-js';
 import type { Session } from '@supabase/supabase-js';
+import { Capacitor } from '@capacitor/core';
+import { API_URL } from './utils/api';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/**
+ * Redirect URL for auth callbacks.
+ * - Web: current origin (e.g. https://nxstops.com/)
+ * - Native (Capacitor): custom URL scheme that iOS/Android can handle
+ */
+const AUTH_REDIRECT_URL = Capacitor.isNativePlatform()
+  ? 'nxstops://auth-callback/'
+  : `${window.location.origin}/`;
 
 export async function fetchCities() {
   const { data, error } = await supabase
@@ -114,22 +125,29 @@ export async function toggleCityActive(cityId: string, isActive: boolean) {
 // ============================================================================
 
 export async function authSignUp(email: string, password: string, name?: string) {
+  // For native apps, email verification links should open the web app (not localhost)
+  const emailRedirect = Capacitor.isNativePlatform()
+    ? 'https://nxstops.com/'
+    : `${window.location.origin}/`;
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: { full_name: name || '' },
-      emailRedirectTo: `${window.location.origin}/`,
+      emailRedirectTo: emailRedirect,
     },
   });
   return { data, error };
 }
 
 export async function authResendVerification(email: string) {
+  const emailRedirect = Capacitor.isNativePlatform()
+    ? 'https://nxstops.com/'
+    : `${window.location.origin}/`;
   const { error } = await supabase.auth.resend({
     type: 'signup',
     email,
-    options: { emailRedirectTo: `${window.location.origin}/` },
+    options: { emailRedirectTo: emailRedirect },
   });
   return { error };
 }
@@ -144,70 +162,168 @@ export async function authSignOut() {
   return { error };
 }
 
+export async function authSignInWithGoogle() {
+  if (Capacitor.isNativePlatform()) {
+    // Native: get OAuth URL without redirecting, then open in system browser
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: AUTH_REDIRECT_URL,
+        skipBrowserRedirect: true,
+      },
+    });
+    if (data?.url) {
+      const { Browser } = await import('@capacitor/browser');
+      await Browser.open({ url: data.url });
+    }
+    return { data, error };
+  }
+  // Web: normal redirect flow
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: AUTH_REDIRECT_URL },
+  });
+  return { data, error };
+}
+
+export async function authSignInWithApple() {
+  if (Capacitor.isNativePlatform()) {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'apple',
+      options: {
+        redirectTo: AUTH_REDIRECT_URL,
+        skipBrowserRedirect: true,
+      },
+    });
+    if (data?.url) {
+      const { Browser } = await import('@capacitor/browser');
+      await Browser.open({ url: data.url });
+    }
+    return { data, error };
+  }
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'apple',
+    options: { redirectTo: AUTH_REDIRECT_URL },
+  });
+  return { data, error };
+}
+
 export async function authResetPassword(email: string) {
+  const emailRedirect = Capacitor.isNativePlatform()
+    ? 'https://nxstops.com/'
+    : `${window.location.origin}/`;
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/`,
+    redirectTo: emailRedirect,
   });
   return { error };
 }
 
-async function compressImage(file: File, maxSize = 512, quality = 0.8): Promise<File> {
-  if (file.size <= 100_000) return file;
+/**
+ * Compress image to a Blob for Supabase Storage upload (reviews, dish images).
+ */
+function compressImage(file: File, maxSize: number, quality: number): Promise<Blob> {
   return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      let { width, height } = img;
-      if (width > maxSize || height > maxSize) {
-        const ratio = Math.min(maxSize / width, maxSize / height);
-        width = Math.round(width * ratio);
-        height = Math.round(height * ratio);
-      }
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) { resolve(file); return; }
-      ctx.drawImage(img, 0, 0, width, height);
-      canvas.toBlob(
-        (blob) => resolve(blob ? new File([blob], file.name, { type: 'image/jpeg' }) : file),
-        'image/jpeg',
-        quality,
-      );
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          let w = img.naturalWidth, h = img.naturalHeight;
+          if (w > maxSize || h > maxSize) {
+            if (w > h) { h = Math.round((h / w) * maxSize); w = maxSize; }
+            else { w = Math.round((w / h) * maxSize); h = maxSize; }
+          }
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) { resolve(file); return; }
+          ctx.drawImage(img, 0, 0, w, h);
+          canvas.toBlob(
+            blob => resolve(blob || file),
+            'image/jpeg',
+            quality,
+          );
+        } catch { resolve(file); }
+      };
+      img.onerror = () => resolve(file);
+      img.src = reader.result as string;
     };
-    img.onerror = () => resolve(file);
-    img.src = URL.createObjectURL(file);
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
   });
 }
 
-export async function uploadAvatar(userId: string, file: File): Promise<{ url: string | null; error: string | null }> {
-  const compressed = await compressImage(file);
-  const path = `${userId}/avatar.jpg`;
+/**
+ * Compress image to a square JPEG base64 data URL for avatar.
+ * Uses createImageBitmap (reliable for large iOS photos) with FileReader fallback.
+ */
+async function compressToDataUrl(file: File, maxSize = 256, quality = 0.7): Promise<string> {
+  const canvas = document.createElement('canvas');
+  let imgWidth: number, imgHeight: number;
+  let drawSource: CanvasImageSource;
 
-  // Upload compressed image to Supabase Storage (overwrites if exists)
-  const { error: uploadError } = await supabase.storage
-    .from('avatars')
-    .upload(path, compressed, { upsert: true, contentType: 'image/jpeg' });
-
-  if (uploadError) {
-    console.error('Avatar upload error:', uploadError);
-    return { url: null, error: uploadError.message };
+  if (typeof createImageBitmap === 'function') {
+    const bmp = await createImageBitmap(file);
+    imgWidth = bmp.width;
+    imgHeight = bmp.height;
+    drawSource = bmp;
+  } else {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error('Failed to load image'));
+        image.src = reader.result as string;
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+    imgWidth = img.naturalWidth;
+    imgHeight = img.naturalHeight;
+    drawSource = img;
   }
 
-  // Get public URL
-  const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
-  const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`; // cache-bust
-
-  // Save to user metadata
-  const { error: updateError } = await supabase.auth.updateUser({
-    data: { avatar_url: publicUrl },
-  });
-
-  if (updateError) {
-    console.error('Avatar metadata update error:', updateError);
-    return { url: publicUrl, error: updateError.message };
+  const cropSize = Math.min(imgWidth, imgHeight);
+  const sx = (imgWidth - cropSize) / 2;
+  const sy = (imgHeight - cropSize) / 2;
+  const outSize = Math.min(cropSize, maxSize);
+  canvas.width = outSize;
+  canvas.height = outSize;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas not supported');
+  ctx.drawImage(drawSource, sx, sy, cropSize, cropSize, 0, 0, outSize, outSize);
+  if ('close' in drawSource && typeof (drawSource as ImageBitmap).close === 'function') {
+    (drawSource as ImageBitmap).close();
   }
+  return canvas.toDataURL('image/jpeg', quality);
+}
 
-  return { url: publicUrl, error: null };
+export async function uploadAvatar(_userId: string, file: File): Promise<{ url: string | null; error: string | null }> {
+  try {
+    // Compress to base64 data URL (~15-30KB for 256x256 JPEG)
+    const dataUrl = await compressToDataUrl(file);
+
+    // Store in localStorage for instant access
+    localStorage.setItem('nxstops_avatar_url', dataUrl);
+
+    // Verify the write actually persisted
+    const stored = localStorage.getItem('nxstops_avatar_url');
+    if (!stored || !stored.startsWith('data:image/')) {
+      return { url: null, error: 'Failed to save photo — storage may be full or unavailable' };
+    }
+
+    // Also save to Supabase user_metadata so it survives app reinstalls
+    try {
+      await supabase.auth.updateUser({ data: { avatar_url: dataUrl } });
+    } catch { /* non-critical — localStorage is the primary store */ }
+
+    return { url: dataUrl, error: null };
+  } catch (err) {
+    console.error('Avatar processing error:', err);
+    return { url: null, error: err instanceof Error ? err.message : 'Failed to process image' };
+  }
 }
 
 export async function authGetSession(): Promise<Session | null> {
@@ -450,7 +566,7 @@ export async function deleteAccount(): Promise<{ success: boolean; error?: strin
   const session = await authGetSession();
   if (!session) return { success: false, error: 'Not authenticated' };
 
-  const response = await fetch('/api/account-delete', {
+  const response = await fetch(`${API_URL}/api/user-actions?action=delete-account`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -528,7 +644,7 @@ export async function submitReport(
   const session = await authGetSession();
   if (!session) return { success: false, error: 'Not authenticated' };
 
-  const response = await fetch('/api/report', {
+  const response = await fetch(`${API_URL}/api/user-actions?action=report`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

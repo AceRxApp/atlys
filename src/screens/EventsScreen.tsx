@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { track } from '@vercel/analytics';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import EventCard from '../components/EventCard';
 import BookingLinks from '../components/BookingLinks';
 import ContextHint from '../components/ContextHint';
 import { SkeletonCard } from '../components/ui';
+import { tagEventUrl } from '../data/bookingLinks';
 import { APIProvider, Map, Marker, InfoWindow } from '@vis.gl/react-google-maps';
 import type { EventItem } from '../types';
 
@@ -25,7 +27,7 @@ const EVENT_CATEGORIES = [
 const DATE_FILTERS = [
   { id: 'all', label: 'All Dates' },
   { id: 'today', label: 'Today' },
-  { id: 'weekend', label: 'This Weekend' },
+  { id: 'week', label: 'This Week' },
   { id: 'month', label: 'This Month' },
 ];
 
@@ -99,7 +101,8 @@ function EventsMapView({ eventsList }: { eventsList: EventItem[] }) {
                   </div>
                   <div className="text-[11px] text-[#78716C] mb-2">{event.venue}</div>
                   {event.url && (
-                    <a href={event.url} target="_blank" rel="noopener noreferrer"
+                    <a href={tagEventUrl(event.url, event.source)} target="_blank" rel="noopener noreferrer"
+                      onClick={() => track('event_ticket_click', { event: event.name, source: event.source || '', category: event.category || '' })}
                       className="block p-1.5 rounded-md bg-[#C48A5A] text-white text-[11px] font-semibold text-center no-underline">
                       Get Tickets
                     </a>
@@ -167,24 +170,14 @@ export default function EventsScreen() {
 
       if (dateFilter === 'today') {
         if (event.date !== todayStr) return false;
-      } else if (dateFilter === 'weekend') {
+      } else if (dateFilter === 'week') {
+        // This Week: today through the coming Sunday (includes weekend)
         const dayOfWeek = today.getDay(); // 0=Sun, 6=Sat
-        const saturday = new Date(today);
-        const sunday = new Date(today);
-        if (dayOfWeek === 0) {
-          // Today is Sunday — show yesterday (Sat) + today (Sun)
-          saturday.setDate(today.getDate() - 1);
-        } else if (dayOfWeek === 6) {
-          // Today is Saturday — show today (Sat) + tomorrow (Sun)
-          sunday.setDate(today.getDate() + 1);
-        } else {
-          // Weekday — show upcoming Sat + Sun
-          saturday.setDate(today.getDate() + (6 - dayOfWeek));
-          sunday.setDate(today.getDate() + (7 - dayOfWeek));
-        }
-        const satStr = toLocal(saturday);
-        const sunStr = toLocal(sunday);
-        if (event.date < satStr || event.date > sunStr) return false;
+        const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+        const endOfWeek = new Date(today);
+        endOfWeek.setDate(today.getDate() + daysUntilSunday);
+        const endOfWeekStr = toLocal(endOfWeek);
+        if (event.date < todayStr || event.date > endOfWeekStr) return false;
       } else if (dateFilter === 'month') {
         const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
         const monthEndStr = toLocal(monthEnd);
@@ -399,7 +392,7 @@ export default function EventsScreen() {
       ) : eventsViewMode === 'map' ? (
         <EventsMapView eventsList={filteredEvents} />
       ) : (
-        <div>
+        <div className="md:grid md:grid-cols-2 md:gap-4">
           {filteredEvents.map(event => (
             <EventCard key={event.id} event={event} />
           ))}

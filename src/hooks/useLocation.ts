@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { API_URL } from '../utils/api';
 
 interface LocationState {
   lat: number | null;
@@ -41,7 +42,7 @@ export function useLocation() {
         let city: string | null = null;
         try {
           const response = await fetch(
-            `/api/places?action=geocode&lat=${latitude}&lng=${longitude}`
+            `${API_URL}/api/places?action=geocode&lat=${latitude}&lng=${longitude}`
           );
           const data = await response.json();
           city = data.city || null;

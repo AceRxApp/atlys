@@ -4,6 +4,7 @@ import { fetchSharedPlan } from '../supabase';
 import type { Stop } from '../types';
 import { formatDistance } from '../services/places';
 import { haversineKm } from '../utils/transport';
+import { API_URL } from '../utils/api';
 
 const getStopName = (stop: Stop) =>
   stop.type === 'event' ? (stop.event?.name || 'Event') : (stop.place?.name || 'Place');
@@ -138,7 +139,8 @@ export default function SharedPlanScreen() {
             {dayPlan.map((stop, index) => {
               const name = getStopName(stop);
               const category = getStopCategory(stop);
-              const photoUrl = stop.place?.photoUrl || null;
+              const rawPhoto = stop.place?.photoUrl || null;
+              const photoUrl = rawPhoto && rawPhoto.startsWith('/api/') ? `${API_URL}${rawPhoto}` : rawPhoto;
               const rating = stop.place?.rating || 0;
               const reviewCount = stop.place?.reviewCount || 0;
 

@@ -5,9 +5,11 @@ import { VIBES, QUICK_FILTERS, SMART_FILTERS, COMMUNITY_TAGS } from '../data';
 import { formatDistance } from '../services/places';
 import { SkeletonCard } from '../components/ui';
 import PlaceCard from '../components/PlaceCard';
-import { APIProvider, Map, Marker, InfoWindow } from '@vis.gl/react-google-maps';
+import { APIProvider, Map, Marker, AdvancedMarker, Pin, InfoWindow } from '@vis.gl/react-google-maps';
 import type { Place } from '../services/places';
+import type { EventItem } from '../types';
 import ContextHint from '../components/ContextHint';
+import { getSunsetGuardian, getRegionSafetyAlert } from '../utils/safetyEngine';
 
 // ---------------------------------------------------------------------------
 // PlacesMapView (local component -- only used within DiscoverScreen)
@@ -22,11 +24,23 @@ function PlacesMapView({ places: mapPlaces }: { places: Place[] }) {
     useMiles,
     MAPS_API_KEY,
     getMapCenter,
+    events,
+    formatEventTime,
+    addEventToPlan,
+    isEventInPlan,
   } = useApp();
 
   const { theme } = useTheme();
+  const [showEventPins, setShowEventPins] = useState(false);
+  const [activeEventId, setActiveEventId] = useState<string | null>(null);
 
   const center = getMapCenter();
+
+  // Today's events with valid coordinates
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayEvents = events.filter(
+    (e: EventItem) => e.date === todayStr && e.lat != null && e.lng != null
+  );
 
   if (!MAPS_API_KEY) {
     return (
@@ -39,25 +53,60 @@ function PlacesMapView({ places: mapPlaces }: { places: Place[] }) {
   }
 
   return (
-    <div className="h-[calc(100vh-280px)] rounded-2xl overflow-hidden border border-border-subtle">
+    <div className="relative h-[calc(100vh-280px)] rounded-2xl overflow-hidden border border-border-subtle">
+      {/* Live Pulse toggle — only shows when events exist today */}
+      {todayEvents.length > 0 && (
+        <button
+          onClick={() => { setShowEventPins(v => !v); if (showEventPins) setActiveEventId(null); }}
+          className={`absolute top-3 right-3 z-10 flex items-center gap-1.5 py-2 px-3 rounded-xl text-xs font-medium cursor-pointer border shadow-sm transition-colors ${
+            showEventPins
+              ? 'bg-[rgba(196,138,90,0.15)] border-[rgba(196,138,90,0.4)] text-[#C48A5A]'
+              : 'bg-bg-card border-border-medium text-text-secondary'
+          }`}
+        >
+          🎫 Today
+          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+            showEventPins ? 'bg-[rgba(196,138,90,0.2)] text-[#C48A5A]' : 'bg-bg-subtle text-text-tertiary'
+          }`}>
+            {todayEvents.length}
+          </span>
+        </button>
+      )}
+
       <APIProvider apiKey={MAPS_API_KEY}>
         <Map
           defaultCenter={center}
           defaultZoom={14}
           gestureHandling="greedy"
           disableDefaultUI={true}
+          mapId="discover-map"
           style={{ width: '100%', height: '100%' }}
           colorScheme={theme.mapColorScheme}
         >
+          {/* Place markers */}
           {mapPlaces.filter(p => p.lat && p.lng).map(place => (
             <Marker
               key={place.placeId}
               position={{ lat: place.lat!, lng: place.lng! }}
-              onClick={() => setActiveMapPin(activeMapPin === place.placeId ? null : place.placeId)}
+              onClick={() => { setActiveMapPin(activeMapPin === place.placeId ? null : place.placeId); setActiveEventId(null); }}
               title={place.name}
             />
           ))}
-          {activeMapPin && (() => {
+
+          {/* Event markers — bronze pins, only when toggle is on */}
+          {showEventPins && todayEvents.map(event => (
+            <AdvancedMarker
+              key={event.id}
+              position={{ lat: event.lat!, lng: event.lng! }}
+              onClick={() => { setActiveEventId(activeEventId === event.id ? null : event.id); setActiveMapPin(null); }}
+              title={event.name}
+            >
+              <Pin background="#C48A5A" borderColor="#A0714A" glyphColor="#FFF" scale={0.9} />
+            </AdvancedMarker>
+          ))}
+
+          {/* Place InfoWindow */}
+          {activeMapPin && !activeEventId && (() => {
             const place = mapPlaces.find(p => p.placeId === activeMapPin);
             if (!place || !place.lat || !place.lng) return null;
             return (
@@ -90,6 +139,49 @@ function PlacesMapView({ places: mapPlaces }: { places: Place[] }) {
               </InfoWindow>
             );
           })()}
+
+          {/* Event InfoWindow */}
+          {activeEventId && (() => {
+            const event = todayEvents.find(e => e.id === activeEventId);
+            if (!event || !event.lat || !event.lng) return null;
+            return (
+              <InfoWindow
+                position={{ lat: event.lat, lng: event.lng }}
+                onCloseClick={() => setActiveEventId(null)}
+              >
+                <div className="p-1 min-w-[160px] text-[#1C1917]">
+                  <div className="font-bold text-sm mb-1">{event.name}</div>
+                  <div className="text-xs text-[#57534E] mb-0.5">
+                    {formatEventTime(event.time)} · {event.category}
+                  </div>
+                  <div className="text-xs text-[#78716C] mb-2 truncate max-w-[200px]">{event.venue}</div>
+                  <div className="flex gap-1.5">
+                    {event.url && (
+                      <a
+                        href={event.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 p-1.5 rounded-md border-none bg-[#C48A5A] text-white text-xs font-semibold cursor-pointer text-center no-underline"
+                      >
+                        Tickets
+                      </a>
+                    )}
+                    <button
+                      onClick={() => { addEventToPlan(event); setActiveEventId(null); }}
+                      disabled={isEventInPlan(event.id)}
+                      className={`flex-1 p-1.5 rounded-md border text-xs font-semibold cursor-pointer ${
+                        isEventInPlan(event.id)
+                          ? 'border-[#D6D3D1] bg-[#F5F5F4] text-[#A8A29E]'
+                          : 'border-[#D6D3D1] bg-white text-[#1C1917]'
+                      }`}
+                    >
+                      {isEventInPlan(event.id) ? 'Added' : '+ Plan'}
+                    </button>
+                  </div>
+                </div>
+              </InfoWindow>
+            );
+          })()}
         </Map>
       </APIProvider>
     </div>
@@ -108,7 +200,7 @@ export default function DiscoverScreen() {
     requestNotificationPermission,
     dismissNotificationPrompt,
     cityLabel,
-    filteredPlaces,
+    filteredPlaces: allFilteredPlaces,
     viewMode,
     setViewMode,
     searchQuery,
@@ -140,11 +232,16 @@ export default function DiscoverScreen() {
     getMapCenter,
     fetchPlaces,
     weather,
-    forYouPlaces,
+    forYouPlaces: allForYouPlaces,
     user,
     requireAuth,
     setScreen,
+    isInPlan,
   } = useApp();
+
+  // Filter out places already in the user's plan to avoid duplicates across tabs
+  const filteredPlaces = allFilteredPlaces.filter(p => !isInPlan(p.placeId));
+  const forYouPlaces = allForYouPlaces.filter(p => !isInPlan(p.placeId));
 
   const { theme } = useTheme();
   const [showFilters, setShowFilters] = useState(false);
@@ -227,7 +324,7 @@ export default function DiscoverScreen() {
           <h1 className="text-xl font-bold mb-0.5">
             {cityLabel} 📍
           </h1>
-          <p className="text-text-tertiary text-[13px]">{filteredPlaces.length} places nearby</p>
+          <p className="text-text-tertiary text-[13px]">{filteredPlaces.length} local & culturally diverse spots</p>
         </div>
         <div className="flex rounded-[10px] overflow-hidden border border-border-strong shrink-0">
           <button onClick={() => setViewMode('list')}
@@ -248,6 +345,56 @@ export default function DiscoverScreen() {
           </button>
         </div>
       </div>
+
+      {/* Region Safety Alert — always-on for high-risk countries */}
+      {(() => {
+        const alert = getRegionSafetyAlert(selectedCity?.country);
+        if (!alert) return null;
+        const colors = {
+          extreme: { bg: 'bg-[rgba(239,68,68,0.12)]', border: 'border-[rgba(239,68,68,0.3)]', text: 'text-[#F87171]' },
+          high: { bg: 'bg-[rgba(251,146,60,0.10)]', border: 'border-[rgba(251,146,60,0.25)]', text: 'text-[#FB923C]' },
+          elevated: { bg: 'bg-[rgba(250,204,21,0.08)]', border: 'border-[rgba(250,204,21,0.2)]', text: 'text-[#FACC15]' },
+        };
+        const c = colors[alert.level];
+        return (
+          <div className={`p-3 rounded-xl mb-3 border ${c.bg} ${c.border}`}>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-lg">{alert.emoji}</span>
+              <span className={`text-[12px] font-bold uppercase tracking-wide ${c.text}`}>{alert.label} — {selectedCity?.country}</span>
+            </div>
+            <p className={`text-[11px] leading-relaxed ${c.text} opacity-90 mb-2`}>{alert.message}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {alert.tips.slice(0, 3).map((tip, i) => (
+                <span key={i} className={`text-[10px] px-2 py-1 rounded-md ${c.bg} border ${c.border} ${c.text} opacity-80`}>
+                  {tip}
+                </span>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Sunset Guardian Banner */}
+      {(() => {
+        const guardian = getSunsetGuardian(weather?.sunset);
+        if (!guardian.active) return null;
+        return (
+          <div className={`flex items-center gap-2.5 p-3 rounded-xl mb-3 border ${
+            guardian.phase === 'night'
+              ? 'bg-[rgba(99,102,241,0.08)] border-[rgba(99,102,241,0.2)]'
+              : guardian.phase === 'golden_hour'
+              ? 'bg-amber-tint-bg10 border-amber-tint-border15'
+              : 'bg-[rgba(99,102,241,0.06)] border-[rgba(99,102,241,0.15)]'
+          }`}>
+            <span className="text-lg">{guardian.emoji}</span>
+            <span className={`text-[12px] font-medium ${
+              guardian.phase === 'night' ? 'text-[#818CF8]' : 'text-accent-amber'
+            }`}>
+              {guardian.message}
+            </span>
+          </div>
+        );
+      })()}
 
       {/* Search Bar */}
       <div className="flex gap-2 mb-3">
@@ -305,7 +452,29 @@ export default function DiscoverScreen() {
       </div>
       )}
 
-      {/* Filters toggle + collapsible filters */}
+      {/* Community Tags — always visible, core to NxStops */}
+      {!showSearch && (
+      <div className="flex gap-1.5 overflow-x-auto pb-2 mb-1 scroll-hidden">
+        {COMMUNITY_TAGS.map(tag => {
+          const active = communityFilters.includes(tag.id);
+          return (
+            <button key={tag.id}
+              aria-pressed={active}
+              aria-label={`Filter by ${tag.label}`}
+              onClick={() => setCommunityFilters(active ? communityFilters.filter(f => f !== tag.id) : [...communityFilters, tag.id])}
+              className={`py-2 px-3 rounded-2xl text-xs font-medium cursor-pointer whitespace-nowrap shrink-0 min-h-[38px] ${
+                active
+                  ? 'border border-community-tint-border40 bg-community-tint-bg12 text-community-text'
+                  : 'border border-community-tint-border20 bg-transparent text-text-secondary'
+              }`}>
+              {tag.emoji} {tag.label}
+            </button>
+          );
+        })}
+      </div>
+      )}
+
+      {/* More Filters toggle + collapsible filters */}
       {!showSearch && (
       <div className="mb-2">
         <button
@@ -315,10 +484,10 @@ export default function DiscoverScreen() {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="16" y2="12" /><line x1="4" y1="18" x2="12" y2="18" />
           </svg>
-          Filters
-          {(quickFilters.length > 0 || communityFilters.length > 0) && (
+          More Filters
+          {quickFilters.length > 0 && (
             <span className="px-1.5 py-0.5 rounded-full bg-amber-tint-bg15 text-accent-amber text-[10px] font-bold">
-              {quickFilters.length + communityFilters.length}
+              {quickFilters.length}
             </span>
           )}
           <span className="text-text-muted text-[10px]" style={{ transform: showFilters ? 'rotate(180deg)' : 'rotate(0deg)' }}>
@@ -366,22 +535,6 @@ export default function DiscoverScreen() {
               </button>
             );
           })}
-          {COMMUNITY_TAGS.map(tag => {
-            const active = communityFilters.includes(tag.id);
-            return (
-              <button key={tag.id}
-                aria-pressed={active}
-                aria-label={`Filter by ${tag.label}`}
-                onClick={() => setCommunityFilters(active ? communityFilters.filter(f => f !== tag.id) : [...communityFilters, tag.id])}
-                className={`py-2.5 px-3.5 rounded-2xl text-xs font-medium cursor-pointer whitespace-nowrap shrink-0 min-h-[44px] ${
-                  active
-                    ? 'border border-community-tint-border40 bg-community-tint-bg12 text-community-text'
-                    : 'border border-border-subtle bg-transparent text-text-muted'
-                }`}>
-                {tag.emoji} {tag.label}
-              </button>
-            );
-          })}
         </div>
         )}
       </div>
@@ -413,37 +566,30 @@ export default function DiscoverScreen() {
                   <p className="text-text-secondary text-sm">No results found. Try a different search.</p>
                 </div>
               )}
+              <div className="md:grid md:grid-cols-2 md:gap-4">
               {!isSearching && searchResults.map(place => (
                 <PlaceCard key={place.placeId} place={place} />
               ))}
+              </div>
             </>
           ) : (
             <>
-              {/* Hidden Gems banner */}
-              {selectedVibes.includes('hidden') && !placesLoading && filteredPlaces.length > 0 && (
-                <div className="card mb-3 px-[18px] py-4" style={{ background: `linear-gradient(135deg, var(--purple-tint-bg08), rgba(139,92,246,0.04))`, border: `1px solid var(--purple-tint-border15)` }}>
-                  <div className="flex items-center gap-2.5 mb-1.5">
-                    <span className="text-xl">💎</span>
-                    <span className="font-semibold text-[15px] text-text-primary">Hidden Gems</span>
+              {/* Vibe banner — shows description for active vibe */}
+              {selectedVibes.length > 0 && !placesLoading && filteredPlaces.length > 0 && (() => {
+                const activeVibe = VIBES.find(v => selectedVibes.includes(v.id));
+                if (!activeVibe) return null;
+                return (
+                  <div className="card mb-3 px-[18px] py-4" style={{ background: `linear-gradient(135deg, var(--amber-tint-bg10), rgba(245,158,11,0.04))`, border: `1px solid var(--amber-tint-border15)` }}>
+                    <div className="flex items-center gap-2.5 mb-1.5">
+                      <span className="text-xl">{activeVibe.emoji}</span>
+                      <span className="font-semibold text-[15px] text-text-primary">{activeVibe.label}</span>
+                    </div>
+                    <p className="text-xs text-text-secondary leading-[1.5] m-0">
+                      {activeVibe.desc}
+                    </p>
                   </div>
-                  <p className="text-xs text-text-secondary leading-[1.5] m-0">
-                    Highly-rated spots most people don't know about — no chains, no tourist traps. The kind of places only locals would take you.
-                  </p>
-                </div>
-              )}
-
-              {/* Locals banner */}
-              {selectedVibes.includes('locals') && !placesLoading && filteredPlaces.length > 0 && (
-                <div className="card mb-3 px-[18px] py-4" style={{ background: `linear-gradient(135deg, var(--green-tint-bg), rgba(34,197,94,0.04))`, border: `1px solid var(--green-tint-border)` }}>
-                  <div className="flex items-center gap-2.5 mb-1.5">
-                    <span className="text-xl">🌻</span>
-                    <span className="font-semibold text-[15px] text-text-primary">Locals</span>
-                  </div>
-                  <p className="text-xs text-text-secondary leading-[1.5] m-0">
-                    Neighborhood favorites — bakeries, flower shops, bookstores, markets, and the charming spots locals love.
-                  </p>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Loading */}
               {placesLoading && <><SkeletonCard /><SkeletonCard /><SkeletonCard /></>}
@@ -503,12 +649,12 @@ export default function DiscoverScreen() {
                         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPlace(place); } }}
                         className="card !p-0 overflow-hidden min-w-[180px] max-w-[200px] shrink-0 cursor-pointer border border-amber-tint-border15">
                         {place.photoUrl ? (
-                          <div className="h-[90px] w-full bg-cover bg-center"
-                            style={{
-                              background: `linear-gradient(to bottom, transparent 40%, var(--bg-image-overlay)), url(${place.photoUrl})`,
-                              backgroundSize: 'cover',
-                              backgroundPosition: 'center',
-                            }} />
+                          <div className="h-[90px] w-full relative overflow-hidden">
+                            <img src={place.photoUrl} alt={place.name} loading="lazy" decoding="async"
+                              className="w-full h-full object-cover block"
+                              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                            <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 40%, var(--bg-image-overlay))' }} />
+                          </div>
                         ) : (
                           <div className="h-[90px] w-full bg-amber-tint-bg06 flex items-center justify-center text-2xl">{'\u2728'}</div>
                         )}
@@ -527,9 +673,11 @@ export default function DiscoverScreen() {
               )}
 
               {/* Place Cards */}
+              <div className="md:grid md:grid-cols-2 md:gap-4">
               {!placesLoading && filteredPlaces.map(place => (
                 <PlaceCard key={place.placeId} place={place} />
               ))}
+              </div>
 
               {/* Expand Radius */}
               {!placesLoading && filteredPlaces.length > 0 && (

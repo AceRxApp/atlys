@@ -2,11 +2,11 @@ import type { Place } from '../services/places';
 import { haversineKm } from './transport';
 
 const VIBE_TYPE_MAP: Record<string, string[]> = {
-  food: ['restaurant', 'cafe', 'bakery', 'bar', 'coffee_shop', 'pizza_restaurant', 'sushi_restaurant', 'steak_house', 'seafood_restaurant', 'brunch_restaurant', 'breakfast_restaurant', 'ice_cream_shop', 'meal_delivery', 'meal_takeaway'],
-  stay: ['hotel', 'motel', 'hostel', 'lodging', 'resort_hotel', 'bed_and_breakfast', 'guest_house', 'campground', 'rv_park'],
-  todo: ['museum', 'art_gallery', 'tourist_attraction', 'amusement_park', 'aquarium', 'zoo', 'performing_arts_theater', 'movie_theater', 'stadium', 'bowling_alley', 'spa'],
-  hidden: ['park', 'market', 'book_store', 'record_store', 'antique_store', 'garden', 'viewpoint'],
-  locals: ['night_club', 'bar', 'cafe', 'coffee_shop', 'market', 'park'],
+  thespot: ['bar', 'wine_bar', 'tourist_attraction', 'park', 'spa', 'bowling_alley', 'amusement_park', 'aquarium', 'zoo', 'historical_landmark', 'performing_arts_theater', 'movie_theater', 'book_store', 'market', 'stadium'],
+  eatsip: ['restaurant', 'cafe', 'bakery', 'bar', 'coffee_shop', 'pizza_restaurant', 'sushi_restaurant', 'steak_house', 'seafood_restaurant', 'brunch_restaurant', 'breakfast_restaurant', 'ice_cream_shop', 'meal_delivery', 'meal_takeaway'],
+  nightlife: ['bar', 'night_club', 'casino', 'wine_bar', 'event_venue', 'karaoke', 'comedy_club', 'performing_arts_theater', 'community_center'],
+  cultureart: ['museum', 'art_gallery', 'tourist_attraction', 'amusement_park', 'aquarium', 'zoo', 'performing_arts_theater', 'movie_theater', 'stadium', 'bowling_alley', 'spa'],
+  neighborhood: ['park', 'cafe', 'bakery', 'coffee_shop', 'market', 'bar', 'library', 'community_center', 'clothing_store', 'gift_shop', 'book_store', 'florist', 'art_gallery', 'beauty_salon', 'jewelry_store'],
 };
 
 // Reverse map: category → vibe
@@ -27,17 +27,66 @@ function shuffle<T>(arr: T[]): T[] {
   return copy;
 }
 
+/** Categories that are food/drink */
+const FOOD_CATEGORIES = new Set([
+  'restaurant', 'cafe', 'coffee_shop', 'bar', 'bakery', 'wine_bar',
+  'steak_house', 'seafood_restaurant', 'pizza_restaurant', 'sushi_restaurant',
+  'brunch_restaurant', 'breakfast_restaurant', 'sandwich_shop', 'ice_cream_shop',
+  'meal_takeaway', 'meal_delivery', 'food', 'night_club',
+  'bistro', 'diner', 'grill', 'bbq', 'tea_house', 'dessert_shop',
+]);
+
+/** Categories appropriate for breakfast/brunch (morning slots) */
+const BREAKFAST_CATEGORIES = new Set([
+  'cafe', 'coffee_shop', 'bakery', 'brunch_restaurant', 'breakfast_restaurant',
+  'restaurant', 'bistro', 'diner',
+]);
+
+/** Parse a timeSlot string like "8:00 AM" or "10:30 AM" into hour (0-23) */
+function parseTimeSlotHour(timeSlot: string): number | null {
+  const m = timeSlot.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!m) return null;
+  let hour = parseInt(m[1], 10);
+  const ampm = m[3].toUpperCase();
+  if (ampm === 'PM' && hour !== 12) hour += 12;
+  if (ampm === 'AM' && hour === 12) hour = 0;
+  return hour;
+}
+
 /**
  * Find alternative places for a Pivot swap.
  * Scores by: same category, same vibe, similar price, proximity, rating.
+ * When planVibe is 'food' or 'stacked', only food/drink places are returned.
+ * When timeSlot is morning (before 11 AM), breakfast/brunch places are prioritized.
  */
 export function findPivotAlternatives(
   allPlaces: Place[],
   currentStop: { category: string; lat: number; lng: number; priceLevel: number; placeId: string },
   excludeIds: Set<string>,
   maxResults: number = 3,
+  planVibe?: string,
+  timeSlot?: string,
 ): Place[] {
-  const open = allPlaces.filter(p => p.openNow && !excludeIds.has(p.placeId));
+  const isFoodVibe = planVibe === 'food' || planVibe === 'stacked';
+  const hour = timeSlot ? parseTimeSlotHour(timeSlot) : null;
+  const isMorning = hour !== null && hour < 11;
+  const isLunch = hour !== null && hour >= 11 && hour < 15;
+
+  let open = allPlaces.filter(p => p.openNow && !excludeIds.has(p.placeId));
+
+  // For food vibes, ONLY return food/drink places
+  if (isFoodVibe) {
+    open = open.filter(p => FOOD_CATEGORIES.has(p.category));
+  }
+
+  // For morning time slots on food vibes, further filter to breakfast-appropriate places
+  if (isFoodVibe && isMorning) {
+    const breakfastOnly = open.filter(p => BREAKFAST_CATEGORIES.has(p.category));
+    // Only use the strict filter if we have enough results
+    if (breakfastOnly.length >= 3) {
+      open = breakfastOnly;
+    }
+  }
 
   const scored = open.map(p => {
     let score = 0;
@@ -49,6 +98,10 @@ export function findPivotAlternatives(
     const currentVibe = CATEGORY_TO_VIBE[currentStop.category];
     const candidateVibe = CATEGORY_TO_VIBE[p.category];
     if (currentVibe && candidateVibe && currentVibe === candidateVibe) score += 20;
+
+    // Time-appropriate bonus for food vibes
+    if (isFoodVibe && isMorning && BREAKFAST_CATEGORIES.has(p.category)) score += 30;
+    if (isFoodVibe && isLunch && (p.category === 'restaurant' || p.category === 'bistro' || p.category === 'diner')) score += 15;
 
     // Similar price: +15 exact, +10 for +-1
     const priceDiff = Math.abs(p.priceLevel - currentStop.priceLevel);

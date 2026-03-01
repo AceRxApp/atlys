@@ -4,7 +4,15 @@ import { Place, formatDistance, getHoursStatus } from '../services/places';
 import { PriceDots, StarRating } from './ui';
 import { DirectionsIcon, PhoneIcon, ShareIcon } from './icons';
 import { COMMUNITY_TAGS } from '../data';
-import { getNightRisk, isNightTime } from '../utils/safetyEngine';
+import { getNightRisk, isNightTime, getPlaceSafety } from '../utils/safetyEngine';
+import { API_URL } from '../utils/api';
+
+/** Ensure photo URLs are absolute (fixes relative URLs on native/iOS) */
+const fixPhotoUrl = (url: string | null | undefined): string | null => {
+  if (!url) return null;
+  if (url.startsWith('/api/')) return `${API_URL}${url}`;
+  return url;
+};
 
 export default memo(function PlaceCard({ place }: { place: Place }) {
   const {
@@ -41,8 +49,8 @@ export default memo(function PlaceCard({ place }: { place: Place }) {
     >
       {/* Photo */}
       {place.photoUrl && (
-        <div className="h-[160px] w-full relative overflow-hidden">
-          <img src={place.photoUrl} alt={place.name} loading="lazy" decoding="async"
+        <div className="h-[160px] md:h-[200px] w-full relative overflow-hidden">
+          <img src={fixPhotoUrl(place.photoUrl)!} alt={place.name} loading="lazy" decoding="async"
             onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
             className="w-full h-full object-cover block" />
           <div className="absolute inset-0" style={{ background: `linear-gradient(to bottom, transparent 60%, var(--bg-image-overlay))` }} />
@@ -94,20 +102,39 @@ export default memo(function PlaceCard({ place }: { place: Place }) {
           </div>
         )}
 
-        {/* Night Risk Indicator (only shows at night) */}
-        {isNightTime(weather?.sunset) && (() => {
-          const risk = getNightRisk(place.category, place.rating, place.reviewCount, place.openNow);
-          return (
-            <div className="flex items-center gap-1 mb-1.5">
-              <span className="text-[11px]">{risk.emoji}</span>
-              <span className={`text-[11px] font-medium ${
-                risk.level === 'low' ? 'text-status-green' : risk.level === 'moderate' ? 'text-accent-amber' : 'text-status-red'
+        {/* Safety Warning (always shown when applicable) */}
+        {(() => {
+          const night = isNightTime(weather?.sunset);
+          const warning = getPlaceSafety(place.category, place.rating, place.reviewCount, place.openNow, night);
+          if (warning) return (
+            <div className={`flex items-center gap-1.5 mb-1.5 px-2 py-1.5 rounded-lg ${
+              warning.level === 'warning' ? 'bg-red-tint-bg' : 'bg-amber-tint-bg10'
+            }`}>
+              <span className="text-[12px]">{warning.emoji}</span>
+              <span className={`text-[11px] font-semibold ${
+                warning.level === 'warning' ? 'text-status-red' : 'text-accent-amber'
               }`}>
-                {risk.label}
+                {warning.label}
               </span>
-              <span className="text-[11px] text-text-muted">{'\u00B7'} {risk.tip}</span>
+              <span className="text-[11px] text-text-muted">{'\u00B7'} {warning.message}</span>
             </div>
           );
+          // Night risk indicator (only at night, no warning)
+          if (night) {
+            const risk = getNightRisk(place.category, place.rating, place.reviewCount, place.openNow);
+            return (
+              <div className="flex items-center gap-1 mb-1.5">
+                <span className="text-[11px]">{risk.emoji}</span>
+                <span className={`text-[11px] font-medium ${
+                  risk.level === 'low' ? 'text-status-green' : risk.level === 'moderate' ? 'text-accent-amber' : 'text-status-red'
+                }`}>
+                  {risk.label}
+                </span>
+                <span className="text-[11px] text-text-muted">{'\u00B7'} {risk.tip}</span>
+              </div>
+            );
+          }
+          return null;
         })()}
 
         {/* Community Tags */}

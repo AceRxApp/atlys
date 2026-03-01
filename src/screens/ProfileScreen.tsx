@@ -3,7 +3,16 @@ import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { useModalA11y } from '../hooks/useModalA11y';
 import { useBiometricAuth } from '../hooks/useBiometricAuth';
-import { uploadAvatar, deleteAccount } from '../supabase';
+import { uploadAvatar, deleteAccount, authSignInWithGoogle } from '../supabase';
+import { useSubscription } from '../hooks/useSubscription';
+import { API_URL } from '../utils/api';
+
+/** Ensure photo URLs are absolute (fixes relative URLs on native/iOS) */
+const fixPhotoUrl = (url: string | null | undefined): string | null => {
+  if (!url) return null;
+  if (url.startsWith('/api/')) return `${API_URL}${url}`;
+  return url;
+};
 
 export default function ProfileScreen() {
   const {
@@ -22,6 +31,7 @@ export default function ProfileScreen() {
     authError, authSubmitting,
     acceptedTerms, setAcceptedTerms,
     handleSignIn, handleSignUp, handleSignOut, handleResetPassword, handleResendVerification,
+    avatarUrl, setAvatarUrl,
   } = useApp();
   const { theme, themePreference, setThemePreference } = useTheme();
   const closeProfile = useCallback(() => setShowProfile(false), [setShowProfile]);
@@ -29,7 +39,6 @@ export default function ProfileScreen() {
   const { isAvailable: biometricAvailable, isEnabled: biometricEnabled, biometricType, enableBiometric, authenticateWithBiometric, disableBiometric } = useBiometricAuth();
 
   const fullName = (user?.user_metadata?.full_name as string) || user?.email || 'Traveler';
-  const avatarUrl = (user?.user_metadata?.avatar_url as string) || null;
   const profileTotalStops = Object.values(tripDays).reduce((sum, stops) => sum + stops.length, 0);
   const profileDayCount = Object.keys(tripDays).length;
 
@@ -42,12 +51,15 @@ export default function ProfileScreen() {
   const [biometricPassword, setBiometricPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const subscription = useSubscription(user);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [billingError, setBillingError] = useState<string | null>(null);
+  const [billingPlan, setBillingPlan] = useState<'monthly' | 'yearly'>('monthly');
 
   const handleAvatarChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
-    // Validate file
     if (!file.type.startsWith('image/')) return;
     if (file.size > 5 * 1024 * 1024) {
       showToast('Image must be under 5MB');
@@ -55,18 +67,29 @@ export default function ProfileScreen() {
     }
 
     setAvatarUploading(true);
-    const { error } = await uploadAvatar(user.id, file);
+    const { url, error } = await uploadAvatar(user.id, file);
     setAvatarUploading(false);
 
-    if (error) {
+    if (error || !url) {
       showToast('Failed to upload photo — try again');
     } else {
+      setAvatarUrl(url);
       showToast('Profile photo updated!');
     }
 
     // Reset input so same file can be re-selected
     if (fileInputRef.current) fileInputRef.current.value = '';
-  }, [user, showToast]);
+  }, [user, showToast, setAvatarUrl]);
+
+  const removeAvatar = useCallback(() => {
+    try { localStorage.removeItem('nxstops_avatar_url'); } catch { /* ignore */ }
+    // Also clear from Supabase so it doesn't restore on reinstall
+    import('../supabase').then(({ supabase }) => {
+      supabase.auth.updateUser({ data: { avatar_url: null } }).catch(() => {});
+    });
+    setAvatarUrl(null);
+    showToast('Profile photo removed');
+  }, [showToast, setAvatarUrl]);
 
   return (
     <div
@@ -78,7 +101,7 @@ export default function ProfileScreen() {
       onClick={closeProfile}
     >
       <div
-        className="modal-sheet bg-bg-surface rounded-t-3xl max-w-[430px] w-full max-h-[92vh] overflow-auto border border-border-subtle border-b-0"
+        className="modal-sheet bg-bg-surface rounded-t-3xl max-w-[430px] md:max-w-[600px] lg:max-w-[700px] w-full max-h-[92vh] overflow-auto border border-border-subtle border-b-0"
         onClick={e => e.stopPropagation()}
       >
         <div className="px-5 pt-6 pb-10">
@@ -111,6 +134,21 @@ export default function ProfileScreen() {
                     </div>
                     <div className="text-base font-semibold text-text-primary">Welcome back</div>
                     <div className="text-[13px] text-text-secondary">Sign in to sync your saved places and trips</div>
+                  </div>
+                  {/* SSO Buttons */}
+                  <div className="flex flex-col gap-2 mb-4">
+                    <button
+                      onClick={() => authSignInWithGoogle()}
+                      className="w-full py-3.5 rounded-xl cursor-pointer bg-white border border-[#dadce0] text-[#3c4043] text-sm font-medium flex items-center justify-center gap-2.5"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 0 1 0-9.18l-7.98-6.19a24.08 24.08 0 0 0 0 21.56l7.98-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+                      Continue with Google
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="flex-1 h-px bg-border-subtle" />
+                    <span className="text-xs text-text-tertiary">or use email</span>
+                    <div className="flex-1 h-px bg-border-subtle" />
                   </div>
                   {biometricEnabled && (
                     <div className="mb-4">
@@ -199,6 +237,21 @@ export default function ProfileScreen() {
                   <div className="text-center mb-5">
                     <div className="text-base font-semibold text-text-primary">Create your account</div>
                     <div className="text-[13px] text-text-secondary">Start saving places and building trips</div>
+                  </div>
+                  {/* SSO Buttons */}
+                  <div className="flex flex-col gap-2 mb-4">
+                    <button
+                      onClick={() => authSignInWithGoogle()}
+                      className="w-full py-3.5 rounded-xl cursor-pointer bg-white border border-[#dadce0] text-[#3c4043] text-sm font-medium flex items-center justify-center gap-2.5"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 0 1 0-9.18l-7.98-6.19a24.08 24.08 0 0 0 0 21.56l7.98-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+                      Continue with Google
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="flex-1 h-px bg-border-subtle" />
+                    <span className="text-xs text-text-tertiary">or use email</span>
+                    <div className="flex-1 h-px bg-border-subtle" />
                   </div>
                   {authError && (
                     <div className="px-3.5 py-2.5 rounded-[10px] bg-red-tint-bg border border-red-tint-border text-status-red text-[13px] mb-3">
@@ -388,21 +441,26 @@ export default function ProfileScreen() {
                   type="file"
                   accept="image/*"
                   onChange={handleAvatarChange}
-                  className="hidden"
+                  style={{ position: 'absolute', width: 0, height: 0, opacity: 0, overflow: 'hidden', pointerEvents: 'none' }}
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={avatarUploading}
                   aria-label="Change profile photo"
-                  className="relative w-20 h-20 rounded-full mb-3 border-[3px] border-amber-tint-border30 overflow-hidden flex items-center justify-center p-0"
+                  className="relative w-20 h-20 rounded-full mb-2 border-[3px] border-amber-tint-border30 overflow-hidden flex items-center justify-center p-0 bg-bg-subtle"
                   style={{
-                    background: avatarUrl
-                      ? `url(${avatarUrl}) center/cover no-repeat`
-                      : `linear-gradient(135deg, var(--amber-tint-border20), var(--amber-tint-border20))`,
                     cursor: avatarUploading ? 'wait' : 'pointer',
                     opacity: avatarUploading ? 0.6 : 1,
                   }}
                 >
+                  {avatarUrl && (
+                    <img
+                      key={avatarUrl.slice(-20)}
+                      src={avatarUrl}
+                      alt="Profile"
+                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    />
+                  )}
                   {!avatarUrl && !avatarUploading && (
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent-amber)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -410,8 +468,8 @@ export default function ProfileScreen() {
                     </svg>
                   )}
                   {avatarUploading && (
-                    <div className="text-[11px] text-white font-semibold" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>
-                      Uploading...
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                      <div className="text-[11px] text-white font-semibold">Saving...</div>
                     </div>
                   )}
                   {/* Camera badge */}
@@ -422,6 +480,14 @@ export default function ProfileScreen() {
                     </svg>
                   </div>
                 </button>
+                {avatarUrl && (
+                  <button
+                    onClick={removeAvatar}
+                    className="text-[11px] text-status-red bg-transparent border-none cursor-pointer mb-1 py-1 px-2"
+                  >
+                    Remove photo
+                  </button>
+                )}
                 <div className="text-lg font-bold text-text-primary mb-1">
                   {fullName}
                 </div>
@@ -446,6 +512,96 @@ export default function ProfileScreen() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* ================================================================ */}
+          {/* SUBSCRIPTION                                                    */}
+          {/* ================================================================ */}
+          {user && (
+            <div className="mb-6">
+              <div className="section-label">Subscription</div>
+              <div className="p-4 rounded-xl border border-border-subtle bg-bg-subtle">
+                {subscription.isPro ? (
+                  <>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="px-2 py-0.5 rounded-full bg-accent-amber text-[10px] font-bold text-text-on-accent">PRO</div>
+                      <span className="text-sm font-semibold text-text-primary">
+                        {subscription.plan === 'pro_yearly' ? 'Yearly Plan' : 'Monthly Plan'}
+                      </span>
+                    </div>
+                    {subscription.cancelAtPeriodEnd && subscription.currentPeriodEnd && (
+                      <div className="text-xs text-text-tertiary mb-2">
+                        Cancels {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+                      </div>
+                    )}
+                    <button
+                      onClick={async () => {
+                        setBillingLoading(true);
+                        try { await subscription.manageBilling(); }
+                        catch { showToast('Failed to open billing portal'); }
+                        setBillingLoading(false);
+                      }}
+                      disabled={billingLoading}
+                      className="w-full py-2.5 rounded-[10px] border border-border-medium bg-transparent text-text-secondary text-sm cursor-pointer"
+                      style={{ opacity: billingLoading ? 0.6 : 1 }}
+                    >
+                      {billingLoading ? 'Opening...' : 'Manage Subscription'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-semibold text-text-primary">Free Plan</span>
+                    </div>
+                    <div className="text-xs text-text-tertiary mb-3">
+                      {subscription.getRemainingUses('plan_my_day')}/{subscription.getLimit('plan_my_day')} AI plans
+                      {' \u00B7 '}
+                      {subscription.getRemainingUses('tastelens')}/{subscription.getLimit('tastelens')} TasteLens scans left this month
+                    </div>
+                    {billingError && (
+                      <div className="px-3 py-2 rounded-lg bg-red-tint-bg border border-red-tint-border text-status-red text-xs mb-2">
+                        {billingError}
+                      </div>
+                    )}
+                    <div className="flex gap-2 mb-2">
+                      <button
+                        onClick={() => setBillingPlan('monthly')}
+                        className={`flex-1 py-2 px-2 rounded-[10px] text-left cursor-pointer ${billingPlan === 'monthly' ? 'bg-amber-tint-bg15 border-[2px] border-accent-amber' : 'bg-bg-subtle border-[2px] border-border-subtle'}`}
+                      >
+                        <div className="text-xs font-bold text-text-primary">Monthly</div>
+                        <div className="text-sm font-bold text-accent-amber">$4.99<span className="text-xs font-normal text-text-tertiary">/mo</span></div>
+                      </button>
+                      <button
+                        onClick={() => setBillingPlan('yearly')}
+                        className={`flex-1 py-2 px-2 rounded-[10px] text-left cursor-pointer relative ${billingPlan === 'yearly' ? 'bg-amber-tint-bg15 border-[2px] border-accent-amber' : 'bg-bg-subtle border-[2px] border-border-subtle'}`}
+                      >
+                        <div className="absolute -top-2 right-1.5 px-1.5 py-0.5 rounded-full bg-accent-amber text-[9px] font-bold text-text-on-accent">SAVE 50%</div>
+                        <div className="text-xs font-bold text-text-primary">Yearly</div>
+                        <div className="text-sm font-bold text-accent-amber">$29.99<span className="text-xs font-normal text-text-tertiary">/yr</span></div>
+                      </button>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        setBillingLoading(true);
+                        setBillingError(null);
+                        try { await subscription.startCheckout(billingPlan); }
+                        catch (err) {
+                          const msg = err instanceof Error ? err.message : 'Failed to start checkout';
+                          setBillingError(msg);
+                          showToast(msg);
+                        }
+                        setBillingLoading(false);
+                      }}
+                      disabled={billingLoading}
+                      className="w-full py-2.5 rounded-[10px] border-none text-sm font-semibold cursor-pointer bg-accent-gradient text-text-on-accent"
+                      style={{ opacity: billingLoading ? 0.6 : 1 }}
+                    >
+                      {billingLoading ? 'Opening checkout...' : `Upgrade to Pro \u2014 ${billingPlan === 'yearly' ? '$29.99/yr' : '$4.99/mo'}`}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -649,6 +805,25 @@ export default function ProfileScreen() {
             </div>
           </div>
 
+          {/* Legal & Safety */}
+          <div className="mb-6">
+            <div className="section-label">Legal</div>
+            <div className="p-3.5 rounded-xl bg-bg-subtle border border-border-subtle">
+              <div className="flex items-start gap-2.5">
+                <span className="text-base mt-0.5">{'\u26A0\uFE0F'}</span>
+                <div>
+                  <div className="text-[13px] font-semibold text-text-primary mb-1">Safety Disclaimer</div>
+                  <p className="text-[12px] text-text-secondary leading-[1.5]">
+                    NxStops provides recommendations for informational purposes only.
+                    Place data, safety indicators, hours, and travel advisories may not always be accurate or up to date.
+                    Always use your own judgment when visiting unfamiliar places, verify hours directly with venues,
+                    and check official government travel advisories before traveling internationally.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Saved Places Section */}
           {savedPlaces.length > 0 && (
             <div className="mb-6">
@@ -665,8 +840,8 @@ export default function ProfileScreen() {
                     <div
                       className="w-[44px] h-[44px] rounded-[10px] shrink-0 overflow-hidden flex items-center justify-center"
                       style={{
-                        background: place.photoUrl
-                          ? `url(${place.photoUrl}) center/cover no-repeat`
+                        background: fixPhotoUrl(place.photoUrl)
+                          ? `url(${fixPhotoUrl(place.photoUrl)}) center/cover no-repeat`
                           : undefined,
                       }}
                     >
@@ -726,8 +901,8 @@ export default function ProfileScreen() {
                         <div key={i}
                           className="w-6 h-6 rounded-md overflow-hidden border border-border-subtle"
                           style={{
-                            background: (stop.place?.photoUrl)
-                              ? `url(${stop.place.photoUrl}) center/cover no-repeat`
+                            background: fixPhotoUrl(stop.place?.photoUrl)
+                              ? `url(${fixPhotoUrl(stop.place?.photoUrl)}) center/cover no-repeat`
                               : undefined,
                           }}
                         >
@@ -752,7 +927,7 @@ export default function ProfileScreen() {
           {user && (
             <>
               <button
-                onClick={handleSignOut}
+                onClick={() => { handleSignOut(); setShowProfile(false); }}
                 className="w-full py-3.5 rounded-xl cursor-pointer bg-none border border-red-tint-border text-status-red text-sm font-medium"
               >
                 Sign Out

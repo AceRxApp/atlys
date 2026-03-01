@@ -13,6 +13,9 @@ const BOOKING_AID = import.meta.env.VITE_BOOKING_AID || '';
 const GYG_PARTNER = import.meta.env.VITE_GYG_PARTNER_ID || '';
 const VIATOR_PID = import.meta.env.VITE_VIATOR_PID || '';
 const KLOOK_AID = import.meta.env.VITE_KLOOK_AID || '';
+const OPENTABLE_REF = import.meta.env.VITE_OPENTABLE_REF || '';
+const RESY_REF = import.meta.env.VITE_RESY_REF || '';
+const TM_AFFILIATE = import.meta.env.VITE_TICKETMASTER_AFFILIATE_ID || '';
 
 export const BOOKING_SERVICES: BookingService[] = [
   {
@@ -97,14 +100,74 @@ export function getPlaceBookingUrl(placeName: string, placeCategory: string, cit
   }
 
   if (FOOD_TYPES.includes(placeCategory)) {
-    return {
-      url: `https://www.opentable.com/s?term=${encodeURIComponent(placeName)}&queryUnderstandingType=location&areaId=0`,
-      label: 'Reserve Table',
-      service: 'OpenTable',
-    };
+    return getRestaurantBookingUrl(placeName, cityName);
   }
 
   return null;
+}
+
+// --------------------------------------------------------------------------
+// Restaurant reservation links (OpenTable + Resy with affiliate tracking)
+// --------------------------------------------------------------------------
+
+export function getRestaurantBookingUrl(
+  placeName: string,
+  cityName?: string,
+): { url: string; label: string; service: string } {
+  const term = encodeURIComponent(placeName);
+  const city = cityName ? encodeURIComponent(cityName) : '';
+
+  // OpenTable (primary — largest reservation network)
+  const otBase = `https://www.opentable.com/s?term=${term}&covers=2${city ? `&queryUnderstandingType=location&rawQuery=${term}+${city}` : ''}`;
+  const otUrl = OPENTABLE_REF ? `${otBase}&ref=${OPENTABLE_REF}` : otBase;
+
+  return { url: otUrl, label: 'Reserve Table', service: 'OpenTable' };
+}
+
+export function getResyBookingUrl(
+  placeName: string,
+  cityName?: string,
+): { url: string; label: string; service: string } {
+  const query = encodeURIComponent(`${placeName}${cityName ? ` ${cityName}` : ''}`);
+  const base = `https://resy.com/cities?query=${query}`;
+  const url = RESY_REF ? `${base}&ref=${RESY_REF}` : base;
+  return { url, label: 'Reserve on Resy', service: 'Resy' };
+}
+
+// --------------------------------------------------------------------------
+// Event URL affiliate tagging
+// --------------------------------------------------------------------------
+
+/**
+ * Tag an event ticket URL with the appropriate affiliate ID.
+ * Works for Ticketmaster and GetYourGuide; passes others through unchanged.
+ */
+export function tagEventUrl(url: string, source?: string): string {
+  if (!url) return url;
+
+  try {
+    const u = new URL(url);
+
+    // Ticketmaster — add affiliate ID
+    if (u.hostname.includes('ticketmaster.com') || source === 'Ticketmaster') {
+      if (TM_AFFILIATE && !u.searchParams.has('at_custom2')) {
+        u.searchParams.set('at_custom2', TM_AFFILIATE);
+      }
+      return u.toString();
+    }
+
+    // GetYourGuide — add partner ID
+    if (u.hostname.includes('getyourguide.com') || source === 'GetYourGuide') {
+      if (GYG_PARTNER && !u.searchParams.has('partner_id')) {
+        u.searchParams.set('partner_id', GYG_PARTNER);
+      }
+      return u.toString();
+    }
+  } catch {
+    // Invalid URL — return as-is
+  }
+
+  return url;
 }
 
 export function getExperienceSearchUrl(query: string): string {

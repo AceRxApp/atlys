@@ -14,7 +14,7 @@ const FIELD_MASK = [
   'places.primaryTypeDisplayName', 'places.rating', 'places.userRatingCount',
   'places.priceLevel', 'places.currentOpeningHours', 'places.nationalPhoneNumber',
   'places.websiteUri', 'places.googleMapsUri', 'places.photos',
-  'places.editorialSummary',
+  'places.editorialSummary', 'places.businessStatus',
 ].join(',');
 
 const FOOD_TYPES = [
@@ -24,52 +24,630 @@ const FOOD_TYPES = [
   'wine_bar', 'fine_dining_restaurant',
 ];
 
-const BAR_TYPES = [
-  'bar', 'wine_bar', 'night_club', 'restaurant', 'cafe',
+const NIGHTLIFE_TYPES = [
+  'bar', 'wine_bar', 'night_club', 'casino',
+  'performing_arts_theater', 'movie_theater',
 ];
 
-const MUSEUM_TYPES = [
-  'museum', 'art_gallery', 'performing_arts_theater', 'historical_landmark',
-];
-
-const OUTDOOR_TYPES = [
-  'park', 'hiking_area', 'zoo', 'aquarium', 'amusement_park',
-  'tourist_attraction',
-];
-
-const ACTIVITY_TYPES = [
+const ADVENTURE_TYPES = [
   'museum', 'art_gallery', 'tourist_attraction', 'park',
   'performing_arts_theater', 'historical_landmark', 'zoo',
-  'aquarium', 'night_club', 'bowling_alley', 'casino',
-  'amusement_park', 'movie_theater', 'market', 'spa',
-  'book_store', 'hiking_area',
+  'aquarium', 'amusement_park', 'hiking_area', 'market',
+  'book_store', 'spa', 'bowling_alley',
 ];
 
-// Vibe → which place types to fetch + what the AI prompt should say
+// Diverse text searches per vibe — we pick random subsets to keep API usage reasonable
+const DIVERSE_TEXT_SEARCHES: Record<string, string[]> = {
+  nightout: [
+    'speakeasy cocktail bar', 'rooftop bar lounge', 'jazz club live music',
+    'Black owned club lounge bar', 'Latin salsa nightclub', 'hookah lounge',
+    'Afrobeat dancehall reggae club', 'wine bar upscale lounge', 'karaoke bar',
+    'hip hop club lounge', 'comedy club open mic', 'underground bar hidden',
+  ],
+  food: [
+    'Mexican taqueria restaurant', 'Ethiopian Eritrean restaurant',
+    'soul food Southern restaurant', 'Jamaican Caribbean jerk restaurant',
+    'Indian curry restaurant', 'Korean BBQ restaurant',
+    'Vietnamese pho banh mi', 'Middle Eastern shawarma falafel',
+    'African restaurant', 'Halal restaurant', 'dim sum Chinese restaurant',
+    'street food food truck', 'hole in the wall restaurant local favorite',
+    'brunch spot breakfast', 'dessert bakery pastry', 'ramen noodle bar',
+  ],
+  adventure: [
+    'cultural district walking tour', 'scenic viewpoint lookout',
+    'historic neighborhood landmark', 'mural street art district',
+    'botanical garden park', 'waterfront boardwalk pier',
+    'cultural center heritage museum', 'farmers market outdoor market',
+    'neighborhood walking tour', 'iconic landmark must see',
+    'beach oceanfront seaside', 'beach bar restaurant waterfront',
+  ],
+  surprise: [
+    'best fine dining restaurant upscale', 'award winning chef restaurant',
+    'Michelin star restaurant tasting menu', 'luxury rooftop bar cocktails',
+    'best rated restaurant city', 'trendy cocktail bar speakeasy',
+    'science museum interactive exhibits', 'natural history museum',
+    'art museum gallery modern contemporary', 'children museum family',
+    'history museum heritage center', 'aquarium ocean exhibit',
+    'botanical garden conservatory', 'zoo wildlife sanctuary',
+    'popular tourist attraction top rated', 'best things to do sightseeing tour',
+    'observation deck skyline viewpoint', 'historic theater performing arts',
+    'famous landmark monument must visit', 'scenic waterfront boardwalk pier',
+  ],
+  chill: [
+    'cozy coffee shop cafe', 'indie bookstore cafe', 'botanical garden park scenic',
+    'farmers market local', 'quiet brunch spot', 'tea house matcha cafe',
+    'bakery pastry shop local', 'scenic walking trail park', 'art gallery exhibition',
+    'vintage shop boutique', 'beach seaside relaxing waterfront',
+  ],
+  daydrinks: [
+    'rooftop bar views', 'happy hour cocktail bar', 'wine bar wine tasting',
+    'craft brewery taproom', 'boozy brunch mimosa', 'cocktail lounge afternoon',
+    'beer garden outdoor patio', 'champagne bar prosecco', 'aperol spritz bar patio',
+    'wine bar small plates tapas',
+  ],
+  cultural: [
+    'Black history museum cultural center', 'Hispanic heritage museum center',
+    'Asian cultural district neighborhood', 'African art gallery museum',
+    'Caribbean cultural center heritage', 'civil rights museum memorial',
+    'jazz heritage museum music history', 'immigration history museum',
+    'science and industry museum', 'natural history museum exhibits',
+    'modern art museum contemporary gallery', 'cultural heritage landmark historic',
+    'planetarium space science center', 'maritime museum naval history',
+    'national monument memorial landmark', 'historic architecture landmark tour',
+  ],
+  stacked: [
+    'hidden gem restaurant local favorite', 'underrated bar speakeasy cocktail',
+    'off the beaten path attraction', 'locals only restaurant neighborhood',
+    'boutique hotel rooftop bar', 'secret garden park hidden',
+    'underground music venue live show', 'artisan coffee roaster cafe',
+    'independent bookstore cafe wine', 'neighborhood dive bar local',
+    'pop up restaurant food experience', 'chef owned restaurant tasting',
+    'interactive art installation museum', 'historic speakeasy hidden bar',
+    'waterfront restaurant scenic dining', 'comedy show improv theater',
+    'craft cocktail bar mixology', 'food hall market multiple vendors',
+    'cultural festival event local', 'architecture tour unique buildings',
+    'beach club oceanfront bar', 'beach seafood restaurant waterfront',
+  ],
+};
+
+// ── Region-aware local cuisine ──
+// Non-Western cities get HEAVY local cuisine with a sprinkle of international
+// Western cities (US, Canada, UK, W. Europe, Australia) get diverse multicultural mix
+interface LocalRegion {
+  keywords: string[];
+  label: string;
+  foodSearches: string[];
+  nightlifeSearches: string[];
+}
+
+const LOCAL_REGIONS: LocalRegion[] = [
+  {
+    keywords: ['ghana', 'accra', 'kumasi', 'tamale'],
+    label: 'Ghanaian',
+    foodSearches: [
+      'fufu restaurant local', 'jollof rice restaurant', 'waakye restaurant',
+      'banku tilapia restaurant', 'kelewele street food', 'chop bar local food',
+      'kenkey restaurant', 'red red beans plantain', 'light soup restaurant',
+      'Ghanaian restaurant local food', 'suya grilled meat spot',
+    ],
+    nightlifeSearches: [
+      'Afrobeat club lounge', 'highlife music bar', 'rooftop bar lounge Accra',
+      'live band bar nightclub', 'outdoor bar garden lounge',
+    ],
+  },
+  {
+    keywords: ['nigeria', 'lagos', 'lekki', 'abuja', 'ibadan', 'port harcourt'],
+    label: 'Nigerian',
+    foodSearches: [
+      'jollof rice restaurant', 'suya spot grilled meat', 'pepper soup restaurant',
+      'egusi soup restaurant', 'pounded yam restaurant', 'amala restaurant',
+      'ofada rice restaurant', 'buka local restaurant', 'Nigerian restaurant local',
+      'chin chin puff puff snack', 'palm wine bar spot',
+    ],
+    nightlifeSearches: [
+      'Afrobeat club lounge', 'rooftop bar lounge Lagos', 'beach bar club',
+      'live music lounge bar', 'karaoke bar nightlife',
+    ],
+  },
+  {
+    keywords: ['senegal', 'dakar'],
+    label: 'Senegalese',
+    foodSearches: [
+      'thieboudienne restaurant', 'yassa poulet restaurant', 'mafe restaurant',
+      'Senegalese restaurant local', 'dibi grilled lamb', 'fataya pastry snack',
+      'cafe touba coffee', 'ceebu jen restaurant', 'African restaurant local food',
+    ],
+    nightlifeSearches: ['live music mbalax bar', 'rooftop bar lounge Dakar', 'beach bar club'],
+  },
+  {
+    keywords: ['kenya', 'nairobi', 'mombasa'],
+    label: 'Kenyan',
+    foodSearches: [
+      'nyama choma restaurant grilled meat', 'ugali sukuma wiki restaurant',
+      'mandazi cafe', 'chapati restaurant local', 'Kenyan restaurant local food',
+      'pilau rice restaurant', 'mutura street food', 'chai tea cafe',
+      'samosa restaurant snack', 'githeri restaurant',
+    ],
+    nightlifeSearches: ['rooftop bar lounge Nairobi', 'live music bar club', 'Afrobeat club'],
+  },
+  {
+    keywords: ['ethiopia', 'addis ababa'],
+    label: 'Ethiopian',
+    foodSearches: [
+      'injera restaurant Ethiopian', 'tibs restaurant', 'kitfo restaurant',
+      'shiro restaurant', 'Ethiopian coffee ceremony cafe', 'doro wot restaurant',
+      'beyaynetu mixed platter restaurant', 'tej honey wine bar',
+      'Ethiopian restaurant local food', 'firfir breakfast restaurant',
+    ],
+    nightlifeSearches: ['Ethiopian music bar', 'live music lounge', 'tej wine bar'],
+  },
+  {
+    keywords: ['south africa', 'johannesburg', 'cape town', 'durban', 'pretoria'],
+    label: 'South African',
+    foodSearches: [
+      'braai restaurant grilled meat', 'bunny chow restaurant', 'bobotie restaurant',
+      'biltong shop', 'pap vleis restaurant', 'gatsby sandwich cape town',
+      'South African restaurant local', 'shisa nyama braai', 'koeksister dessert',
+      'chakalaka restaurant', 'rooibos tea cafe',
+    ],
+    nightlifeSearches: ['rooftop bar lounge', 'jazz club live music', 'craft beer brewery'],
+  },
+  {
+    keywords: ['jamaica', 'kingston', 'montego bay', 'ocho rios', 'negril'],
+    label: 'Jamaican',
+    foodSearches: [
+      'jerk chicken restaurant', 'oxtail restaurant Jamaican', 'ackee saltfish restaurant',
+      'patty shop beef patty', 'curry goat restaurant', 'festival fried dumpling',
+      'Jamaican restaurant local food', 'ital food restaurant', 'bammy cassava restaurant',
+      'escovitch fish restaurant', 'run down mackerel restaurant', 'sorrel drink juice bar',
+    ],
+    nightlifeSearches: [
+      'reggae dancehall club', 'rum bar cocktail', 'beach bar lounge',
+      'live reggae music bar', 'sound system party club',
+    ],
+  },
+  {
+    keywords: ['trinidad', 'tobago', 'port of spain'],
+    label: 'Trinidadian',
+    foodSearches: [
+      'doubles roti restaurant', 'bake and shark restaurant', 'pelau restaurant',
+      'callaloo crab restaurant', 'Trinidadian restaurant local food',
+      'macaroni pie restaurant', 'curry duck restaurant', 'corn soup street food',
+    ],
+    nightlifeSearches: ['soca calypso club', 'rum bar cocktail lounge', 'beach bar'],
+  },
+  {
+    keywords: ['barbados', 'bridgetown'],
+    label: 'Bajan',
+    foodSearches: [
+      'flying fish cou cou restaurant', 'Bajan restaurant local food',
+      'fish cutter sandwich', 'macaroni pie restaurant', 'pudding souse restaurant',
+      'rum punch bar', 'conkies local dessert', 'cutters beach bar restaurant',
+    ],
+    nightlifeSearches: ['beach bar rum bar', 'live music bar lounge', 'calypso club'],
+  },
+  {
+    keywords: ['bahamas', 'nassau', 'freeport'],
+    label: 'Bahamian',
+    foodSearches: [
+      'conch salad restaurant', 'cracked conch restaurant', 'Bahamian restaurant local',
+      'peas and rice restaurant', 'guava duff dessert', 'fish fry restaurant local',
+      'sky juice cocktail bar', 'johnnycake restaurant',
+    ],
+    nightlifeSearches: ['beach bar club', 'junkanoo festival bar', 'rum bar lounge'],
+  },
+  {
+    keywords: ['puerto rico', 'san juan', 'ponce'],
+    label: 'Puerto Rican',
+    foodSearches: [
+      'mofongo restaurant', 'lechon asado restaurant', 'alcapurrias frituras',
+      'arroz con gandules restaurant', 'piragua shaved ice', 'bacalaito fritters',
+      'Puerto Rican restaurant local food', 'chinchorro bar food', 'tembleque dessert',
+    ],
+    nightlifeSearches: ['salsa reggaeton club', 'rum bar cocktail lounge', 'rooftop bar Old San Juan'],
+  },
+  {
+    keywords: ['dominican republic', 'santo domingo', 'punta cana'],
+    label: 'Dominican',
+    foodSearches: [
+      'mangu restaurant Dominican', 'sancocho soup restaurant', 'la bandera restaurant',
+      'chicharron restaurant', 'Dominican restaurant local food', 'empanada stand',
+      'morir sonando juice bar', 'chimichurri burger Dominican', 'habichuela con dulce',
+    ],
+    nightlifeSearches: ['merengue bachata club', 'rum bar lounge', 'colmado bar local'],
+  },
+  {
+    keywords: ['cuba', 'havana'],
+    label: 'Cuban',
+    foodSearches: [
+      'ropa vieja restaurant', 'Cuban sandwich restaurant', 'lechon restaurant',
+      'arroz con pollo restaurant', 'tostones maduros restaurant', 'Cuban restaurant local',
+      'mojito bar cocktail', 'paladar restaurant local', 'Cuban coffee cafecito',
+    ],
+    nightlifeSearches: ['salsa club live music', 'mojito bar lounge', 'live son cubano bar'],
+  },
+  {
+    keywords: ['haiti', 'port-au-prince'],
+    label: 'Haitian',
+    foodSearches: [
+      'griot fried pork restaurant', 'diri ak djon djon restaurant', 'tassot restaurant',
+      'Haitian restaurant local food', 'accra fritters snack', 'soup joumou restaurant',
+      'pain patate dessert', 'pikliz restaurant spicy',
+    ],
+    nightlifeSearches: ['kompa music club', 'rum bar lounge', 'live music bar'],
+  },
+  {
+    keywords: ['mexico', 'mexico city', 'cdmx', 'cancun', 'cozumel', 'cabo san lucas', 'puerto vallarta', 'guadalajara', 'oaxaca', 'playa del carmen', 'tulum', 'merida', 'puebla', 'monterrey', 'tijuana'],
+    label: 'Mexican',
+    foodSearches: [
+      'taqueria street tacos al pastor', 'mole restaurant Oaxacan', 'tamales restaurant local',
+      'pozole restaurant', 'elote esquites street food', 'tlayuda restaurant',
+      'torta restaurant Mexican sandwich', 'churros chocolate cafe', 'cochinita pibil restaurant',
+      'birria restaurant', 'mezcal bar mezcaleria', 'ceviche mariscos restaurant',
+      'Mexican market antojitos comida', 'huarache sope restaurant',
+    ],
+    nightlifeSearches: [
+      'mezcal bar cantina', 'rooftop bar lounge', 'live mariachi bar',
+      'pulqueria bar', 'Latin nightclub salsa', 'speakeasy cocktail bar',
+    ],
+  },
+  {
+    keywords: ['colombia', 'bogota', 'medellin', 'cartagena', 'cali', 'barranquilla'],
+    label: 'Colombian',
+    foodSearches: [
+      'arepa restaurant', 'bandeja paisa restaurant', 'empanada stand local',
+      'sancocho soup restaurant', 'ajiaco restaurant', 'lechona restaurant',
+      'Colombian restaurant local food', 'patacon restaurant', 'buñuelo pandebono bakery',
+      'ceviche restaurant Caribbean coast', 'aguardiente bar',
+    ],
+    nightlifeSearches: [
+      'salsa club Cali style', 'reggaeton club bar', 'rooftop bar lounge',
+      'live vallenato music bar', 'aguardiente bar nightlife',
+    ],
+  },
+  {
+    keywords: ['brazil', 'sao paulo', 'rio de janeiro', 'salvador', 'recife', 'belo horizonte', 'fortaleza', 'florianopolis', 'brasilia'],
+    label: 'Brazilian',
+    foodSearches: [
+      'churrascaria steakhouse', 'feijoada restaurant', 'acai bowl cafe',
+      'coxinha snack bar', 'pao de queijo bakery', 'Brazilian restaurant local food',
+      'moqueca fish stew restaurant', 'pastel fried pastry', 'tapioca crepe stand',
+      'brigadeiro dessert cafe', 'boteco bar restaurant',
+    ],
+    nightlifeSearches: [
+      'samba bar live music', 'forró dance club', 'rooftop bar lounge',
+      'pagode live bar', 'caipirinha cocktail bar',
+    ],
+  },
+  {
+    keywords: ['peru', 'lima', 'cusco', 'arequipa'],
+    label: 'Peruvian',
+    foodSearches: [
+      'ceviche restaurant Peruvian', 'lomo saltado restaurant', 'anticucho restaurant',
+      'causa rellena restaurant', 'aji de gallina restaurant', 'Peruvian restaurant local food',
+      'chicharron sandwich restaurant', 'lucuma dessert cafe', 'pisco sour bar',
+      'pollo a la brasa rotisserie', 'chifa restaurant Peruvian Chinese',
+    ],
+    nightlifeSearches: ['pisco bar cocktail lounge', 'peña criolla live music', 'rooftop bar'],
+  },
+  {
+    keywords: ['argentina', 'buenos aires', 'mendoza', 'cordoba'],
+    label: 'Argentine',
+    foodSearches: [
+      'parrilla steakhouse asado', 'empanada restaurant Argentine', 'milanesa restaurant',
+      'choripan sandwich stand', 'dulce de leche dessert cafe', 'Argentine restaurant local',
+      'provoleta grilled cheese', 'locro stew restaurant', 'medialunas bakery cafe',
+      'malbec wine bar bodega',
+    ],
+    nightlifeSearches: ['tango milonga club', 'wine bar bodega', 'jazz bar lounge', 'boliche nightclub'],
+  },
+  {
+    keywords: ['india', 'mumbai', 'delhi', 'new delhi', 'bangalore', 'bengaluru', 'chennai', 'kolkata', 'hyderabad', 'jaipur', 'pune', 'goa', 'ahmedabad', 'kochi'],
+    label: 'Indian',
+    foodSearches: [
+      'biryani restaurant local', 'tandoori restaurant dhaba', 'dosa south Indian restaurant',
+      'chaat street food', 'thali restaurant', 'chai tea cafe stall',
+      'paneer tikka restaurant', 'butter chicken restaurant local', 'pav bhaji street food',
+      'idli sambar restaurant', 'kebab restaurant mughlai', 'lassi sweet shop',
+      'vada pav street food', 'chole bhature restaurant', 'paratha restaurant',
+    ],
+    nightlifeSearches: [
+      'rooftop bar lounge', 'live music bar Bollywood', 'craft brewery taproom',
+      'hookah lounge bar', 'wine bar cocktail lounge',
+    ],
+  },
+  {
+    keywords: ['thailand', 'bangkok', 'chiang mai', 'phuket', 'pattaya', 'krabi', 'koh samui'],
+    label: 'Thai',
+    foodSearches: [
+      'pad thai restaurant local', 'tom yum restaurant', 'green curry restaurant Thai',
+      'mango sticky rice dessert', 'som tum papaya salad', 'Thai street food stall',
+      'khao soi restaurant', 'massaman curry restaurant', 'Thai restaurant local food',
+      'boat noodle restaurant', 'night market food stall', 'Thai tea cafe',
+    ],
+    nightlifeSearches: [
+      'rooftop bar Bangkok', 'cocktail lounge bar', 'night market bar',
+      'jazz bar live music', 'sky bar lounge',
+    ],
+  },
+  {
+    keywords: ['vietnam', 'hanoi', 'ho chi minh', 'saigon', 'da nang', 'hoi an'],
+    label: 'Vietnamese',
+    foodSearches: [
+      'pho restaurant local', 'banh mi sandwich restaurant', 'bun cha restaurant',
+      'com tam broken rice restaurant', 'Vietnamese restaurant local food',
+      'spring roll restaurant', 'ca phe sua da Vietnamese coffee', 'bun bo hue restaurant',
+      'banh xeo crepe restaurant', 'Vietnamese street food stall', 'egg coffee cafe',
+    ],
+    nightlifeSearches: [
+      'rooftop bar lounge', 'bia hoi beer corner', 'cocktail bar speakeasy',
+      'live music bar', 'night market street food bar',
+    ],
+  },
+  {
+    keywords: ['japan', 'tokyo', 'osaka', 'kyoto', 'yokohama', 'sapporo', 'fukuoka', 'nagoya'],
+    label: 'Japanese',
+    foodSearches: [
+      'ramen shop local', 'sushi restaurant omakase', 'izakaya bar restaurant',
+      'yakitori grilled chicken restaurant', 'tempura restaurant', 'udon soba noodle shop',
+      'matcha cafe tea house', 'takoyaki street food', 'tonkatsu restaurant',
+      'onigiri rice ball shop', 'Japanese curry restaurant', 'okonomiyaki restaurant',
+    ],
+    nightlifeSearches: [
+      'izakaya bar drinking', 'sake bar Japanese', 'cocktail bar lounge',
+      'karaoke bar', 'jazz bar live music',
+    ],
+  },
+  {
+    keywords: ['korea', 'seoul', 'busan', 'incheon', 'jeju', 'south korea'],
+    label: 'Korean',
+    foodSearches: [
+      'Korean BBQ restaurant local', 'bibimbap restaurant', 'kimchi jjigae restaurant',
+      'tteokbokki street food', 'Korean fried chicken restaurant', 'samgyeopsal restaurant',
+      'kalguksu noodle soup restaurant', 'jajangmyeon restaurant', 'Korean restaurant local food',
+      'sundubu jjigae tofu soup', 'gimbap restaurant', 'hotteok street food dessert',
+    ],
+    nightlifeSearches: [
+      'soju bar Korean', 'noraebang karaoke', 'Korean craft beer bar',
+      'makgeolli bar traditional', 'rooftop bar lounge Seoul',
+    ],
+  },
+  {
+    keywords: ['china', 'beijing', 'shanghai', 'guangzhou', 'shenzhen', 'chengdu', 'hong kong', 'macau', 'hangzhou', 'xian'],
+    label: 'Chinese',
+    foodSearches: [
+      'dim sum restaurant local', 'hot pot restaurant Sichuan', 'dumpling restaurant',
+      'Peking duck restaurant', 'hand pulled noodle shop', 'mapo tofu restaurant',
+      'bao steamed buns', 'congee breakfast restaurant', 'wonton restaurant',
+      'Cantonese restaurant local', 'Chinese street food stall', 'xiaolongbao soup dumpling',
+    ],
+    nightlifeSearches: [
+      'cocktail bar lounge', 'rooftop bar skyline', 'karaoke KTV bar',
+      'jazz bar live music', 'craft brewery taproom',
+    ],
+  },
+  {
+    keywords: ['singapore'],
+    label: 'Singaporean',
+    foodSearches: [
+      'hawker center food stall', 'chicken rice restaurant', 'laksa restaurant',
+      'char kway teow restaurant', 'chili crab restaurant', 'roti prata restaurant',
+      'kaya toast coffee shop', 'satay street food', 'bak kut teh restaurant',
+      'nasi lemak restaurant', 'ice kachang dessert', 'Singaporean restaurant local food',
+    ],
+    nightlifeSearches: ['rooftop bar lounge', 'cocktail bar speakeasy', 'craft beer bar', 'live music bar'],
+  },
+  {
+    keywords: ['malaysia', 'kuala lumpur', 'penang', 'malacca', 'langkawi'],
+    label: 'Malaysian',
+    foodSearches: [
+      'nasi lemak restaurant local', 'char kuey teow restaurant', 'roti canai restaurant',
+      'laksa restaurant', 'satay street food', 'Malaysian restaurant local food',
+      'teh tarik cafe', 'nasi kandar restaurant', 'cendol dessert',
+      'mamak restaurant', 'rendang restaurant',
+    ],
+    nightlifeSearches: ['rooftop bar lounge', 'night market food bar', 'cocktail bar lounge'],
+  },
+  {
+    keywords: ['indonesia', 'jakarta', 'bali', 'yogyakarta', 'bandung'],
+    label: 'Indonesian',
+    foodSearches: [
+      'nasi goreng restaurant', 'satay restaurant local', 'rendang restaurant',
+      'gado gado restaurant', 'bakso meatball soup', 'Indonesian restaurant local food',
+      'warung local food stall', 'nasi padang restaurant', 'martabak street food',
+      'soto soup restaurant', 'tempeh tofu restaurant',
+    ],
+    nightlifeSearches: ['beach bar club Bali', 'rooftop bar lounge', 'live music bar'],
+  },
+  {
+    keywords: ['philippines', 'manila', 'cebu', 'boracay'],
+    label: 'Filipino',
+    foodSearches: [
+      'adobo restaurant Filipino', 'sinigang soup restaurant', 'lechon restaurant',
+      'sisig restaurant', 'halo halo dessert', 'Filipino restaurant local food',
+      'lumpia spring roll', 'kare kare restaurant', 'tapa silog breakfast',
+      'pancit noodle restaurant', 'balut street food',
+    ],
+    nightlifeSearches: ['karaoke bar', 'rooftop bar lounge', 'live band bar', 'craft beer bar'],
+  },
+  {
+    keywords: ['dubai', 'abu dhabi', 'uae', 'sharjah'],
+    label: 'Emirati & Middle Eastern',
+    foodSearches: [
+      'shawarma restaurant local', 'mandi restaurant Arabic', 'kunafa dessert shop',
+      'falafel hummus restaurant', 'machboos restaurant', 'Arabic restaurant local food',
+      'karak chai tea cafe', 'luqaimat dessert shop', 'manakeesh bakery',
+      'kebab grill restaurant', 'dates Arabic sweets shop',
+    ],
+    nightlifeSearches: [
+      'rooftop bar lounge Dubai', 'beach bar club', 'shisha hookah lounge',
+      'cocktail bar speakeasy', 'sky bar lounge',
+    ],
+  },
+  {
+    keywords: ['lebanon', 'beirut'],
+    label: 'Lebanese',
+    foodSearches: [
+      'mezze restaurant Lebanese', 'shawarma restaurant', 'falafel restaurant local',
+      'manoushe bakery', 'tabbouleh fattoush restaurant', 'kibbeh restaurant',
+      'Lebanese restaurant local food', 'knafeh dessert', 'arak bar Lebanese wine',
+    ],
+    nightlifeSearches: ['rooftop bar Beirut', 'cocktail bar lounge', 'live music bar'],
+  },
+  {
+    keywords: ['turkey', 'istanbul', 'ankara', 'izmir', 'antalya'],
+    label: 'Turkish',
+    foodSearches: [
+      'kebab restaurant Turkish local', 'lahmacun pide restaurant', 'baklava kunefe dessert',
+      'Turkish breakfast kahvalti', 'iskender doner restaurant', 'kofte meatball restaurant',
+      'Turkish restaurant local food', 'simit bakery', 'manti dumpling restaurant',
+      'Turkish coffee cafe', 'borek pastry shop', 'raki meyhane bar',
+    ],
+    nightlifeSearches: ['meyhane bar Turkish', 'rooftop bar lounge Istanbul', 'live music bar', 'raki bar'],
+  },
+  {
+    keywords: ['morocco', 'marrakech', 'fes', 'casablanca', 'rabat'],
+    label: 'Moroccan',
+    foodSearches: [
+      'tagine restaurant Moroccan', 'couscous restaurant', 'pastilla bastilla restaurant',
+      'harira soup restaurant', 'Moroccan restaurant local food', 'mint tea cafe',
+      'msemen pancake bakery', 'mechoui roasted lamb', 'rfissa restaurant',
+    ],
+    nightlifeSearches: ['rooftop bar riad', 'live gnawa music', 'cocktail lounge bar'],
+  },
+  {
+    keywords: ['egypt', 'cairo', 'alexandria'],
+    label: 'Egyptian',
+    foodSearches: [
+      'koshari restaurant Egyptian', 'foul medames restaurant', 'shawarma kofta restaurant',
+      'Egyptian restaurant local food', 'feteer meshaltet pastry', 'molokhia restaurant',
+      'hawawshi restaurant', 'ta\'ameya falafel Egyptian', 'om ali dessert shop',
+    ],
+    nightlifeSearches: ['Nile rooftop bar', 'shisha hookah lounge', 'live music bar'],
+  },
+  {
+    keywords: ['israel', 'tel aviv', 'jerusalem', 'haifa'],
+    label: 'Israeli & Middle Eastern',
+    foodSearches: [
+      'hummus restaurant local', 'falafel restaurant best local', 'shakshuka restaurant',
+      'sabich restaurant', 'Israeli restaurant local food', 'bourekas bakery',
+      'halva dessert shop', 'schnitzel restaurant', 'jachnun malawach breakfast',
+    ],
+    nightlifeSearches: ['cocktail bar Tel Aviv', 'rooftop bar lounge', 'live music bar'],
+  },
+];
+
+/** Detect if a city is in a region with strong local food culture */
+function detectLocalRegion(city: string): LocalRegion | null {
+  if (!city) return null;
+  const cityLower = city.toLowerCase();
+  for (const region of LOCAL_REGIONS) {
+    if (region.keywords.some(kw => cityLower.includes(kw))) {
+      return region;
+    }
+  }
+  return null;
+}
+
+// Vibe → which Google types to fetch + diverse text searches + AI behavior
 const VIBE_CONFIG: Record<string, {
-  fetchFood: boolean;
-  fetchActivity: boolean;
-  foodTypes?: string[];
-  activityTypes?: string[];
+  foodTypes: string[];
+  activityTypes: string[];
+  textSearchKey: string;
+  textSearchCount: number;
   aiHint: string;
+  structureHint: Record<string, string>;
 }> = {
   nightout: {
-    fetchFood: true, fetchActivity: true,
-    foodTypes: BAR_TYPES,
-    activityTypes: ['night_club', 'performing_arts_theater', 'casino', 'movie_theater'],
-    aiHint: 'This is a NIGHT OUT. Pick nightlife spots — bars, lounges, clubs, live music venues, date-night restaurants. Avoid daytime-only places, museums, and parks. Prioritize culturally unique spots — Black-owned, Latino-owned, Asian-owned, Caribbean, LGBTQ+-friendly, or culturally themed venues over generic chains.',
+    foodTypes: ['restaurant', 'fine_dining_restaurant', 'steak_house', 'seafood_restaurant', 'wine_bar', 'bar'],
+    activityTypes: NIGHTLIFE_TYPES,
+    textSearchKey: 'nightout',
+    textSearchCount: 4,
+    aiHint: 'This is a NIGHT OUT. Start with dinner or a pre-game food spot, then build through bars, lounges, speakeasies, jazz clubs, or live music, and END with a late-night food spot (tacos, pizza, diner, etc). The arc should feel like a real night out with friends — not just a list of bars.',
+    structureHint: {
+      morning: 'Brunch spot → 2 chill daytime bars/lounges',
+      afternoon: 'Late lunch → 2 happy hour spots or pre-game bars',
+      evening: 'Dinner → bar/lounge → speakeasy or club → late-night food',
+      full: 'Dinner/pre-game → cocktail bar → lounge or jazz club → dance spot or live music → late-night eats → after-hours spot',
+    },
+  },
+  stacked: {
+    foodTypes: FOOD_TYPES.concat(['fine_dining_restaurant', 'steak_house', 'seafood_restaurant']),
+    activityTypes: ADVENTURE_TYPES.concat(NIGHTLIFE_TYPES),
+    textSearchKey: 'stacked',
+    textSearchCount: 6,
+    aiHint: 'This is the STACKED concierge itinerary — a premium day-to-night experience planned like a personal concierge. The arc goes: morning fuel → daytime culture/adventure → lunch → afternoon activity → dinner → lounge/rooftop → nightclub or live music → late-night eats. Every stop should feel intentional, elevated, and exciting. Mix iconic must-see landmarks with hidden gems, underrated spots, and unique local-only experiences. At least half the stops should be places most tourists would NOT know about — the kind of spot a well-connected local friend would take you to. This is the ULTIMATE full-day experience.',
+    structureHint: {
+      morning: 'Breakfast → activity → coffee stop',
+      afternoon: 'Lunch → cultural experience → scenic walk',
+      evening: 'Dinner → lounge → club → late-night eats',
+      full: 'Breakfast → morning activity/culture → lunch → afternoon adventure → dinner → lounge or rooftop → nightclub or live music → late-night eats',
+    },
   },
   food: {
-    fetchFood: true, fetchActivity: false,
-    aiHint: 'This is a FOOD-ONLY tour. Every stop MUST be a restaurant, cafe, bakery, or food spot. No museums, parks, landmarks, or tourist attractions. PRIORITIZE cultural diversity: mix cuisines from different cultures (Mexican, Ethiopian, Korean, Indian, Caribbean, Southern soul food, etc). Avoid chain restaurants. Prefer locally-owned, family-run, and culturally authentic spots over generic American restaurants.',
+    foodTypes: FOOD_TYPES,
+    activityTypes: [],
+    textSearchKey: 'food',
+    textSearchCount: 5,
+    aiHint: 'This is a FOOD TOUR — a global culinary journey through the city. Every stop is food or drink. ABSOLUTE RULE: Each stop MUST be a DIFFERENT cuisine/culture. If stop 1 is Mexican, stop 2 must be a completely different culture (Chinese, Ethiopian, Korean, Indian, Caribbean, Italian, Middle Eastern, Japanese, African, Vietnamese, Thai, etc.). NEVER two stops from the same cuisine, culture, or restaurant brand. Rotate through as many different cultures as possible. Create a NARRATIVE ARC: start light (coffee, pastries, brunch), build to heavier dishes (entrees, BBQ, curry), end sweet or boozy (dessert, cocktails, nightcap). Include a mix of sit-down, casual, and grab-and-go. This food tour should feel like eating around the WORLD in one day.',
+    structureHint: {
+      morning: 'Coffee/pastry → stroll neighborhood → brunch spot (2.5-3 hrs after first stop)',
+      afternoon: 'Lunch entree → scenic walk or coffee break → happy hour drinks + bites (2.5-3 hrs after lunch)',
+      evening: 'Dinner entree → walk and digest → dessert or cocktail spot (2.5-3 hrs after dinner)',
+      full: 'Coffee/pastry (10 AM) → walk/explore → brunch (12:30-1 PM) → stroll/digest → afternoon bite (3:30-4 PM) → walk → dinner (7 PM) → dessert or nightcap (9:30-10 PM)',
+    },
   },
   adventure: {
-    fetchFood: false, fetchActivity: true,
-    aiHint: 'This is an ADVENTURE day. Pick from outdoor spots, museums, galleries, landmarks, scenic viewpoints, and attractions. No restaurants or bars. Prioritize culturally significant spots — cultural centers, heritage sites, neighborhood-specific landmarks, and locally important places over generic tourist traps.',
+    foodTypes: FOOD_TYPES,
+    activityTypes: ADVENTURE_TYPES,
+    textSearchKey: 'adventure',
+    textSearchCount: 4,
+    aiHint: 'This is an ADVENTURE day. Mix outdoor spots, museums, galleries, landmarks, scenic walks, and BEACHES (if any beaches appear in the places list) — but ALWAYS weave food in between activities. Never have 3 non-food stops in a row. The food should match the neighborhood vibe (e.g., tacos near a cultural district, cafe near a park, seafood near a beach). BEACH RULE: If the city has beaches in the places list, you MUST include at least one beach stop — people visiting coastal cities want to experience the ocean. Schedule beach time for late morning or afternoon when it\'s warmest. Pair it with a nearby beach bar, seafood spot, or waterfront restaurant.',
+    structureHint: {
+      morning: 'Breakfast/brunch → outdoor activity, museum, or beach → coffee or snack stop',
+      afternoon: 'Lunch → museum or landmark → beach or scenic walk → market or snack',
+      evening: 'Dinner → cultural venue or viewpoint → dessert or drinks',
+      full: 'Breakfast → morning activity → lunch (local spot) → beach or afternoon adventure → snack/coffee → dinner or sunset spot',
+    },
   },
   surprise: {
-    fetchFood: true, fetchActivity: true,
-    aiHint: 'Create a well-rounded mix of the best food, sights, and experiences. PRIORITIZE cultural diversity and authenticity: include spots from different cultural backgrounds (Black-owned, Hispanic-owned, Asian-owned, immigrant-run, etc). Mix cuisines and cultures. Avoid chain restaurants and generic tourist attractions. Give people an authentic, diverse feel for the city.',
+    foodTypes: FOOD_TYPES.concat(['fine_dining_restaurant', 'steak_house', 'seafood_restaurant']),
+    activityTypes: ADVENTURE_TYPES.concat(NIGHTLIFE_TYPES).concat(['shopping_mall', 'clothing_store', 'spa']),
+    textSearchKey: 'surprise',
+    textSearchCount: 6,
+    aiHint: 'THE CURATED CITY — you are an elite city discovery concierge creating a plan for EVERYONE (all nationalities, races, genders, ages). This plan showcases each city\'s ABSOLUTE BEST and most iconic experiences. UPSCALE RESTAURANTS: Include the city\'s most celebrated fine dining (think Tre Dita / RPM Italian caliber in Chicago, Carbone in NYC, Nobu in Miami). REAL MUSEUMS & ATTRACTIONS: Include MAJOR, well-known museums and attractions people actually visit — places like the Museum of Science and Industry, Art Institute, Field Museum in Chicago; MoMA, Met in NYC; Smithsonian in DC. These must be REAL, verified, popular places with reviews — not obscure or closed locations. TOURIST LANDMARKS: Include the iconic sights visitors come for (observation decks, monuments, famous parks, waterfronts). Mix upscale dining + world-class museums + iconic tourist landmarks + celebrated bars. NEVER make the plan all restaurants or all museums — always a rich MIX of both. Every stop must be a real, operating, well-reviewed place that people actually go to.',
+    structureHint: {
+      morning: 'Best brunch or upscale café → iconic cultural landmark or gallery → artisan bakery or coffee',
+      afternoon: 'Top-rated lunch (upscale casual or fine dining) → world-class museum or luxury shopping district → scenic neighborhood or cultural landmark',
+      evening: 'Award-winning dinner (fine dining caliber) → celebrated cocktail bar or rooftop lounge → nightlife or late-night bite',
+      full: 'Upscale brunch or café → iconic landmark or gallery → best lunch (chef-driven) → world-class museum or luxury shopping → scenic neighborhood → fine dining dinner → top cocktail bar or rooftop → nightlife or late-night bite',
+    },
+  },
+  chill: {
+    foodTypes: ['cafe', 'coffee_shop', 'bakery', 'breakfast_restaurant', 'brunch_restaurant', 'ice_cream_shop'],
+    activityTypes: ['book_store', 'park', 'art_gallery', 'market', 'spa', 'library'],
+    textSearchKey: 'chill',
+    textSearchCount: 3,
+    aiHint: 'This is a CHILL morning/day. Think cozy coffee shops, indie bookstores, scenic parks, farmers markets, and relaxed brunch spots. The pace should be slow and leisurely — not rushed. Every stop should feel like a warm exhale.',
+    structureHint: {
+      morning: 'Coffee shop or bakery → scenic walk or park → brunch spot',
+      afternoon: 'Cafe or tea house → bookstore or gallery → dessert or market browse',
+      evening: 'Cozy dinner spot → quiet wine bar or dessert cafe → scenic walk',
+      full: 'Morning coffee → park or bookstore → brunch → afternoon cafe → gallery or market → cozy dinner',
+    },
+  },
+  daydrinks: {
+    foodTypes: ['restaurant', 'bar', 'wine_bar', 'brunch_restaurant', 'cafe', 'seafood_restaurant'],
+    activityTypes: ['bar', 'wine_bar'],
+    textSearchKey: 'daydrinks',
+    textSearchCount: 3,
+    aiHint: 'This is a DAY DRINKS outing. Think rooftop bars with views, happy hour spots, wine bars, breweries, and cocktail-forward lunch spots. Pair every drink stop with food — tapas, small plates, or a proper lunch. The vibe is social, sunny, and relaxed but elevated.',
+    structureHint: {
+      morning: 'Boozy brunch → mimosa bar or wine bar → cafe or bakery',
+      afternoon: 'Lunch + cocktails → rooftop bar or brewery → happy hour spot with bites',
+      evening: 'Happy hour dinner → wine bar or cocktail lounge → rooftop sunset drinks',
+      full: 'Boozy brunch → midday wine bar → lunch + cocktails → rooftop happy hour → dinner + drinks → sunset bar',
+    },
   },
 };
 
@@ -106,6 +684,37 @@ async function fetchNearbyPlaces(
     console.error('[NxStops Plan] Google Places error:', response.status, errText.slice(0, 300));
     return [];
   }
+  const data = await response.json();
+  return data.places || [];
+}
+
+async function textSearchPlaces(
+  query: string, lat: number, lng: number, radius: number,
+): Promise<Record<string, unknown>[]> {
+  // Use locationRestriction (rectangle) to STRICTLY limit results to the city area
+  // locationBias only hints — Google can return results from other cities/countries
+  const deltaLat = radius / 111111;
+  const deltaLng = radius / (111111 * Math.cos(lat * Math.PI / 180));
+  const body = {
+    textQuery: query,
+    maxResultCount: 10,
+    locationRestriction: {
+      rectangle: {
+        low: { latitude: lat - deltaLat, longitude: lng - deltaLng },
+        high: { latitude: lat + deltaLat, longitude: lng + deltaLng },
+      },
+    },
+  };
+  const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': GOOGLE_API_KEY,
+      'X-Goog-FieldMask': FIELD_MASK,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) return [];
   const data = await response.json();
   return data.places || [];
 }
@@ -198,7 +807,7 @@ function transformPlace(raw: Record<string, unknown>, userLat: number, userLng: 
     tags,
     address: (raw.formattedAddress as string) || '',
     photoUrl: photoNames.length > 0
-      ? `/api/places?action=photo&name=${encodeURIComponent(photoNames[0])}&maxWidth=400`
+      ? `https://nxstops.com/api/places?action=photo&name=${encodeURIComponent(photoNames[0])}&maxWidth=400`
       : null,
     photoNames,
     rating: (raw.rating as number) || 0,
@@ -233,7 +842,7 @@ async function callOpenAI(messages: { role: string; content: string }[]): Promis
         model: 'gpt-4o-mini',
         messages,
         temperature: 0.8,
-        max_tokens: 500,
+        max_tokens: 800,
         response_format: { type: 'json_object' },
       }),
     });
@@ -265,7 +874,7 @@ async function callGemini(systemPrompt: string, userPrompt: string): Promise<str
           contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
           generationConfig: {
             temperature: 0.8,
-            maxOutputTokens: 500,
+            maxOutputTokens: 800,
             responseMimeType: 'application/json',
           },
         }),
@@ -304,14 +913,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const {
-      lat, lng, city, vibe, subVibe, mood, travelGroup, duration,
-      weather, preferences, events,
+      lat, lng, city, vibe, mood, travelGroup, duration,
+      weather, preferences, events, advisory, jetLagContext,
     } = req.body as {
       lat: number; lng: number; city?: string;
-      vibe?: string; subVibe?: string; mood?: string;
+      vibe?: string; mood?: string;
       travelGroup?: string; duration?: string;
       weather?: string; preferences?: string;
       events?: { name: string; category: string; time: string; venue: string }[];
+      advisory?: string;
+      jetLagContext?: string;
     };
 
     if (!lat || !lng) {
@@ -322,26 +933,141 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const vibeKey = vibe && VIBE_CONFIG[vibe] ? vibe : 'surprise';
     const config = VIBE_CONFIG[vibeKey];
 
-    // 1. Fetch ONLY the place types relevant to this vibe
+    // 1. ALWAYS fetch food places (food is woven into every itinerary)
     const fetches: Promise<Record<string, unknown>[]>[] = [];
-    let fetchLabels: string[] = [];
+    const fetchLabels: string[] = [];
 
-    if (config.fetchFood) {
-      const types = config.foodTypes || FOOD_TYPES;
-      fetches.push(fetchNearbyPlaces(lat, lng, types, 2500));
-      fetchLabels.push('food');
-    }
-    if (config.fetchActivity) {
-      const types = config.activityTypes || ACTIVITY_TYPES;
-      fetches.push(fetchNearbyPlaces(lat, lng, types, 3000));
+    // Food types — always fetched (start with 5km, expand if too few results)
+    fetches.push(fetchNearbyPlaces(lat, lng, config.foodTypes, 5000));
+    fetchLabels.push('food');
+
+    // Activity types — fetched if the vibe has them
+    if (config.activityTypes.length > 0) {
+      fetches.push(fetchNearbyPlaces(lat, lng, config.activityTypes, 6000));
       fetchLabels.push('activity');
     }
 
     const rawResults = await Promise.all(fetches);
-    const allRaw = rawResults.flat();
+    let allRaw = rawResults.flat();
+
+    // Fallback for small/island/remote cities: if nearby search returned too few,
+    // retry with much larger radius (25km covers most islands and small cities)
+    if (allRaw.length < 10) {
+      console.log(`[NxStops Plan] Only ${allRaw.length} nearby results — expanding search radius to 25km`);
+      const expandedFetches: Promise<Record<string, unknown>[]>[] = [
+        fetchNearbyPlaces(lat, lng, config.foodTypes, 25000),
+      ];
+      if (config.activityTypes.length > 0) {
+        expandedFetches.push(fetchNearbyPlaces(lat, lng, config.activityTypes, 25000));
+      }
+      const expandedResults = await Promise.all(expandedFetches);
+      allRaw = [...allRaw, ...expandedResults.flat()];
+    }
+
+    // 1b. Region-aware text searches
+    // Non-Western cities → HEAVY local cuisine + sprinkle of international
+    // Western cities → diverse multicultural mix
+    const localRegion = detectLocalRegion(city || '');
+    const shuffledSearches: string[] = [];
+
+    if (localRegion) {
+      // LOCAL REGION: 70-80% local cuisine, 20-30% sprinkle of international
+      if (vibeKey === 'nightout') {
+        // Nightlife: use region's nightlife searches + a few global ones
+        const localNight = localRegion.nightlifeSearches.sort(() => Math.random() - 0.5).slice(0, 3);
+        const globalNight = (DIVERSE_TEXT_SEARCHES.nightout || []).sort(() => Math.random() - 0.5).slice(0, 1);
+        shuffledSearches.push(...localNight, ...globalNight);
+        // Always include local food for dinner/late-night stops
+        const localFood = localRegion.foodSearches.sort(() => Math.random() - 0.5).slice(0, 2);
+        shuffledSearches.push(...localFood);
+      } else if (vibeKey === 'food') {
+        // Food tour: mostly local cuisine, sprinkle 1 international
+        const localFood = localRegion.foodSearches.sort(() => Math.random() - 0.5).slice(0, 5);
+        const globalFood = (DIVERSE_TEXT_SEARCHES.food || []).sort(() => Math.random() - 0.5).slice(0, 1);
+        shuffledSearches.push(...localFood, ...globalFood);
+      } else if (vibeKey === 'adventure') {
+        // Adventure: keep adventure searches + local food for meal stops
+        const adventureSearches = (DIVERSE_TEXT_SEARCHES.adventure || []).sort(() => Math.random() - 0.5).slice(0, 3);
+        const localFood = localRegion.foodSearches.sort(() => Math.random() - 0.5).slice(0, 2);
+        shuffledSearches.push(...adventureSearches, ...localFood);
+      } else {
+        // Surprise/chill/daydrinks: heavy local + cultural mix
+        const localFood = localRegion.foodSearches.sort(() => Math.random() - 0.5).slice(0, 3);
+        const globalSurprise = (DIVERSE_TEXT_SEARCHES.surprise || []).sort(() => Math.random() - 0.5).slice(0, 1);
+        const culturalSearches = (DIVERSE_TEXT_SEARCHES.cultural || []).sort(() => Math.random() - 0.5).slice(0, 2);
+        shuffledSearches.push(...localFood, ...globalSurprise, ...culturalSearches);
+      }
+
+      // Stacked vibe: add nightlife searches for evening portion
+      if (vibeKey === 'stacked') {
+        const localNight = localRegion.nightlifeSearches.sort(() => Math.random() - 0.5).slice(0, 2);
+        shuffledSearches.push(...localNight);
+      }
+    } else {
+      // WESTERN / DEFAULT: diverse multicultural mix (existing behavior)
+      const vibeSearches = DIVERSE_TEXT_SEARCHES[config.textSearchKey] || [];
+      shuffledSearches.push(...vibeSearches.sort(() => Math.random() - 0.5).slice(0, config.textSearchCount));
+
+      // Always add a few diverse food searches for non-food vibes
+      if (vibeKey !== 'food') {
+        const foodSearches = DIVERSE_TEXT_SEARCHES.food.sort(() => Math.random() - 0.5).slice(0, 2);
+        shuffledSearches.push(...foodSearches);
+        // Always add cultural/ethnic place searches too
+        const culturalSearches = DIVERSE_TEXT_SEARCHES.cultural.sort(() => Math.random() - 0.5).slice(0, 2);
+        shuffledSearches.push(...culturalSearches);
+      }
+
+      // Stacked vibe: add nightlife text searches for evening portion
+      if (vibeKey === 'stacked') {
+        const nightSearches = DIVERSE_TEXT_SEARCHES.nightout.sort(() => Math.random() - 0.5).slice(0, 2);
+        shuffledSearches.push(...nightSearches);
+      }
+    }
+
+    if (shuffledSearches.length > 0) {
+      // Use larger text search radius (10km default, 25km for small/island cities)
+      const textRadius = allRaw.length < 15 ? 25000 : 10000;
+      const textResults = await Promise.all(
+        shuffledSearches.map(q => textSearchPlaces(q, lat, lng, textRadius).catch(() => []))
+      );
+      allRaw = [...allRaw, ...textResults.flat()];
+    }
+
+    // 1c. Filter out closed, not-yet-open, ghost listings, and out-of-city places
+    const NOT_OPEN_RE = /\b(coming soon|opening soon|under construction|not yet open|grand opening|pre-opening|opening \d{4}|opens? in|currently closed|permanently closed|temporarily closed|reopening|closed for renovation|under renovation)\b/i;
+    allRaw = allRaw.filter(p => {
+      const status = p.businessStatus as string | undefined;
+      if (status === 'CLOSED_PERMANENTLY' || status === 'CLOSED_TEMPORARILY') return false;
+      // Filter out "coming soon" / not-yet-open places
+      const summary = (p.editorialSummary as { text?: string } | undefined)?.text || '';
+      const name = (p.displayName as { text?: string } | undefined)?.text || '';
+      if (NOT_OPEN_RE.test(summary) || NOT_OPEN_RE.test(name)) return false;
+      // Filter out non-venues: junctions, event halls, generic POIs
+      const primaryType = p.primaryType as string | undefined;
+      if (!primaryType) return false;
+      const NON_VENUE_TYPES = ['event_venue', 'wedding_venue', 'banquet_hall', 'condominium_complex', 'apartment_complex', 'residential_area'];
+      if (NON_VENUE_TYPES.includes(primaryType)) return false;
+      if (/\b(junction|interchange|roundabout|overpass|flyover|intersection|highway)\b/i.test(name)) return false;
+      // Filter out ghost listings with no reviews AND no rating (likely non-existent)
+      // Allow places with a rating even if review count is 0 (common on small islands)
+      const reviewCount = (p.userRatingCount as number) || 0;
+      const rating = (p.rating as number) || 0;
+      if (reviewCount === 0 && rating === 0) return false;
+      // Safety net: filter out places too far from the city center (>50km)
+      const loc = p.location as { latitude: number; longitude: number } | undefined;
+      if (loc) {
+        const dLat = (loc.latitude - lat) * Math.PI / 180;
+        const dLng = (loc.longitude - lng) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat * Math.PI / 180) * Math.cos(loc.latitude * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+        const distKm = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        if (distKm > 50) return false;
+      }
+      return true;
+    });
+
     const allTransformed = allRaw.map(p => transformPlace(p, lat, lng));
 
-    // 2. Filter out chains — NxStops is about culturally diverse, locally-owned spots
+    // 2. Filter out chains + hotels — NxStops is about culturally diverse, locally-owned spots
     const CHAIN_KEYWORDS = [
       'starbucks', 'mcdonald', 'subway', 'burger king', 'wendy', 'taco bell',
       'chick-fil-a', 'chipotle', 'panera', 'dunkin', 'domino', 'pizza hut',
@@ -352,24 +1078,52 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       'arby', 'sonic drive', 'whataburger', 'raising cane', 'in-n-out',
       'cold stone', 'baskin-robbins', 'krispy kreme', 'tim horton',
     ];
+    const EXCLUDED_PLAN_TYPES = new Set([
+      'lodging', 'hotel', 'motel', 'resort_hotel', 'extended_stay_hotel',
+      'gas_station', 'car_wash', 'car_repair', 'car_dealer',
+      'hospital', 'dentist', 'doctor', 'pharmacy', 'veterinary_care',
+      'school', 'university', 'post_office', 'bank', 'atm',
+      'gym', 'fitness_center', 'grocery_store', 'supermarket', 'convenience_store',
+    ]);
     const filtered = allTransformed.filter(p => {
       const nameLower = p.name.toLowerCase();
-      return !CHAIN_KEYWORDS.some(chain => nameLower.includes(chain));
+      if (CHAIN_KEYWORDS.some(chain => nameLower.includes(chain))) return false;
+      if (EXCLUDED_PLAN_TYPES.has(p.category)) return false;
+      if (/\b(hotel|motel|inn|suites|lodge|resort)\b/i.test(nameLower) && !nameLower.includes('restaurant') && !nameLower.includes('bar')) return false;
+      // Filter out very low-rated places (safety concern)
+      if (p.rating > 0 && p.rating < 2.5) return false;
+      // Filter out low-rated nightlife specifically
+      const nightlifeTypes = ['bar', 'night_club', 'casino', 'wine_bar'];
+      if (nightlifeTypes.includes(p.category) && p.rating > 0 && p.rating < 3.0) return false;
+      return true;
     });
 
-    // 3. Deduplicate, sort by rating, take top 30
+    // 3. Deduplicate by placeId AND by brand/name similarity
     const seen = new Set<string>();
+    const seenNames = new Set<string>();
     const allPlaces: PlanPlace[] = [];
     for (const p of filtered) {
-      if (p.placeId && !seen.has(p.placeId)) {
-        seen.add(p.placeId);
-        allPlaces.push(p);
-      }
+      if (!p.placeId || seen.has(p.placeId)) continue;
+      // Normalize name: lowercase, strip trailing location words, keep first 2-3 core words
+      const nameLower = p.name.toLowerCase().replace(/['']/g, "'");
+      // Extract the brand/base name (first 2-3 significant words) to catch "Ramen San", "Ramen San Whiskey Bar", "Ramen San Lincolnwood"
+      const nameWords = nameLower.replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 1);
+      const baseName = nameWords.slice(0, 3).join(' ');
+      // Skip if we already have a place with this base name (same brand/restaurant)
+      if (baseName && seenNames.has(baseName)) continue;
+      // Also check if any existing name starts with or contains this base name
+      const isDuplicate = baseName.length >= 5 && [...seenNames].some(existing =>
+        existing.startsWith(baseName) || baseName.startsWith(existing)
+      );
+      if (isDuplicate) continue;
+      seen.add(p.placeId);
+      if (baseName) seenNames.add(baseName);
+      allPlaces.push(p);
     }
     allPlaces.sort((a, b) => (b.rating || 0) - (a.rating || 0));
     const topPlaces = allPlaces.slice(0, 30);
 
-    console.log(`[NxStops Plan] vibe="${vibeKey}" subVibe="${subVibe || ''}" fetched=[${fetchLabels}] totalPlaces=${topPlaces.length}`);
+    console.log(`[NxStops Plan] vibe="${vibeKey}" duration="${duration || 'full'}" region="${localRegion?.label || 'diverse'}" fetched=[${fetchLabels}] totalPlaces=${topPlaces.length}`);
 
     if (topPlaces.length < 3) {
       return res.status(200).json({
@@ -396,47 +1150,121 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       eventsSection = `\n\nTODAY'S EVENTS (can include 0-1 in the plan):\n${todayEvents.map((e, i) => `E${i}: ${e.name} at ${e.venue} (${e.time}) [${e.category}]`).join('\n')}`;
     }
 
-    // 4. Build AI prompt — structured vibe drives place selection
-    const durationLabel = duration || 'full day';
+    // 4. Build AI prompt — curated itinerary with food woven in
+    const durationLabel = duration || 'full';
     const isFullDay = durationLabel === 'full day' || durationLabel === 'full';
-    const stopCount = isFullDay ? 6 : 3;
+    const isStackedVibe = vibeKey === 'stacked';
+    const jetLagActive = !!jetLagContext;
+    const stopCount = jetLagActive
+      ? (isStackedVibe ? 6 : isFullDay ? 4 : 2)
+      : (isStackedVibe ? 8 : isFullDay ? 6 : 3);
     const now = new Date();
     const timeLabel = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-    // Build human-readable vibe description for the AI
     const vibeLabels: Record<string, string> = {
       nightout: 'Night Out', food: 'Food Tour',
-      adventure: 'Adventure', surprise: 'Surprise Me',
+      adventure: 'Adventure', surprise: 'The Curated City',
+      chill: 'Chill Vibes', daydrinks: 'Day Drinks',
+      stacked: 'Stacked',
     };
-    const vibeLabel = vibeLabels[vibeKey] || 'Surprise Me';
-    const subVibeNote = subVibe && subVibe !== 'mix' ? ` (focus: ${subVibe})` : '';
+    const vibeLabel = vibeLabels[vibeKey] || 'The Curated City';
 
-    const prompt = `Create a ${durationLabel} itinerary from ONLY the numbered places below.
+    // Duration-specific structure guidance
+    const durationKey = (['morning', 'afternoon', 'evening'].includes(durationLabel) ? durationLabel : 'full') as keyof typeof config.structureHint;
+    const structureGuide = config.structureHint[durationKey] || config.structureHint.full;
 
-CONTEXT:
-- City: ${city || 'nearby area'}
-- Current time: ${timeLabel}
-- Vibe: ${vibeLabel}${subVibeNote}
-- Group: ${travelGroup || 'solo'}${weather ? `\n- Weather: ${weather}` : ''}${preferences ? `\n- User preferences: ${preferences}` : ''}
+    // Duration-specific time windows
+    const timeWindows: Record<string, string> = {
+      morning: '8:00 AM – 12:00 PM',
+      afternoon: '12:00 PM – 5:00 PM',
+      evening: '5:00 PM – 12:00 AM',
+      full: isStackedVibe ? '9:00 AM – 2:00 AM' : '9:00 AM – 11:00 PM',
+    };
+    const timeWindow = timeWindows[durationKey] || timeWindows.full;
 
-PLACES (pick from these only, reference by idx):
+    const prompt = `You are planning a curated ${vibeLabel} itinerary${isStackedVibe ? ' — the concierge itinerary: a premium FULL day-to-night experience with breakfast through late-night nightlife' : ''}. This should feel like a LOCAL FRIEND planned it — not a generic list from Google.
+
+CITY: ${city || 'nearby area'}
+TIME: ${timeLabel} | WINDOW: ${timeWindow}
+VIBE: ${vibeLabel}
+GROUP: ${travelGroup || 'solo'}${weather ? `\nWEATHER: ${weather}` : ''}${preferences ? `\nPREFS: ${preferences}` : ''}${jetLagContext ? `\nJET LAG: ${jetLagContext}` : ''}
+
+ITINERARY STRUCTURE (follow this arc):
+${structureGuide}
+
+PLACES (pick from these ONLY, reference by idx):
 ${JSON.stringify(condensed)}${eventsSection}
 
-RULES:
-1. Pick exactly ${stopCount} stops
-2. CRITICAL: ${config.aiHint}
-3. CULTURAL DIVERSITY IS CORE: NxStops is NOT a generic travel app. Always prioritize Black-owned, Hispanic-owned, Asian-owned, Indian-owned, Caribbean, Middle Eastern, African, and other culturally diverse businesses. Mix cultures in every plan. Avoid chains. Give travelers an authentic, multicultural experience they can't get from Google Maps or TripAdvisor.
-4. Time-logical ordering: earlier activities first, dinner/nightlife last
-5. Prefer places that are currently open and have 4.0+ ratings
-6. The "spend" field must be a realistic USD estimate for one person (e.g. coffee=$5, museum=$20, nice dinner=$45)
-7. Group adjustments: family=kid-friendly, no nightlife; couple=intimate/scenic; solo=flexible; friends=social/group-friendly
-8. Keep stops close together for walkability
-9. Variety: pick diverse CULTURES and options within the theme (different cultural cuisines for food, different cultural neighborhoods for sightseeing, etc)${subVibe && subVibe !== 'mix' ? `\n10. SUB-THEME: Focus on "${subVibe}" specifically when choosing stops` : ''}${eventsSection ? `\n${subVibe && subVibe !== 'mix' ? '11' : '10'}. Include at most 1 event if it fits the vibe/timing` : ''}
+CRITICAL RULES:
+
+1. Pick exactly ${stopCount} stops. EVERY stop must be a DIFFERENT place — never pick the same idx twice. Each stop must be a unique, distinct location.
+
+2. ${config.aiHint}
+
+2b. UNIQUE EXPERIENCES: Do NOT just pick the most obvious tourist attractions. Mix 1-2 iconic landmarks with hidden gems, underrated local favorites, and unique experiences most visitors wouldn't find on their own. A great plan feels like a local insider curated it — not like a Google "top 10" list. Vary the neighborhoods — don't cluster all stops in the same tourist district.
+
+3. FOOD IS ALWAYS WOVEN IN: ${vibeKey === 'food'
+  ? 'Every stop is food/drink. Create a GLOBAL TASTING JOURNEY — each stop MUST be a different cuisine/culture (e.g., Mexican → Chinese → Ethiopian → Korean → Indian → Caribbean). NEVER two stops from the same cuisine, culture, or restaurant name/brand. Vary price points and vibes. If two places have similar names or are the same brand, only pick ONE.'
+  : isStackedVibe
+    ? 'At least 3-4 stops MUST be food/drink — breakfast, lunch, dinner, and late-night eats. Food goes BETWEEN activities, not lumped together. Match the food to the neighborhood and time of day. Every food stop MUST be a DIFFERENT cuisine — if you pick pizza, do NOT pick another pizza place. If you pick Chinese, do NOT pick another Chinese spot. Each food stop = different cultural cuisine.'
+    : `At least ${isFullDay ? '2-3' : '1'} stop(s) MUST be food/drink. Food goes BETWEEN activities, not lumped at the start or end. Match the food to the neighborhood and time of day. Every food stop MUST be a DIFFERENT cuisine — if you pick pizza, do NOT pick another pizza place. If you pick Chinese, do NOT pick another Chinese spot. Each food stop = different cultural cuisine.`}
+
+${isStackedVibe ? `3b. STACKED NIGHTLIFE IS MANDATORY: The evening portion (after dinner) MUST include at least 2-3 nightlife stops — a lounge or rooftop bar, a nightclub or live music venue, and late-night eats. The day should arc from chill morning → active afternoon → elevated dinner → nightlife escalation → late-night wind-down. This is a premium concierge-level full day-to-night experience.` : ''}
+${vibeKey !== 'food' ? `3c. REAL MUSEUMS & ATTRACTIONS ARE MANDATORY: At least ${isFullDay ? '2' : '1'} stop(s) MUST be a REAL, well-known, verified museum, attraction, or cultural landmark that people actually visit (e.g., science museums, art museums, aquariums, zoos, botanical gardens, observation decks, historic landmarks, performing arts theaters). Pick places with high review counts that are clearly open and operating. Do NOT make every stop a restaurant or bar. The plan should feel like you're EXPERIENCING the city — museums, landmarks, culture, AND great food. This app is for EVERYONE — all nationalities, races, genders, ages — so choose safe, inclusive, welcoming places.` : ''}
+
+4. ${localRegion
+  ? `LOCAL CULTURE IS KING: You are in ${localRegion.label} territory. HEAVILY prioritize authentic ${localRegion.label} food, drinks, and culture — this is what travelers come here for. At least ${isStackedVibe ? '4 out of 8' : isFullDay ? '3 out of 6' : '2 out of 3'} food stops should be ${localRegion.label} cuisine. Include at least 1 cultural/heritage stop (museum, landmark, cultural center). You may sprinkle in 1 international option if it's genuinely great.`
+  : 'CULTURAL DIVERSITY IS CORE: NxStops is NOT a generic travel app. Mix cultures — Black-owned, Hispanic-owned, Asian-owned, Caribbean, Middle Eastern, African, and other culturally diverse businesses. Include ethnic neighborhoods, cultural landmarks, and heritage museums — not just restaurants. Never pick 2 places from the same cuisine or culture back-to-back.'}
+
+5. VIBE NOTE: For each stop, write a "reason" that is a vivid 1-sentence description making someone EXCITED to go. Examples:
+   - "A tucked-away speakeasy with killer mezcal cocktails and dim jazz lighting"
+   - "Grandma's recipe Ethiopian injera that locals line up for every Saturday"
+   - "Rooftop views of the skyline with craft cocktails at golden hour"
+   Do NOT write generic reasons like "highly rated restaurant" or "popular bar."
+
+6. MEAL-APPROPRIATE FOOD: Match food to the time of day. This is critical:
+   - BREAKFAST (before 11 AM): ONLY pick cafés, bakeries, brunch spots, breakfast restaurants, coffee shops, diners, or places known for breakfast/brunch. NEVER recommend pizza, BBQ, steakhouses, sushi, or dinner-style restaurants for breakfast.
+   - LUNCH (11 AM – 3 PM): Any restaurant is fine — tacos, sandwiches, sit-down, casual, etc.
+   - DINNER (6 PM – 10 PM): Elevated dining, sit-down restaurants, steakhouses, etc.
+   - LATE-NIGHT (after 10 PM): Tacos, pizza, diners, food trucks, 24-hour spots are perfect here.
+   If a place's category is "pizza_restaurant", "steak_house", "sushi_restaurant", or "seafood_restaurant", do NOT schedule it before 11 AM.
+
+7. REALISTIC TIMING: Each timeSlot must be a specific time (e.g., "7:30 PM") that accounts for how long people ACTUALLY spend at each stop PLUS travel time between them. Use these minimums:
+   - Coffee/cafe/bakery: 30-45 min at the spot
+   - Quick bite (tacos, street food, snack stop): 45 min
+   - Sit-down restaurant/dinner: 1.5 hours (ordering, waiting, eating, paying)
+   - Bar/lounge/cocktail spot: 1-1.5 hours
+   - Movie theater: 2.5-3 hours (trailers + film + exit)
+   - Museum/gallery/activity: 2-3 hours
+   - Park/scenic walk/market: 1.5-2 hours
+   - Beach/waterfront: 1.5-2.5 hours (swimming, relaxing, walking the shore)
+   - Travel between stops: add 20-30 min buffer for transit, parking, walking, delays
+
+   Example: If dinner starts at 7:00 PM (1.5h) + 25 min travel = next stop no earlier than 8:55 PM → round to 9:00 PM.
+   NEVER schedule the next stop less than the activity duration + travel buffer after the previous one. Dinner isn't at 2 PM. Coffee isn't at 10 PM.
+${vibeKey === 'food' ? `
+   FOOD TOUR SPACING (CRITICAL): On a food tour, you MUST leave AT LEAST 2.5-3 HOURS between each food stop. People need time to digest, walk around, and build appetite again. Fill the gaps with scenic walks, window shopping, coffee/tea (not food), or casual strolling through neighborhoods. Example: brunch at 10:00 AM → next food stop no earlier than 12:30-1:00 PM → next food stop no earlier than 3:30-4:00 PM. NEVER schedule food stops only 1-1.5 hours apart — that's way too rushed and uncomfortable.` : ''}
+
+8. NO DUPLICATE NAMES, BRANDS, OR CUISINES: NEVER pick two places with the same name or brand (e.g., "Ramen San" and "Ramen San Whiskey Bar" are the SAME restaurant — pick only one). If two places look like the same chain or brand, only pick ONE. NEVER pick two food stops serving the same cuisine type — no two pizza places, no two Chinese restaurants, no two sushi spots, no two burger joints. Each food stop should be a completely different culinary culture (e.g., Italian → Ethiopian → Korean → Mexican). Spread your picks across DIFFERENT restaurants, bars, and venues.
+
+9. MIX PRICE POINTS: Not everything expensive. Include at least one affordable/casual stop.
+
+10. SPEND: Realistic per-person USD (coffee=$5, tacos=$12, nice dinner=$45, museum=$20, bar=$18).
+
+11. WALKABILITY: Keep stops reasonably close together.
+
+12. GROUP: family=kid-friendly no nightlife; couple=intimate/romantic; solo=flexible/chill; friends=social/fun.${eventsSection ? `\n\n13. Include at most 1 event if it fits the vibe and timing.` : ''}${advisory ? `\n\n${eventsSection ? '14' : '13'}. TRAVEL ADVISORY: ${advisory}. Factor this into your recommendations — prefer well-lit, busy, indoor venues. For any outdoor stops after 6 PM, mention safety awareness in the reason.` : ''}${jetLagContext ? `\n\n${eventsSection ? (advisory ? '15' : '14') : (advisory ? '14' : '13')}. JET LAG ADJUSTMENT: The traveler is adjusting to a new timezone. Plan a LIGHTER, gentler itinerary:
+   - Start the day LATER (no stops before 10-11 AM — they may sleep in)
+   - Include at least 1 relaxing stop (cafe, park, scenic walk) between activities
+   - Avoid back-to-back high-energy activities
+   - Prioritize comfortable food spots with good seating over rushed street food
+   - Keep evening stops mellow — no late-night past 10 PM
+   The traveler should still have a great time, just at a gentler pace.` : ''}
 
 Return ONLY this JSON:
-{"stops":[{"idx":0,"timeSlot":"9:00 AM","reason":"why this fits","spend":15}],"dayTitle":"Catchy 3-4 word title"}`;
+{"stops":[{"idx":0,"timeSlot":"7:30 PM","reason":"Vivid 1-sentence vibe description","spend":25}],"dayTitle":"Catchy 3-5 word title"}`;
 
-    const systemMsg = 'You are NxStops, a culturally diverse itinerary generator. You prioritize authentic, locally-owned, and culturally diverse businesses — Black-owned, Hispanic-owned, Asian-owned, immigrant-run, and culturally unique spots. You avoid chain restaurants and generic tourist traps. Return ONLY valid JSON, no markdown, no explanation, no extra text.';
+    const systemMsg = 'You are NxStops, a curated itinerary planner that feels like a local friend who knows all the best spots. You prioritize culturally diverse, locally-owned businesses and create itineraries with a narrative arc — not just a list of places. Every plan should make someone excited to go out. Return ONLY valid JSON.';
     const messages = [
       { role: 'system', content: systemMsg },
       { role: 'user', content: prompt },
@@ -473,15 +1301,46 @@ Return ONLY this JSON:
       return res.status(502).json({ error: 'AI returned unexpected format. Try again.' });
     }
 
-    // 5. Map AI selections back to full place objects
+    // 5. Map AI selections back to full place objects, dedup by idx and name
+    const usedIdx = new Set<number>();
+    const usedNames = new Set<string>();
     const planStops = aiPlan.stops
-      .filter(s => s.idx >= 0 && s.idx < topPlaces.length)
+      .filter(s => {
+        if (s.idx < 0 || s.idx >= topPlaces.length) return false;
+        // Skip duplicate indices
+        if (usedIdx.has(s.idx)) return false;
+        // Skip duplicate names (same restaurant with different idx)
+        const baseName = topPlaces[s.idx].name.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).slice(0, 3).join(' ');
+        if (baseName.length >= 5 && [...usedNames].some(n => n.startsWith(baseName) || baseName.startsWith(n))) return false;
+        usedIdx.add(s.idx);
+        usedNames.add(baseName);
+        return true;
+      })
       .map(s => ({
         place: topPlaces[s.idx],
         timeSlot: s.timeSlot || '',
         reason: s.reason || '',
         estimatedSpend: s.spend || 0,
       }));
+
+    // Backfill if dedup removed stops — pick unused places to reach the target count
+    if (planStops.length < stopCount) {
+      for (let i = 0; i < topPlaces.length && planStops.length < stopCount; i++) {
+        if (usedIdx.has(i)) continue;
+        const baseName = topPlaces[i].name.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).slice(0, 3).join(' ');
+        if (baseName.length >= 5 && [...usedNames].some(n => n.startsWith(baseName) || baseName.startsWith(n))) continue;
+        usedIdx.add(i);
+        usedNames.add(baseName);
+        // Insert at the end with a reasonable time slot
+        const lastTime = planStops.length > 0 ? planStops[planStops.length - 1].timeSlot : '';
+        planStops.push({
+          place: topPlaces[i],
+          timeSlot: lastTime ? '' : '',
+          reason: 'Bonus stop to round out your day',
+          estimatedSpend: 0,
+        });
+      }
+    }
 
     return res.status(200).json({
       plan: planStops,

@@ -4,41 +4,69 @@ import { LocationIcon } from '../components/icons';
 import { formatDistance } from '../services/places';
 import type { PlanDuration } from '../types';
 import ContextHint from '../components/ContextHint';
+import { useSubscription } from '../hooks/useSubscription';
+import PaywallModal from '../components/PaywallModal';
 
-// ── Vibe Cards + Sub-Vibes ──
+// ── Vibe Cards ──
 interface VibeOption {
   id: string;
   emoji: string;
   label: string;
-  subVibes: { id: string; label: string }[];
+  desc: string;
 }
 
-const PLAN_VIBES: VibeOption[] = [
-  { id: 'nightout', emoji: '\u{1F319}', label: 'Night Out', subVibes: [
-    { id: 'date-night', label: 'Date Night' },
-    { id: 'clubs', label: 'Clubs' },
-    { id: 'bars', label: 'Bars & Lounges' },
-    { id: 'live-music', label: 'Live Music' },
-  ]},
-  { id: 'food', emoji: '\u{1F37D}\u{FE0F}', label: 'Food Tour', subVibes: [
-    { id: 'restaurants', label: 'Restaurants' },
-    { id: 'bar-hopping', label: 'Bar Hopping' },
-    { id: 'desserts', label: 'Desserts' },
-    { id: 'quick-bites', label: 'Quick Bites' },
-    { id: 'sit-down', label: 'Sit-Down' },
-    { id: 'mix', label: 'Mix of everything' },
-  ]},
-  { id: 'adventure', emoji: '\u{1F33F}', label: 'Adventure', subVibes: [
-    { id: 'outdoor', label: 'Outdoor' },
-    { id: 'museums', label: 'Museums' },
-    { id: 'sightseeing', label: 'Sightseeing' },
-    { id: 'mix', label: 'Mix' },
-  ]},
-  { id: 'surprise', emoji: '\u{1F3B2}', label: 'Surprise Me', subVibes: [] },
-];
+function getVibesForDuration(duration: PlanDuration): VibeOption[] {
+  const food: VibeOption = {
+    id: 'food', emoji: '\u{1F37D}\u{FE0F}', label: 'Food Tour',
+    desc: duration === 'morning' ? 'Coffee crawl, brunch spots, morning bites'
+      : duration === 'afternoon' ? 'Lunch crawl, desserts, afternoon bites'
+      : duration === 'evening' ? 'Dinner crawl, late-night bites, cocktails'
+      : 'A curated food crawl through the city',
+  };
+  const adventure: VibeOption = {
+    id: 'adventure', emoji: '\u{1F33F}', label: 'Adventure',
+    desc: duration === 'morning' ? 'Parks, museums, scenic walks + breakfast'
+      : duration === 'afternoon' ? 'Culture, landmarks, markets + lunch'
+      : duration === 'evening' ? 'Sunset spots, viewpoints, culture + dinner'
+      : 'Outdoor, museums, culture + food between',
+  };
+  const curatedCity: VibeOption = {
+    id: 'surprise', emoji: '\u{1F3D9}\u{FE0F}', label: 'The Curated City',
+    desc: duration === 'morning' ? 'Top cafés, brunch spots, parks & culture'
+      : duration === 'afternoon' ? 'Best lunch, museums, shopping & neighborhoods'
+      : duration === 'evening' ? 'Top dinner, bars, events & nightlife'
+      : 'The city\'s greatest hits — top-rated everything',
+  };
+
+  if (duration === 'morning') {
+    return [
+      { id: 'chill', emoji: '\u{2615}', label: 'Chill Vibes', desc: 'Coffee shops, bookstores, scenic walks' },
+      food, adventure, curatedCity,
+    ];
+  }
+  if (duration === 'afternoon') {
+    return [
+      { id: 'daydrinks', emoji: '\u{1F379}', label: 'Day Drinks', desc: 'Rooftop bars, happy hour, wine bars' },
+      food, adventure, curatedCity,
+    ];
+  }
+  if (duration === 'evening') {
+    return [
+      { id: 'nightout', emoji: '\u{1F319}', label: 'Night Out',
+        desc: 'Dinner, bars, lounges, late night bites' },
+      food, adventure, curatedCity,
+    ];
+  }
+  // Full day vibes
+  return [
+    { id: 'stacked', emoji: '\u{1F525}', label: 'Stacked',
+      desc: 'The concierge itinerary — breakfast to late-night' },
+    food, adventure, curatedCity,
+  ];
+}
 
 const PLAN_DURATIONS: { id: PlanDuration; emoji: string; label: string; desc: string }[] = [
-  { id: 'full', emoji: '\u{2600}\u{FE0F}', label: 'Full Day', desc: '6 stops' },
+  { id: 'full', emoji: '\u{2600}\u{FE0F}', label: 'Full Day', desc: '6-8 stops' },
   { id: 'morning', emoji: '\u{1F305}', label: 'Morning', desc: '3 stops' },
   { id: 'afternoon', emoji: '\u{26C5}', label: 'Afternoon', desc: '3 stops' },
   { id: 'evening', emoji: '\u{1F319}', label: 'Evening', desc: '3 stops' },
@@ -303,15 +331,27 @@ export default function HomeScreen() {
     useMiles,
     setDishLensContext,
     cityLabel,
+    user,
+    showToast,
+    setShowProfile,
+    setAuthScreen,
   } = useApp();
+  const subscription = useSubscription(user);
 
   const [selectedVibe, setSelectedVibe] = useState<string | null>(null);
-  const [selectedSubVibe, setSelectedSubVibe] = useState<string | null>(null);
   const [planDuration, setPlanDuration] = useState<PlanDuration>('full');
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const hasLocation = useGps || !!selectedCity;
-  const activeVibe = PLAN_VIBES.find(v => v.id === selectedVibe);
+  const currentVibes = getVibesForDuration(planDuration);
+
+  // Reset vibe when duration changes if current vibe isn't available
+  useEffect(() => {
+    if (selectedVibe && !currentVibes.some(v => v.id === selectedVibe)) {
+      setSelectedVibe(null);
+    }
+  }, [planDuration]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Rotate loading messages
   useEffect(() => {
@@ -323,22 +363,27 @@ export default function HomeScreen() {
   }, [autoPlanLoading]);
 
   const handleSelectVibe = (vibeId: string) => {
-    if (selectedVibe === vibeId) {
-      setSelectedVibe(null);
-      setSelectedSubVibe(null);
-    } else {
-      setSelectedVibe(vibeId);
-      setSelectedSubVibe(null);
-    }
+    setSelectedVibe(selectedVibe === vibeId ? null : vibeId);
   };
 
   const handlePlanMyDay = async () => {
+    // Require sign-in
+    if (!user) {
+      setShowProfile(true);
+      setAuthScreen('signup');
+      return;
+    }
+    // Check free tier usage
+    if (!subscription.canUseFeature('plan_my_day')) {
+      setShowPaywall(true);
+      return;
+    }
+
     const vibe = selectedVibe || 'surprise';
-    const subVibe = selectedSubVibe || undefined;
-    const vibeLabel = PLAN_VIBES.find(v => v.id === vibe)?.label || 'Surprise Me';
-    const mood = subVibe && subVibe !== 'mix' ? `${vibeLabel} — ${subVibe}` : vibeLabel;
-    const success = await planMyDay(mood, planDuration, vibe, subVibe);
+    const vibeLabel = currentVibes.find(v => v.id === vibe)?.label || 'The Curated City';
+    const success = await planMyDay(vibeLabel, planDuration, vibe);
     if (success) {
+      subscription.useFeature('plan_my_day');
       setScreen('plan');
     }
   };
@@ -369,7 +414,7 @@ export default function HomeScreen() {
           subtitle="Your all-in-one travel companion. Here's how to get started:"
           hints={[
             { emoji: '\u{1F4CD}', title: 'Pick your destination', description: 'Search for any city or tap "Use my location" to explore where you are right now.' },
-            { emoji: '\u{1F3AF}', title: 'Choose your vibe', description: 'Select moods like Foodie, Nightlife, or Hidden Gems — then pick Full Day, Morning, Afternoon, or Evening.' },
+            { emoji: '\u{1F3AF}', title: 'Choose your vibe', description: 'Select moods like Stacked, Food Tour, or The Curated City — then pick Full Day, Morning, Afternoon, or Evening.' },
             { emoji: '\u{2728}', title: 'Auto-plan your day', description: 'Tap "Plan My Day" and our AI builds a complete itinerary with the best stops for your mood and time.' },
             { emoji: '\u{1F30D}', title: 'Explore featured cities', description: 'Scroll through popular destinations worldwide for trip inspiration.' },
           ]}
@@ -415,7 +460,7 @@ export default function HomeScreen() {
         </div>
 
         {/* Featured Destinations */}
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
           {FEATURED_DESTINATIONS.map(dest => {
             const matchedCity = cities.find(c => c.name.toLowerCase() === dest.city.toLowerCase());
             return (
@@ -521,41 +566,24 @@ export default function HomeScreen() {
       {/* ── I'm out for... ── */}
       <div className="mb-5">
         <label className="section-label block mb-2.5">I'm out for...</label>
-        <div className="grid grid-cols-4 gap-2">
-          {PLAN_VIBES.map(v => (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
+          {currentVibes.map(v => (
             <button key={v.id}
               onClick={() => handleSelectVibe(v.id)}
-              className={`py-3 px-2 rounded-xl text-center cursor-pointer transition-all duration-150 ${
+              className={`py-3 px-3 rounded-xl text-left cursor-pointer transition-all duration-150 ${
                 selectedVibe === v.id
-                  ? 'border-2 border-accent-amber bg-amber-tint-bg15 scale-[1.02]'
+                  ? 'border-2 border-accent-amber bg-amber-tint-bg15 scale-[1.01]'
                   : 'border border-border-medium bg-transparent'
               }`}>
-              <div className="text-xl mb-1">{v.emoji}</div>
-              <div className={`text-[11px] font-semibold leading-tight ${selectedVibe === v.id ? 'text-accent-amber' : 'text-text-primary'}`}>{v.label}</div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-lg">{v.emoji}</span>
+                <span className={`text-[13px] font-semibold ${selectedVibe === v.id ? 'text-accent-amber' : 'text-text-primary'}`}>{v.label}</span>
+              </div>
+              <div className="text-[11px] text-text-tertiary leading-snug">{v.desc}</div>
             </button>
           ))}
         </div>
       </div>
-
-      {/* ── Sub-vibe pills ── */}
-      {activeVibe && activeVibe.subVibes.length > 0 && (
-        <div className="mb-5 animate-[fadeSlideIn_0.2s_ease-out]">
-          <label className="section-label block mb-2">What kind?</label>
-          <div className="flex flex-wrap gap-2">
-            {activeVibe.subVibes.map(sv => (
-              <button key={sv.id}
-                onClick={() => setSelectedSubVibe(selectedSubVibe === sv.id ? null : sv.id)}
-                className={`py-2 px-3.5 rounded-full text-[12px] font-medium cursor-pointer transition-colors duration-150 border ${
-                  selectedSubVibe === sv.id
-                    ? 'border-accent-amber bg-amber-tint-bg15 text-accent-amber'
-                    : 'border-border-medium bg-transparent text-text-secondary hover:text-text-primary'
-                }`}>
-                {sv.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* ── Generate Button ── */}
       <button
@@ -565,6 +593,12 @@ export default function HomeScreen() {
       >
         {'\u2728'} Plan My Day
       </button>
+      {!subscription.isPro && (
+        <div className="text-center text-xs text-text-tertiary mt-1.5">
+          {subscription.getRemainingUses('plan_my_day')} of {subscription.getLimit('plan_my_day')} free plans left this month
+          {' '}<button onClick={() => setShowPaywall(true)} className="text-accent-amber bg-transparent border-none cursor-pointer text-xs p-0 underline">Upgrade</button>
+        </div>
+      )}
 
       {/* ── Discover First: Nearby Picks ── */}
       {!placesLoading && (() => {
@@ -594,12 +628,12 @@ export default function HomeScreen() {
                   onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPlace(place); } }}
                   className="card !p-0 overflow-hidden min-w-[160px] max-w-[180px] shrink-0 cursor-pointer border border-amber-tint-border15">
                   {place.photoUrl ? (
-                    <div className="h-[100px] w-full bg-cover bg-center"
-                      style={{
-                        background: `linear-gradient(to bottom, transparent 40%, var(--bg-image-overlay)), url(${place.photoUrl})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                      }} />
+                    <div className="h-[100px] w-full relative overflow-hidden">
+                      <img src={place.photoUrl} alt={place.name} loading="lazy" decoding="async"
+                        className="w-full h-full object-cover block"
+                        onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                      <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 40%, var(--bg-image-overlay))' }} />
+                    </div>
                   ) : (
                     <div className="h-[100px] w-full bg-amber-tint-bg06 flex items-center justify-center text-2xl">{'\u2728'}</div>
                   )}
@@ -645,6 +679,18 @@ export default function HomeScreen() {
         </button>
       </div>
 
+      {/* Paywall Modal */}
+      {showPaywall && (
+        <PaywallModal
+          feature="plan_my_day"
+          remaining={subscription.getRemainingUses('plan_my_day')}
+          limit={subscription.getLimit('plan_my_day')}
+          onClose={() => setShowPaywall(false)}
+          onUpgrade={subscription.startCheckout}
+          requiresAuth={!user}
+          onSignIn={() => { setShowPaywall(false); setShowProfile(true); setAuthScreen('signup'); }}
+        />
+      )}
 
     </div>
   );

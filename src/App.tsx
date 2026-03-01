@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense, useRef } from 'react';
+import { API_URL } from './utils/api';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -152,6 +153,10 @@ const CityScreen = lazy(() => import('./screens/CityScreen'));
 const ChatBot = lazy(() => import('./components/ChatBot'));
 const SharedPlanScreen = lazy(() => import('./screens/SharedPlanScreen'));
 const DishLensScreen = lazy(() => import('./screens/DishLensScreen'));
+const BrandsScreen = lazy(() => import('./screens/BrandsScreen'));
+const BrandTripScreen = lazy(() => import('./screens/BrandTripScreen'));
+const WorldCupScreen = lazy(() => import('./screens/WorldCupScreen'));
+const WorldCupTripScreen = lazy(() => import('./screens/WorldCupTripScreen'));
 
 // ============================================================================
 // DEEP LINK — /place/:placeId
@@ -218,7 +223,7 @@ export default function App() {
     return (['home', 'discover', 'events', 'currency', 'plan', 'tastelens'].includes(path) ? path : 'home') as Screen;
   })();
 
-  const isInfoPage = ['/about', '/privacy', '/terms', '/contact'].includes(routerLocation.pathname) || routerLocation.pathname.startsWith('/cities/');
+  const isInfoPage = ['/about', '/privacy', '/terms', '/contact', '/brands', '/worldcup'].includes(routerLocation.pathname) || routerLocation.pathname.startsWith('/cities/') || routerLocation.pathname.startsWith('/brands/') || routerLocation.pathname.startsWith('/worldcup/');
 
   const setScreen = useCallback((s: string) => {
     navigate(s === 'home' ? '/' : `/${s}`);
@@ -244,6 +249,9 @@ export default function App() {
   const [showSafety, setShowSafety] = useState(false);
   const [showCulture, setShowCulture] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(() => {
+    try { return localStorage.getItem('nxstops_avatar_url'); } catch { return null; }
+  });
   const [showAdmin, setShowAdmin] = useState(false);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -271,8 +279,19 @@ export default function App() {
   // TasteLens context (for navigating to TasteLens tab with restaurant context)
   const [dishLensContext, setDishLensContext] = useState<{ dish?: string; city?: string; restaurant?: string }>({});
 
-  // GDPR consent
-  const [showConsent, setShowConsent] = useState(() => !localStorage.getItem('nxstops_consent'));
+  // GDPR consent — skip on native iOS/Android (no browser cookies in native apps)
+  const [showConsent, setShowConsent] = useState(() => {
+    if (localStorage.getItem('nxstops_consent')) return false;
+    try {
+      const { Capacitor } = require('@capacitor/core');
+      if (Capacitor.isNativePlatform()) {
+        // Auto-accept on native — no cookie banner needed
+        localStorage.setItem('nxstops_consent', 'true');
+        return false;
+      }
+    } catch { /* not in Capacitor */ }
+    return true;
+  });
 
   // Admin state
   const [isAdmin, setIsAdmin] = useState(false);
@@ -289,7 +308,7 @@ export default function App() {
       try {
         const { data: { session } } = await (await import('./supabase')).supabase.auth.getSession();
         if (!session?.access_token) return;
-        const res = await fetch('/api/admin', {
+        const res = await fetch(`${API_URL}/api/admin`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
         if (!cancelled && res.ok) {
@@ -299,6 +318,30 @@ export default function App() {
       } catch { /* ignore */ }
     })();
     return () => { cancelled = true; };
+  }, [auth.user]);
+
+  // Sync avatar state: localStorage is primary, Supabase user_metadata is backup (survives reinstall)
+  useEffect(() => {
+    const stored = localStorage.getItem('nxstops_avatar_url');
+    if (stored && stored.startsWith('data:image/')) {
+      // localStorage has avatar — use it
+      setAvatarUrl(stored);
+    } else if (auth.user?.user_metadata?.avatar_url) {
+      const metaAvatar = auth.user.user_metadata.avatar_url as string;
+      if (typeof metaAvatar === 'string' && metaAvatar.startsWith('data:image/')) {
+        // No localStorage but Supabase has our base64 avatar — restore it (post-reinstall)
+        localStorage.setItem('nxstops_avatar_url', metaAvatar);
+        setAvatarUrl(metaAvatar);
+      } else if (typeof metaAvatar === 'string' && metaAvatar.startsWith('http')) {
+        // Old stale Google/CDN URL — clear it
+        import('./supabase').then(({ supabase }) => {
+          supabase.auth.updateUser({ data: { avatar_url: null } }).catch(() => {});
+        });
+        setAvatarUrl(null);
+      }
+    } else {
+      setAvatarUrl(null);
+    }
   }, [auth.user]);
 
   // Auth gate — opens sign-in if not logged in, returns true if authed
@@ -510,6 +553,8 @@ export default function App() {
     selectedPlace, setSelectedPlace, activePhotoIndex, setActivePhotoIndex,
     showSafety, setShowSafety,
     showProfile, setShowProfile, showAdmin, setShowAdmin, showCulture, setShowCulture,
+    // Avatar
+    avatarUrl, setAvatarUrl,
     // Helpers
     showToast, getGreeting, getTimeSuggestion, getDistanceReference, currentTime,
     requireAuth,
@@ -526,7 +571,7 @@ export default function App() {
   }), [
     screen, setScreen, location, auth, places, events, trip, stopRatings, offlineSave,
     selectedPlace, activePhotoIndex,
-    showSafety, showProfile, showAdmin, showCulture,
+    showSafety, showProfile, showAdmin, showCulture, avatarUrl,
     showToast, getGreeting, getTimeSuggestion, getDistanceReference, currentTime, requireAuth,
     showNotificationPrompt, notificationPermission, requestNotificationPermission, dismissNotificationPrompt,
     adminSignups, adminCities, adminLoading, adminTab, openAdmin, handleToggleCity,
@@ -573,7 +618,7 @@ export default function App() {
     const isLast = onboardingStep >= onboardingSteps.length - 1;
 
     return (
-      <div className="font-['DM_Sans',system-ui,sans-serif] bg-bg-body min-h-screen text-text-primary flex flex-col items-center justify-center max-w-[430px] mx-auto px-6 py-10">
+      <div className="font-['DM_Sans',system-ui,sans-serif] bg-bg-body min-h-screen text-text-primary flex flex-col items-center justify-center max-w-[430px] md:max-w-[768px] lg:max-w-[1024px] mx-auto px-6 py-10">
         <div className="flex-1 flex flex-col items-center justify-center text-center">
           <div className="text-4xl font-bold mb-1 bg-accent-text-gradient bg-clip-text text-transparent">
             NxStops
@@ -593,7 +638,7 @@ export default function App() {
         <div className="w-full flex flex-col gap-2.5">
           <button
             onClick={() => {
-              if (isLast) { localStorage.setItem('nxstops_onboarded', 'true'); setShowOnboarding(false); track('onboarding_complete'); }
+              if (isLast) { localStorage.setItem('nxstops_onboarded', 'true'); localStorage.setItem('nxstops_hint_home', '1'); setShowOnboarding(false); track('onboarding_complete'); }
               else { setOnboardingStep(onboardingStep + 1); }
             }}
             className="w-full p-4 rounded-[14px] border-none bg-accent-gradient text-text-on-accent text-base font-semibold cursor-pointer shadow-[0_4px_20px_var(--amber-tint-shadow)]">
@@ -601,7 +646,7 @@ export default function App() {
           </button>
           {!isLast && (
             <button
-              onClick={() => { localStorage.setItem('nxstops_onboarded', 'true'); setShowOnboarding(false); track('onboarding_skipped'); }}
+              onClick={() => { localStorage.setItem('nxstops_onboarded', 'true'); localStorage.setItem('nxstops_hint_home', '1'); setShowOnboarding(false); track('onboarding_skipped'); }}
               className="w-full p-3 rounded-[14px] border border-border-subtle bg-transparent text-text-tertiary text-sm cursor-pointer">
               Skip
             </button>
@@ -617,13 +662,16 @@ export default function App() {
 
   return (
     <AppContext.Provider value={contextValue}>
-      <div className="font-['DM_Sans',system-ui,sans-serif] bg-body-gradient min-h-screen text-text-primary max-w-[430px] mx-auto relative overflow-x-hidden">
+      <div className="font-['DM_Sans',system-ui,sans-serif] bg-body-gradient min-h-screen text-text-primary max-w-[430px] md:max-w-[768px] lg:max-w-[1024px] mx-auto relative overflow-x-hidden">
         {/* Skip to content link for keyboard users */}
         <a href="#main-content" className="skip-link">Skip to content</a>
 
+        {/* iOS safe-area bar — solid bg behind status bar so content never shows through */}
+        <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] md:max-w-[768px] lg:max-w-[1024px] z-50 bg-bg-body pointer-events-none" style={{ height: 'env(safe-area-inset-top, 0px)' }} />
+
         {/* Offline banner */}
         {isOffline && (
-          <div className="fixed top-0 left-0 right-0 z-[9999] animate-offline-banner">
+          <div className="fixed left-0 right-0 z-[9999] animate-offline-banner" style={{ top: 'env(safe-area-inset-top, 0px)' }}>
             <div className="bg-[#78350F] text-[#FDE68A] text-[13px] text-center py-2.5 px-4 flex items-center justify-center gap-2 font-medium">
               <span className="w-2 h-2 rounded-full bg-[#F59E0B] animate-pulse shrink-0" />
               You're offline — showing cached data
@@ -631,9 +679,9 @@ export default function App() {
           </div>
         )}
 
-        {/* Header */}
+        {/* Header — fixed/frozen, always visible below status bar */}
         {!isInfoPage && (
-        <header className="sticky top-0 z-40 px-5 py-3 bg-bg-body/95 backdrop-blur-md border-b border-border-subtle/50">
+        <header className="fixed left-1/2 -translate-x-1/2 w-full max-w-[430px] md:max-w-[768px] lg:max-w-[1024px] z-40 px-5 py-3 bg-bg-body/95 backdrop-blur-md border-b border-border-subtle/50" style={{ top: 'env(safe-area-inset-top, 0px)' }}>
           <div className="flex justify-between items-center">
             {/* Left: Logo + time */}
             <div className="flex items-center gap-3">
@@ -677,11 +725,10 @@ export default function App() {
               )}
               <button onClick={() => setShowProfile(true)}
                 aria-label="Open profile"
-                className={`w-[36px] h-[36px] rounded-full border-2 border-amber-tint-border30 cursor-pointer flex items-center justify-center text-base p-0 text-text-secondary shrink-0 ml-1 ${!auth.user?.user_metadata?.avatar_url ? 'bg-bg-subtle-button' : ''}`}
-                style={auth.user?.user_metadata?.avatar_url
-                  ? { background: `url(${auth.user.user_metadata.avatar_url}) center/cover no-repeat` }
-                  : undefined}>
-                {!auth.user?.user_metadata?.avatar_url && (
+                className={`w-[36px] h-[36px] rounded-full border-2 border-amber-tint-border30 cursor-pointer flex items-center justify-center text-base p-0 text-text-secondary shrink-0 ml-1 overflow-hidden ${!avatarUrl ? 'bg-bg-subtle-button' : ''}`}>
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                ) : (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A8A29E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                     <circle cx="12" cy="7" r="4" />
@@ -694,7 +741,7 @@ export default function App() {
         )}
 
         {/* Content — routed screens */}
-        <main id="main-content" className={isInfoPage ? 'p-0' : 'px-5 pb-[100px] pt-0'}>
+        <main id="main-content" className={isInfoPage ? 'p-0' : 'px-5 md:px-8 lg:px-10 pb-[100px]'} style={!isInfoPage ? { paddingTop: 'calc(env(safe-area-inset-top, 0px) + 64px)' } : undefined}>
           <Suspense fallback={<><SkeletonCard /><SkeletonCard /><SkeletonCard /></>}>
             <div key={routerLocation.pathname} className="page-enter">
               <Routes>
@@ -708,6 +755,10 @@ export default function App() {
                 <Route path="/privacy" element={<PrivacyScreen />} />
                 <Route path="/terms" element={<TermsScreen />} />
                 <Route path="/contact" element={<ContactScreen />} />
+                <Route path="/brands" element={<BrandsScreen />} />
+                <Route path="/brands/:slug" element={<BrandTripScreen />} />
+                <Route path="/worldcup" element={<WorldCupScreen />} />
+                <Route path="/worldcup/:slug" element={<WorldCupTripScreen />} />
                 <Route path="/cities/:slug" element={<CityScreen />} />
                 <Route path="/place/:placeId" element={<PlaceDeepLink />} />
                 <Route path="/trip/:slug" element={<SharedPlanScreen />} />
@@ -731,7 +782,7 @@ export default function App() {
         </main>
 
         {/* Bottom Navigation */}
-        {!isInfoPage && <nav aria-label="Main navigation" className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-bg-nav backdrop-blur-[24px] border-t border-border-nav flex justify-around pt-2 pb-7">
+        {!isInfoPage && <nav aria-label="Main navigation" className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] md:max-w-[768px] lg:max-w-[1024px] bg-bg-nav backdrop-blur-[24px] border-t border-border-nav flex justify-around pt-2" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)' }}>
           {([
             { id: 'home' as Screen, icon: HomeIcon, label: 'Home' },
             { id: 'discover' as Screen, icon: DiscoverIcon, label: 'Discover' },
@@ -784,7 +835,7 @@ export default function App() {
               ).slice(0, 5)
             : [];
           return (
-            <div className="fixed inset-0 bg-bg-body z-[200] flex flex-col max-w-[430px] mx-auto">
+            <div className="fixed inset-0 bg-bg-body z-[200] flex flex-col max-w-[430px] md:max-w-[768px] lg:max-w-[1024px] mx-auto">
               {/* Search Header */}
               <div className="flex items-center gap-2.5 px-5 py-4 border-b border-border-subtle">
                 <input
@@ -1045,7 +1096,7 @@ export default function App() {
 
         {/* PWA Install Banner */}
         {showInstallBanner && (
-          <div className="fixed bottom-[90px] left-1/2 -translate-x-1/2 max-w-[400px] w-[calc(100%-40px)] bg-bg-surface border border-amber-tint-border30 rounded-2xl p-4 z-[250] shadow-[0_8px_30px_rgba(0,0,0,0.4)] animate-toast-in flex items-center gap-3">
+          <div className="fixed bottom-[90px] left-1/2 -translate-x-1/2 max-w-[400px] md:max-w-[600px] w-[calc(100%-40px)] bg-bg-surface border border-amber-tint-border30 rounded-2xl p-4 z-[250] shadow-[0_8px_30px_rgba(0,0,0,0.4)] animate-toast-in flex items-center gap-3">
             <div className="w-[44px] h-[44px] rounded-xl shrink-0 bg-accent-gradient flex items-center justify-center text-xl text-[#0C0A09] font-bold">
               N
             </div>
@@ -1068,7 +1119,7 @@ export default function App() {
 
         {/* GDPR Consent Banner */}
         {showConsent && (
-          <div className="fixed bottom-0 left-1/2 -translate-x-1/2 max-w-[430px] w-full bg-bg-surface border-t border-border-subtle px-5 py-4 z-[260] animate-slide-up">
+          <div className="fixed bottom-0 left-1/2 -translate-x-1/2 max-w-[430px] md:max-w-[768px] lg:max-w-[1024px] w-full bg-bg-surface border-t border-border-subtle px-5 py-4 z-[260] animate-slide-up">
             <p className="text-[13px] text-text-secondary leading-normal mb-3">
               We use cookies and location data to improve your experience. By continuing, you agree to our{' '}
               <a href="/privacy" className="text-accent-amber underline">Privacy Policy</a> and{' '}

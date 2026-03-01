@@ -7,8 +7,10 @@ import { PriceDots, StarRating } from './ui';
 import { formatDistance, getHoursStatus } from '../services/places';
 import { COMMUNITY_TAGS } from '../data';
 import { submitReport } from '../supabase';
-import { getPlaceBookingUrl } from '../data/bookingLinks';
+import { getPlaceBookingUrl, getResyBookingUrl } from '../data/bookingLinks';
 import CurrencyMiniConverter from './CurrencyMiniConverter';
+import { getNightRisk, isNightTime, getPlaceSafety, getNightSafetyTips, getRegionSafetyAlert } from '../utils/safetyEngine';
+import { API_URL } from '../utils/api';
 import type { Place } from '../services/places';
 
 export default function PlaceDetailModal({ place }: { place: Place }) {
@@ -48,6 +50,8 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
     setDishLensContext,
     setScreen,
     cityLabel,
+    weather,
+    selectedCity,
   } = useApp();
   const closeModal = useCallback(() => setSelectedPlace(null), [setSelectedPlace]);
   const modalRef = useModalA11y(true, closeModal);
@@ -63,7 +67,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
 
   // Build photo URLs from photoNames (up to 10)
   const galleryPhotos = (place.photoNames || []).slice(0, 10).map(
-    (name) => `/api/places?action=photo&name=${encodeURIComponent(name)}&maxWidth=800`
+    (name) => `${API_URL}/api/places?action=photo&name=${encodeURIComponent(name)}&maxWidth=800`
   );
   const hasMultiplePhotos = galleryPhotos.length > 1;
 
@@ -102,9 +106,9 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                   key={i}
                   src={url}
                   alt={`${place.name} photo ${i + 1} of ${galleryPhotos.length}`}
-                  loading="lazy"
+                  loading={i === 0 ? 'eager' : 'lazy'}
                   decoding="async"
-                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  onError={e => { (e.target as HTMLImageElement).style.opacity = '0'; }}
                   className="h-full object-cover block shrink-0"
                   style={{ width: `${100 / galleryPhotos.length}%` }}
                 />
@@ -217,6 +221,73 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
             )}
           </div>
 
+          {/* Region Safety Alert — persistent for high-risk countries */}
+          {(() => {
+            const regionAlert = getRegionSafetyAlert(selectedCity?.country);
+            if (!regionAlert) return null;
+            const c = regionAlert.level === 'extreme'
+              ? { bg: 'bg-[rgba(239,68,68,0.12)]', border: 'border-[rgba(239,68,68,0.3)]', text: 'text-[#F87171]' }
+              : regionAlert.level === 'high'
+              ? { bg: 'bg-[rgba(251,146,60,0.10)]', border: 'border-[rgba(251,146,60,0.25)]', text: 'text-[#FB923C]' }
+              : { bg: 'bg-[rgba(250,204,21,0.08)]', border: 'border-[rgba(250,204,21,0.2)]', text: 'text-[#FACC15]' };
+            return (
+              <div className={`flex items-start gap-2.5 p-3.5 rounded-xl mb-4 border ${c.bg} ${c.border}`}>
+                <span className="text-lg mt-0.5">{regionAlert.emoji}</span>
+                <div>
+                  <div className={`text-[13px] font-semibold mb-0.5 ${c.text}`}>{regionAlert.label}</div>
+                  <div className="text-[12px] text-text-secondary leading-[1.4]">{regionAlert.message}</div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Safety Warning */}
+          {(() => {
+            const night = isNightTime(weather?.sunset);
+            const warning = getPlaceSafety(place.category, place.rating, place.reviewCount, place.openNow, night);
+            if (warning) return (
+              <div className={`flex items-start gap-2.5 p-3.5 rounded-xl mb-4 border ${
+                warning.level === 'warning'
+                  ? 'bg-red-tint-bg border-red-tint-border'
+                  : 'bg-amber-tint-bg10 border-amber-tint-border15'
+              }`}>
+                <span className="text-lg mt-0.5">{warning.emoji}</span>
+                <div>
+                  <div className={`text-[13px] font-semibold mb-0.5 ${
+                    warning.level === 'warning' ? 'text-status-red' : 'text-accent-amber'
+                  }`}>
+                    {warning.label}
+                  </div>
+                  <div className="text-[12px] text-text-secondary leading-[1.4]">{warning.message}</div>
+                </div>
+              </div>
+            );
+            // Show night risk at night even without a warning
+            if (night) {
+              const risk = getNightRisk(place.category, place.rating, place.reviewCount, place.openNow);
+              return (
+                <div className={`flex items-start gap-2.5 p-3.5 rounded-xl mb-4 border ${
+                  risk.level === 'low'
+                    ? 'bg-green-tint-bg border-green-tint-border'
+                    : risk.level === 'moderate'
+                    ? 'bg-amber-tint-bg10 border-amber-tint-border15'
+                    : 'bg-red-tint-bg border-red-tint-border'
+                }`}>
+                  <span className="text-lg mt-0.5">{risk.emoji}</span>
+                  <div>
+                    <div className={`text-[13px] font-semibold mb-0.5 ${
+                      risk.level === 'low' ? 'text-status-green' : risk.level === 'moderate' ? 'text-accent-amber' : 'text-status-red'
+                    }`}>
+                      {risk.label}
+                    </div>
+                    <div className="text-[12px] text-text-secondary leading-[1.4]">{risk.tip}</div>
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })()}
+
           {/* Quick Actions */}
           <div className="grid grid-cols-4 gap-2 mb-5">
             {place.googleMapsUrl && (
@@ -310,6 +381,16 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                 style={isReservable(place) ? { background: 'linear-gradient(135deg, rgba(218,55,67,0.12), rgba(218,55,67,0.05))' } : undefined}>
                 {isReservable(place) ? 'Reserve on OpenTable' : 'Book Tickets'}
               </a>
+              {isReservable(place) && (() => {
+                const resy = getResyBookingUrl(place.name, cityLabel);
+                return (
+                  <a href={resy.url} target="_blank" rel="noopener noreferrer"
+                    onClick={() => track('booking_click', { place: place.name, category: place.categoryDisplay || '', type: 'resy' })}
+                    className="flex items-center justify-center gap-2 w-full mt-2 p-3 rounded-xl box-border no-underline text-[13px] font-semibold bg-bg-subtle-medium border border-border-medium text-text-secondary">
+                    Also on Resy
+                  </a>
+                );
+              })()}
               {place.googleMapsUrl && (
                 <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
                   className="block text-center mt-2 text-text-secondary text-xs no-underline">
@@ -380,18 +461,36 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
           )}
 
           {/* Good to Know (Safety) */}
-          {getSafetyIndicators(place).length > 0 && (
-            <div className="mb-4">
-              <div className="section-label !mb-1.5">Good to know</div>
-              <div className="flex gap-1.5 flex-wrap">
-                {getSafetyIndicators(place).map(ind => (
-                  <span key={ind} className="text-xs text-text-secondary px-2.5 py-1 bg-bg-subtle rounded-lg">
-                    {ind}
-                  </span>
-                ))}
+          {(() => {
+            const indicators = getSafetyIndicators(place);
+            const night = isNightTime(weather?.sunset);
+            const tips = night ? getNightSafetyTips(true, false) : [];
+            if (indicators.length === 0 && tips.length === 0) return null;
+            return (
+              <div className="mb-4">
+                <div className="section-label !mb-1.5">Good to know</div>
+                {indicators.length > 0 && (
+                  <div className="flex gap-1.5 flex-wrap mb-2">
+                    {indicators.map(ind => (
+                      <span key={ind} className="text-xs text-text-secondary px-2.5 py-1 bg-bg-subtle rounded-lg">
+                        {ind}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {tips.length > 0 && (
+                  <div className="mt-1.5 p-2.5 rounded-lg bg-amber-tint-bg10">
+                    <div className="text-[11px] font-semibold text-accent-amber mb-1">{'\u{1F319}'} Night safety tips</div>
+                    {tips.slice(0, 3).map((tip, i) => (
+                      <div key={i} className="text-[11px] text-text-secondary leading-[1.5] pl-3">
+                        {'\u2022'} {tip}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Community Tags */}
           {placeTagsCache[place.placeId] && Object.keys(placeTagsCache[place.placeId]).length > 0 && (
@@ -633,7 +732,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
 
         {/* Sticky Bottom Bar */}
         <div
-          className="fixed bottom-0 left-1/2 -translate-x-1/2 max-w-[430px] w-full px-5 pt-4 pb-8 border-t border-border-subtle"
+          className="fixed bottom-0 left-1/2 -translate-x-1/2 max-w-[430px] md:max-w-[600px] lg:max-w-[700px] w-full px-5 pt-4 pb-8 border-t border-border-subtle"
           style={{ background: `linear-gradient(to top, var(--bg-surface), var(--bg-surface-alpha))` }}
         >
           <button

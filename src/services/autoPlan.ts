@@ -2,6 +2,7 @@
 
 import type { Place } from './places';
 import { fetchRetry } from '../utils/fetchRetry';
+import { API_URL } from '../utils/api';
 
 export interface AutoPlanStop {
   place: Place;
@@ -28,10 +29,12 @@ export interface AutoPlanRequest {
   weather?: string;
   preferences?: string;
   events?: { name: string; category: string; time: string; venue: string }[];
+  advisory?: string;
+  jetLagContext?: string;
 }
 
 export async function generateDayPlan(request: AutoPlanRequest): Promise<AutoPlanResult> {
-  const response = await fetchRetry('/api/plan-day', {
+  const response = await fetchRetry(`${API_URL}/api/plan-day`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
@@ -48,8 +51,19 @@ export async function generateDayPlan(request: AutoPlanRequest): Promise<AutoPla
     throw new Error(data.message || 'No plan generated. Try a different location.');
   }
 
+  // Prefix relative photo URLs with API_URL for native apps
+  const plan = (data.plan as AutoPlanStop[]).map(stop => ({
+    ...stop,
+    place: {
+      ...stop.place,
+      photoUrl: stop.place.photoUrl && stop.place.photoUrl.startsWith('/')
+        ? `${API_URL}${stop.place.photoUrl}`
+        : stop.place.photoUrl,
+    },
+  }));
+
   return {
-    plan: data.plan,
+    plan,
     dayTitle: data.dayTitle || 'Your Day Plan',
     totalPlaces: data.totalPlaces || 0,
   };

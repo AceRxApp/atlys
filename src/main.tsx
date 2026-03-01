@@ -3,14 +3,38 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/react'
+import { Capacitor } from '@capacitor/core'
 import App from './App'
 import { ThemeProvider } from './context/ThemeContext'
 import './index.css'
 import { initSentry, Sentry } from './utils/sentry'
 import { getThemeForTime } from './styles/theme'
+import { supabase } from './supabase'
 
 // Initialize error tracking before rendering
 initSentry();
+
+// ── Native OAuth callback handler ──
+// When the iOS/Android app receives a deep link like nxstops://auth-callback/#access_token=...,
+// we extract the auth tokens and set the Supabase session.
+if (Capacitor.isNativePlatform()) {
+  import('@capacitor/app').then(({ App: CapApp }) => {
+    CapApp.addListener('appUrlOpen', async ({ url }) => {
+      // OAuth callbacks come as: nxstops://auth-callback/#access_token=...&refresh_token=...
+      if (url.includes('auth-callback')) {
+        const hashPart = url.includes('#') ? url.split('#')[1] : '';
+        const params = new URLSearchParams(hashPart);
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+        if (accessToken && refreshToken) {
+          await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+          // Close the in-app browser if open
+          import('@capacitor/browser').then(({ Browser }) => Browser.close()).catch(() => {});
+        }
+      }
+    });
+  });
+}
 
 function ErrorFallback({ error }: { error: Error }) {
   const isDark = getThemeForTime() === 'dark';

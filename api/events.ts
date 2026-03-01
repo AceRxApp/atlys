@@ -1,5 +1,5 @@
 // Vercel Serverless API Route — Multi-Source Events Proxy
-// Aggregates: Ticketmaster + SeatGeek + PredictHQ + TheSportsDB + API-Football + GetYourGuide
+// Aggregates: Ticketmaster + SeatGeek + PredictHQ + TheSportsDB + API-Football + GetYourGuide + Eventbrite
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors.js';
@@ -10,6 +10,7 @@ const PREDICTHQ_TOKEN = (process.env.PREDICTHQ_TOKEN || '').trim();
 const GOOGLE_API_KEY = (process.env.GOOGLE_PLACES_API_KEY || '').trim();
 const API_FOOTBALL_KEY = (process.env.API_FOOTBALL_KEY || '').trim();
 const GETYOURGUIDE_KEY = (process.env.GETYOURGUIDE_PARTNER_KEY || '').trim();
+// Eventbrite token no longer needed — using public page scraping instead of deprecated API
 
 interface NormalizedEvent {
   id: string;
@@ -70,7 +71,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (SEATGEEK_CLIENT_ID) {
       nonGeoFetchers.push(fetchSeatGeek(latNum, lngNum, radius as string));
     }
-
     const [geoResult, ...nonGeoResults] = await Promise.all([
       geoPromise,
       ...nonGeoFetchers.map(f => f.catch(() => [] as NormalizedEvent[])),
@@ -105,6 +105,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       phase2Fetchers.push(fetchGetYourGuide(latNum, lngNum).catch(() => [] as NormalizedEvent[]));
     }
 
+    // Eventbrite — scrape public search page (needs city/country)
+    if (geoResult?.city && geoResult?.country) {
+      phase2Fetchers.push(fetchEventbrite(geoResult.city, geoResult.country).catch(() => [] as NormalizedEvent[]));
+    }
+
     if (phase2Fetchers.length > 0) {
       const phase2Results = await Promise.all(phase2Fetchers);
       for (const events of phase2Results) {
@@ -121,9 +126,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    // Filter out past events and junk/test event names
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split('T')[0];
+
+    const JUNK_PATTERNS = [
+      /^test\b/i,
+      /\btest\s+test/i,
+      /^tbd$/i,
+      /^tba$/i,
+      /^placeholder/i,
+      /^untitled\s*event$/i,
+      /^sample\b/i,
+    ];
+
+    const filtered = allEvents.filter(e => {
+      // Remove events with dates in the past
+      if (e.date && e.date < todayStr) return false;
+      // Remove junk/test event names
+      const name = (e.name || '').trim();
+      if (!name || name.length < 2) return false;
+      if (JUNK_PATTERNS.some(p => p.test(name))) return false;
+      return true;
+    });
+
     // Deduplicate by name + date (fuzzy match)
     const seen = new Set<string>();
-    const deduped = allEvents.filter(e => {
+    const deduped = filtered.filter(e => {
       const key = `${e.name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30)}_${e.date}`;
       if (seen.has(key)) return false;
       seen.add(key);
@@ -166,6 +196,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         thesportsdb: true,
         apifootball: !!API_FOOTBALL_KEY,
         getyourguide: !!GETYOURGUIDE_KEY,
+        eventbrite: true,
       },
     });
   } catch (error) {
@@ -204,6 +235,8 @@ async function reverseGeocode(lat: number, lng: number): Promise<{ country: stri
 // Ticketmaster
 // --------------------------------------------------------------------------
 async function fetchTicketmaster(lat: number, lng: number, radius: string, category?: string, page: string = '0'): Promise<NormalizedEvent[]> {
+  const now = new Date();
+  const startDateTime = now.toISOString().split('.')[0] + 'Z';
   const params = new URLSearchParams({
     apikey: TICKETMASTER_API_KEY,
     latlong: `${lat},${lng}`,
@@ -212,6 +245,7 @@ async function fetchTicketmaster(lat: number, lng: number, radius: string, categ
     sort: 'date,asc',
     size: '50',
     page,
+    startDateTime,
   });
 
   if (category) params.set('classificationName', category);
@@ -249,6 +283,8 @@ async function fetchTicketmaster(lat: number, lng: number, radius: string, categ
 // SeatGeek
 // --------------------------------------------------------------------------
 async function fetchSeatGeek(lat: number, lng: number, radius: string): Promise<NormalizedEvent[]> {
+  const now = new Date();
+  const nowISO = now.toISOString().split('.')[0];
   const params = new URLSearchParams({
     client_id: SEATGEEK_CLIENT_ID,
     lat: lat.toString(),
@@ -256,6 +292,7 @@ async function fetchSeatGeek(lat: number, lng: number, radius: string): Promise<
     range: `${radius}mi`,
     per_page: '50',
     sort: 'datetime_local.asc',
+    'datetime_local.gte': nowISO,
   });
 
   const response = await fetch(`https://api.seatgeek.com/2/events?${params}`);
@@ -560,6 +597,71 @@ async function fetchGetYourGuide(lat: number, lng: number): Promise<NormalizedEv
         lng: a.coordinates?.lng || null,
       };
     });
+  } catch { return []; }
+}
+
+// --------------------------------------------------------------------------
+// Eventbrite — Scrape public search page for events (API search deprecated)
+// --------------------------------------------------------------------------
+async function fetchEventbrite(city: string, country: string): Promise<NormalizedEvent[]> {
+  try {
+    // Build Eventbrite search URL: /d/{country}--{city}/all-events/
+    const slug = (s: string) => s.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    const url = `https://www.eventbrite.com/d/${slug(country)}--${slug(city)}/all-events/`;
+
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; NxStops/1.0)',
+        'Accept': 'text/html',
+      },
+    });
+    if (!response.ok) return [];
+
+    const html = await response.text();
+
+    // Extract JSON-LD structured event data from <script type="application/ld+json">
+    const ldMatches = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi) || [];
+
+    const events: NormalizedEvent[] = [];
+    for (const scriptTag of ldMatches) {
+      const jsonStr = scriptTag.replace(/<script[^>]*>/, '').replace(/<\/script>/, '');
+      try {
+        const data = JSON.parse(jsonStr);
+        if (!data?.itemListElement) continue;
+
+        for (const item of data.itemListElement) {
+          const ev = item.item;
+          if (!ev || ev['@type'] !== 'Event') continue;
+
+          const startDate = ev.startDate || '';
+          const date = startDate.includes('T') ? startDate.split('T')[0] : startDate;
+          const time = startDate.includes('T') ? startDate.split('T')[1]?.slice(0, 5) || '' : '';
+          const geo = ev.location?.geo;
+          const address = ev.location?.address;
+
+          // Extract event ID from URL
+          const idMatch = ev.url?.match(/tickets?-(\d+)/);
+          const eventId = idMatch ? idMatch[1] : String(events.length);
+
+          events.push({
+            id: `eb_${eventId}`,
+            name: ev.name || '',
+            date,
+            time,
+            venue: ev.location?.name || '',
+            venueAddress: [address?.streetAddress, address?.addressLocality].filter(Boolean).join(', '),
+            imageUrl: ev.image || null,
+            url: ev.url || '',
+            category: 'Event',
+            source: 'Eventbrite',
+            lat: geo?.latitude ? parseFloat(geo.latitude) : null,
+            lng: geo?.longitude ? parseFloat(geo.longitude) : null,
+          });
+        }
+      } catch { /* skip malformed JSON-LD */ }
+    }
+
+    return events;
   } catch { return []; }
 }
 

@@ -176,7 +176,7 @@ function AddCurrencyModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60" />
-      <div className="relative w-full max-w-[430px] bg-bg-surface rounded-t-2xl p-4 pb-8 max-h-[70vh] flex flex-col"
+      <div className="relative w-full max-w-[430px] md:max-w-[600px] lg:max-w-[700px] bg-bg-surface rounded-t-2xl p-4 pb-8 max-h-[70vh] flex flex-col"
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-base font-bold text-text-primary m-0">Add Currency</h3>
@@ -227,7 +227,7 @@ function BasePickerModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60" />
-      <div className="relative w-full max-w-[430px] bg-bg-surface rounded-t-2xl p-4 pb-8 max-h-[70vh] flex flex-col"
+      <div className="relative w-full max-w-[430px] md:max-w-[600px] lg:max-w-[700px] bg-bg-surface rounded-t-2xl p-4 pb-8 max-h-[70vh] flex flex-col"
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-base font-bold text-text-primary m-0">Base Currency</h3>

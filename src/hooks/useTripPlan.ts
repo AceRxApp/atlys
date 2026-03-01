@@ -8,7 +8,15 @@ import { calcWalkMinutes, calcDriveMinutes, buildMapsUrl, haversineKm } from '..
 import { PRICE_LEVEL_ESTIMATE } from '../data/constants';
 import { hapticImpact, hapticNotification, hapticSelection } from '../utils/haptics';
 import { generateDayPlan } from '../services/autoPlan';
+import { fetchTravelAdvisory } from '../services/travelAdvisory';
 import { getPreferenceSummary, recordTripGenerated, recordAddedToTrip, recordSwapPreference } from '../utils/preferences';
+
+/** Get timezone offset in hours for a given date and IANA timezone */
+function getTimezoneOffsetHours(date: Date, timeZone: string): number {
+  const utcStr = date.toLocaleString('en-US', { timeZone: 'UTC' });
+  const tzStr = date.toLocaleString('en-US', { timeZone });
+  return (new Date(tzStr).getTime() - new Date(utcStr).getTime()) / 3600000;
+}
 
 export function useTripPlan(deps: {
   useGps: boolean;
@@ -35,6 +43,33 @@ export function useTripPlan(deps: {
   const dayPlan = tripDays[activeDay] || [];
   const totalStops = Object.values(tripDays).reduce((sum, stops) => sum + stops.length, 0);
   const dayCount = Object.keys(tripDays).length;
+
+  // Auto-sort: when tripStartDate changes, move dated events to their correct day
+  useEffect(() => {
+    if (!tripStartDate) return;
+    const startMs = new Date(tripStartDate + 'T00:00:00').getTime();
+    let moved = false;
+    const updated: Record<number, Stop[]> = {};
+    for (const [day, stops] of Object.entries(tripDays)) {
+      updated[Number(day)] = [...stops];
+    }
+    for (const [day, stops] of Object.entries(updated)) {
+      const dayNum = Number(day);
+      for (let i = stops.length - 1; i >= 0; i--) {
+        const stop = stops[i];
+        if (stop.type !== 'event' || !stop.event?.date) continue;
+        const eventMs = new Date(stop.event.date + 'T00:00:00').getTime();
+        const correctDay = Math.floor((eventMs - startMs) / 86400000) + 1;
+        if (correctDay >= 1 && correctDay <= dayCount && correctDay !== dayNum) {
+          stops.splice(i, 1);
+          if (!updated[correctDay]) updated[correctDay] = [];
+          updated[correctDay].push(stop);
+          moved = true;
+        }
+      }
+    }
+    if (moved) setTripDays(updated);
+  }, [tripStartDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const estimatedSpend = useMemo(() => {
     return dayPlan.reduce((total, stop) => {
@@ -124,6 +159,19 @@ export function useTripPlan(deps: {
     track('add_event_to_plan', { event: event.name, day: String(activeDay) });
   };
 
+  const addEventToPlanOnDay = (event: EventItem, day: number) => {
+    if (!requireAuth()) return;
+    const allStops = Object.values(tripDays).flat();
+    if (allStops.find(s => s.event?.id === event.id)) return;
+    hapticImpact('Medium');
+    setTripDays(prev => ({
+      ...prev,
+      [day]: [...(prev[day] || []), { id: crypto.randomUUID(), type: 'event' as const, event, addedAt: new Date() }],
+    }));
+    showToast(`Added ${event.name} to Day ${day}`);
+    track('add_from_link', { event: event.name, day: String(day) });
+  };
+
   const isEventInPlan = (eventId: string) => Object.values(tripDays).flat().some(s => s.event?.id === eventId);
 
   const removeFromPlan = (stopId: string) => {
@@ -159,9 +207,15 @@ export function useTripPlan(deps: {
     if (oldIndex === newIndex) return;
     hapticImpact('Medium');
     setActiveDayStops(prev => {
+      // Save original timeSlots — times belong to positions, not stops
+      const originalTimeSlots = prev.map(s => s.timeSlot);
       const result = [...prev];
       const [removed] = result.splice(oldIndex, 1);
       result.splice(newIndex, 0, removed);
+      // Reassign timeSlots so times stay in their original order
+      for (let i = 0; i < result.length; i++) {
+        result[i] = { ...result[i], timeSlot: originalTimeSlots[i] };
+      }
       return result;
     });
   };
@@ -215,11 +269,15 @@ export function useTripPlan(deps: {
         const idx = updated[dayNum].findIndex(s => s.id === oldStopId);
         if (idx !== -1) {
           const newStops = [...updated[dayNum]];
+          const old = newStops[idx];
           newStops[idx] = {
             id: crypto.randomUUID(),
             type: 'place',
             place: newPlace,
             addedAt: new Date(),
+            timeSlot: old.timeSlot,
+            reason: old.reason,
+            estimatedSpend: old.estimatedSpend,
           };
           updated[dayNum] = newStops;
           break;
@@ -384,6 +442,7 @@ export function useTripPlan(deps: {
   const [autoPlanLoading, setAutoPlanLoading] = useState(false);
   const [autoPlanError, setAutoPlanError] = useState<string | null>(null);
   const [lastPlanTitle, setLastPlanTitle] = useState<string | null>(null);
+  const [lastPlanVibe, setLastPlanVibe] = useState<string | null>(null);
 
   const planMyDay = useCallback(async (mood: string, duration: PlanDuration, vibe?: string, subVibe?: string): Promise<boolean> => {
     if (!lat || !lng) {
@@ -400,6 +459,43 @@ export function useTripPlan(deps: {
         : undefined;
 
       const prefSummary = getPreferenceSummary() || undefined;
+
+      // Fetch travel advisory for international destinations
+      let advisoryStr: string | undefined;
+      if (selectedCity?.country) {
+        try {
+          const adv = await fetchTravelAdvisory(selectedCity.country);
+          if (adv?.hasAdvisory && adv.level && adv.level !== 'normal') {
+            advisoryStr = `${adv.level.replace(/_/g, ' ')}: ${adv.summary || adv.country}`;
+          }
+        } catch { /* advisory is optional */ }
+      }
+
+      // Compute jet lag context for the AI
+      let jetLagStr: string | undefined;
+      if (selectedCity?.timezone) {
+        try {
+          const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          const destTz = selectedCity.timezone;
+          if (userTz !== destTz) {
+            const refDate = new Date();
+            const userOffset = getTimezoneOffsetHours(refDate, userTz);
+            const destOffset = getTimezoneOffsetHours(refDate, destTz);
+            const hourDiff = Math.abs(destOffset - userOffset);
+            if (hourDiff >= 5) {
+              let tripDay = activeDay;
+              if (tripStartDate) {
+                const startMs = new Date(tripStartDate + 'T00:00:00').getTime();
+                const todayMs = new Date().setHours(0, 0, 0, 0);
+                tripDay = Math.max(1, Math.floor((todayMs - startMs) / 86400000) + 1);
+              }
+              if (tripDay <= 2) {
+                jetLagStr = `Day ${tripDay} of trip with ${Math.round(hourDiff)}-hour timezone shift (${userTz} → ${destTz}). Traveler is likely jet-lagged.`;
+              }
+            }
+          }
+        } catch { /* timezone calc is optional */ }
+      }
 
       // Get today's events for the AI to optionally include
       const today = new Date().toISOString().split('T')[0];
@@ -420,6 +516,8 @@ export function useTripPlan(deps: {
         weather: weatherStr,
         preferences: prefSummary,
         events: todayEvents.length > 0 ? todayEvents : undefined,
+        advisory: advisoryStr,
+        jetLagContext: jetLagStr,
       });
 
       // Convert plan stops to Stop objects
@@ -436,6 +534,7 @@ export function useTripPlan(deps: {
       // Populate the currently active day (preserve other days)
       setTripDays(prev => ({ ...prev, [activeDay]: stops }));
       setLastPlanTitle(result.dayTitle);
+      setLastPlanVibe(vibe || null);
 
       // Record in preference memory
       recordTripGenerated(mood);
@@ -474,16 +573,16 @@ export function useTripPlan(deps: {
     } finally {
       setAutoPlanLoading(false);
     }
-  }, [lat, lng, weather, cityLabel, travelGroup, events, showToast, activeDay]);
+  }, [lat, lng, weather, cityLabel, travelGroup, events, showToast, activeDay, selectedCity, tripStartDate]);
 
   return {
     tripDays, setTripDays, activeDay, setActiveDay,
     dayPlan, totalStops, dayCount, setActiveDayStops,
-    addToPlan, addEventToPlan, removeFromPlan, isInPlan, isEventInPlan,
+    addToPlan, addEventToPlan, addEventToPlanOnDay, removeFromPlan, isInPlan, isEventInPlan,
     clearPlan, movePlanStop, reorderStops, addDay, removeDay, moveStopToDay, pivotStop,
     getRouteUrl, getFullTripRouteUrl, sharePlan, shareAsLink, getTransportInfo, getDaySummary,
     estimatedSpend,
-    autoPlanLoading, autoPlanError, lastPlanTitle, planMyDay,
+    autoPlanLoading, autoPlanError, lastPlanTitle, lastPlanVibe, planMyDay,
     tripStartDate, setTripStartDate,
   };
 }

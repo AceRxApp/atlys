@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { CloseIcon } from './icons';
+import { API_URL } from '../utils/api';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -114,7 +115,7 @@ export default function ChatBot({ city, onClose }: { city: string | null; onClos
       const apiMessages = [...messages.filter(m => m.role !== 'assistant' || messages.indexOf(m) > 0), userMsg]
         .map(m => ({ role: m.role, content: m.content }));
 
-      const res = await fetch('/api/chat', {
+      const res = await fetch(`${API_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: apiMessages, city }),
@@ -158,7 +159,7 @@ export default function ChatBot({ city, onClose }: { city: string | null; onClos
       onClick={onClose}
     >
       <div
-        className="modal-sheet bg-bg-surface rounded-t-3xl max-w-[430px] w-full h-[40vh] flex flex-col border border-border-subtle border-b-0"
+        className="modal-sheet bg-bg-surface rounded-t-3xl max-w-[430px] md:max-w-[600px] lg:max-w-[700px] w-full h-[40vh] flex flex-col border border-border-subtle border-b-0"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}

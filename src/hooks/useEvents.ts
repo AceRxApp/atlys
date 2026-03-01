@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { City } from '../types';
 import { CITY_COORDS } from '../data';
+import { API_URL } from '../utils/api';
 
 interface LocState {
   lat: number | null;
@@ -30,16 +31,22 @@ export function useEvents(deps: {
     else if (selectedCity) {
       const c = CITY_COORDS[selectedCity.name.toLowerCase()];
       if (c) { lat = c.lat; lng = c.lng; }
+      else if (selectedCity.lat && selectedCity.lng) { lat = selectedCity.lat; lng = selectedCity.lng; }
     }
     if (!lat || !lng) return;
     setEventsLoading(true);
     setEventsError(false);
     try {
       const params = new URLSearchParams({ lat: lat.toString(), lng: lng.toString(), radius: '50' });
-      const response = await fetch(`/api/events?${params}`);
+      const response = await fetch(`${API_URL}/api/events?${params}`);
       if (response.ok) {
         const data = await response.json();
-        setEvents(data.events || []);
+        // Client-side safety: filter out any past events that slipped through
+        const todayStr = new Date().toISOString().split('T')[0];
+        const futureEvents = (data.events || []).filter((e: { date?: string }) =>
+          !e.date || e.date >= todayStr
+        );
+        setEvents(futureEvents);
       } else {
         setEventsError(true);
       }
@@ -50,7 +57,7 @@ export function useEvents(deps: {
   }, [useGps, loc.lat, loc.lng, selectedCity]);
 
   useEffect(() => {
-    if (screen === 'events' && (useGps || selectedCity)) fetchEventsData();
+    if ((screen === 'events' || screen === 'discover') && (useGps || selectedCity)) fetchEventsData();
   }, [screen, fetchEventsData, useGps, selectedCity]);
 
   // Helpers
