@@ -170,6 +170,7 @@ export async function authSignInWithGoogle() {
       options: {
         redirectTo: AUTH_REDIRECT_URL,
         skipBrowserRedirect: true,
+        queryParams: { prompt: 'select_account' },
       },
     });
     if (data?.url) {
@@ -181,7 +182,10 @@ export async function authSignInWithGoogle() {
   // Web: normal redirect flow
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: AUTH_REDIRECT_URL },
+    options: {
+      redirectTo: AUTH_REDIRECT_URL,
+      queryParams: { prompt: 'select_account' },
+    },
   });
   return { data, error };
 }
