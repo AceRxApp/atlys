@@ -231,7 +231,7 @@ export default function DiscoverScreen() {
     MAPS_API_KEY,
     getMapCenter,
     fetchPlaces,
-    weather,
+    weather, formatTemp,
     forYouPlaces: allForYouPlaces,
     user,
     requireAuth,
@@ -297,8 +297,8 @@ export default function DiscoverScreen() {
           <div className="flex items-center gap-2.5 mb-3 px-3.5 py-2 rounded-xl border border-blue-tint-border"
             style={{ background: 'linear-gradient(135deg, var(--blue-tint-bg), var(--bg-subtle))' }}>
             <span className="text-xl">{weather.emoji}</span>
-            <span className="text-sm font-semibold text-text-primary">{weather.temp}°F</span>
-            <span className="text-xs text-text-secondary flex-1 truncate">{weather.description} · H:{weather.high}° L:{weather.low}°</span>
+            <span className="text-sm font-semibold text-text-primary">{formatTemp(weather.temp)}</span>
+            <span className="text-xs text-text-secondary flex-1 truncate">{weather.description} · H:{formatTemp(weather.high)} L:{formatTemp(weather.low)}</span>
             {guardian.active && (
               <span className={`text-[11px] font-medium shrink-0 ${guardian.phase === 'night' ? 'text-[#818CF8]' : 'text-accent-amber'}`}>
                 {guardian.emoji} {guardian.message.split('.')[0]}
@@ -327,7 +327,7 @@ export default function DiscoverScreen() {
           <h1 className="text-xl font-bold mb-0.5">
             {cityLabel} 📍
           </h1>
-          <p className="text-text-tertiary text-[13px]">{filteredPlaces.length} local & culturally diverse spots</p>
+          <p className="text-text-tertiary text-[13px]">{filteredPlaces.length} places near you</p>
         </div>
         <div className="flex rounded-[10px] overflow-hidden border border-border-strong shrink-0">
           <button onClick={() => setViewMode('list')}
@@ -433,29 +433,7 @@ export default function DiscoverScreen() {
       </div>
       )}
 
-      {/* Community Tags — always visible, core to NxStops */}
-      {!showSearch && (
-      <div className="flex gap-1.5 overflow-x-auto pb-2 mb-1 scroll-hidden">
-        {COMMUNITY_TAGS.map(tag => {
-          const active = communityFilters.includes(tag.id);
-          return (
-            <button key={tag.id}
-              aria-pressed={active}
-              aria-label={`Filter by ${tag.label}`}
-              onClick={() => setCommunityFilters(active ? communityFilters.filter(f => f !== tag.id) : [...communityFilters, tag.id])}
-              className={`py-2 px-3 rounded-2xl text-xs font-medium cursor-pointer whitespace-nowrap shrink-0 min-h-[38px] ${
-                active
-                  ? 'border border-community-tint-border40 bg-community-tint-bg12 text-community-text'
-                  : 'border border-community-tint-border20 bg-transparent text-text-secondary'
-              }`}>
-              {tag.emoji} {tag.label}
-            </button>
-          );
-        })}
-      </div>
-      )}
-
-      {/* More Filters toggle + collapsible filters */}
+      {/* More Filters toggle + collapsible filters (includes community tags) */}
       {!showSearch && (
       <div className="mb-2">
         <button
@@ -466,9 +444,9 @@ export default function DiscoverScreen() {
             <line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="16" y2="12" /><line x1="4" y1="18" x2="12" y2="18" />
           </svg>
           More Filters
-          {quickFilters.length > 0 && (
+          {(quickFilters.length > 0 || communityFilters.length > 0) && (
             <span className="px-1.5 py-0.5 rounded-full bg-amber-tint-bg15 text-accent-amber text-[10px] font-bold">
-              {quickFilters.length}
+              {quickFilters.length + communityFilters.length}
             </span>
           )}
           <span className="text-text-muted text-[10px]" style={{ transform: showFilters ? 'rotate(180deg)' : 'rotate(0deg)' }}>
@@ -476,7 +454,27 @@ export default function DiscoverScreen() {
           </span>
         </button>
 
-        {showFilters && (
+        {showFilters && (<>
+        {/* Community Tags */}
+        <div className="flex gap-1.5 overflow-x-auto pb-2 mb-1.5 scroll-hidden">
+          {COMMUNITY_TAGS.map(tag => {
+            const active = communityFilters.includes(tag.id);
+            return (
+              <button key={tag.id}
+                aria-pressed={active}
+                aria-label={`Filter by ${tag.label}`}
+                onClick={() => setCommunityFilters(active ? communityFilters.filter(f => f !== tag.id) : [...communityFilters, tag.id])}
+                className={`py-2 px-3 rounded-2xl text-xs font-medium cursor-pointer whitespace-nowrap shrink-0 min-h-[38px] ${
+                  active
+                    ? 'border border-community-tint-border40 bg-community-tint-bg12 text-community-text'
+                    : 'border border-community-tint-border20 bg-transparent text-text-secondary'
+                }`}>
+                {tag.emoji} {tag.label}
+              </button>
+            );
+          })}
+        </div>
+        {/* Smart & Quick Filters */}
         <div className="flex gap-1.5 overflow-x-auto pb-3 scroll-hidden">
           {visibleSmartFilters.map(filter => {
             const active = quickFilters.includes(filter.id);
@@ -517,7 +515,7 @@ export default function DiscoverScreen() {
             );
           })}
         </div>
-        )}
+        </>)}
       </div>
       )}
 

@@ -8,124 +8,24 @@ import PaywallModal from '../components/PaywallModal';
 // ---------- Intro Guide (first-time users) ----------
 function TasteLensIntro({ onDismiss }: { onDismiss: () => void }) {
   return (
-    <div className="card p-5 mb-4 border border-amber-tint-border20 relative overflow-hidden"
+    <div className="card p-4 mb-4 border border-amber-tint-border20 relative overflow-hidden"
       style={{ background: 'linear-gradient(135deg, var(--amber-tint-bg10), var(--bg-subtle))' }}>
-      {/* Dismiss */}
-      <button onClick={onDismiss}
-        className="absolute top-3 right-3 text-text-tertiary bg-transparent border-none cursor-pointer text-xs p-1">
-        {'\u2715'}
-      </button>
-
-      {/* Title */}
-      <div className="flex items-center gap-2 mb-2">
+      <div className="flex items-center gap-2.5 mb-2">
         <span className="text-2xl">{'\u{1F37D}\u{FE0F}'}</span>
-        <div>
-          <h3 className="text-base font-bold text-text-primary m-0">Welcome to TasteLens</h3>
-          <p className="text-xs text-text-tertiary m-0">Your AI-powered food explorer</p>
+        <div className="flex-1">
+          <h3 className="text-base font-bold text-text-primary m-0">TasteLens</h3>
         </div>
+        <button onClick={onDismiss}
+          className="text-text-tertiary bg-transparent border-none cursor-pointer text-xs p-1">
+          {'\u2715'}
+        </button>
       </div>
-
       <p className="text-[13px] text-text-body leading-relaxed m-0 mb-3">
-        Not sure what to order? Wondering what a dish actually looks like? TasteLens breaks down any food for you — photos, calories, allergens, spice level, dietary info, food pairings, and cultural background.
+        Snap a menu, type a dish name, or search any food to get photos, calories, allergens, and more.
       </p>
-
-      {/* Section: How to use */}
-      <div className="text-[11px] text-accent-amber uppercase tracking-wider font-bold mb-2">How to use it</div>
-
-      <div className="space-y-3 mb-4">
-        {/* Mode 1: Take photo */}
-        <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-xl bg-accent-gradient flex items-center justify-center shrink-0">
-            <span className="text-base">{'\u{1F4F7}'}</span>
-          </div>
-          <div>
-            <div className="text-[13px] font-semibold text-text-primary">Take a photo of a menu</div>
-            <div className="text-xs text-text-tertiary leading-relaxed">
-              At a restaurant? Tap "Take Photo" and point your camera at the menu. Our AI will read every dish and show them as buttons — tap any dish to get the full breakdown.
-            </div>
-          </div>
-        </div>
-
-        {/* Mode 2: Upload photo */}
-        <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-xl bg-amber-tint-bg15 border border-amber-tint-border20 flex items-center justify-center shrink-0">
-            <span className="text-base">{'\u{1F5BC}\u{FE0F}'}</span>
-          </div>
-          <div>
-            <div className="text-[13px] font-semibold text-text-primary">Upload a menu photo</div>
-            <div className="text-xs text-text-tertiary leading-relaxed">
-              Already saved a picture of a menu? Tap "Upload Photo" and pick it from your gallery. Works the same way — we'll scan it and list every dish for you to explore.
-            </div>
-          </div>
-        </div>
-
-        {/* Mode 3: Type dish + restaurant */}
-        <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-xl bg-amber-tint-bg15 border border-amber-tint-border20 flex items-center justify-center shrink-0">
-            <span className="text-base">{'\u{1F4CD}'}</span>
-          </div>
-          <div>
-            <div className="text-[13px] font-semibold text-text-primary">Type a dish from a specific restaurant</div>
-            <div className="text-xs text-text-tertiary leading-relaxed">
-              Know the restaurant? Open TasteLens from any restaurant in your Plan or on Discover — it'll automatically link to that restaurant. Then type the dish name (e.g. "Big Mac") and get a breakdown tailored to that spot.
-            </div>
-          </div>
-        </div>
-
-        {/* Mode 4: Explore any food */}
-        <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-xl bg-amber-tint-bg15 border border-amber-tint-border20 flex items-center justify-center shrink-0">
-            <span className="text-base">{'\u{1F50D}'}</span>
-          </div>
-          <div>
-            <div className="text-[13px] font-semibold text-text-primary">Search any food — no restaurant needed</div>
-            <div className="text-xs text-text-tertiary leading-relaxed">
-              Just curious about a food? Type any dish name — like "Pad Thai", "Croissant", or "Birria Tacos" — and get a full breakdown of what it is, what's in it, and what it looks like. No restaurant required.
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Section: What you'll get */}
-      <div className="text-[11px] text-accent-amber uppercase tracking-wider font-bold mb-2">What you'll get for every dish</div>
-      <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mb-4">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs">{'\u{1F4F8}'}</span>
-          <span className="text-xs text-text-secondary">Real photos of the dish</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs">{'\u{1F525}'}</span>
-          <span className="text-xs text-text-secondary">Calorie count</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs">{'\u{1F336}\u{FE0F}'}</span>
-          <span className="text-xs text-text-secondary">Spice level meter</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs">{'\u26A0\u{FE0F}'}</span>
-          <span className="text-xs text-text-secondary">Allergen warnings</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs">{'\u{1F33F}'}</span>
-          <span className="text-xs text-text-secondary">Dietary tags (vegan, etc.)</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs">{'\u{1F37D}\u{FE0F}'}</span>
-          <span className="text-xs text-text-secondary">Food pairing suggestions</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs">{'\u{1F4D6}'}</span>
-          <span className="text-xs text-text-secondary">Description & serving size</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs">{'\u{1F4A1}'}</span>
-          <span className="text-xs text-text-secondary">Cultural background</span>
-        </div>
-      </div>
-
       <button onClick={onDismiss}
         className="w-full py-2.5 rounded-xl bg-accent-gradient text-text-on-accent text-sm font-semibold border-none cursor-pointer">
-        Got it, let's explore
+        Got it
       </button>
     </div>
   );

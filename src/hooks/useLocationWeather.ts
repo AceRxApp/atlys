@@ -46,6 +46,24 @@ export function useLocationWeather(loc: LocState) {
     localStorage.setItem('nxstops_use_gps', String(v));
   }, []);
 
+  // Temperature unit preference (persisted)
+  const [useCelsius, setUseCelsiusRaw] = useState(() => {
+    const saved = localStorage.getItem('nxstops_use_celsius');
+    if (saved !== null) return saved === 'true';
+    // Default: Celsius for non-US countries
+    return !(selectedCity?.country === 'USA' || selectedCity?.country === 'United States');
+  });
+
+  const setUseCelsius = useCallback((v: boolean) => {
+    setUseCelsiusRaw(v);
+    localStorage.setItem('nxstops_use_celsius', String(v));
+  }, []);
+
+  const formatTemp = useCallback((fahrenheit: number) => {
+    if (useCelsius) return `${Math.round((fahrenheit - 32) * 5 / 9)}°C`;
+    return `${fahrenheit}°F`;
+  }, [useCelsius]);
+
   // Derived
   const cityLabel = useGps ? (loc.city || 'Near You') : (selectedCity?.name || '');
   const citySlug = useGps ? (loc.city || '').toLowerCase().replace(/\s+/g, '-') : (selectedCity?.slug || '');
@@ -137,6 +155,7 @@ export function useLocationWeather(loc: LocState) {
     useGps, setUseGps, searchRadius, setSearchRadius,
     loading, weather, loc,
     cityLabel, citySlug, useMiles,
+    useCelsius, setUseCelsius, formatTemp,
     getMapCenter, MAPS_API_KEY,
   };
 }

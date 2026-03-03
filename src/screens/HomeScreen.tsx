@@ -323,7 +323,7 @@ export default function HomeScreen() {
     loading,
     autoPlanLoading,
     planMyDay,
-    weather,
+    weather, formatTemp,
     forYouPlaces,
     filteredPlaces,
     placesLoading,
@@ -481,7 +481,13 @@ export default function HomeScreen() {
                   alt={`${dest.landmark}, ${dest.city}`}
                   className="absolute inset-0 w-full h-full object-cover"
                   loading="lazy"
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
                 />
+                {/* Fallback when image fails */}
+                <div className="absolute inset-0 -z-10 flex items-center justify-center"
+                  style={{ background: 'linear-gradient(135deg, var(--amber-tint-bg15), var(--bg-subtle))' }}>
+                  <span className="text-3xl opacity-60">{'\u{1F3D9}\u{FE0F}'}</span>
+                </div>
                 <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.2) 50%, transparent 100%)' }} />
                 <div className="absolute bottom-0 left-0 right-0 p-2.5">
                   <div className="text-sm font-bold text-white leading-tight">{dest.city}</div>
@@ -519,8 +525,8 @@ export default function HomeScreen() {
         <div className="flex items-center gap-2.5 mb-5 py-2.5 px-3.5 rounded-xl border border-blue-tint-border"
           style={{ background: 'linear-gradient(135deg, var(--blue-tint-bg), var(--bg-subtle))' }}>
           <span className="text-2xl">{weather.emoji}</span>
-          <span className="text-base font-bold text-text-primary">{weather.temp}°F</span>
-          <span className="text-xs text-text-secondary flex-1">{weather.description} · H: {weather.high}° L: {weather.low}°</span>
+          <span className="text-base font-bold text-text-primary">{formatTemp(weather.temp)}</span>
+          <span className="text-xs text-text-secondary flex-1">{weather.description} · H: {formatTemp(weather.high)} L: {formatTemp(weather.low)}</span>
         </div>
       )}
 

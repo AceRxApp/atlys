@@ -139,6 +139,9 @@ export interface AppContextType {
   cityLabel: string;
   citySlug: string;
   useMiles: boolean;
+  useCelsius: boolean;
+  setUseCelsius: (v: boolean) => void;
+  formatTemp: (fahrenheit: number) => string;
   weather: {
     temp: number;
     high: number;
@@ -279,6 +282,12 @@ export interface AppContextType {
   planMyDay: (mood: string, duration: PlanDuration, vibe?: string, subVibe?: string) => Promise<boolean>;
   tripStartDate: string | null;
   setTripStartDate: (date: string | null) => void;
+  tripHistory: {
+    id: string; city: string; title: string | null;
+    totalStops: number; dayCount: number; savedAt: string;
+    stops: { name: string; photoUrl?: string | null }[];
+  }[];
+  clearTripHistory: () => void;
 
   // --- Fetch triggers ---
   fetchPlaces: () => Promise<void>;

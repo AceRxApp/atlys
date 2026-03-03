@@ -163,7 +163,7 @@ export default function PlanScreen() {
     getDistanceReference,
     getTransportInfo,
     showToast,
-    weather,
+    weather, formatTemp,
     formatEventDate,
     formatEventTime,
     user,
@@ -387,7 +387,7 @@ export default function PlanScreen() {
             <div className="flex items-center gap-2.5">
               <span className="text-lg">{weather.emoji}</span>
               <div className="text-left">
-                <span className="text-sm font-semibold text-text-primary">{weather.temp}°F</span>
+                <span className="text-sm font-semibold text-text-primary">{formatTemp(weather.temp)}</span>
                 <span className="text-xs text-text-secondary ml-1.5">{weather.description}</span>
               </div>
             </div>
@@ -405,8 +405,8 @@ export default function PlanScreen() {
                   <div key={day.date} className="text-center min-w-[60px] shrink-0 p-1.5 rounded-[10px] bg-bg-subtle">
                     <div className="text-[11px] text-text-tertiary mb-0.5">{formatDayLabel(i + 1)}</div>
                     <div className="text-xl mb-0.5">{day.emoji}</div>
-                    <div className="text-xs font-semibold text-text-primary">{day.high}°</div>
-                    <div className="text-[11px] text-text-tertiary">{day.low}°</div>
+                    <div className="text-xs font-semibold text-text-primary">{formatTemp(day.high)}</div>
+                    <div className="text-[11px] text-text-tertiary">{formatTemp(day.low)}</div>
                     {day.precipChance > 30 && (
                       <div className="text-[11px] text-status-blue mt-0.5">&#x1f4a7; {day.precipChance}%</div>
                     )}

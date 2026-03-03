@@ -23,6 +23,8 @@ export default function ProfileScreen() {
     setScreen,
     tripDays,
     showToast,
+    useCelsius, setUseCelsius,
+    tripHistory, clearTripHistory,
     // Auth
     authScreen, setAuthScreen,
     authEmail, setAuthEmail,
@@ -681,6 +683,35 @@ export default function ProfileScreen() {
             </button>
           </div>
 
+          {/* Temperature Unit */}
+          <div className="mb-6">
+            <div className="section-label">Temperature</div>
+            <div className="flex gap-2">
+              {([
+                { key: false, label: '°F', desc: 'Fahrenheit' },
+                { key: true, label: '°C', desc: 'Celsius' },
+              ] as const).map(({ key, label, desc }) => {
+                const isActive = useCelsius === key;
+                return (
+                  <button
+                    key={label}
+                    onClick={() => setUseCelsius(key)}
+                    aria-label={`Use ${desc}`}
+                    aria-pressed={isActive}
+                    className={`flex-1 flex flex-col items-center gap-1 py-3 px-2 rounded-xl cursor-pointer ${
+                      isActive
+                        ? 'bg-amber-tint-bg15 border-[1.5px] border-accent-amber text-accent-amber'
+                        : 'bg-bg-subtle border-[1.5px] border-border-subtle text-text-secondary'
+                    }`}
+                  >
+                    <span className={`text-lg font-bold ${isActive ? '' : ''}`}>{label}</span>
+                    <span className={`text-xs ${isActive ? 'font-semibold' : 'font-medium'}`}>{desc}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Security Section — Biometric */}
           {user && biometricAvailable && (
             <div className="mb-6">
@@ -916,6 +947,62 @@ export default function ProfileScreen() {
                           +{stops.length - 3}
                         </div>
                       )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Past Trips */}
+          {tripHistory.length > 0 && (
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <div className="section-label mb-0">Past Trips</div>
+                <button
+                  onClick={clearTripHistory}
+                  className="text-[11px] text-text-tertiary bg-transparent border-none cursor-pointer py-1 px-1"
+                >
+                  Clear all
+                </button>
+              </div>
+              <div className="flex flex-col gap-2">
+                {tripHistory.map(trip => (
+                  <div
+                    key={trip.id}
+                    className="flex items-center justify-between py-3 px-3.5 rounded-xl bg-bg-subtle border border-border-subtle"
+                  >
+                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                      <div className="w-9 h-9 rounded-[10px] bg-purple-tint-bg12 flex items-center justify-center text-base shrink-0">
+                        {'\u{1F4CD}'}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-text-primary truncate">
+                          {trip.title || trip.city || 'Trip'}
+                        </div>
+                        <div className="text-xs text-text-tertiary">
+                          {trip.city} · {trip.totalStops} {trip.totalStops === 1 ? 'stop' : 'stops'} · {trip.dayCount} {trip.dayCount === 1 ? 'day' : 'days'}
+                        </div>
+                        <div className="text-[11px] text-text-muted mt-0.5">
+                          {new Date(trip.savedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      {trip.stops.slice(0, 3).map((s, i) => (
+                        <div key={i}
+                          className="w-6 h-6 rounded-md overflow-hidden border border-border-subtle"
+                          style={{
+                            background: fixPhotoUrl(s.photoUrl)
+                              ? `url(${fixPhotoUrl(s.photoUrl)}) center/cover no-repeat`
+                              : undefined,
+                          }}
+                        >
+                          {!s.photoUrl && (
+                            <div className="w-full h-full bg-purple-tint-bg15" />
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}

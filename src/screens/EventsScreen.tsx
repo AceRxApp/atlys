@@ -141,7 +141,7 @@ export default function EventsScreen() {
     MAPS_API_KEY,
     getMapCenter,
     fetchEventsData,
-    weather,
+    weather, formatTemp,
   } = useApp();
   const { theme } = useTheme();
 
@@ -254,11 +254,11 @@ export default function EventsScreen() {
           style={{ background: 'linear-gradient(135deg, var(--blue-tint-bg), var(--bg-subtle))' }}>
           <span className="text-2xl">{weather.emoji}</span>
           <div className="flex-1">
-            <span className="text-sm font-semibold text-text-primary">{weather.temp}°F</span>
+            <span className="text-sm font-semibold text-text-primary">{formatTemp(weather.temp)}</span>
             <span className="text-xs text-text-secondary ml-1.5">{weather.description}</span>
           </div>
           <div className="text-[11px] text-text-tertiary shrink-0">
-            H: {weather.high}° L: {weather.low}°
+            H: {formatTemp(weather.high)} L: {formatTemp(weather.low)}
           </div>
         </div>
       )}

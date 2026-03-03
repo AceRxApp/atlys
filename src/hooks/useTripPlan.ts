@@ -189,13 +189,50 @@ export function useTripPlan(deps: {
 
   const isInPlan = (placeId: string) => Object.values(tripDays).flat().some(s => s.place?.placeId === placeId);
 
+  // Trip history — save snapshots of cleared plans
+  const [tripHistory, setTripHistory] = useState<{
+    id: string; city: string; title: string | null;
+    totalStops: number; dayCount: number; savedAt: string;
+    stops: { name: string; photoUrl?: string | null }[];
+  }[]>(() => {
+    try {
+      const raw = localStorage.getItem('nxstops_trip_history');
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  });
+
   const clearPlan = () => {
     hapticNotification('Warning');
+    // Save snapshot to history before clearing (if there are stops)
+    if (totalStops > 0) {
+      const allStops = Object.values(tripDays).flat();
+      const entry = {
+        id: Date.now().toString(36),
+        city: cityLabel,
+        title: lastPlanTitle,
+        totalStops,
+        dayCount,
+        savedAt: new Date().toISOString(),
+        stops: allStops.slice(0, 4).map(s => ({
+          name: s.place?.name || s.event?.name || 'Stop',
+          photoUrl: s.place?.photoUrl || null,
+        })),
+      };
+      const updated = [entry, ...tripHistory].slice(0, 10);
+      setTripHistory(updated);
+      localStorage.setItem('nxstops_trip_history', JSON.stringify(updated));
+    }
     setTripDays({ 1: [] });
     setActiveDay(1);
     setLastPlanTitle(null);
     setLastPlanVibe(null);
     showToast('Plan cleared');
+  };
+
+  const clearTripHistory = () => {
+    setTripHistory([]);
+    localStorage.removeItem('nxstops_trip_history');
+    showToast('Trip history cleared');
   };
 
   const movePlanStop = (index: number, direction: 'up' | 'down') => {
@@ -588,5 +625,6 @@ export function useTripPlan(deps: {
     estimatedSpend,
     autoPlanLoading, autoPlanError, lastPlanTitle, lastPlanVibe, planMyDay,
     tripStartDate, setTripStartDate,
+    tripHistory, clearTripHistory,
   };
 }
