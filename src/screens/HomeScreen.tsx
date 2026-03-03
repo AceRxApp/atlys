@@ -380,7 +380,7 @@ export default function HomeScreen() {
     }
 
     const vibe = selectedVibe || 'surprise';
-    const vibeLabel = currentVibes.find(v => v.id === vibe)?.label || 'The Curated City';
+    const vibeLabel = currentVibes.find(v => v.id === vibe)?.label || 'Best of the City';
     const success = await planMyDay(vibeLabel, planDuration, vibe);
     if (success) {
       subscription.useFeature('plan_my_day');
@@ -414,7 +414,7 @@ export default function HomeScreen() {
           hints={[
             { emoji: '\u{1F4CD}', title: 'Pick your destination', description: 'Search for any city or tap "Use my location" to explore where you are right now.' },
             { emoji: '\u{1F3AF}', title: 'Choose your vibe', description: 'Pick a mood like Food Tour, Adventure, or Best of the City — then choose Full Day, Morning, Afternoon, or Evening.' },
-            { emoji: '\u{2728}', title: 'Auto-plan your day', description: 'Tap "Plan My Day" and our AI builds a complete itinerary with the best stops for your mood and time.' },
+            { emoji: '\u{1F4CB}', title: 'Auto-plan your day', description: 'Tap "Plan My Day" and our AI builds a complete itinerary with the best stops for your mood and time.' },
             { emoji: '\u{1F30D}', title: 'Explore featured cities', description: 'Scroll through popular destinations worldwide for trip inspiration.' },
           ]}
         />

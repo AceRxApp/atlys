@@ -270,7 +270,7 @@ export default function PlanScreen() {
     weather: '\u{2601}\u{FE0F} Weather',
     activities: '\u{1F3AF} Activities',
     group: '\u{1F465} Group',
-    comfort: '\u{2728} Comfort',
+    comfort: '\u{1F9F3} Comfort',
   };
 
   const daySummary = getDaySummary();

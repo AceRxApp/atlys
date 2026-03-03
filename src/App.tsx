@@ -954,7 +954,7 @@ export default function App() {
               style={{ background: 'linear-gradient(135deg, #C48A5A, #A06830)' }}
               title="AI Travel Assistant"
             >
-              {'\u{2728}'}
+              {'\u{1F4AC}'}
             </button>
           </div>
         )}

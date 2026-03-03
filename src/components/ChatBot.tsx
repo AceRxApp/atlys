@@ -166,7 +166,7 @@ export default function ChatBot({ city, onClose }: { city: string | null; onClos
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-accent-gradient flex items-center justify-center text-lg">
-              {'\u{2728}'}
+              {'\u{1F916}'}
             </div>
             <div>
               <div className="text-[15px] font-bold text-text-primary">NxStops AI</div>
