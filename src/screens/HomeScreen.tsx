@@ -585,29 +585,14 @@ export default function HomeScreen() {
         </div>
       </div>
 
-      {/* ── Generate Button ── */}
-      <button
-        onClick={handlePlanMyDay}
-        className="w-full p-4 rounded-[14px] border-none text-base font-bold cursor-pointer shadow-[0_4px_20px_var(--amber-tint-shadow)]"
-        style={{ background: 'linear-gradient(135deg, var(--accent-amber), var(--accent-amber-dark))', color: '#0C0A09' }}
-      >
-        {'\u2728'} Plan My Day
-      </button>
-      {!subscription.isPro && (
-        <div className="text-center text-xs text-text-tertiary mt-1.5">
-          {subscription.getRemainingUses('plan_my_day')} of {subscription.getLimit('plan_my_day')} free plans left this month
-          {' '}<button onClick={() => setShowPaywall(true)} className="text-accent-amber bg-transparent border-none cursor-pointer text-xs p-0 underline">Upgrade</button>
-        </div>
-      )}
-
-      {/* ── Discover First: Nearby Picks ── */}
+      {/* ── Nearby Picks — show what's around before committing to a plan ── */}
       {!placesLoading && (() => {
         const picks = forYouPlaces.length >= 3
           ? forYouPlaces.slice(0, 6)
           : filteredPlaces.filter(p => p.rating >= 4.0 && p.photoUrl).slice(0, 6);
         if (picks.length < 2) return null;
         return (
-          <div className="mt-6">
+          <div className="mb-5">
             <div className="flex justify-between items-center mb-2.5">
               <h3 className="text-[15px] font-semibold flex items-center gap-1.5">
                 {'\u2728'} Nearby Picks
@@ -654,6 +639,21 @@ export default function HomeScreen() {
           </div>
         );
       })()}
+
+      {/* ── Generate Button ── */}
+      <button
+        onClick={handlePlanMyDay}
+        className="w-full p-4 rounded-[14px] border-none text-base font-bold cursor-pointer shadow-[0_4px_20px_var(--amber-tint-shadow)]"
+        style={{ background: 'linear-gradient(135deg, var(--accent-amber), var(--accent-amber-dark))', color: '#0C0A09' }}
+      >
+        {'\u2728'} Plan My Day
+      </button>
+      {!subscription.isPro && (
+        <div className="text-center text-xs text-text-tertiary mt-1.5">
+          {subscription.getRemainingUses('plan_my_day')} of {subscription.getLimit('plan_my_day')} free plans left this month
+          {' '}<button onClick={() => setShowPaywall(true)} className="text-accent-amber bg-transparent border-none cursor-pointer text-xs p-0 underline">Upgrade</button>
+        </div>
+      )}
 
       {/* ── Quick Actions ── */}
       <div className="mt-5 flex gap-2.5">

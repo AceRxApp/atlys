@@ -463,6 +463,27 @@ export default function PlanScreen() {
         </button>
       </div>
 
+      {/* Day Summary — at a glance before the stops */}
+      {daySummary && dayPlan.length >= 2 && (
+        <div className="card mb-3 p-3 border border-amber-tint-border15 flex justify-around text-center"
+          style={{ background: `linear-gradient(135deg, var(--amber-tint-bg06), var(--bg-subtle))` }}>
+          <div>
+            <div className="text-[11px] text-text-tertiary mb-0.5">Distance</div>
+            <div className="text-sm font-bold text-text-primary">{daySummary.distance}</div>
+          </div>
+          <div className="w-px bg-border-subtle" />
+          <div>
+            <div className="text-[11px] text-text-tertiary mb-0.5">{'\u{1F6B6}'} Walk</div>
+            <div className="text-sm font-bold text-text-primary">{daySummary.totalWalkMin}m</div>
+          </div>
+          <div className="w-px bg-border-subtle" />
+          <div>
+            <div className="text-[11px] text-text-tertiary mb-0.5">{'\u{1F697}'} Drive</div>
+            <div className="text-sm font-bold text-text-primary">{daySummary.totalDriveMin}m</div>
+          </div>
+        </div>
+      )}
+
       {/* Day-of events banner */}
       {tripStartDate && (() => {
         const start = new Date(tripStartDate + 'T00:00:00');
@@ -683,7 +704,7 @@ export default function PlanScreen() {
                         className="py-[5px] px-2 rounded-lg text-xs bg-bg-subtle-medium text-text-tertiary border border-border-medium cursor-pointer">
                         <option value="">Move to...</option>
                         {sortedDays.filter(d => d !== activeDay).map(d => (
-                          <option key={d} value={d}>Day {d}</option>
+                          <option key={d} value={d}>{formatDayLabel(d)}</option>
                         ))}
                       </select>
                     )}
@@ -860,27 +881,6 @@ export default function PlanScreen() {
         </SortableContext>
         </DndContext>
       </>)}
-
-      {/* Day Summary */}
-      {daySummary && dayPlan.length >= 2 && (
-        <div className="card mt-3 p-3.5 border border-amber-tint-border15 flex justify-around text-center"
-          style={{ background: `linear-gradient(135deg, var(--amber-tint-bg06), var(--bg-subtle))` }}>
-          <div>
-            <div className="text-xs text-text-tertiary mb-0.5">Total Distance</div>
-            <div className="text-base font-bold text-text-primary">{daySummary.distance}</div>
-          </div>
-          <div className="w-px bg-border-subtle" />
-          <div>
-            <div className="text-xs text-text-tertiary mb-0.5">{'\u{1F6B6}'} Walking</div>
-            <div className="text-base font-bold text-text-primary">{daySummary.totalWalkMin}m</div>
-          </div>
-          <div className="w-px bg-border-subtle" />
-          <div>
-            <div className="text-xs text-text-tertiary mb-0.5">{'\u{1F697}'} Driving</div>
-            <div className="text-base font-bold text-text-primary">{daySummary.totalDriveMin}m</div>
-          </div>
-        </div>
-      )}
 
       {/* Pack This Checklist */}
       {allStops.length > 0 && packingItems.length > 0 && (

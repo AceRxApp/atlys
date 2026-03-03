@@ -43,6 +43,7 @@ export const VIBE_TYPE_MAP: Record<string, string[]> = {
     'bowling_alley', 'amusement_park', 'aquarium', 'zoo',
     'historical_landmark', 'performing_arts_theater', 'movie_theater',
     'book_store', 'market', 'stadium',
+    'beach', 'hiking_area', 'national_park', 'garden', 'marina',
   ],
   eatsip: [
     'restaurant', 'cafe', 'coffee_shop', 'bar', 'bakery',
@@ -66,7 +67,7 @@ export const VIBE_TYPE_MAP: Record<string, string[]> = {
     'ice_cream_shop', 'bar', 'wine_bar', 'library',
     'community_center', 'performing_arts_theater',
     'clothing_store', 'gift_shop', 'beauty_salon', 'shopping_mall',
-    'jewelry_store', 'shoe_store',
+    'jewelry_store', 'shoe_store', 'garden', 'playground',
   ],
 };
 
@@ -505,6 +506,8 @@ const DIVERSE_NEIGHBORHOOD_SEARCHES = [
   'scenic street mural district',
   'cultural district arts district',
   'food hall food court diverse',
+  'beach boardwalk promenade coastal walk',
+  'park garden scenic trail nature',
 ];
 
 /** Run multiple text searches in parallel, dedupe, filter chains+excluded+out-of-city */
@@ -647,6 +650,8 @@ export async function searchNearby(
         'beach club pool day club', 'luxury lounge upscale bar',
         'best rated place top spot', 'sky bar panoramic view',
         'iconic restaurant famous', 'popular nightclub trendy club',
+        'beach shoreline coast ocean', 'hiking trail nature walk',
+        'marina harbor waterfront', 'national park nature reserve',
       ], lat, lng, searchRadius, 10),
       fetchNearbyByTypes(lat, lng, radius, VIBE_TYPE_MAP.thespot),
     ]);

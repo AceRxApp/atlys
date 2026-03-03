@@ -41,6 +41,9 @@ export function useAuth(showToast: (msg: string) => void, onSignOut: () => void)
   const [authSubmitting, setAuthSubmitting] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
+  // Clear errors when switching between signin/signup/reset screens
+  useEffect(() => { setAuthError(null); }, [authScreen]);
+
   // Check session on mount + subscribe to auth state changes
   useEffect(() => {
     authGetSession()

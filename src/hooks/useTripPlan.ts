@@ -176,6 +176,8 @@ export function useTripPlan(deps: {
 
   const removeFromPlan = (stopId: string) => {
     hapticImpact('Light');
+    setLastPlanTitle(null);
+    setLastPlanVibe(null);
     setTripDays(prev => {
       const updated = { ...prev };
       for (const day of Object.keys(updated)) {
@@ -191,6 +193,8 @@ export function useTripPlan(deps: {
     hapticNotification('Warning');
     setTripDays({ 1: [] });
     setActiveDay(1);
+    setLastPlanTitle(null);
+    setLastPlanVibe(null);
     showToast('Plan cleared');
   };
 

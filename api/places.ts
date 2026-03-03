@@ -68,7 +68,7 @@ async function handleNearbySearch(req: VercelRequest, res: VercelResponse) {
 
   // Use the Places API (New) — Nearby Search
   const body: Record<string, unknown> = {
-    includedTypes: types ? (types as string).split(',') : ['restaurant', 'bar', 'cafe', 'museum', 'night_club', 'tourist_attraction', 'park'],
+    includedTypes: types ? (types as string).split(',') : ['restaurant', 'bar', 'cafe', 'museum', 'night_club', 'tourist_attraction', 'park', 'beach', 'hiking_area', 'national_park'],
     maxResultCount: 20,
     locationRestriction: {
       circle: {

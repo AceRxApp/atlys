@@ -290,20 +290,23 @@ export default function DiscoverScreen() {
         </div>
       )}
 
-      {/* Weather Banner */}
-      {weather && (
-        <div className="flex items-center gap-2.5 mb-3 px-3.5 py-2.5 rounded-xl border border-blue-tint-border"
-          style={{ background: 'linear-gradient(135deg, var(--blue-tint-bg), var(--bg-subtle))' }}>
-          <span className="text-2xl">{weather.emoji}</span>
-          <div className="flex-1">
+      {/* Weather + Sunset Guardian — combined compact banner */}
+      {weather && (() => {
+        const guardian = getSunsetGuardian(weather.sunset);
+        return (
+          <div className="flex items-center gap-2.5 mb-3 px-3.5 py-2 rounded-xl border border-blue-tint-border"
+            style={{ background: 'linear-gradient(135deg, var(--blue-tint-bg), var(--bg-subtle))' }}>
+            <span className="text-xl">{weather.emoji}</span>
             <span className="text-sm font-semibold text-text-primary">{weather.temp}°F</span>
-            <span className="text-xs text-text-secondary ml-1.5">{weather.description}</span>
+            <span className="text-xs text-text-secondary flex-1 truncate">{weather.description} · H:{weather.high}° L:{weather.low}°</span>
+            {guardian.active && (
+              <span className={`text-[11px] font-medium shrink-0 ${guardian.phase === 'night' ? 'text-[#818CF8]' : 'text-accent-amber'}`}>
+                {guardian.emoji} {guardian.message.split('.')[0]}
+              </span>
+            )}
           </div>
-          <div className="text-xs text-text-tertiary shrink-0">
-            H: {weather.high}° L: {weather.low}°
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* First-visit hint */}
       <ContextHint
@@ -370,28 +373,6 @@ export default function DiscoverScreen() {
                 </span>
               ))}
             </div>
-          </div>
-        );
-      })()}
-
-      {/* Sunset Guardian Banner */}
-      {(() => {
-        const guardian = getSunsetGuardian(weather?.sunset);
-        if (!guardian.active) return null;
-        return (
-          <div className={`flex items-center gap-2.5 p-3 rounded-xl mb-3 border ${
-            guardian.phase === 'night'
-              ? 'bg-[rgba(99,102,241,0.08)] border-[rgba(99,102,241,0.2)]'
-              : guardian.phase === 'golden_hour'
-              ? 'bg-amber-tint-bg10 border-amber-tint-border15'
-              : 'bg-[rgba(99,102,241,0.06)] border-[rgba(99,102,241,0.15)]'
-          }`}>
-            <span className="text-lg">{guardian.emoji}</span>
-            <span className={`text-[12px] font-medium ${
-              guardian.phase === 'night' ? 'text-[#818CF8]' : 'text-accent-amber'
-            }`}>
-              {guardian.message}
-            </span>
           </div>
         );
       })()}
