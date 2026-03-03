@@ -370,7 +370,7 @@ export const sunsetTheme: ThemeTokens = {
   text: {
     primary: '#FFE8E0',
     secondary: '#D4A89E',
-    tertiary: '#9A7068',
+    tertiary: '#B58478',
     muted: '#7A5850',
     disabled: '#5A4440',
     body: '#E8C4B8',

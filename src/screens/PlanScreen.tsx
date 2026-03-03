@@ -371,8 +371,8 @@ export default function PlanScreen() {
         hints={[
           { emoji: '\u{2630}', title: 'Drag to reorder', description: 'Hold the drag handle on any stop and drag it to rearrange your route.' },
           { emoji: '\u{1F4C5}', title: 'Set trip date', description: 'Tap "Set trip date" to see real calendar dates on your day tabs instead of Day 1, Day 2.' },
-          { emoji: '\u{1F504}', title: 'Pivot to alternatives', description: 'Tap "Pivot" on any stop to see similar nearby alternatives and swap them in.' },
-          { emoji: '\u{1F392}', title: 'Pack This checklist', description: 'Auto-generated packing list based on your stops, weather, and travel group.' },
+          { emoji: '\u{1F504}', title: 'Swap alternatives', description: 'Tap "Swap" on any stop to see similar nearby spots and switch them in.' },
+          { emoji: '\u{1F392}', title: 'Packing list', description: 'Auto-generated packing checklist based on your stops, weather, and travel group.' },
           { emoji: '\u{1F4F8}', title: 'Share & export', description: 'Share your plan as a link, text it to friends, or export as a shareable image.' },
         ]}
       />
@@ -614,7 +614,7 @@ export default function PlanScreen() {
                               );
                             })()}
                             {stop.reason && (
-                              <p className="text-xs text-text-tertiary mt-1 italic leading-snug">{'\u2728'} {stop.reason}</p>
+                              <p className="text-xs text-text-tertiary mt-1 italic leading-snug">{stop.reason}</p>
                             )}
                             {/* Safety indicator — always visible */}
                             {(() => {
@@ -772,7 +772,7 @@ export default function PlanScreen() {
                             : 'bg-amber-tint-bg10 text-accent-amber border-amber-tint-border20'
                         }`}
                       >
-                        {pivotLoading ? '\u23F3' : '\u{1F504}'} Pivot
+                        {pivotLoading ? '\u23F3' : '\u{1F504}'} Swap
                       </button>
                     )}
                   </div>
@@ -784,7 +784,7 @@ export default function PlanScreen() {
                     return (
                       <div className="mt-2 p-3 rounded-xl border border-amber-tint-border30 bg-amber-tint-bg06">
                         <div className="flex items-center gap-2 mb-2">
-                          <span className="text-xs font-semibold text-accent-amber">{'\u{1F504}'} Plan B</span>
+                          <span className="text-xs font-semibold text-accent-amber">{'\u{1F504}'} Alternative</span>
                           <span className="text-[11px] text-text-muted ml-auto">{pivotIndex + 1} of {pivotAlternatives.length}</span>
                         </div>
                         <div className="flex gap-3 items-center">
@@ -890,7 +890,7 @@ export default function PlanScreen() {
             className="w-full py-3.5 px-4 bg-transparent border-none cursor-pointer flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-lg">{'\u{1F392}'}</span>
-              <span className="text-sm font-semibold text-text-primary">Pack This</span>
+              <span className="text-sm font-semibold text-text-primary">Packing List</span>
             </div>
             <div className="flex items-center gap-2">
               <span className={`text-xs font-semibold py-0.5 px-2 rounded-[10px] ${

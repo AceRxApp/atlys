@@ -524,9 +524,9 @@ export default function DiscoverScreen() {
       {/* Community filter active banner */}
       {communityFilters.length > 0 && !showSearch && (
         <div className="flex items-center gap-2 mb-2.5 px-3.5 py-2.5 rounded-[10px] bg-community-tint-bg border border-community-tint-border">
-          <span className="text-sm">✨</span>
+          <span className="text-sm">🏷️</span>
           <span className="text-xs text-community-text leading-[1.4]">
-            Showing results based on smart matching. Tap a place → leave a review to improve community tags!
+            Filtered by community reviews. Tap a place to leave your own review and help improve results!
           </span>
         </div>
       )}
@@ -617,9 +617,9 @@ export default function DiscoverScreen() {
                 <div className="mb-4">
                   <div className="flex justify-between items-center mb-2.5">
                     <h3 className="text-[15px] font-semibold flex items-center gap-1.5">
-                      {'\u2728'} For You
+                      For You
                     </h3>
-                    <span className="text-xs text-text-tertiary">Based on your taste</span>
+                    <span className="text-xs text-text-tertiary">Based on your preferences</span>
                   </div>
                   <div className="flex gap-3 overflow-x-auto pb-2 scroll-hidden">
                     {forYouPlaces.slice(0, 8).map(place => (
@@ -637,7 +637,7 @@ export default function DiscoverScreen() {
                             <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 40%, var(--bg-image-overlay))' }} />
                           </div>
                         ) : (
-                          <div className="h-[90px] w-full bg-amber-tint-bg06 flex items-center justify-center text-2xl">{'\u2728'}</div>
+                          <div className="h-[90px] w-full bg-amber-tint-bg06 flex items-center justify-center text-xl text-text-tertiary">{'\u{1F4CD}'}</div>
                         )}
                         <div className="py-2.5 px-3">
                           <div className="text-[13px] font-semibold text-text-primary mb-[3px] overflow-hidden text-ellipsis whitespace-nowrap">{place.name}</div>

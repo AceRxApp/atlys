@@ -18,10 +18,10 @@ interface VibeOption {
 function getVibesForDuration(duration: PlanDuration): VibeOption[] {
   const food: VibeOption = {
     id: 'food', emoji: '\u{1F37D}\u{FE0F}', label: 'Food Tour',
-    desc: duration === 'morning' ? 'Coffee crawl, brunch spots, morning bites'
-      : duration === 'afternoon' ? 'Lunch crawl, desserts, afternoon bites'
-      : duration === 'evening' ? 'Dinner crawl, late-night bites, cocktails'
-      : 'A curated food crawl through the city',
+    desc: duration === 'morning' ? 'Coffee shops, brunch spots, bakeries'
+      : duration === 'afternoon' ? 'Lunch spots, desserts, afternoon bites'
+      : duration === 'evening' ? 'Dinner spots, late-night bites, cocktails'
+      : 'The best food spots across the city',
   };
   const adventure: VibeOption = {
     id: 'adventure', emoji: '\u{1F33F}', label: 'Adventure',
@@ -31,7 +31,7 @@ function getVibesForDuration(duration: PlanDuration): VibeOption[] {
       : 'Outdoor, museums, culture + food between',
   };
   const curatedCity: VibeOption = {
-    id: 'surprise', emoji: '\u{1F3D9}\u{FE0F}', label: 'The Curated City',
+    id: 'surprise', emoji: '\u{1F3D9}\u{FE0F}', label: 'Best of the City',
     desc: duration === 'morning' ? 'Top cafés, brunch spots, parks & culture'
       : duration === 'afternoon' ? 'Best lunch, museums, shopping & neighborhoods'
       : duration === 'evening' ? 'Top dinner, bars, events & nightlife'
@@ -59,8 +59,8 @@ function getVibesForDuration(duration: PlanDuration): VibeOption[] {
   }
   // Full day vibes
   return [
-    { id: 'stacked', emoji: '\u{1F525}', label: 'Stacked',
-      desc: 'The concierge itinerary — breakfast to late-night' },
+    { id: 'stacked', emoji: '\u{1F525}', label: 'Full Experience',
+      desc: 'Breakfast to late night — the complete itinerary' },
     food, adventure, curatedCity,
   ];
 }
@@ -73,11 +73,11 @@ const PLAN_DURATIONS: { id: PlanDuration; emoji: string; label: string; desc: st
 ];
 
 const LOADING_MESSAGES = [
-  'Finding the best spots nearby...',
-  'Checking what\'s open right now...',
-  'Building your perfect day...',
-  'Curating hidden gems...',
-  'Almost there...',
+  'Finding top spots nearby...',
+  'Checking what\'s open now...',
+  'Building your itinerary...',
+  'Adding local favorites...',
+  'Almost ready...',
 ];
 
 // 8 major tourist attractions across all continents
@@ -394,7 +394,6 @@ export default function HomeScreen() {
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
         <div className="w-16 h-[3px] rounded-sm mx-auto mb-6 animate-shimmer"
           style={{ background: 'linear-gradient(90deg, var(--amber-tint-border30) 25%, var(--accent-amber) 50%, var(--amber-tint-border30) 75%)', backgroundSize: '200% 100%' }} />
-        <div className="text-5xl mb-4">{'\u2728'}</div>
         <div className="text-lg font-bold text-text-primary mb-2">Planning your day...</div>
         <div className="text-sm text-text-tertiary">{LOADING_MESSAGES[loadingMsgIdx]}</div>
       </div>
@@ -414,7 +413,7 @@ export default function HomeScreen() {
           subtitle="Your all-in-one travel companion. Here's how to get started:"
           hints={[
             { emoji: '\u{1F4CD}', title: 'Pick your destination', description: 'Search for any city or tap "Use my location" to explore where you are right now.' },
-            { emoji: '\u{1F3AF}', title: 'Choose your vibe', description: 'Select moods like Stacked, Food Tour, or The Curated City — then pick Full Day, Morning, Afternoon, or Evening.' },
+            { emoji: '\u{1F3AF}', title: 'Choose your vibe', description: 'Pick a mood like Food Tour, Adventure, or Best of the City — then choose Full Day, Morning, Afternoon, or Evening.' },
             { emoji: '\u{2728}', title: 'Auto-plan your day', description: 'Tap "Plan My Day" and our AI builds a complete itinerary with the best stops for your mood and time.' },
             { emoji: '\u{1F30D}', title: 'Explore featured cities', description: 'Scroll through popular destinations worldwide for trip inspiration.' },
           ]}
@@ -510,7 +509,7 @@ export default function HomeScreen() {
       {/* Greeting */}
       <div className="mb-5">
         <h1 className="text-[26px] font-bold mb-1">
-          {getGreeting()} {'\u2728'}
+          {getGreeting()}
         </h1>
         <p className="text-text-secondary text-sm">{getTimeSuggestion()}</p>
       </div>
@@ -565,7 +564,7 @@ export default function HomeScreen() {
 
       {/* ── I'm out for... ── */}
       <div className="mb-5">
-        <label className="section-label block mb-2.5">I'm out for...</label>
+        <label className="section-label block mb-2.5">What's your vibe?</label>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
           {currentVibes.map(v => (
             <button key={v.id}
@@ -595,7 +594,7 @@ export default function HomeScreen() {
           <div className="mb-5">
             <div className="flex justify-between items-center mb-2.5">
               <h3 className="text-[15px] font-semibold flex items-center gap-1.5">
-                {'\u2728'} Nearby Picks
+                Nearby Picks
               </h3>
               <button
                 onClick={() => setScreen('discover')}
@@ -620,7 +619,7 @@ export default function HomeScreen() {
                       <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 40%, var(--bg-image-overlay))' }} />
                     </div>
                   ) : (
-                    <div className="h-[100px] w-full bg-amber-tint-bg06 flex items-center justify-center text-2xl">{'\u2728'}</div>
+                    <div className="h-[100px] w-full bg-amber-tint-bg06 flex items-center justify-center text-xl text-text-tertiary">{'\u{1F4CD}'}</div>
                   )}
                   <div className="py-2.5 px-3">
                     <div className="text-[13px] font-semibold text-text-primary mb-[3px] overflow-hidden text-ellipsis whitespace-nowrap">{place.name}</div>
@@ -646,7 +645,7 @@ export default function HomeScreen() {
         className="w-full p-4 rounded-[14px] border-none text-base font-bold cursor-pointer shadow-[0_4px_20px_var(--amber-tint-shadow)]"
         style={{ background: 'linear-gradient(135deg, var(--accent-amber), var(--accent-amber-dark))', color: '#0C0A09' }}
       >
-        {'\u2728'} Plan My Day
+        Plan My Day
       </button>
       {!subscription.isPro && (
         <div className="text-center text-xs text-text-tertiary mt-1.5">
