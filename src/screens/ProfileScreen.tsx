@@ -303,7 +303,7 @@ export default function ProfileScreen() {
                     {/* Terms acceptance */}
                     <label className="flex items-start gap-2.5 cursor-pointer py-1">
                       <input type="checkbox" checked={acceptedTerms} onChange={e => setAcceptedTerms(e.target.checked)}
-                        className="w-[18px] h-[18px] mt-0.5 shrink-0" style={{ accentColor: '#E8940A' }} />
+                        className="w-[18px] h-[18px] mt-0.5 shrink-0" style={{ accentColor: 'var(--accent-amber)' }} />
                       <span className="text-xs text-text-secondary leading-[1.4]">
                         I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-accent-amber underline">Terms of Service</a> and <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-accent-amber underline">Privacy Policy</a>
                       </span>
@@ -461,6 +461,7 @@ export default function ProfileScreen() {
                       src={avatarUrl}
                       alt="Profile"
                       style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
                     />
                   )}
                   {!avatarUrl && !avatarUploading && (
@@ -485,7 +486,7 @@ export default function ProfileScreen() {
                 {avatarUrl && (
                   <button
                     onClick={removeAvatar}
-                    className="text-[11px] text-status-red bg-transparent border-none cursor-pointer mb-1 py-1 px-2"
+                    className="text-[11px] text-status-red bg-transparent border-none cursor-pointer mb-1 py-2.5 px-3 min-h-[44px]"
                   >
                     Remove photo
                   </button>

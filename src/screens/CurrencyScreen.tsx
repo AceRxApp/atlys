@@ -56,7 +56,7 @@ function SortableCurrencyRow({
       </button>
       {!isBase && (
         <button onClick={onRemove} aria-label={`Remove ${code}`}
-          className="text-status-red bg-red-tint-bg border border-red-tint-border rounded-lg px-2 py-1 text-xs cursor-pointer">
+          className="text-status-red bg-red-tint-bg border border-red-tint-border rounded-lg px-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center text-xs cursor-pointer">
           ✕
         </button>
       )}

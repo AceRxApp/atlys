@@ -237,7 +237,7 @@ function CitySearch({ cities, selectedCity, loading, onSelect }: CitySearchProps
           <button
             onClick={() => { setQuery(''); onSelect(null); setOpen(true); inputRef.current?.focus(); }}
             aria-label="Clear city"
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer p-1 text-text-tertiary text-base leading-none"
+            className="absolute right-1 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center text-text-tertiary text-base leading-none"
           >
             ✕
           </button>
@@ -467,6 +467,7 @@ export default function HomeScreen() {
                 key={dest.city}
                 role="button"
                 tabIndex={0}
+                aria-label={`Select ${dest.city}, ${dest.country}`}
                 onClick={() => {
                   if (matchedCity) {
                     setSelectedCity(matchedCity);
@@ -555,6 +556,8 @@ export default function HomeScreen() {
           {PLAN_DURATIONS.map(d => (
             <button key={d.id}
               onClick={() => setPlanDuration(d.id)}
+              aria-label={`${d.label} — ${d.desc}`}
+              aria-pressed={planDuration === d.id}
               className={`py-2.5 px-2 rounded-xl text-center cursor-pointer transition-colors duration-150 ${
                 planDuration === d.id
                   ? 'border-2 border-accent-amber bg-amber-tint-bg15'
@@ -575,6 +578,8 @@ export default function HomeScreen() {
           {currentVibes.map(v => (
             <button key={v.id}
               onClick={() => handleSelectVibe(v.id)}
+              aria-label={`${v.label} — ${v.desc}`}
+              aria-pressed={selectedVibe === v.id}
               className={`py-3 px-3 rounded-xl text-left cursor-pointer transition-all duration-150 ${
                 selectedVibe === v.id
                   ? 'border-2 border-accent-amber bg-amber-tint-bg15 scale-[1.01]'

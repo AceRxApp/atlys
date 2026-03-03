@@ -114,9 +114,9 @@ function PlacesMapView({ places: mapPlaces }: { places: Place[] }) {
                 position={{ lat: place.lat, lng: place.lng }}
                 onCloseClick={() => setActiveMapPin(null)}
               >
-                <div className="p-1 min-w-[160px] text-[#1C1917]">
+                <div className="p-1 min-w-[160px]" style={{ color: '#1C1917' }}>
                   <div className="font-bold text-sm mb-1">{place.name}</div>
-                  <div className="text-xs text-[#57534E] mb-1">
+                  <div className="text-xs mb-1" style={{ color: '#57534E' }}>
                     {place.categoryDisplay}
                     {place.rating > 0 && ` · ★ ${place.rating.toFixed(1)}`}
                     {place.distance != null && ` · ${formatDistance(place.distance, useMiles)}`}
@@ -124,13 +124,15 @@ function PlacesMapView({ places: mapPlaces }: { places: Place[] }) {
                   <div className="flex gap-1.5 mt-2">
                     <button
                       onClick={() => { setSelectedPlace(place); setActiveMapPin(null); }}
-                      className="flex-1 p-1.5 rounded-md border-none bg-[#E8940A] text-[#0C0A09] text-xs font-semibold cursor-pointer"
+                      className="flex-1 p-1.5 rounded-md border-none text-xs font-semibold cursor-pointer"
+                      style={{ background: 'var(--accent-amber)', color: '#0C0A09' }}
                     >
                       Details
                     </button>
                     <button
                       onClick={() => { addToPlan(place); setActiveMapPin(null); }}
-                      className="flex-1 p-1.5 rounded-md border border-[#D6D3D1] bg-white text-[#1C1917] text-xs font-semibold cursor-pointer"
+                      className="flex-1 p-1.5 rounded-md text-xs font-semibold cursor-pointer"
+                      style={{ border: '1px solid #D6D3D1', background: 'white', color: '#1C1917' }}
                     >
                       + Plan
                     </button>
@@ -149,19 +151,20 @@ function PlacesMapView({ places: mapPlaces }: { places: Place[] }) {
                 position={{ lat: event.lat, lng: event.lng }}
                 onCloseClick={() => setActiveEventId(null)}
               >
-                <div className="p-1 min-w-[160px] text-[#1C1917]">
+                <div className="p-1 min-w-[160px]" style={{ color: '#1C1917' }}>
                   <div className="font-bold text-sm mb-1">{event.name}</div>
-                  <div className="text-xs text-[#57534E] mb-0.5">
+                  <div className="text-xs mb-0.5" style={{ color: '#57534E' }}>
                     {formatEventTime(event.time)} · {event.category}
                   </div>
-                  <div className="text-xs text-[#78716C] mb-2 truncate max-w-[200px]">{event.venue}</div>
+                  <div className="text-xs mb-2 truncate max-w-[200px]" style={{ color: '#78716C' }}>{event.venue}</div>
                   <div className="flex gap-1.5">
                     {event.url && (
                       <a
                         href={event.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-1 p-1.5 rounded-md border-none bg-[#C48A5A] text-white text-xs font-semibold cursor-pointer text-center no-underline"
+                        className="flex-1 p-1.5 rounded-md border-none text-white text-xs font-semibold cursor-pointer text-center no-underline"
+                        style={{ background: 'var(--event-bronze, #C48A5A)' }}
                       >
                         Tickets
                       </a>
@@ -169,11 +172,11 @@ function PlacesMapView({ places: mapPlaces }: { places: Place[] }) {
                     <button
                       onClick={() => { addEventToPlan(event); setActiveEventId(null); }}
                       disabled={isEventInPlan(event.id)}
-                      className={`flex-1 p-1.5 rounded-md border text-xs font-semibold cursor-pointer ${
-                        isEventInPlan(event.id)
-                          ? 'border-[#D6D3D1] bg-[#F5F5F4] text-[#A8A29E]'
-                          : 'border-[#D6D3D1] bg-white text-[#1C1917]'
-                      }`}
+                      className="flex-1 p-1.5 rounded-md text-xs font-semibold cursor-pointer"
+                      style={isEventInPlan(event.id)
+                        ? { border: '1px solid #D6D3D1', background: '#F5F5F4', color: '#A8A29E' }
+                        : { border: '1px solid #D6D3D1', background: 'white', color: '#1C1917' }
+                      }
                     >
                       {isEventInPlan(event.id) ? 'Added' : '+ Plan'}
                     </button>
@@ -245,6 +248,7 @@ export default function DiscoverScreen() {
 
   const { theme } = useTheme();
   const [showFilters, setShowFilters] = useState(false);
+  const [safetyExpanded, setSafetyExpanded] = useState(false);
 
   // Contextual smart filter visibility
   const currentHour = new Date().getHours();
@@ -349,7 +353,7 @@ export default function DiscoverScreen() {
         </div>
       </div>
 
-      {/* Region Safety Alert — always-on for high-risk countries */}
+      {/* Region Safety Alert — collapsible, collapsed by default */}
       {(() => {
         const alert = getRegionSafetyAlert(selectedCity?.country);
         if (!alert) return null;
@@ -360,20 +364,28 @@ export default function DiscoverScreen() {
         };
         const c = colors[alert.level];
         return (
-          <div className={`p-3 rounded-xl mb-3 border ${c.bg} ${c.border}`}>
-            <div className="flex items-center gap-2 mb-1.5">
+          <button
+            onClick={() => setSafetyExpanded(!safetyExpanded)}
+            className={`w-full text-left p-3 rounded-xl mb-3 border ${c.bg} ${c.border} bg-transparent cursor-pointer`}
+          >
+            <div className="flex items-center gap-2">
               <span className="text-lg">{alert.emoji}</span>
-              <span className={`text-[12px] font-bold uppercase tracking-wide ${c.text}`}>{alert.label} — {selectedCity?.country}</span>
+              <span className={`text-[12px] font-bold uppercase tracking-wide ${c.text} flex-1`}>{alert.label} — {selectedCity?.country}</span>
+              <span className={`text-xs ${c.text}`}>{safetyExpanded ? '\u25B2' : '\u25BC'}</span>
             </div>
-            <p className={`text-[11px] leading-relaxed ${c.text} opacity-90 mb-2`}>{alert.message}</p>
-            <div className="flex flex-wrap gap-1.5">
-              {alert.tips.slice(0, 3).map((tip, i) => (
-                <span key={i} className={`text-[10px] px-2 py-1 rounded-md ${c.bg} border ${c.border} ${c.text} opacity-80`}>
-                  {tip}
-                </span>
-              ))}
-            </div>
-          </div>
+            {safetyExpanded && (
+              <>
+                <p className={`text-[11px] leading-relaxed ${c.text} opacity-90 mb-2 mt-1.5`}>{alert.message}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {alert.tips.slice(0, 3).map((tip, i) => (
+                    <span key={i} className={`text-[10px] px-2 py-1 rounded-md ${c.bg} border ${c.border} ${c.text} opacity-80`}>
+                      {tip}
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
+          </button>
         );
       })()}
 
