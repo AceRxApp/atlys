@@ -7,6 +7,26 @@ import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors.js';
 const GOOGLE_API_KEY = (process.env.GOOGLE_PLACES_API_KEY || '').trim();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const { action } = req.query;
+
+  // Photo proxy: skip CORS origin check — <img> tags don't need CORS,
+  // and Capacitor WKWebView may send Origin: null which would get rejected.
+  // SSRF protection is handled by the photo name regex instead.
+  if (action === 'photo') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    if (req.method === 'OPTIONS') return res.status(200).end();
+    const clientIp = getClientIp(req.headers);
+    if (!(await checkRateLimit(clientIp, 60, 60_000))) {
+      return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+    }
+    try {
+      return await handlePlacePhoto(req, res);
+    } catch (error) {
+      console.error('Photo proxy error:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
   const corsOk = setCorsHeaders(res, req.headers.origin as string | undefined, 'GET, OPTIONS');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -16,8 +36,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!(await checkRateLimit(clientIp, 60, 60_000))) {
     return res.status(429).json({ error: 'Too many requests. Please try again later.' });
   }
-
-  const { action } = req.query;
 
   try {
     switch (action) {

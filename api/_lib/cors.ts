@@ -14,8 +14,10 @@ export const ALLOWED_ORIGINS = [
   'http://localhost:4173',
 ];
 
-/** Check if origin is from a Capacitor native app (any scheme://localhost) */
+/** Check if origin is from a Capacitor native app (any scheme://localhost or null) */
 function isNativeAppOrigin(origin: string): boolean {
+  // Capacitor WKWebView with custom schemes may send "null" as origin
+  if (origin === 'null') return true;
   try {
     const url = new URL(origin);
     return url.hostname === 'localhost';
