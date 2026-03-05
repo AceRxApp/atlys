@@ -7,6 +7,7 @@ import ContextHint from '../components/ContextHint';
 import { useSubscription } from '../hooks/useSubscription';
 import PaywallModal from '../components/PaywallModal';
 import { fixPhotoUrl } from '../utils/photoUrl';
+import NativeImg from '../components/NativeImg';
 
 // ── Vibe Cards ──
 interface VibeOption {
@@ -478,12 +479,11 @@ export default function HomeScreen() {
                 onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (matchedCity) { setSelectedCity(matchedCity); setUseGps(false); } } }}
                 className="relative overflow-hidden rounded-xl border border-border-subtle cursor-pointer h-[130px]"
               >
-                <img
+                <NativeImg
                   src={dest.image}
                   alt={`${dest.landmark}, ${dest.city}`}
                   className="absolute inset-0 w-full h-full object-cover"
                   loading="lazy"
-                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
                 />
                 {/* Fallback when image fails */}
                 <div className="absolute inset-0 -z-10 flex items-center justify-center"
@@ -625,9 +625,8 @@ export default function HomeScreen() {
                   className="card !p-0 overflow-hidden min-w-[160px] max-w-[180px] shrink-0 cursor-pointer border border-amber-tint-border15">
                   {place.photoUrl ? (
                     <div className="h-[100px] w-full relative overflow-hidden">
-                      <img src={fixPhotoUrl(place.photoUrl)!} alt={place.name} loading="lazy" decoding="async"
-                        className="w-full h-full object-cover block"
-                        onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                      <NativeImg src={fixPhotoUrl(place.photoUrl)!} alt={place.name} loading="lazy" decoding="async"
+                        className="w-full h-full object-cover block" />
                       <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 40%, var(--bg-image-overlay))' }} />
                     </div>
                   ) : (

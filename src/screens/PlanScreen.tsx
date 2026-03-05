@@ -14,6 +14,7 @@ import type { TravelAdvisory } from '../services/travelAdvisory';
 import type { Stop } from '../types';
 import { BOOKING_SERVICES } from '../data/bookingLinks';
 import { fixPhotoUrl } from '../utils/photoUrl';
+import NativeImg from '../components/NativeImg';
 import {
   DndContext,
   closestCenter,
@@ -563,13 +564,12 @@ export default function PlanScreen() {
                       aria-label={stop.type === 'place' ? `View details for ${getStopName(stop)}` : undefined}
                     >
                       {stop.type === 'place' && stop.place?.photoUrl && (
-                        <img src={fixPhotoUrl(stop.place.photoUrl)!} alt={stop.place.name} loading="lazy" decoding="async"
+                        <NativeImg src={fixPhotoUrl(stop.place.photoUrl)!} alt={stop.place.name} loading="lazy" decoding="async"
                           className="w-20 h-20 rounded-xl shrink-0 object-cover" />
                       )}
                       {stop.type === 'event' && stop.event?.imageUrl && (
-                        <img src={stop.event.imageUrl} alt={stop.event.name} loading="lazy" decoding="async"
+                        <NativeImg src={stop.event.imageUrl} alt={stop.event.name} loading="lazy" decoding="async"
                           referrerPolicy="no-referrer"
-                          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
                           className="w-20 h-20 rounded-xl shrink-0 object-cover" />
                       )}
                       <div className="flex-1 min-w-0">
@@ -791,7 +791,7 @@ export default function PlanScreen() {
                           {/* Photo */}
                           <div className="w-14 h-14 rounded-xl shrink-0 overflow-hidden bg-bg-subtle-strong">
                             {alt.photoUrl ? (
-                              <img src={fixPhotoUrl(alt.photoUrl)!} alt={alt.name} className="w-full h-full object-cover" />
+                              <NativeImg src={fixPhotoUrl(alt.photoUrl)!} alt={alt.name} className="w-full h-full object-cover" />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-xl text-text-tertiary">{'\u{1F4CD}'}</div>
                             )}

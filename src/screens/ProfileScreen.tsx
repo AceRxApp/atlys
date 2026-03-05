@@ -6,6 +6,7 @@ import { useBiometricAuth } from '../hooks/useBiometricAuth';
 import { uploadAvatar, deleteAccount, authSignInWithGoogle } from '../supabase';
 import { useSubscription } from '../hooks/useSubscription';
 import { fixPhotoUrl } from '../utils/photoUrl';
+import NativeImg from '../components/NativeImg';
 
 export default function ProfileScreen() {
   const {
@@ -449,12 +450,11 @@ export default function ProfileScreen() {
                   }}
                 >
                   {avatarUrl && (
-                    <img
+                    <NativeImg
                       key={avatarUrl.slice(-20)}
                       src={avatarUrl}
                       alt="Profile"
                       style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                      onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
                     />
                   )}
                   {!avatarUrl && !avatarUploading && (

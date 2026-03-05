@@ -3,6 +3,7 @@ import { track } from '@vercel/analytics';
 import { useApp } from '../context/AppContext';
 import { tagEventUrl } from '../data/bookingLinks';
 import type { EventItem } from '../types';
+import NativeImg from './NativeImg';
 
 const CATEGORY_EMOJI: Record<string, string> = {
   music: '\u{1F3B5}', sports: '\u{26BD}', comedy: '\u{1F923}',
@@ -27,7 +28,7 @@ export default function EventCard({ event }: { event: EventItem }) {
     <div className="card p-0 overflow-hidden">
       {showImage ? (
         <div className="h-[140px] md:h-[180px] w-full relative overflow-hidden">
-          <img
+          <NativeImg
             src={event.imageUrl!}
             alt={event.name}
             loading="lazy"

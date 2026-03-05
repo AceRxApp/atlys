@@ -6,6 +6,7 @@ import { DirectionsIcon, PhoneIcon, ShareIcon } from './icons';
 import { COMMUNITY_TAGS } from '../data';
 import { getNightRisk, isNightTime, getPlaceSafety } from '../utils/safetyEngine';
 import { fixPhotoUrl } from '../utils/photoUrl';
+import NativeImg from './NativeImg';
 
 export default memo(function PlaceCard({ place }: { place: Place }) {
   const {
@@ -43,8 +44,7 @@ export default memo(function PlaceCard({ place }: { place: Place }) {
       {/* Photo */}
       {place.photoUrl && (
         <div className="h-[160px] md:h-[200px] w-full relative overflow-hidden">
-          <img src={fixPhotoUrl(place.photoUrl)!} alt={place.name} loading="lazy" decoding="async"
-            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          <NativeImg src={fixPhotoUrl(place.photoUrl)!} alt={place.name} loading="lazy" decoding="async"
             className="w-full h-full object-cover block" />
           <div className="absolute inset-0" style={{ background: `linear-gradient(to bottom, transparent 60%, var(--bg-image-overlay))` }} />
           <div className={`absolute top-2.5 left-2.5 px-2.5 py-1 rounded-lg text-xs font-semibold backdrop-blur-[8px] ${place.openNow ? 'bg-[rgba(34,197,94,0.2)] text-status-green' : 'bg-[rgba(239,68,68,0.2)] text-status-red'}`}>

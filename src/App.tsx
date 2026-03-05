@@ -18,6 +18,7 @@ import { AppContext } from './context/AppContext';
 import { HomeIcon, DiscoverIcon, EventsIcon, TasteLensIcon, PlanIcon, ShieldIcon, GearIcon, CloseIcon, SearchIcon } from './components/icons';
 import { SkeletonCard } from './components/ui';
 import Footer from './components/Footer';
+import NativeImg from './components/NativeImg';
 
 // Custom hooks (extracted logic)
 import { useAuth } from './hooks/useAuth';
@@ -727,7 +728,7 @@ export default function App() {
                 aria-label="Open profile"
                 className={`w-[36px] h-[36px] rounded-full border-2 border-amber-tint-border30 cursor-pointer flex items-center justify-center text-base p-0 text-text-secondary shrink-0 ml-1 overflow-hidden ${!avatarUrl ? 'bg-bg-subtle-button' : ''}`}>
                 {avatarUrl ? (
-                  <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  <NativeImg src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                 ) : (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A8A29E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />

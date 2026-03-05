@@ -5,6 +5,7 @@ import type { Stop } from '../types';
 import { formatDistance } from '../services/places';
 import { haversineKm } from '../utils/transport';
 import { fixPhotoUrl } from '../utils/photoUrl';
+import NativeImg from '../components/NativeImg';
 
 const getStopName = (stop: Stop) =>
   stop.type === 'event' ? (stop.event?.name || 'Event') : (stop.place?.name || 'Place');
@@ -155,7 +156,7 @@ export default function SharedPlanScreen() {
                   <div className="card border border-amber-tint-bg10 p-3">
                     <div className="flex gap-3">
                       {photoUrl && (
-                        <img src={photoUrl} alt={name}
+                        <NativeImg src={photoUrl} alt={name}
                           className="w-16 h-16 rounded-xl shrink-0 object-cover" />
                       )}
                       <div className="flex-1 min-w-0">

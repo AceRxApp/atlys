@@ -11,6 +11,7 @@ import type { EventItem } from '../types';
 import ContextHint from '../components/ContextHint';
 import { getSunsetGuardian, getRegionSafetyAlert } from '../utils/safetyEngine';
 import { fixPhotoUrl } from '../utils/photoUrl';
+import NativeImg from '../components/NativeImg';
 
 // ---------------------------------------------------------------------------
 // PlacesMapView (local component -- only used within DiscoverScreen)
@@ -642,9 +643,8 @@ export default function DiscoverScreen() {
                         className="card !p-0 overflow-hidden min-w-[180px] max-w-[200px] shrink-0 cursor-pointer border border-amber-tint-border15">
                         {place.photoUrl ? (
                           <div className="h-[90px] w-full relative overflow-hidden">
-                            <img src={fixPhotoUrl(place.photoUrl)!} alt={place.name} loading="lazy" decoding="async"
-                              className="w-full h-full object-cover block"
-                              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                            <NativeImg src={fixPhotoUrl(place.photoUrl)!} alt={place.name} loading="lazy" decoding="async"
+                              className="w-full h-full object-cover block" />
                             <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 40%, var(--bg-image-overlay))' }} />
                           </div>
                         ) : (

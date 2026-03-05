@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { track } from '@vercel/analytics';
 import { useApp } from '../context/AppContext';
 import { useModalA11y } from '../hooks/useModalA11y';
@@ -9,6 +9,7 @@ import { COMMUNITY_TAGS } from '../data';
 import { submitReport } from '../supabase';
 import { getPlaceBookingUrl, getResyBookingUrl } from '../data/bookingLinks';
 import CurrencyMiniConverter from './CurrencyMiniConverter';
+import NativeImg from './NativeImg';
 import { getNightRisk, isNightTime, getPlaceSafety, getNightSafetyTips, getRegionSafetyAlert } from '../utils/safetyEngine';
 import { API_URL } from '../utils/api';
 import type { Place } from '../services/places';
@@ -66,9 +67,10 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
   const inPlan = isInPlan(place.placeId);
 
   // Build photo URLs from photoNames (up to 10)
-  const galleryPhotos = (place.photoNames || []).slice(0, 10).map(
-    (name) => `${API_URL}/api/places?action=photo&name=${encodeURIComponent(name)}&maxWidth=800`
-  );
+  const galleryPhotos = useMemo(() =>
+    (place.photoNames || []).slice(0, 10).map(
+      (name) => `${API_URL}/api/places?action=photo&name=${encodeURIComponent(name)}&maxWidth=800`
+    ), [place.photoNames]);
   const hasMultiplePhotos = galleryPhotos.length > 1;
 
   const goToPhoto = (dir: 'prev' | 'next') => {
@@ -102,13 +104,12 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
               }}
             >
               {galleryPhotos.map((url, i) => (
-                <img
+                <NativeImg
                   key={i}
                   src={url}
                   alt={`${place.name} photo ${i + 1} of ${galleryPhotos.length}`}
                   loading={i === 0 ? 'eager' : 'lazy'}
                   decoding="async"
-                  onError={e => { (e.target as HTMLImageElement).style.opacity = '0'; }}
                   className="h-full object-cover block shrink-0"
                   style={{ width: `${100 / galleryPhotos.length}%` }}
                 />
@@ -645,7 +646,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                   {review.photo_urls && review.photo_urls.length > 0 && (
                     <div className="flex gap-1.5 mb-1.5 overflow-x-auto">
                       {review.photo_urls.map((url, pi) => (
-                        <img
+                        <NativeImg
                           key={pi}
                           src={url}
                           alt={`Review photo ${pi + 1}`}

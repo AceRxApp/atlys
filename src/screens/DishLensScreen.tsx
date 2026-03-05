@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import { API_URL } from '../utils/api';
 import { useSubscription } from '../hooks/useSubscription';
 import PaywallModal from '../components/PaywallModal';
+import NativeImg from '../components/NativeImg';
 
 // ---------- Intro Guide (first-time users) ----------
 function TasteLensIntro({ onDismiss }: { onDismiss: () => void }) {
@@ -117,7 +118,7 @@ function DishHero({ images, name }: { images: DishImage[]; name: string }) {
     const img = validImages[0];
     return (
       <div className="relative mb-4">
-        <img
+        <NativeImg
           src={img.url}
           alt={img.alt || name}
           className="w-full h-[220px] rounded-2xl object-cover"
@@ -157,7 +158,7 @@ function DishHero({ images, name }: { images: DishImage[]; name: string }) {
             className="shrink-0 w-full relative"
             style={{ scrollSnapAlign: 'start' }}
           >
-            <img
+            <NativeImg
               src={img.url}
               alt={img.alt || name}
               className="w-full h-[220px] object-cover"

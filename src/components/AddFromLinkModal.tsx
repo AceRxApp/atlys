@@ -4,6 +4,7 @@ import { track } from '@vercel/analytics';
 import { API_URL } from '../utils/api';
 import { useApp } from '../context/AppContext';
 import type { EventItem } from '../types';
+import NativeImg from './NativeImg';
 
 interface Props {
   onClose: () => void;
@@ -189,7 +190,7 @@ export default function AddFromLinkModal({ onClose }: Props) {
           {/* Image preview (from link extraction) */}
           {imageUrl && (
             <div className="mt-3 rounded-xl overflow-hidden mb-3">
-              <img
+              <NativeImg
                 src={imageUrl}
                 alt=""
                 className="w-full h-[120px] object-cover"
