@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import type { Stop } from '../types';
 import type { Place } from '../services/places';
 import type { EventItem } from '../types';
+import { API_URL } from '../utils/api';
 
 export function useOfflineSave(
   tripDays: Record<number, Stop[]>,
@@ -41,7 +42,7 @@ export function useOfflineSave(
       // Also cache gallery photos for place detail view
       if (stop.place?.photoNames) {
         for (const name of stop.place.photoNames.slice(0, 5)) {
-          photoUrls.push(`/api/places?action=photo&name=${encodeURIComponent(name)}&maxWidth=800`);
+          photoUrls.push(`${API_URL}/api/places?action=photo&name=${encodeURIComponent(name)}&maxWidth=800`);
         }
       }
       if (stop.event?.imageUrl) photoUrls.push(stop.event.imageUrl);
@@ -50,7 +51,7 @@ export function useOfflineSave(
     // Collect API URLs
     const apiUrls: string[] = [];
     if (lat && lng) {
-      apiUrls.push(`/api/weather?lat=${lat}&lng=${lng}`);
+      apiUrls.push(`${API_URL}/api/weather?lat=${lat}&lng=${lng}`);
     }
 
     // Save places + events data to localStorage for full offline access

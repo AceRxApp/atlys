@@ -5,14 +5,7 @@ import { useModalA11y } from '../hooks/useModalA11y';
 import { useBiometricAuth } from '../hooks/useBiometricAuth';
 import { uploadAvatar, deleteAccount, authSignInWithGoogle } from '../supabase';
 import { useSubscription } from '../hooks/useSubscription';
-import { API_URL } from '../utils/api';
-
-/** Ensure photo URLs are absolute (fixes relative URLs on native/iOS) */
-const fixPhotoUrl = (url: string | null | undefined): string | null => {
-  if (!url) return null;
-  if (url.startsWith('/api/')) return `${API_URL}${url}`;
-  return url;
-};
+import { fixPhotoUrl } from '../utils/photoUrl';
 
 export default function ProfileScreen() {
   const {

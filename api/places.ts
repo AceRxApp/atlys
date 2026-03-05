@@ -333,7 +333,7 @@ async function handlePlacePhoto(req: VercelRequest, res: VercelResponse) {
   }
 
   // Validate photo resource name format to prevent SSRF
-  if (!/^places\/[A-Za-z0-9\-_]+\/photos\/[A-Za-z0-9\-_.~]+$/.test(name as string)) {
+  if (!/^places\/[A-Za-z0-9\-_]+\/photos\/[A-Za-z0-9\-_.~:=+]+$/.test(name as string)) {
     return res.status(400).json({ error: 'Invalid photo name format' });
   }
 

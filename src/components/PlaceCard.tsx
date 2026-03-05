@@ -5,14 +5,7 @@ import { PriceDots, StarRating } from './ui';
 import { DirectionsIcon, PhoneIcon, ShareIcon } from './icons';
 import { COMMUNITY_TAGS } from '../data';
 import { getNightRisk, isNightTime, getPlaceSafety } from '../utils/safetyEngine';
-import { API_URL } from '../utils/api';
-
-/** Ensure photo URLs are absolute (fixes relative URLs on native/iOS) */
-const fixPhotoUrl = (url: string | null | undefined): string | null => {
-  if (!url) return null;
-  if (url.startsWith('/api/')) return `${API_URL}${url}`;
-  return url;
-};
+import { fixPhotoUrl } from '../utils/photoUrl';
 
 export default memo(function PlaceCard({ place }: { place: Place }) {
   const {
