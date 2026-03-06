@@ -236,7 +236,7 @@ async function handleWebhook(req: VercelRequest, res: VercelResponse) {
       }
 
       case 'invoice.payment_failed': {
-        const invoice = event.data.object as Record<string, unknown>;
+        const invoice = event.data.object as unknown as Record<string, unknown>;
         const subId = invoice.subscription as string | undefined;
         if (subId) {
           await supabase.from('subscriptions').update({

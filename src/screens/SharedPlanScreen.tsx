@@ -87,7 +87,7 @@ export default function SharedPlanScreen() {
     const aCoord = a.place ? { lat: a.place.lat, lng: a.place.lng } : null;
     const bCoord = b.place ? { lat: b.place.lat, lng: b.place.lng } : null;
     if (!aCoord?.lat || !aCoord?.lng || !bCoord?.lat || !bCoord?.lng) return null;
-    const km = haversineKm(aCoord.lat, aCoord.lng, bCoord.lat, bCoord.lng);
+    const km = haversineKm(aCoord, bCoord);
     return formatDistance(km, false);
   };
 

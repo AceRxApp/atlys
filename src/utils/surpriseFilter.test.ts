@@ -16,13 +16,14 @@ function makePlace(overrides: Partial<Place> = {}): Place {
     openNow: true,
     distance: 0.5,
     photoUrl: null,
-    photos: [],
+    photoNames: [],
     address: '123 Main St',
     phone: null,
     website: null,
     googleMapsUrl: null,
     editorialSummary: null,
     hours: null,
+    tags: [],
     ...overrides,
   };
 }

@@ -1,13 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase, fetchCities, fetchPlacesByCity } from './supabase';
-
-interface City {
-  id: string;
-  slug: string;
-  name: string;
-  country: string;
-  region: string;
-}
+import type { City } from './types';
 
 interface Place {
   id: string;

@@ -220,7 +220,7 @@ export function usePlaces(deps: {
         case 'lateNight': {
           if (!place.openNow) return false;
           // Check if place is open late (parse hours for closing time after 11 PM)
-          const closesLate = place.hours.some(h => {
+          const closesLate = (place.hours || []).some(h => {
             const match = h.match(/–\s*(\d{1,2}):(\d{2})\s*(AM|PM)/i);
             if (!match) return h.toLowerCase().includes('open 24 hours');
             const [, hr, , ampm] = match;

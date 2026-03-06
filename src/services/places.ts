@@ -23,14 +23,14 @@ export interface Place {
   reviewCount: number;
   priceLevel: number;
   openNow: boolean;
-  hours: string[];
+  hours: string[] | null;
   distance: number | null;
   lat: number;
   lng: number;
-  phone: string;
-  website: string;
-  googleMapsUrl: string;
-  editorialSummary: string;
+  phone: string | null;
+  website: string | null;
+  googleMapsUrl: string | null;
+  editorialSummary: string | null;
 }
 
 // ============================================================================
@@ -111,8 +111,8 @@ export function formatDistance(km: number, useMiles = false): string {
 // HOURS STATUS HELPER
 // ============================================================================
 
-export function getHoursStatus(hours: string[], openNow: boolean): { text: string; urgent: boolean } {
-  if (!hours.length) return { text: openNow ? 'Open' : 'Closed', urgent: false };
+export function getHoursStatus(hours: string[] | null, openNow: boolean): { text: string; urgent: boolean } {
+  if (!hours || !hours.length) return { text: openNow ? 'Open' : 'Closed', urgent: false };
 
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const now = new Date();

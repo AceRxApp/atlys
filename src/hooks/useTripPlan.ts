@@ -25,7 +25,7 @@ export function useTripPlan(deps: {
   cityLabel: string;
   citySlug: string;
   useMiles: boolean;
-  showToast: (msg: string) => void;
+  showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   requireAuth: () => boolean;
   lat: number | null;
   lng: number | null;

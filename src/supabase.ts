@@ -2,6 +2,7 @@ import { createClient, RealtimeChannel } from '@supabase/supabase-js';
 import type { Session } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
 import { API_URL } from './utils/api';
+import type { City } from './types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -17,7 +18,7 @@ const AUTH_REDIRECT_URL = Capacitor.isNativePlatform()
   ? 'nxstops://auth-callback/'
   : `${window.location.origin}/`;
 
-export async function fetchCities() {
+export async function fetchCities(): Promise<City[]> {
   const { data, error } = await supabase
     .from('cities')
     .select('*')
@@ -32,14 +33,14 @@ export async function fetchCities() {
   // Map center_lat/center_lng to lat/lng for fallback coordinate resolution
   const cities = (data || []).map((c: Record<string, unknown>) => ({
     ...c,
-    lat: c.center_lat ?? c.lat ?? null,
-    lng: c.center_lng ?? c.lng ?? null,
-  }));
+    lat: (c.center_lat ?? c.lat ?? null) as number | null,
+    lng: (c.center_lng ?? c.lng ?? null) as number | null,
+  })) as City[];
 
   // Deduplicate: if "Washington" and "Washington D.C." both exist, keep the more specific one
-  const names = new Set(cities.map((c: Record<string, unknown>) => (c.name as string).toLowerCase()));
-  return cities.filter((c: Record<string, unknown>) => {
-    const name = (c.name as string).toLowerCase();
+  const names = new Set(cities.map(c => c.name.toLowerCase()));
+  return cities.filter(c => {
+    const name = c.name.toLowerCase();
     for (const other of names) {
       if (other !== name && other.startsWith(name) && other.length > name.length) {
         return false; // a more specific version exists

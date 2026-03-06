@@ -292,7 +292,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
           {/* Quick Actions */}
           <div className="grid grid-cols-4 gap-2 mb-5">
             {place.googleMapsUrl && (
-              <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+              <a href={place.googleMapsUrl || undefined} target="_blank" rel="noopener noreferrer"
                 className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-bg-subtle-medium text-text-secondary no-underline text-xs">
                 <DirectionsIcon />
                 Directions
@@ -393,7 +393,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                 );
               })()}
               {place.googleMapsUrl && (
-                <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+                <a href={place.googleMapsUrl || undefined} target="_blank" rel="noopener noreferrer"
                   className="block text-center mt-2 text-text-secondary text-xs no-underline">
                   View on Google Maps
                 </a>
@@ -420,7 +420,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
           {place.address && (
             <div className="mb-4">
               <div className="section-label !mb-1.5">Address</div>
-              <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+              <a href={place.googleMapsUrl || undefined} target="_blank" rel="noopener noreferrer"
                 className="text-text-primary text-sm no-underline leading-[1.4]">
                 {place.address}
               </a>
@@ -436,7 +436,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
           )}
 
           {/* Hours */}
-          {place.hours.length > 0 && (
+          {place.hours && place.hours.length > 0 && (
             <div className="mb-4">
               <div className="section-label !mb-1.5">Hours</div>
               {place.hours.map((h, i) => {

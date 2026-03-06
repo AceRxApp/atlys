@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { LocationIcon } from '../components/icons';
 import { formatDistance } from '../services/places';
-import type { PlanDuration } from '../types';
+import type { PlanDuration, City } from '../types';
 import ContextHint from '../components/ContextHint';
 import { useSubscription } from '../hooks/useSubscription';
 import PaywallModal from '../components/PaywallModal';
@@ -123,10 +123,10 @@ const FEATURED_DESTINATIONS = [
 // ============================================================================
 
 interface CitySearchProps {
-  cities: { id: string; name: string; country: string; region: string }[];
-  selectedCity: { id: string; name: string; country: string } | null;
+  cities: City[];
+  selectedCity: City | null;
   loading: boolean;
-  onSelect: (city: CitySearchProps['cities'][number] | null) => void;
+  onSelect: (city: City | null) => void;
 }
 
 function CitySearch({ cities, selectedCity, loading, onSelect }: CitySearchProps) {

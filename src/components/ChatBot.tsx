@@ -29,7 +29,7 @@ function getInitialMessage(city: string | null): ChatMessage {
 
 function renderMarkdown(text: string) {
   const lines = text.split('\n');
-  const elements: (string | JSX.Element)[] = [];
+  const elements: (string | React.ReactElement)[] = [];
 
   lines.forEach((line, li) => {
     const numMatch = line.match(/^\d+\.\s+/);
@@ -40,7 +40,7 @@ function renderMarkdown(text: string) {
     else if (bulletMatch) processed = line.slice(bulletMatch[0].length);
 
     // Inline formatting: **bold**, *italic*
-    const parts: (string | JSX.Element)[] = [];
+    const parts: (string | React.ReactElement)[] = [];
     const inlineRegex = /(\*\*(.+?)\*\*|\*(.+?)\*)/g;
     let lastIndex = 0;
     let match;
