@@ -10,6 +10,7 @@ import NativeImg from '../components/NativeImg';
 import { CITY_COORDS } from '../data/cityCoords';
 
 const TravelMap = lazy(() => import('../components/TravelMap'));
+import TripMomentsModal from '../components/TripMomentsModal';
 
 export default function ProfileScreen() {
   const {
@@ -32,6 +33,8 @@ export default function ProfileScreen() {
     acceptedTerms, setAcceptedTerms,
     handleSignIn, handleSignUp, handleSignOut, handleResetPassword, handleResendVerification,
     avatarUrl, setAvatarUrl,
+    // City Progress & Achievements
+    categoryProgress, achievements, totalCitiesExplored, totalPlacesVisited,
   } = useApp();
   const { theme, themePreference, setThemePreference } = useTheme();
   const closeProfile = useCallback(() => setShowProfile(false), [setShowProfile]);
@@ -55,6 +58,7 @@ export default function ProfileScreen() {
   const [billingLoading, setBillingLoading] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
   const [billingPlan, setBillingPlan] = useState<'monthly' | 'yearly'>('monthly');
+  const [viewingTrip, setViewingTrip] = useState<typeof tripHistory[number] | null>(null);
 
   const handleAvatarChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1037,6 +1041,13 @@ export default function ProfileScreen() {
                             ))}
                         </div>
                       )}
+                      {/* View Timeline button */}
+                      <button
+                        onClick={() => setViewingTrip(trip)}
+                        className="mt-2.5 w-full py-2 rounded-xl bg-amber-tint-bg10 border border-amber-tint-border20 text-accent-amber text-xs font-semibold cursor-pointer"
+                      >
+                        {'\u{1F4F8}'} View Timeline
+                      </button>
                     </div>
                   </details>
                 ))}
@@ -1068,6 +1079,64 @@ export default function ProfileScreen() {
               </div>
             );
           })()}
+
+          {/* Explorer Stats */}
+          {totalPlacesVisited > 0 && (
+            <div className="mb-6">
+              <div className="section-label">Explorer Stats</div>
+              <div className="card p-4 border border-border-subtle">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="text-center flex-1">
+                    <div className="text-2xl font-bold text-accent-amber">{totalPlacesVisited}</div>
+                    <div className="text-[11px] text-text-tertiary">Places</div>
+                  </div>
+                  <div className="w-px h-8 bg-border-subtle" />
+                  <div className="text-center flex-1">
+                    <div className="text-2xl font-bold text-text-primary">{totalCitiesExplored}</div>
+                    <div className="text-[11px] text-text-tertiary">Cities</div>
+                  </div>
+                </div>
+                {/* Category progress bars */}
+                {Object.entries(categoryProgress).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([cat, count]) => (
+                  <div key={cat} className="flex items-center gap-2.5 mb-2">
+                    <span className="text-xs text-text-secondary w-20 capitalize truncate">{cat}</span>
+                    <div className="flex-1 h-2 rounded-full bg-bg-subtle-strong overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-accent-amber transition-all duration-500"
+                        style={{ width: `${Math.min(100, (count / 10) * 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-[11px] text-text-tertiary w-6 text-right">{count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Achievements */}
+          {achievements.length > 0 && (
+            <div className="mb-6">
+              <div className="section-label">Achievements</div>
+              <div className="grid grid-cols-3 gap-2">
+                {achievements.map(ach => (
+                  <div
+                    key={ach.id}
+                    className={`text-center p-3 rounded-xl border ${
+                      ach.unlockedAt
+                        ? 'bg-amber-tint-bg10 border-amber-tint-border20'
+                        : 'bg-bg-subtle border-border-subtle opacity-50'
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">{ach.unlockedAt ? ach.emoji : '?'}</div>
+                    <div className="text-[11px] font-semibold text-text-primary truncate">{ach.title}</div>
+                    <div className="text-[10px] text-text-tertiary mt-0.5">
+                      {ach.unlockedAt ? 'Unlocked!' : `${ach.progress}/${ach.requirement}`}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Sign Out Button & Danger Zone */}
           {user && (
@@ -1127,6 +1196,14 @@ export default function ProfileScreen() {
           )}
         </div>
       </div>
+
+      {/* Trip Moments Modal */}
+      {viewingTrip && (
+        <TripMomentsModal
+          trip={viewingTrip}
+          onClose={() => setViewingTrip(null)}
+        />
+      )}
     </div>
   );
 }

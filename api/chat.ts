@@ -81,7 +81,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { messages, city } = req.body as { messages: ChatMessage[]; city?: string };
+    const { messages, city, planContext } = req.body as {
+      messages: ChatMessage[];
+      city?: string;
+      planContext?: { stops: { name: string; category: string; timeSlot?: string }[]; city: string; timeOfDay: string };
+    };
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'Messages array is required' });
@@ -96,6 +100,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       systemContent += `\n\nThe user is currently exploring ${city} in the NxStops app. Tailor your suggestions to this city when relevant.`;
     }
 
+    // Enhanced plan-aware prompt
+    if (planContext && planContext.stops.length > 0) {
+      const stopList = planContext.stops
+        .map((s, i) => `${i + 1}. ${s.name} (${s.category}${s.timeSlot ? `, ${s.timeSlot}` : ''})`)
+        .join('\n');
+      systemContent += `\n\nThe user has an active itinerary in ${planContext.city}. Current time of day: ${planContext.timeOfDay}.
+Their current plan:
+${stopList}
+
+You can suggest modifications to their plan. When suggesting a change, end your message with one of these action tags on its own line:
+[ACTION:add] [TYPE:place_category] - to suggest adding a new stop
+[ACTION:replace] [TARGET:stop_name] [TYPE:place_category] - to suggest replacing a stop
+[ACTION:remove] [TARGET:stop_name] - to suggest removing a stop
+
+Only use action tags when the user explicitly asks to modify their plan. Keep being conversational otherwise.`;
+    }
+
     const groqBody = {
       model: GROQ_MODEL,
       messages: [
@@ -103,7 +124,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ...recentMessages.map(m => ({ role: m.role, content: m.content })),
       ],
       temperature: 0.7,
-      max_tokens: 300,
+      max_tokens: 400,
     };
 
     const response = await callGroq(groqBody);
@@ -128,11 +149,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const data = await response.json();
-    const reply =
+    let reply =
       data.choices?.[0]?.message?.content ||
       "Sorry, I couldn't generate a response. Try again!";
 
-    return res.status(200).json({ reply });
+    // Parse action tags from response
+    let modification: { action: string; placeType?: string; targetStop?: string; suggestion?: string } | undefined;
+    const actionMatch = reply.match(/\[ACTION:(add|replace|remove)\](?:\s*\[TYPE:([^\]]+)\])?(?:\s*\[TARGET:([^\]]+)\])?/);
+    if (actionMatch) {
+      modification = {
+        action: actionMatch[1],
+        placeType: actionMatch[2] || undefined,
+        targetStop: actionMatch[3] || undefined,
+        suggestion: reply.replace(actionMatch[0], '').trim(),
+      };
+      // Remove the action tag from the visible reply
+      reply = reply.replace(actionMatch[0], '').trim();
+    }
+
+    return res.status(200).json({ reply, modification });
   } catch (err) {
     console.error('[NxStops Chat] Error:', err);
     return res.status(500).json({ error: 'Something went wrong. Please try again.' });

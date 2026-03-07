@@ -77,6 +77,7 @@ export interface TripHistoryEntry {
   categoryBreakdown: Record<string, number>;
   ratings: Record<string, 'up' | 'down'>;
   stops: TripHistoryStop[];
+  moments?: { stopId: string; photos: string[]; note: string; checkedInAt: string }[];
 }
 
 export interface StopCheckIn {
@@ -85,4 +86,42 @@ export interface StopCheckIn {
   rating?: number;
   comment?: string;
   actualSpend?: number;
+  photos?: string[];
+  journalNote?: string;
+}
+
+// --- Logistics ---
+export interface Reservation {
+  id: string;
+  name: string;
+  dateTime: string;
+  confirmationNumber: string;
+  notes?: string;
+}
+
+export interface TripLogistics {
+  reservations: Reservation[];
+  tickets: { id: string; name: string; url?: string; reference?: string }[];
+  hotel: { name: string; address: string; checkIn: string; checkOut: string } | null;
+  transitPass: { type: string; reference: string } | null;
+}
+
+// --- Achievements ---
+export interface Achievement {
+  id: string;
+  emoji: string;
+  title: string;
+  description: string;
+  unlockedAt: string | null;
+  progress: number;
+  requirement: number;
+}
+
+// --- Itinerary Alerts ---
+export interface ItineraryAlert {
+  id: string;
+  type: 'closing_soon' | 'skipped' | 'bonus_time' | 'time_swap';
+  message: string;
+  stopId?: string;
+  action?: { label: string; actionType: 'reorder' | 'remove' | 'suggest' | 'swap' };
 }

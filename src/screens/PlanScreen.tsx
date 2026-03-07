@@ -33,6 +33,11 @@ import SortableStopCard from '../components/SortableStopCard';
 import AddFromLinkModal from '../components/AddFromLinkModal';
 import WrapUpModal from '../components/WrapUpModal';
 import QuickReviewPrompt from '../components/QuickReviewPrompt';
+import NearbyDiscoveries from '../components/NearbyDiscoveries';
+import LogisticsPanel from '../components/LogisticsPanel';
+import ItineraryAlertBanner from '../components/ItineraryAlertBanner';
+import ExploreModeBanner from '../components/ExploreModeBanner';
+import ChatBot from '../components/ChatBot';
 
 // Local helpers (not on context)
 const getStopName = (stop: Stop) =>
@@ -198,6 +203,21 @@ export default function PlanScreen() {
     progressPercent,
     spentSoFar,
     reviewPromptStopId,
+    // New features
+    itineraryAlerts,
+    dismissAlert,
+    exploreActive,
+    currentStopIndex,
+    startExplore,
+    stopExplore,
+    currentExploreStop,
+    nextExploreStop,
+    nextStopDistance,
+    nextStopWalkMin,
+    shouldLeaveNow,
+    leaveByMessage,
+    addToPlan,
+    checkIns,
   } = useApp();
 
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -234,6 +254,13 @@ export default function PlanScreen() {
   const [showPackList, setShowPackList] = useState(false);
   const [showWeatherForecast, setShowWeatherForecast] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  // Nearby discoveries toggle
+  const [expandedNearby, setExpandedNearby] = useState<string | null>(null);
+  // Chat FAB
+  const [showChat, setShowChat] = useState(false);
+  // Logistics panel
+  const [showLogistics, setShowLogistics] = useState(false);
 
   // Travel advisory state
   const [advisory, setAdvisory] = useState<TravelAdvisory | null>(null);
@@ -456,6 +483,36 @@ export default function PlanScreen() {
         );
       })()}
 
+      {/* Logistics Panel (Trip Info) */}
+      {totalStops > 0 && <LogisticsPanel />}
+
+      {/* Explore Mode — Start Trip button or active banner */}
+      {isLiveDay && !exploreActive && dayPlan.length > 0 && (
+        <button
+          onClick={startExplore}
+          className="w-full mb-3 py-3.5 rounded-xl border-none text-sm font-bold cursor-pointer"
+          style={{ background: 'linear-gradient(135deg, #22C55E, #16A34A)', color: '#fff' }}
+        >
+          {'\u{1F680}'} Start Trip
+        </button>
+      )}
+
+      {exploreActive && currentExploreStop && (
+        <ExploreModeBanner
+          currentStop={currentExploreStop}
+          nextStop={nextExploreStop}
+          currentStopIndex={currentStopIndex}
+          totalStops={dayPlan.length}
+          nextStopDistance={nextStopDistance}
+          nextStopWalkMin={nextStopWalkMin}
+          shouldLeaveNow={shouldLeaveNow}
+          leaveByMessage={leaveByMessage}
+          tripComplete={false}
+          onCheckIn={(stopId) => checkIn(stopId)}
+          onEndTrip={stopExplore}
+        />
+      )}
+
       {/* Day Tabs */}
       <div className="flex gap-2 overflow-x-auto pb-3 mb-3 scroll-hidden">
         {sortedDays.map(day => {
@@ -477,6 +534,26 @@ export default function PlanScreen() {
           + Day
         </button>
       </div>
+
+      {/* Itinerary Alerts */}
+      {itineraryAlerts.length > 0 && (
+        <ItineraryAlertBanner
+          alerts={itineraryAlerts}
+          onDismiss={dismissAlert}
+          onAction={(alert) => {
+            if (alert.action?.actionType === 'reorder' && alert.stopId) {
+              const idx = dayPlan.findIndex(s => s.id === alert.stopId);
+              if (idx > 0) reorderStops(idx, 0);
+              dismissAlert(alert.id);
+            } else if (alert.action?.actionType === 'remove' && alert.stopId) {
+              removeFromPlan(alert.stopId);
+              dismissAlert(alert.id);
+            } else {
+              dismissAlert(alert.id);
+            }
+          }}
+        />
+      )}
 
       {/* Day Summary — at a glance before the stops */}
       {daySummary && dayPlan.length >= 2 && (
@@ -769,6 +846,17 @@ export default function PlanScreen() {
                         {'\u{1F37D}\u{FE0F}'} TasteLens
                       </button>
                     )}
+                    {/* Nearby toggle */}
+                    <button
+                      onClick={() => setExpandedNearby(expandedNearby === stop.id ? null : stop.id)}
+                      className={`py-[5px] px-2.5 rounded-lg text-xs border cursor-pointer flex items-center gap-1 ${
+                        expandedNearby === stop.id
+                          ? 'bg-accent-amber text-text-on-accent border-accent-amber'
+                          : 'bg-amber-tint-bg10 text-accent-amber border-amber-tint-border20'
+                      }`}
+                    >
+                      {'\u{1F4CD}'} Nearby
+                    </button>
                     {stop.type === 'place' && stop.place && (
                       <button
                         disabled={pivotLoading}
@@ -900,6 +988,11 @@ export default function PlanScreen() {
                   })()}
                 </div>
               </div>
+
+              {/* Nearby Discoveries */}
+              {expandedNearby === stop.id && (
+                <NearbyDiscoveries stop={stop} />
+              )}
 
               {/* Transportation between stops */}
               {index < dayPlan.length - 1 && (() => {
@@ -1048,6 +1141,24 @@ export default function PlanScreen() {
           )}
         </div>
 
+        {/* Publish Route (Community Routes) */}
+        {totalStops >= 3 && user && (
+          <button
+            onClick={async () => {
+              if (!requireAuth()) return;
+              const slug = await shareAsLink();
+              if (slug) {
+                const { publishRoute } = await import('../supabase');
+                const ok = await publishRoute(slug, 'adventure', user.user_metadata?.name || 'Traveler');
+                showToast(ok ? 'Route published to community!' : 'Could not publish route');
+              }
+            }}
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl cursor-pointer border border-amber-tint-border20 bg-amber-tint-bg10 text-accent-amber text-[13px] font-semibold"
+          >
+            {'\u{1F30D}'} Publish to Community
+          </button>
+        )}
+
         {/* Full trip route (multi-day only) */}
         {dayCount > 1 && totalStops >= 2 && getFullTripRouteUrl() && (
           <a href={getFullTripRouteUrl()} target="_blank" rel="noopener noreferrer"
@@ -1148,6 +1259,40 @@ export default function PlanScreen() {
 
       {/* Wrap-up modal — portal to escape .page-enter transform */}
       {wrapUpOpen && createPortal(<WrapUpModal />, document.body)}
+
+      {/* Chat FAB */}
+      {totalStops > 0 && createPortal(
+        <button
+          onClick={() => setShowChat(true)}
+          className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+80px)] right-5 w-14 h-14 rounded-full bg-accent-gradient text-text-on-accent border-none cursor-pointer shadow-lg flex items-center justify-center text-xl z-40"
+          aria-label="Open AI assistant"
+          style={{ boxShadow: '0 4px 20px var(--amber-tint-shadow)' }}
+        >
+          {'\u{1F916}'}
+        </button>,
+        document.body
+      )}
+
+      {/* ChatBot modal with plan context */}
+      {showChat && createPortal(
+        <ChatBot
+          city={cityLabel}
+          onClose={() => setShowChat(false)}
+          planContext={{
+            stops: dayPlan.map(s => ({
+              name: getStopName(s),
+              category: getStopCategory(s),
+              timeSlot: s.timeSlot,
+            })),
+            city: cityLabel,
+            timeOfDay: new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening',
+          }}
+          onModification={(mod) => {
+            showToast(`AI suggests: ${mod.action} ${mod.placeType || ''}`);
+          }}
+        />,
+        document.body
+      )}
     </div>
   );
 }

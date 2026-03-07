@@ -79,13 +79,19 @@ export function useLiveDay(deps: {
     }
   }, [dayPlan]);
 
-  const addQuickReview = useCallback((stopId: string, rating: number, comment?: string) => {
+  const addQuickReview = useCallback((stopId: string, rating: number, comment?: string, photos?: string[], journalNote?: string) => {
     setCheckIns(prev => {
       const existing = prev[stopId];
       if (!existing) return prev;
       return {
         ...prev,
-        [stopId]: { ...existing, rating, comment },
+        [stopId]: {
+          ...existing,
+          rating,
+          comment,
+          ...(photos && photos.length > 0 ? { photos } : {}),
+          ...(journalNote ? { journalNote } : {}),
+        },
       };
     });
     setReviewPromptStopId(null);

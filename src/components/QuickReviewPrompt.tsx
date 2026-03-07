@@ -1,18 +1,55 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import type { Stop } from '../types';
 import { saveReview } from '../supabase';
+
+function compressPhoto(file: File, maxSize = 400, quality = 0.6): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ratio = Math.min(maxSize / img.width, maxSize / img.height, 1);
+        canvas.width = img.width * ratio;
+        canvas.height = img.height * ratio;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = reader.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function QuickReviewPrompt({ stop }: { stop: Stop }) {
   const { addQuickReview, setReviewPromptStopId, citySlug, user } = useApp();
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [journalNote, setJournalNote] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const name = stop.place?.name || stop.event?.name || 'this stop';
   const placeId = stop.place?.placeId;
 
+  const handleAddPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    for (const file of Array.from(files).slice(0, 3 - photos.length)) {
+      try {
+        const compressed = await compressPhoto(file);
+        setPhotos(prev => [...prev.slice(0, 2), compressed]);
+      } catch { /* skip */ }
+    }
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
   const handleSave = () => {
-    addQuickReview(stop.id, rating, comment || undefined);
+    addQuickReview(stop.id, rating, comment || undefined, photos.length > 0 ? photos : undefined, journalNote || undefined);
 
     // Also save to Supabase if it's a place with a rating
     if (placeId && rating > 0 && user) {
@@ -54,6 +91,39 @@ export default function QuickReviewPrompt({ stop }: { stop: Stop }) {
               </button>
             ))}
           </div>
+
+          {/* Photo picker */}
+          <div className="flex gap-2 mb-3">
+            {photos.map((src, i) => (
+              <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-border-subtle">
+                <img src={src} alt="" className="w-full h-full object-cover" />
+                <button
+                  onClick={() => setPhotos(prev => prev.filter((_, j) => j !== i))}
+                  className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-bg-modal-overlay text-white text-[10px] border-none cursor-pointer flex items-center justify-center"
+                >{'\u2715'}</button>
+              </div>
+            ))}
+            {photos.length < 3 && (
+              <button
+                onClick={() => fileRef.current?.click()}
+                className="w-16 h-16 rounded-lg border border-dashed border-border-medium bg-bg-subtle flex flex-col items-center justify-center cursor-pointer text-text-tertiary text-xs gap-0.5"
+              >
+                <span className="text-lg">{'\u{1F4F7}'}</span>
+                <span>Add</span>
+              </button>
+            )}
+            <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={handleAddPhoto} />
+          </div>
+
+          {/* Journal note */}
+          <textarea
+            placeholder="Add a note... (optional)"
+            value={journalNote}
+            onChange={e => setJournalNote(e.target.value)}
+            maxLength={200}
+            rows={2}
+            className="input-field w-full mb-3 text-sm resize-none"
+          />
 
           {/* Optional comment */}
           <input

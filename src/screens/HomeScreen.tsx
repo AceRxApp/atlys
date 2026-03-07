@@ -8,6 +8,7 @@ import { useSubscription } from '../hooks/useSubscription';
 import PaywallModal from '../components/PaywallModal';
 import { fixPhotoUrl } from '../utils/photoUrl';
 import NativeImg from '../components/NativeImg';
+import CommunityRoutesSection from '../components/CommunityRoutesSection';
 
 // ── Vibe Cards ──
 interface VibeOption {
@@ -333,6 +334,7 @@ export default function HomeScreen() {
     useMiles,
     setDishLensContext,
     cityLabel,
+    citySlug,
     user,
     showToast,
     setShowProfile,
@@ -688,6 +690,9 @@ export default function HomeScreen() {
           </div>
         </button>
       </div>
+
+      {/* Community Routes */}
+      {hasLocation && <CommunityRoutesSection citySlug={citySlug} />}
 
       {/* Paywall Modal */}
       {showPaywall && (

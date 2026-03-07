@@ -8,12 +8,26 @@ interface ChatMessage {
   error?: boolean;
 }
 
+interface PlanContext {
+  stops: { name: string; category: string; timeSlot?: string }[];
+  city: string;
+  timeOfDay: string;
+}
+
 const QUICK_PROMPTS = [
   'Best food spots nearby?',
   'What should I do today?',
   'Any hidden gems here?',
   'Budget travel tips',
   'Safety tips for solo travel',
+];
+
+const PLAN_QUICK_PROMPTS = [
+  'Add dessert nearby',
+  'Replace with outdoor activity',
+  'What if it rains?',
+  'Suggest a dinner spot',
+  'What should I skip?',
 ];
 
 const SESSION_KEY = 'nxstops_chat';
@@ -72,7 +86,12 @@ function renderMarkdown(text: string) {
   return elements;
 }
 
-export default function ChatBot({ city, onClose }: { city: string | null; onClose: () => void }) {
+export default function ChatBot({ city, onClose, planContext, onModification }: {
+  city: string | null;
+  onClose: () => void;
+  planContext?: PlanContext;
+  onModification?: (mod: { action: string; placeType?: string; targetStop?: string; suggestion?: string }) => void;
+}) {
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
       const saved = sessionStorage.getItem(SESSION_KEY);
@@ -118,13 +137,17 @@ export default function ChatBot({ city, onClose }: { city: string | null; onClos
       const res = await fetch(`${API_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: apiMessages, city }),
+        body: JSON.stringify({ messages: apiMessages, city, planContext }),
       });
 
       const data = await res.json();
 
       if (res.ok && data.reply) {
         setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
+        // Handle plan modifications from AI
+        if (data.modification && onModification) {
+          onModification(data.modification);
+        }
       } else {
         setMessages(prev => [...prev, {
           role: 'assistant',
@@ -229,7 +252,7 @@ export default function ChatBot({ city, onClose }: { city: string | null; onClos
         {/* Quick Prompts (only show when conversation just started) */}
         {messages.length <= 1 && (
           <div className="px-5 pb-2 flex gap-1.5 flex-wrap shrink-0">
-            {QUICK_PROMPTS.map(prompt => (
+            {(planContext ? PLAN_QUICK_PROMPTS : QUICK_PROMPTS).map(prompt => (
               <button
                 key={prompt}
                 onClick={() => sendMessage(prompt)}

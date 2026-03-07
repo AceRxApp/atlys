@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { City, EventItem, Stop, AdminSignup, Vibe, QuickFilter, TravelGroup, CommunityTag, PlanDuration, TripHistoryEntry, StopCheckIn } from '../types';
+import type { City, EventItem, Stop, AdminSignup, Vibe, QuickFilter, TravelGroup, CommunityTag, PlanDuration, TripHistoryEntry, StopCheckIn, Achievement, ItineraryAlert, Reservation } from '../types';
 import type { Place } from '../services/places';
 import type { Review } from '../supabase';
 import type { User } from '@supabase/supabase-js';
@@ -295,7 +295,7 @@ export interface AppContextType {
   isLiveDay: boolean;
   liveDayNumber: number | null;
   checkIn: (stopId: string) => void;
-  addQuickReview: (stopId: string, rating: number, comment?: string) => void;
+  addQuickReview: (stopId: string, rating: number, comment?: string, photos?: string[], journalNote?: string) => void;
   isCheckedIn: (stopId: string) => boolean;
   getCheckIn: (stopId: string) => StopCheckIn | null;
   checkedInCount: number;
@@ -304,6 +304,46 @@ export interface AppContextType {
   spentSoFar: number;
   reviewPromptStopId: string | null;
   setReviewPromptStopId: (id: string | null) => void;
+  checkIns: Record<string, StopCheckIn>;
+
+  // --- Logistics ---
+  reservations: Reservation[];
+  tickets: { id: string; name: string; url?: string; reference?: string }[];
+  hotel: { name: string; address: string; checkIn: string; checkOut: string } | null;
+  transitPass: { type: string; reference: string } | null;
+  addReservation: (name: string, dateTime: string, confirmationNumber: string, notes?: string) => void;
+  removeReservation: (id: string) => void;
+  addTicket: (name: string, url?: string, reference?: string) => void;
+  removeTicket: (id: string) => void;
+  setHotel: (hotel: { name: string; address: string; checkIn: string; checkOut: string } | null) => void;
+  setTransitPass: (transitPass: { type: string; reference: string } | null) => void;
+  clearLogistics: () => void;
+
+  // --- City Progress & Achievements ---
+  categoryProgress: Record<string, number>;
+  achievements: Achievement[];
+  totalCitiesExplored: number;
+  totalPlacesVisited: number;
+
+  // --- Itinerary Alerts ---
+  itineraryAlerts: ItineraryAlert[];
+  dismissAlert: (id: string) => void;
+
+  // --- Explore Mode ---
+  exploreActive: boolean;
+  currentStopIndex: number;
+  currentExploreStop: Stop | null;
+  nextExploreStop: Stop | null;
+  nextStopDistance: string | null;
+  nextStopWalkMin: number | null;
+  shouldLeaveNow: boolean;
+  leaveByMessage: string | null;
+  tripComplete: boolean;
+  startExplore: () => void;
+  stopExplore: () => void;
+
+  // --- City slug setter ---
+  setCitySlug: (slug: string) => void;
 
   // --- Fetch triggers ---
   fetchPlaces: () => Promise<void>;

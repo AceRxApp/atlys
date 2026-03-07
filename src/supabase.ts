@@ -856,6 +856,62 @@ export async function fetchSharedPlan(slug: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Community Routes
+// ---------------------------------------------------------------------------
+
+export async function publishRoute(
+  slug: string, category: string, creatorName: string,
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('shared_plans')
+    .update({ is_published: true, category, creator_name: creatorName })
+    .eq('slug', slug);
+  if (error) { console.error('Error publishing route:', error); return false; }
+  return true;
+}
+
+export async function fetchCommunityRoutes(
+  citySlug?: string, limit = 20,
+): Promise<{
+  slug: string; city_slug: string; city_label: string; day_title: string | null;
+  trip_days: Record<number, unknown[]>; view_count: number; likes_count: number;
+  category: string | null; creator_name: string | null; created_at: string;
+}[]> {
+  let query = supabase
+    .from('shared_plans')
+    .select('slug, city_slug, city_label, day_title, trip_days, view_count, likes_count, category, creator_name, created_at')
+    .eq('is_published', true)
+    .order('view_count', { ascending: false })
+    .limit(limit);
+
+  if (citySlug) {
+    query = query.eq('city_slug', citySlug);
+  }
+
+  const { data, error } = await query;
+  if (error || !data) return [];
+  return data as {
+    slug: string; city_slug: string; city_label: string; day_title: string | null;
+    trip_days: Record<number, unknown[]>; view_count: number; likes_count: number;
+    category: string | null; creator_name: string | null; created_at: string;
+  }[];
+}
+
+export async function incrementRouteLikes(slug: string): Promise<void> {
+  const { data } = await supabase
+    .from('shared_plans')
+    .select('likes_count')
+    .eq('slug', slug)
+    .single();
+  if (data) {
+    await supabase
+      .from('shared_plans')
+      .update({ likes_count: (data.likes_count || 0) + 1 })
+      .eq('slug', slug);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Push Subscriptions
 // ---------------------------------------------------------------------------
 

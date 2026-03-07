@@ -29,6 +29,10 @@ import { useTripPlan } from './hooks/useTripPlan';
 import { useStopRatings } from './hooks/useStopRatings';
 import { useOfflineSave } from './hooks/useOfflineSave';
 import { useLiveDay } from './hooks/useLiveDay';
+import { useTripLogistics } from './hooks/useTripLogistics';
+import { useCityProgress } from './hooks/useCityProgress';
+import { useItineraryAlerts } from './hooks/useItineraryAlerts';
+import { useExploreMode } from './hooks/useExploreMode';
 
 type Screen = 'home' | 'discover' | 'events' | 'currency' | 'plan' | 'tastelens';
 
@@ -394,6 +398,26 @@ export default function App() {
     events.events,
   );
 
+  // --- Trip Logistics ---
+  const logistics = useTripLogistics(location.citySlug);
+
+  // --- City Progress & Achievements ---
+  const cityProgress = useCityProgress(trip.tripHistory, liveDay.checkIns);
+
+  // --- Itinerary Alerts ---
+  const itineraryAlerts = useItineraryAlerts({
+    dayPlan: trip.tripDays[trip.activeDay] || [],
+    isLiveDay: liveDay.isLiveDay,
+    checkIns: liveDay.checkIns,
+  });
+
+  // --- Explore Mode ---
+  const exploreMode = useExploreMode({
+    dayPlan: trip.tripDays[trip.activeDay] || [],
+    isLiveDay: liveDay.isLiveDay,
+    checkIns: liveDay.checkIns,
+  });
+
   // --- Reset photo index when selectedPlace changes ---
   useEffect(() => {
     if (selectedPlace) {
@@ -581,8 +605,33 @@ export default function App() {
     showOnboarding, onboardingStep, setOnboardingStep, setShowOnboarding,
     // DishLens
     dishLensContext, setDishLensContext,
+    // Logistics
+    ...logistics,
+    // City Progress & Achievements
+    ...cityProgress,
+    // Itinerary Alerts
+    itineraryAlerts: itineraryAlerts.alerts,
+    dismissAlert: itineraryAlerts.dismissAlert,
+    // Explore Mode
+    exploreActive: exploreMode.exploreActive,
+    currentStopIndex: exploreMode.currentStopIndex,
+    currentExploreStop: exploreMode.currentStop,
+    nextExploreStop: exploreMode.nextStop,
+    nextStopDistance: exploreMode.nextStopDistance,
+    nextStopWalkMin: exploreMode.nextStopWalkMin,
+    shouldLeaveNow: exploreMode.shouldLeaveNow,
+    leaveByMessage: exploreMode.leaveByMessage,
+    tripComplete: exploreMode.tripComplete,
+    startExplore: exploreMode.startExplore,
+    stopExplore: exploreMode.stopExplore,
+    // City slug setter
+    setCitySlug: (slug: string) => {
+      const city = location.cities.find(c => c.slug === slug);
+      if (city) location.setSelectedCity(city);
+    },
   }), [
     screen, setScreen, location, auth, places, events, trip, liveDay, stopRatings, offlineSave,
+    logistics, cityProgress, itineraryAlerts, exploreMode,
     selectedPlace, activePhotoIndex,
     showSafety, showProfile, showAdmin, showCulture, avatarUrl,
     showToast, getGreeting, getTimeSuggestion, getDistanceReference, currentTime, requireAuth,
