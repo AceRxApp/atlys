@@ -667,7 +667,9 @@ export default function HomeScreen() {
         </div>
       )}
 
-      {/* ── Quick Actions ── */}
+      {/* ── Discover — Community Routes + Quick Actions ── */}
+      {hasLocation && <CommunityRoutesSection citySlug={citySlug} />}
+
       <div className="mt-5 flex gap-2.5">
         <button
           onClick={() => setScreen('tastelens')}
@@ -690,9 +692,6 @@ export default function HomeScreen() {
           </div>
         </button>
       </div>
-
-      {/* Community Routes */}
-      {hasLocation && <CommunityRoutesSection citySlug={citySlug} />}
 
       {/* Paywall Modal */}
       {showPaywall && (

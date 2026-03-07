@@ -555,28 +555,7 @@ export default function PlanScreen() {
         />
       )}
 
-      {/* Day Summary — at a glance before the stops */}
-      {daySummary && dayPlan.length >= 2 && (
-        <div className="card mb-3 p-3 border border-amber-tint-border15 flex justify-around text-center"
-          style={{ background: `linear-gradient(135deg, var(--amber-tint-bg06), var(--bg-subtle))` }}>
-          <div>
-            <div className="text-[11px] text-text-tertiary mb-0.5">Distance</div>
-            <div className="text-sm font-bold text-text-primary">{daySummary.distance}</div>
-          </div>
-          <div className="w-px bg-border-subtle" />
-          <div>
-            <div className="text-[11px] text-text-tertiary mb-0.5">{'\u{1F6B6}'} Walk</div>
-            <div className="text-sm font-bold text-text-primary">{daySummary.totalWalkMin}m</div>
-          </div>
-          <div className="w-px bg-border-subtle" />
-          <div>
-            <div className="text-[11px] text-text-tertiary mb-0.5">{'\u{1F697}'} Drive</div>
-            <div className="text-sm font-bold text-text-primary">{daySummary.totalDriveMin}m</div>
-          </div>
-        </div>
-      )}
-
-      {/* Day-of events banner */}
+      {/* Day-of events — grouped with alerts above */}
       {tripStartDate && (() => {
         const start = new Date(tripStartDate + 'T00:00:00');
         start.setDate(start.getDate() + (activeDay - 1));
@@ -599,6 +578,27 @@ export default function PlanScreen() {
           </div>
         );
       })()}
+
+      {/* Day Summary — distance & time at a glance */}
+      {daySummary && dayPlan.length >= 2 && (
+        <div className="card mb-3 p-3 border border-amber-tint-border15 flex justify-around text-center"
+          style={{ background: `linear-gradient(135deg, var(--amber-tint-bg06), var(--bg-subtle))` }}>
+          <div>
+            <div className="text-[11px] text-text-tertiary mb-0.5">Distance</div>
+            <div className="text-sm font-bold text-text-primary">{daySummary.distance}</div>
+          </div>
+          <div className="w-px bg-border-subtle" />
+          <div>
+            <div className="text-[11px] text-text-tertiary mb-0.5">{'\u{1F6B6}'} Walk</div>
+            <div className="text-sm font-bold text-text-primary">{daySummary.totalWalkMin}m</div>
+          </div>
+          <div className="w-px bg-border-subtle" />
+          <div>
+            <div className="text-[11px] text-text-tertiary mb-0.5">{'\u{1F697}'} Drive</div>
+            <div className="text-sm font-bold text-text-primary">{daySummary.totalDriveMin}m</div>
+          </div>
+        </div>
+      )}
 
       {/* Active day stops */}
       {dayPlan.length === 0 ? (
@@ -1090,10 +1090,12 @@ export default function PlanScreen() {
       )}
 
 
-      {/* Pivot is now inline — see pivot card inside each stop */}
-
-      {/* Action Buttons */}
+      {/* ═══════════════════════════════════════════════════════════════
+          SHARE & EXPORT
+          ══════════════════════════════════════════════════════════════ */}
       <div className="flex flex-col gap-2.5 mt-5">
+        <div className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.05em]">Share & Export</div>
+
         {/* Primary: Get Route + Share */}
         <div className="flex gap-2.5">
           {dayPlan.length > 0 && (
@@ -1123,41 +1125,23 @@ export default function PlanScreen() {
               {'\u{1F4F8}'} Export
             </button>
           )}
-          {totalStops > 0 && (
+          {totalStops >= 3 && user && (
             <button
-              onClick={saveForOffline}
-              disabled={offlineSaving}
-              aria-label={offlineSaved ? 'Plan saved for offline use' : 'Save plan for offline use'}
-              className={`flex-1 flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl border text-[13px] font-semibold min-h-[52px] transition-all duration-200 ${
-                offlineSaving
-                  ? 'bg-bg-subtle border-border-medium text-text-tertiary cursor-wait animate-pulse'
-                  : offlineSaved
-                    ? 'bg-green-tint-bg border-green-tint-border text-status-green cursor-pointer active:scale-[0.96]'
-                    : 'bg-bg-subtle border-border-medium text-text-secondary cursor-pointer active:scale-[0.96] hover:border-accent-amber'
-              }`}
+              onClick={async () => {
+                if (!requireAuth()) return;
+                const slug = await shareAsLink();
+                if (slug) {
+                  const { publishRoute } = await import('../supabase');
+                  const ok = await publishRoute(slug, 'adventure', user.user_metadata?.name || 'Traveler');
+                  showToast(ok ? 'Route published to community!' : 'Could not publish route');
+                }
+              }}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl cursor-pointer border border-amber-tint-border20 bg-amber-tint-bg10 text-accent-amber text-[13px] font-semibold"
             >
-              {offlineSaving ? '\u{23F3} Saving...' : offlineSaved ? '\u{2705} Saved Offline' : '\u{1F4E5} Save Offline'}
+              {'\u{1F30D}'} Publish
             </button>
           )}
         </div>
-
-        {/* Publish Route (Community Routes) */}
-        {totalStops >= 3 && user && (
-          <button
-            onClick={async () => {
-              if (!requireAuth()) return;
-              const slug = await shareAsLink();
-              if (slug) {
-                const { publishRoute } = await import('../supabase');
-                const ok = await publishRoute(slug, 'adventure', user.user_metadata?.name || 'Traveler');
-                showToast(ok ? 'Route published to community!' : 'Could not publish route');
-              }
-            }}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl cursor-pointer border border-amber-tint-border20 bg-amber-tint-bg10 text-accent-amber text-[13px] font-semibold"
-          >
-            {'\u{1F30D}'} Publish to Community
-          </button>
-        )}
 
         {/* Full trip route (multi-day only) */}
         {dayCount > 1 && totalStops >= 2 && getFullTripRouteUrl() && (
@@ -1167,25 +1151,49 @@ export default function PlanScreen() {
           </a>
         )}
 
-        {/* Book Your Trip — affiliate links */}
+        {/* Save Offline */}
         {totalStops > 0 && (
-          <div className="mt-2 p-4 rounded-2xl bg-bg-elevated border border-border-subtle">
-            <div className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.05em] mb-3">Book Your Trip</div>
-            <div className="flex gap-2 overflow-x-auto scroll-hidden pb-1">
-              {BOOKING_SERVICES.map(s => (
-                <a key={s.id} href={s.buildUrl(cityLabel)} target="_blank" rel="noopener noreferrer"
-                  onClick={() => track('plan_booking_click', { service: s.id, city: cityLabel })}
-                  className="flex flex-col items-center gap-1.5 min-w-[90px] shrink-0 py-3 px-2 rounded-xl bg-bg-subtle border border-border-subtle no-underline text-center">
-                  <span className="text-xl">{s.emoji}</span>
-                  <span className="text-xs font-semibold text-text-primary">{s.name}</span>
-                  <span className="text-[11px] text-text-tertiary leading-tight">{s.description}</span>
-                </a>
-              ))}
-            </div>
-          </div>
+          <button
+            onClick={saveForOffline}
+            disabled={offlineSaving}
+            aria-label={offlineSaved ? 'Plan saved for offline use' : 'Save plan for offline use'}
+            className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-[13px] font-semibold transition-all duration-200 ${
+              offlineSaving
+                ? 'bg-bg-subtle border-border-medium text-text-tertiary cursor-wait animate-pulse'
+                : offlineSaved
+                  ? 'bg-green-tint-bg border-green-tint-border text-status-green cursor-pointer active:scale-[0.96]'
+                  : 'bg-bg-subtle border-border-medium text-text-secondary cursor-pointer active:scale-[0.96] hover:border-accent-amber'
+            }`}
+          >
+            {offlineSaving ? '\u{23F3} Saving...' : offlineSaved ? '\u{2705} Saved Offline' : '\u{1F4E5} Save Offline'}
+          </button>
         )}
+      </div>
 
-        {/* Danger zone */}
+      {/* ═══════════════════════════════════════════════════════════════
+          TRIP RESOURCES
+          ══════════════════════════════════════════════════════════════ */}
+      {totalStops > 0 && (
+        <div className="mt-4 p-4 rounded-2xl bg-bg-elevated border border-border-subtle">
+          <div className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.05em] mb-3">Book Your Trip</div>
+          <div className="flex gap-2 overflow-x-auto scroll-hidden pb-1">
+            {BOOKING_SERVICES.map(s => (
+              <a key={s.id} href={s.buildUrl(cityLabel)} target="_blank" rel="noopener noreferrer"
+                onClick={() => track('plan_booking_click', { service: s.id, city: cityLabel })}
+                className="flex flex-col items-center gap-1.5 min-w-[90px] shrink-0 py-3 px-2 rounded-xl bg-bg-subtle border border-border-subtle no-underline text-center">
+                <span className="text-xl">{s.emoji}</span>
+                <span className="text-xs font-semibold text-text-primary">{s.name}</span>
+                <span className="text-[11px] text-text-tertiary leading-tight">{s.description}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════
+          MANAGE
+          ══════════════════════════════════════════════════════════════ */}
+      <div className="mt-6">
         <div className="flex items-center justify-center gap-4 pt-1">
           {dayCount > 1 && (
             <button onClick={() => removeDay(activeDay)}
@@ -1216,8 +1224,7 @@ export default function PlanScreen() {
           )}
         </div>
 
-        {/* Safety Disclaimer */}
-        <div className="mt-6 mb-2 px-1">
+        <div className="mt-4 mb-2 px-1">
           <p className="text-[11px] text-text-tertiary leading-[1.5] text-center">
             NxStops recommendations are for informational purposes only. Hours, safety data, and travel advisories may not be current. Always verify with venues directly and use your own judgment.
           </p>

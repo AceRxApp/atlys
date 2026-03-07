@@ -611,7 +611,94 @@ export default function ProfileScreen() {
           )}
 
           {/* ================================================================ */}
-          {/* COMMON — Theme, Saved, Trips, Sign Out (all users see theme)    */}
+          {/* YOUR JOURNEY — Stats, Achievements, Travel Map                  */}
+          {/* ================================================================ */}
+
+          {/* Explorer Stats */}
+          {totalPlacesVisited > 0 && (
+            <div className="mb-6">
+              <div className="section-label">Your Journey</div>
+              <div className="card p-4 border border-border-subtle">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="text-center flex-1">
+                    <div className="text-2xl font-bold text-accent-amber">{totalPlacesVisited}</div>
+                    <div className="text-[11px] text-text-tertiary">Places</div>
+                  </div>
+                  <div className="w-px h-8 bg-border-subtle" />
+                  <div className="text-center flex-1">
+                    <div className="text-2xl font-bold text-text-primary">{totalCitiesExplored}</div>
+                    <div className="text-[11px] text-text-tertiary">Cities</div>
+                  </div>
+                </div>
+                {/* Category progress bars */}
+                {Object.entries(categoryProgress).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([cat, count]) => (
+                  <div key={cat} className="flex items-center gap-2.5 mb-2">
+                    <span className="text-xs text-text-secondary w-20 capitalize truncate">{cat}</span>
+                    <div className="flex-1 h-2 rounded-full bg-bg-subtle-strong overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-accent-amber transition-all duration-500"
+                        style={{ width: `${Math.min(100, (count / 10) * 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-[11px] text-text-tertiary w-6 text-right">{count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Achievements */}
+          {achievements.length > 0 && (
+            <div className="mb-6">
+              <div className="section-label">Achievements</div>
+              <div className="grid grid-cols-3 gap-2">
+                {achievements.map(ach => (
+                  <div
+                    key={ach.id}
+                    className={`text-center p-3 rounded-xl border ${
+                      ach.unlockedAt
+                        ? 'bg-amber-tint-bg10 border-amber-tint-border20'
+                        : 'bg-bg-subtle border-border-subtle opacity-50'
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">{ach.unlockedAt ? ach.emoji : '?'}</div>
+                    <div className="text-[11px] font-semibold text-text-primary truncate">{ach.title}</div>
+                    <div className="text-[10px] text-text-tertiary mt-0.5">
+                      {ach.unlockedAt ? 'Unlocked!' : `${ach.progress}/${ach.requirement}`}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Travel Map */}
+          {tripHistory.length > 0 && (() => {
+            const visitedCities = [...new Set(tripHistory.map(t => t.city.toLowerCase()))]
+              .map(cityName => {
+                const coords = CITY_COORDS[cityName];
+                if (!coords) return null;
+                return { name: cityName, lat: coords.lat, lng: coords.lng };
+              })
+              .filter(Boolean) as { name: string; lat: number; lng: number }[];
+
+            if (visitedCities.length === 0) return null;
+
+            return (
+              <div className="mb-6">
+                <div className="section-label">Your Travel Map</div>
+                <Suspense fallback={<div className="w-full h-[200px] rounded-2xl bg-bg-subtle animate-pulse" />}>
+                  <TravelMap cities={visitedCities} apiKey={MAPS_API_KEY} />
+                </Suspense>
+                <div className="text-xs text-text-tertiary text-center mt-2">
+                  {visitedCities.length} {visitedCities.length === 1 ? 'city' : 'cities'} explored
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ================================================================ */}
+          {/* SETTINGS — Theme, Temperature, Security, Tools                  */}
           {/* ================================================================ */}
 
           {/* Theme Section */}
@@ -1050,89 +1137,6 @@ export default function ProfileScreen() {
                       </button>
                     </div>
                   </details>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Travel Map */}
-          {tripHistory.length > 0 && (() => {
-            const visitedCities = [...new Set(tripHistory.map(t => t.city.toLowerCase()))]
-              .map(cityName => {
-                const coords = CITY_COORDS[cityName];
-                if (!coords) return null;
-                return { name: cityName, lat: coords.lat, lng: coords.lng };
-              })
-              .filter(Boolean) as { name: string; lat: number; lng: number }[];
-
-            if (visitedCities.length === 0) return null;
-
-            return (
-              <div className="mb-6">
-                <div className="section-label">Your Travel Map</div>
-                <Suspense fallback={<div className="w-full h-[200px] rounded-2xl bg-bg-subtle animate-pulse" />}>
-                  <TravelMap cities={visitedCities} apiKey={MAPS_API_KEY} />
-                </Suspense>
-                <div className="text-xs text-text-tertiary text-center mt-2">
-                  {visitedCities.length} {visitedCities.length === 1 ? 'city' : 'cities'} explored
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Explorer Stats */}
-          {totalPlacesVisited > 0 && (
-            <div className="mb-6">
-              <div className="section-label">Explorer Stats</div>
-              <div className="card p-4 border border-border-subtle">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="text-center flex-1">
-                    <div className="text-2xl font-bold text-accent-amber">{totalPlacesVisited}</div>
-                    <div className="text-[11px] text-text-tertiary">Places</div>
-                  </div>
-                  <div className="w-px h-8 bg-border-subtle" />
-                  <div className="text-center flex-1">
-                    <div className="text-2xl font-bold text-text-primary">{totalCitiesExplored}</div>
-                    <div className="text-[11px] text-text-tertiary">Cities</div>
-                  </div>
-                </div>
-                {/* Category progress bars */}
-                {Object.entries(categoryProgress).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([cat, count]) => (
-                  <div key={cat} className="flex items-center gap-2.5 mb-2">
-                    <span className="text-xs text-text-secondary w-20 capitalize truncate">{cat}</span>
-                    <div className="flex-1 h-2 rounded-full bg-bg-subtle-strong overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-accent-amber transition-all duration-500"
-                        style={{ width: `${Math.min(100, (count / 10) * 100)}%` }}
-                      />
-                    </div>
-                    <span className="text-[11px] text-text-tertiary w-6 text-right">{count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Achievements */}
-          {achievements.length > 0 && (
-            <div className="mb-6">
-              <div className="section-label">Achievements</div>
-              <div className="grid grid-cols-3 gap-2">
-                {achievements.map(ach => (
-                  <div
-                    key={ach.id}
-                    className={`text-center p-3 rounded-xl border ${
-                      ach.unlockedAt
-                        ? 'bg-amber-tint-bg10 border-amber-tint-border20'
-                        : 'bg-bg-subtle border-border-subtle opacity-50'
-                    }`}
-                  >
-                    <div className="text-2xl mb-1">{ach.unlockedAt ? ach.emoji : '?'}</div>
-                    <div className="text-[11px] font-semibold text-text-primary truncate">{ach.title}</div>
-                    <div className="text-[10px] text-text-tertiary mt-0.5">
-                      {ach.unlockedAt ? 'Unlocked!' : `${ach.progress}/${ach.requirement}`}
-                    </div>
-                  </div>
                 ))}
               </div>
             </div>
