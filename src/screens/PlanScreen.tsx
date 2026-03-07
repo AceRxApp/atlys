@@ -38,6 +38,7 @@ import LogisticsPanel from '../components/LogisticsPanel';
 import ItineraryAlertBanner from '../components/ItineraryAlertBanner';
 import ExploreModeBanner from '../components/ExploreModeBanner';
 import ChatBot from '../components/ChatBot';
+import CheckInCelebration from '../components/CheckInCelebration';
 
 // Local helpers (not on context)
 const getStopName = (stop: Stop) =>
@@ -218,7 +219,21 @@ export default function PlanScreen() {
     leaveByMessage,
     addToPlan,
     checkIns,
+    currentStreak,
   } = useApp();
+
+  // Compute trip phase for context-aware UI
+  type TripPhase = 'planning' | 'pretrip' | 'live' | 'posttrip';
+  const tripPhase: TripPhase = (() => {
+    if (!tripStartDate) return 'planning';
+    const start = new Date(tripStartDate + 'T00:00:00');
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const diffDays = Math.floor((today.getTime() - start.getTime()) / 86400000);
+    const dayNum = diffDays + 1;
+    if (dayNum >= 1 && dayNum <= dayCount) return 'live';
+    if (dayNum > dayCount) return 'posttrip';
+    return 'pretrip';
+  })();
 
   const dateInputRef = useRef<HTMLInputElement>(null);
   const [showAddLinkModal, setShowAddLinkModal] = useState(false);
@@ -261,6 +276,22 @@ export default function PlanScreen() {
   const [showChat, setShowChat] = useState(false);
   // Logistics panel
   const [showLogistics, setShowLogistics] = useState(false);
+
+  // Check-in celebration
+  const [celebrationMsg, setCelebrationMsg] = useState<string | null>(null);
+  const [celebrationStreak, setCelebrationStreak] = useState(0);
+  const handleCheckInWithCelebration = useCallback((stopId: string) => {
+    checkIn(stopId);
+    const newCount = checkedInCount + 1;
+    if (newCount >= totalStopsToday) {
+      setCelebrationMsg('All stops visited! Amazing day!');
+    } else if (newCount >= 3) {
+      setCelebrationMsg(`${newCount} stops down! Keep going!`);
+    } else {
+      setCelebrationMsg('Checked in!');
+    }
+    setCelebrationStreak(currentStreak + 1);
+  }, [checkIn, checkedInCount, totalStopsToday, currentStreak]);
 
   // Travel advisory state
   const [advisory, setAdvisory] = useState<TravelAdvisory | null>(null);
@@ -397,30 +428,35 @@ export default function PlanScreen() {
         })()}
       </div>
 
-      {/* Quick Add — add events, restaurants, or places manually */}
-      <div
-        onClick={() => { if (!requireAuth()) return; setShowAddLinkModal(true); }}
-        className="mt-1 mb-3 inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-dashed border-accent-amber bg-amber-tint-bg06 text-accent-amber text-xs font-medium cursor-pointer"
-      >
-        <span>{'\u2795'}</span>
-        Quick Add
-      </div>
+      {/* Quick Add — planning & pre-trip only */}
+      {(tripPhase === 'planning' || tripPhase === 'pretrip') && (
+        <div
+          onClick={() => { if (!requireAuth()) return; setShowAddLinkModal(true); }}
+          className="mt-1 mb-3 inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-dashed border-accent-amber bg-amber-tint-bg06 text-accent-amber text-xs font-medium cursor-pointer"
+        >
+          <span>{'\u2795'}</span>
+          Quick Add
+        </div>
+      )}
 
-      <ContextHint
-        storageKey="plan"
-        title="Your Trip Plan"
-        subtitle="Organize your perfect itinerary day by day."
-        hints={[
-          { emoji: '\u{2630}', title: 'Drag to reorder', description: 'Hold the drag handle on any stop and drag it to rearrange your route.' },
-          { emoji: '\u{1F4C5}', title: 'Set trip date', description: 'Tap "Set trip date" to see real calendar dates on your day tabs instead of Day 1, Day 2.' },
-          { emoji: '\u{1F504}', title: 'Swap alternatives', description: 'Tap "Swap" on any stop to see similar nearby spots and switch them in.' },
-          { emoji: '\u{1F392}', title: 'Packing list', description: 'Auto-generated packing checklist based on your stops, weather, and travel group.' },
-          { emoji: '\u{1F4F8}', title: 'Share & export', description: 'Share your plan as a link, text it to friends, or export as a shareable image.' },
-        ]}
-      />
+      {/* Context hints — planning phase only */}
+      {tripPhase === 'planning' && (
+        <ContextHint
+          storageKey="plan"
+          title="Your Trip Plan"
+          subtitle="Organize your perfect itinerary day by day."
+          hints={[
+            { emoji: '\u{2630}', title: 'Drag to reorder', description: 'Hold the drag handle on any stop and drag it to rearrange your route.' },
+            { emoji: '\u{1F4C5}', title: 'Set trip date', description: 'Tap "Set trip date" to see real calendar dates on your day tabs instead of Day 1, Day 2.' },
+            { emoji: '\u{1F504}', title: 'Swap alternatives', description: 'Tap "Swap" on any stop to see similar nearby spots and switch them in.' },
+            { emoji: '\u{1F392}', title: 'Packing list', description: 'Auto-generated packing checklist based on your stops, weather, and travel group.' },
+            { emoji: '\u{1F4F8}', title: 'Share & export', description: 'Share your plan as a link, text it to friends, or export as a shareable image.' },
+          ]}
+        />
+      )}
 
-      {/* Trip Weather Forecast (collapsed by default) */}
-      {weather && weather.forecast.length > 0 && dayCount > 0 && (
+      {/* Trip Weather Forecast — pretrip & live only */}
+      {(tripPhase === 'pretrip' || tripPhase === 'live') && weather && weather.forecast.length > 0 && dayCount > 0 && (
         <div className="card mb-3 p-0 overflow-hidden border border-blue-tint-border"
           style={{ background: `linear-gradient(135deg, var(--blue-tint-bg), var(--bg-subtle))` }}>
           <button
@@ -460,8 +496,8 @@ export default function PlanScreen() {
         </div>
       )}
 
-      {/* Travel Advisory Banner */}
-      {advisory && (() => {
+      {/* Travel Advisory Banner — pretrip & live only */}
+      {(tripPhase === 'pretrip' || tripPhase === 'live') && advisory && (() => {
         const display = getAdvisoryDisplay(advisory);
         if (!display) return null;
         return (
@@ -483,8 +519,58 @@ export default function PlanScreen() {
         );
       })()}
 
-      {/* Logistics Panel (Trip Info) */}
-      {totalStops > 0 && <LogisticsPanel />}
+      {/* Logistics Panel — pretrip & live only */}
+      {(tripPhase === 'pretrip' || tripPhase === 'live') && totalStops > 0 && <LogisticsPanel />}
+
+      {/* Post-trip summary card */}
+      {tripPhase === 'posttrip' && (
+        <div className="mb-4 p-5 rounded-2xl border border-green-tint-border"
+          style={{ background: 'linear-gradient(135deg, var(--green-tint-bg), var(--bg-subtle))' }}>
+          <div className="text-center mb-3">
+            <div className="text-3xl mb-2">{'\u2705'}</div>
+            <h2 className="text-lg font-bold text-text-primary">Trip Complete!</h2>
+            <p className="text-sm text-text-secondary mt-1">
+              {totalStops} stop{totalStops !== 1 ? 's' : ''} across {dayCount} day{dayCount !== 1 ? 's' : ''} in {cityLabel}
+            </p>
+          </div>
+          {/* Stats row */}
+          <div className="flex justify-around py-3 mb-3 rounded-xl bg-bg-subtle/50">
+            <div className="text-center">
+              <div className="text-lg font-bold text-text-primary">{Object.keys(checkIns).length}</div>
+              <div className="text-[11px] text-text-tertiary">Visited</div>
+            </div>
+            <div className="w-px bg-border-subtle" />
+            <div className="text-center">
+              <div className="text-lg font-bold text-text-primary">
+                {Object.values(checkIns).filter(c => c.photos && c.photos.length > 0).length}
+              </div>
+              <div className="text-[11px] text-text-tertiary">Photos</div>
+            </div>
+            <div className="w-px bg-border-subtle" />
+            <div className="text-center">
+              <div className="text-lg font-bold text-text-primary">
+                {Object.values(checkIns).filter(c => c.rating && c.rating > 0).length}
+              </div>
+              <div className="text-[11px] text-text-tertiary">Reviews</div>
+            </div>
+          </div>
+          {/* Actions */}
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => { if (!requireAuth()) return; shareAsLink(); }}
+              className="w-full py-3 rounded-xl bg-accent-gradient text-text-on-accent border-none text-sm font-semibold cursor-pointer"
+            >
+              {'\u{1F4E4}'} Share Your Trip
+            </button>
+            <button
+              onClick={startWrapUp}
+              className="w-full py-3 rounded-xl bg-bg-subtle-strong text-text-primary border border-border-medium text-sm font-semibold cursor-pointer"
+            >
+              {'\u{2728}'} Start a New Trip
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Explore Mode — Start Trip button or active banner */}
       {isLiveDay && !exploreActive && dayPlan.length > 0 && (
@@ -508,7 +594,7 @@ export default function PlanScreen() {
           shouldLeaveNow={shouldLeaveNow}
           leaveByMessage={leaveByMessage}
           tripComplete={false}
-          onCheckIn={(stopId) => checkIn(stopId)}
+          onCheckIn={(stopId) => handleCheckInWithCelebration(stopId)}
           onEndTrip={stopExplore}
         />
       )}
@@ -579,8 +665,8 @@ export default function PlanScreen() {
         );
       })()}
 
-      {/* Day Summary — distance & time at a glance */}
-      {daySummary && dayPlan.length >= 2 && (
+      {/* Day Summary — planning, pretrip, posttrip (replaced by live progress bar during live) */}
+      {tripPhase !== 'live' && daySummary && dayPlan.length >= 2 && (
         <div className="card mb-3 p-3 border border-amber-tint-border15 flex justify-around text-center"
           style={{ background: `linear-gradient(135deg, var(--amber-tint-bg06), var(--bg-subtle))` }}>
           <div>
@@ -614,7 +700,10 @@ export default function PlanScreen() {
                 <span className="w-2 h-2 rounded-full bg-status-green animate-pulse" />
                 Live Day {liveDayNumber}
               </span>
-              <span className="text-xs text-text-secondary">
+              <span className="text-xs text-text-secondary flex items-center gap-2">
+                {currentStreak >= 3 && (
+                  <span className="text-accent-amber font-semibold">{'\u{1F525}'} {currentStreak} streak</span>
+                )}
                 {checkedInCount}/{totalStopsToday} visited
               </span>
             </div>
@@ -650,12 +739,12 @@ export default function PlanScreen() {
                 <div
                   className={`absolute -left-8 top-4 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold z-[1] ${
                     isLiveDay && isCheckedIn(stop.id)
-                      ? 'bg-status-green text-white'
+                      ? 'bg-status-green text-white checked-in-glow'
                       : stop.type === 'event'
                       ? 'bg-events-gradient text-text-primary'
                       : 'bg-accent-gradient text-text-on-accent'
                   }`}
-                  style={{ boxShadow: `0 0 0 4px var(--bg-body)` }}
+                  style={{ boxShadow: isLiveDay && isCheckedIn(stop.id) ? undefined : '0 0 0 4px var(--bg-body)' }}
                 >
                   {isLiveDay && isCheckedIn(stop.id) ? '\u2713' : index + 1}
                 </div>
@@ -801,7 +890,7 @@ export default function PlanScreen() {
                   <div className="flex gap-1.5 mt-2 flex-wrap">
                     {isLiveDay && !isCheckedIn(stop.id) && (
                       <button
-                        onClick={() => checkIn(stop.id)}
+                        onClick={() => handleCheckInWithCelebration(stop.id)}
                         className="py-[5px] px-2.5 rounded-lg text-xs bg-green-tint-bg text-status-green border border-green-tint-border cursor-pointer flex items-center gap-1 font-semibold"
                       >
                         {'\u{1F4CD}'} Check In
@@ -1028,8 +1117,8 @@ export default function PlanScreen() {
         </DndContext>
       </>)}
 
-      {/* Pack This Checklist */}
-      {allStops.length > 0 && packingItems.length > 0 && (
+      {/* Pack This Checklist — pretrip only */}
+      {tripPhase === 'pretrip' && allStops.length > 0 && packingItems.length > 0 && (
         <div className="card mt-3 p-0 overflow-hidden">
           <button
             onClick={() => setShowPackList(!showPackList)}
@@ -1091,9 +1180,9 @@ export default function PlanScreen() {
 
 
       {/* ═══════════════════════════════════════════════════════════════
-          SHARE & EXPORT
+          SHARE & EXPORT — planning, pretrip, posttrip (hidden during live)
           ══════════════════════════════════════════════════════════════ */}
-      <div className="flex flex-col gap-2.5 mt-5">
+      {tripPhase !== 'live' && <div className="flex flex-col gap-2.5 mt-5">
         <div className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.05em]">Share & Export</div>
 
         {/* Primary: Get Route + Share */}
@@ -1151,8 +1240,8 @@ export default function PlanScreen() {
           </a>
         )}
 
-        {/* Save Offline */}
-        {totalStops > 0 && (
+        {/* Save Offline — pretrip only */}
+        {tripPhase === 'pretrip' && totalStops > 0 && (
           <button
             onClick={saveForOffline}
             disabled={offlineSaving}
@@ -1168,12 +1257,12 @@ export default function PlanScreen() {
             {offlineSaving ? '\u{23F3} Saving...' : offlineSaved ? '\u{2705} Saved Offline' : '\u{1F4E5} Save Offline'}
           </button>
         )}
-      </div>
+      </div>}
 
       {/* ═══════════════════════════════════════════════════════════════
-          TRIP RESOURCES
+          TRIP RESOURCES — pretrip only
           ══════════════════════════════════════════════════════════════ */}
-      {totalStops > 0 && (
+      {tripPhase === 'pretrip' && totalStops > 0 && (
         <div className="mt-4 p-4 rounded-2xl bg-bg-elevated border border-border-subtle">
           <div className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.05em] mb-3">Book Your Trip</div>
           <div className="flex gap-2 overflow-x-auto scroll-hidden pb-1">
@@ -1191,9 +1280,9 @@ export default function PlanScreen() {
       )}
 
       {/* ═══════════════════════════════════════════════════════════════
-          MANAGE
+          MANAGE — planning & pretrip only
           ══════════════════════════════════════════════════════════════ */}
-      <div className="mt-6">
+      {(tripPhase === 'planning' || tripPhase === 'pretrip') && <div className="mt-6">
         <div className="flex items-center justify-center gap-4 pt-1">
           {dayCount > 1 && (
             <button onClick={() => removeDay(activeDay)}
@@ -1229,7 +1318,7 @@ export default function PlanScreen() {
             NxStops recommendations are for informational purposes only. Hours, safety data, and travel advisories may not be current. Always verify with venues directly and use your own judgment.
           </p>
         </div>
-      </div>
+      </div>}
 
       {/* Add from Link modal */}
       {showAddLinkModal && <AddFromLinkModal onClose={() => setShowAddLinkModal(false)} />}
@@ -1264,11 +1353,21 @@ export default function PlanScreen() {
         return createPortal(<QuickReviewPrompt stop={stop} />, document.body);
       })()}
 
+      {/* Check-in celebration — portal */}
+      {celebrationMsg && createPortal(
+        <CheckInCelebration
+          message={celebrationMsg}
+          streak={celebrationStreak}
+          onDone={() => setCelebrationMsg(null)}
+        />,
+        document.body
+      )}
+
       {/* Wrap-up modal — portal to escape .page-enter transform */}
       {wrapUpOpen && createPortal(<WrapUpModal />, document.body)}
 
-      {/* Chat FAB */}
-      {totalStops > 0 && createPortal(
+      {/* Chat FAB — not during posttrip */}
+      {tripPhase !== 'posttrip' && totalStops > 0 && createPortal(
         <button
           onClick={() => setShowChat(true)}
           className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+80px)] right-5 w-14 h-14 rounded-full bg-accent-gradient text-text-on-accent border-none cursor-pointer shadow-lg flex items-center justify-center text-xl z-40"

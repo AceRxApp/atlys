@@ -302,6 +302,7 @@ export interface AppContextType {
   totalStopsToday: number;
   progressPercent: number;
   spentSoFar: number;
+  currentStreak: number;
   reviewPromptStopId: string | null;
   setReviewPromptStopId: (id: string | null) => void;
   checkIns: Record<string, StopCheckIn>;

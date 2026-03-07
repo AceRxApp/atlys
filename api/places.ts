@@ -256,9 +256,10 @@ function isNonVenue(p: Record<string, unknown>): boolean {
   const primaryType = p.primaryType as string | undefined;
   // No primaryType = generic POI (junctions, streets, interchanges)
   if (!primaryType) return true;
-  if (EXCLUDED_PRIMARY_TYPES.has(primaryType)) return true;
-  // Catch junctions/interchanges by name
   const name = (p.displayName as { text?: string } | undefined)?.text || '';
+  // Allow safari/wildlife experiences even if typed as lodging/resort
+  if (EXCLUDED_PRIMARY_TYPES.has(primaryType) && !/\b(safari|wildlife|game|conservancy|sanctuary|reserve)\b/i.test(name)) return true;
+  // Catch junctions/interchanges by name
   if (/\b(junction|interchange|roundabout|overpass|flyover|intersection|highway|motorway)\b/i.test(name)) return true;
   return false;
 }

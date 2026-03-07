@@ -44,6 +44,7 @@ export const VIBE_TYPE_MAP: Record<string, string[]> = {
     'historical_landmark', 'performing_arts_theater', 'movie_theater',
     'book_store', 'market', 'stadium',
     'beach', 'hiking_area', 'national_park', 'garden', 'marina',
+    'wildlife_park', 'wildlife_refuge', 'nature_preserve',
   ],
   eatsip: [
     'restaurant', 'cafe', 'coffee_shop', 'bar', 'bakery',
@@ -60,6 +61,7 @@ export const VIBE_TYPE_MAP: Record<string, string[]> = {
     'museum', 'art_gallery', 'tourist_attraction', 'performing_arts_theater',
     'historical_landmark', 'church', 'library', 'community_center',
     'aquarium', 'zoo', 'movie_theater',
+    'wildlife_park', 'wildlife_refuge', 'nature_preserve',
   ],
   neighborhood: [
     'cafe', 'bakery', 'coffee_shop', 'restaurant', 'brunch_restaurant',
@@ -301,13 +303,17 @@ const EXCLUDED_TYPES = new Set([
 
 /** Filter out places that don't belong in NxStops */
 function isExcludedPlace(place: Place): boolean {
+  const nameLower = place.name.toLowerCase();
+  // Safari/wildlife experiences are allowed even if typed as lodging/resort
+  const isSafariExperience = /\b(safari|wildlife|game|conservancy|sanctuary|reserve)\b/i.test(nameLower);
   // Excluded by category type
-  if (EXCLUDED_TYPES.has(place.category)) return true;
+  if (EXCLUDED_TYPES.has(place.category) && !isSafariExperience) return true;
   // No primaryType = likely a junction, street, interchange, or generic POI — not a real venue
   if (!place.category) return true;
   // Catch hotels/motels by name even if Google types them differently
-  const nameLower = place.name.toLowerCase();
-  if (/\b(hotel|motel|inn|suites|lodge|resort)\b/i.test(nameLower) && !nameLower.includes('restaurant') && !nameLower.includes('bar') && !nameLower.includes('rooftop')) return true;
+  if (/\b(hotel|motel|inn|suites|lodge|resort)\b/i.test(nameLower)
+    && !nameLower.includes('restaurant') && !nameLower.includes('bar') && !nameLower.includes('rooftop')
+    && !isSafariExperience) return true;
   // Catch junctions, streets, interchanges, roundabouts by name
   if (/\b(junction|interchange|roundabout|overpass|underpass|flyover|intersection|highway|motorway|expressway)\b/i.test(nameLower)) return true;
   return false;

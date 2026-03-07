@@ -116,6 +116,16 @@ export function useLiveDay(deps: {
     ? Math.round((checkedInCount / totalStopsToday) * 100)
     : 0;
 
+  // Streak: consecutive checked-in stops from the start
+  const currentStreak = useMemo(() => {
+    let streak = 0;
+    for (const stop of dayPlan) {
+      if (checkIns[stop.id]) streak++;
+      else break;
+    }
+    return streak;
+  }, [dayPlan, checkIns]);
+
   const spentSoFar = useMemo(() => {
     return dayPlan
       .filter(s => checkIns[s.id])
@@ -141,6 +151,7 @@ export function useLiveDay(deps: {
     totalStopsToday,
     progressPercent,
     spentSoFar,
+    currentStreak,
     reviewPromptStopId,
     setReviewPromptStopId,
   };

@@ -26,7 +26,7 @@ function compressPhoto(file: File, maxSize = 400, quality = 0.6): Promise<string
 }
 
 export default function QuickReviewPrompt({ stop }: { stop: Stop }) {
-  const { addQuickReview, setReviewPromptStopId, citySlug, user } = useApp();
+  const { addQuickReview, setReviewPromptStopId, citySlug, user, dayPlan, checkIns, getTransportInfo, checkedInCount, totalStopsToday } = useApp();
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
@@ -35,6 +35,21 @@ export default function QuickReviewPrompt({ stop }: { stop: Stop }) {
 
   const name = stop.place?.name || stop.event?.name || 'this stop';
   const placeId = stop.place?.placeId;
+
+  // Post-stop closure: find next stop and compute stats
+  const stopIndex = dayPlan.findIndex(s => s.id === stop.id);
+  const nextStop = stopIndex >= 0 && stopIndex < dayPlan.length - 1 ? dayPlan[stopIndex + 1] : null;
+  const nextStopName = nextStop ? (nextStop.place?.name || nextStop.event?.name || 'Next stop') : null;
+  const nextStopTransport = nextStop ? getTransportInfo(stop, nextStop) : null;
+
+  // Fun stat based on check-in count
+  const getFunStat = () => {
+    if (checkedInCount >= totalStopsToday) return 'You crushed every stop today!';
+    if (checkedInCount >= 4) return 'Explorer level: seasoned traveler';
+    if (checkedInCount === 3) return 'Hat trick! 3 stops explored';
+    if (checkedInCount === 2) return 'Getting warmed up!';
+    return 'First stop down!';
+  };
 
   const handleAddPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -71,6 +86,18 @@ export default function QuickReviewPrompt({ stop }: { stop: Stop }) {
           {/* Handle bar */}
           <div className="flex justify-center mb-4">
             <div className="w-10 h-1 rounded-full bg-border-medium" />
+          </div>
+
+          {/* Mini recap stats */}
+          <div className="flex justify-around py-2 px-3 mb-3 rounded-xl bg-bg-subtle/50 border border-border-subtle">
+            <div className="text-center">
+              <div className="text-sm font-bold text-status-green">{checkedInCount}/{totalStopsToday}</div>
+              <div className="text-[10px] text-text-tertiary">visited</div>
+            </div>
+            <div className="w-px bg-border-subtle" />
+            <div className="text-center px-2">
+              <div className="text-[11px] font-semibold text-accent-amber">{getFunStat()}</div>
+            </div>
           </div>
 
           <div className="text-center mb-4">
@@ -151,6 +178,21 @@ export default function QuickReviewPrompt({ stop }: { stop: Stop }) {
               Save
             </button>
           </div>
+
+          {/* Next stop teaser */}
+          {nextStopName && (
+            <div className="mt-4 pt-3 border-t border-border-subtle">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-text-tertiary">Up next:</span>
+                <span className="text-xs font-semibold text-text-primary truncate">{nextStopName}</span>
+                {nextStopTransport && (
+                  <span className="text-[11px] text-text-tertiary ml-auto shrink-0">
+                    {nextStopTransport.emoji} {nextStopTransport.walkMinutes}min
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

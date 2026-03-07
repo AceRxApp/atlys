@@ -1,7 +1,38 @@
+import { useState } from 'react';
 import { fixPhotoUrl } from '../utils/photoUrl';
 import NativeImg from './NativeImg';
 import { buildMapsUrl } from '../utils/transport';
 import type { Stop } from '../types';
+
+/** Generate a teaser clue based on stop category without revealing the name */
+function getMysteryTeaser(stop: Stop): string {
+  const category = (stop.place?.category || stop.event?.category || '').toLowerCase();
+  const name = (stop.place?.name || stop.event?.name || '').toLowerCase();
+
+  if (/restaurant|food|bistro|diner|grill|bbq|seafood|steak|brunch/i.test(category))
+    return 'A delicious spot where locals eat...';
+  if (/cafe|coffee|tea|bakery/i.test(category))
+    return 'A cozy place to sip and savor...';
+  if (/bar|pub|brewery|wine|cocktail|nightclub/i.test(category))
+    return 'A place to raise a glass...';
+  if (/park|garden|hiking|nature|trail/i.test(category))
+    return 'A breath of fresh air awaits...';
+  if (/beach|waterfront|marina|pier/i.test(category))
+    return 'Waves and views are calling...';
+  if (/museum|gallery|art|cultural/i.test(category))
+    return 'Culture and stories to discover...';
+  if (/market|shopping|store|mall|boutique/i.test(category))
+    return 'A treasure trove of finds...';
+  if (/temple|church|mosque|shrine|monument/i.test(category))
+    return 'A place of wonder and history...';
+  if (/safari|wildlife|zoo|aquarium/i.test(category))
+    return 'Wild encounters ahead...';
+  if (/spa|wellness|yoga/i.test(category))
+    return 'Relaxation is on the horizon...';
+  if (stop.type === 'event')
+    return 'An experience you won\'t forget...';
+  return 'Something special awaits around the corner...';
+}
 
 interface Props {
   currentStop: Stop;
@@ -110,6 +141,8 @@ export default function ExploreModeBanner({
     );
   }
 
+  const [mysteryMode, setMysteryMode] = useState(false);
+
   const photo = getStopPhoto(currentStop);
   const name = getStopName(currentStop);
   const category = getStopCategory(currentStop);
@@ -124,11 +157,23 @@ export default function ExploreModeBanner({
 
   return (
     <div className="bg-bg-elevated border border-green-tint-border rounded-2xl p-4 mb-4 animate-fade-in">
-      {/* Header: label + progress dots */}
+      {/* Header: label + mystery toggle + progress dots */}
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-semibold text-green-500 uppercase tracking-wider">
-          Explore Mode
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-green-500 uppercase tracking-wider">
+            {mysteryMode ? 'Mystery Mode' : 'Explore Mode'}
+          </span>
+          <button
+            onClick={() => setMysteryMode(!mysteryMode)}
+            className={`text-[10px] font-semibold py-0.5 px-2 rounded-full border cursor-pointer transition-colors ${
+              mysteryMode
+                ? 'bg-accent-amber text-text-on-accent border-accent-amber'
+                : 'bg-transparent text-text-tertiary border-border-medium'
+            }`}
+          >
+            {mysteryMode ? '\u{1F52E} On' : '\u{1F52E} Mystery'}
+          </button>
+        </div>
         <div className="flex gap-1">
           {Array.from({ length: totalStops }).map((_, i) => {
             const isCurrent = i === currentStopIndex;
@@ -141,7 +186,9 @@ export default function ExploreModeBanner({
                     ? 'bg-green-500'
                     : isCurrent
                       ? 'bg-green-500 animate-pulse'
-                      : 'bg-border-medium'
+                      : mysteryMode
+                        ? 'bg-accent-amber/30'
+                        : 'bg-border-medium'
                 }`}
               />
             );
@@ -221,17 +268,28 @@ export default function ExploreModeBanner({
         </div>
       )}
 
-      {/* Next stop preview */}
+      {/* Next stop preview / mystery teaser */}
       {nextStop && (
         <div className="flex items-center gap-2 pt-2 border-t border-border-subtle">
-          <span className="text-xs text-text-tertiary">Next:</span>
-          <span className="text-xs font-medium text-text-secondary truncate">
-            {getStopName(nextStop)}
-          </span>
-          {nextStopWalkMin != null && nextStopDistance != null && (
-            <span className="text-xs text-text-tertiary ml-auto shrink-0">
-              {nextStopDistance} {'\u00B7'} {nextStopWalkMin}min walk
-            </span>
+          {mysteryMode ? (
+            <>
+              <span className="text-xs text-accent-amber">{'\u{1F52E}'}</span>
+              <span className="text-xs font-medium text-accent-amber/80 italic truncate">
+                {getMysteryTeaser(nextStop)}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-xs text-text-tertiary">Next:</span>
+              <span className="text-xs font-medium text-text-secondary truncate">
+                {getStopName(nextStop)}
+              </span>
+              {nextStopWalkMin != null && nextStopDistance != null && (
+                <span className="text-xs text-text-tertiary ml-auto shrink-0">
+                  {nextStopDistance} {'\u00B7'} {nextStopWalkMin}min walk
+                </span>
+              )}
+            </>
           )}
         </div>
       )}
