@@ -40,11 +40,11 @@ export const COMMUNITY_TAGS: { id: CommunityTag; emoji: string; label: string }[
 ];
 
 export const VIBES: { id: Vibe; emoji: string; label: string; desc: string }[] = [
-  { id: 'thespot', emoji: '📍', label: 'The Spot', desc: 'Lounges, scenic spots, tourist attractions, hangout places' },
-  { id: 'eatsip', emoji: '🍽️', label: 'Eat & Sip', desc: 'Hole-in-the-wall eats, mom & pop spots' },
-  { id: 'nightlife', emoji: '🍸', label: 'Nightlife', desc: 'Bars, clubs, live music, speakeasies, open mic' },
-  { id: 'cultureart', emoji: '🎨', label: 'Culture & Art', desc: 'Galleries, murals, cultural districts' },
-  { id: 'neighborhood', emoji: '🏘️', label: 'The Neighborhood', desc: 'Walkable areas, shops, boutiques, markets, ethnic enclaves' },
+  { id: 'thespot', emoji: '📍', label: 'The Spot', desc: 'Parks, beaches, scenic spots, attractions, hangout places' },
+  { id: 'eatsip', emoji: '🍽️', label: 'Eat & Sip', desc: 'Restaurants, cafes, bakeries, local eats, brunch spots' },
+  { id: 'nightlife', emoji: '🍸', label: 'Nightlife', desc: 'Bars, clubs, live music, speakeasies, karaoke' },
+  { id: 'cultureart', emoji: '🎨', label: 'Culture & Art', desc: 'Museums, galleries, landmarks, theaters, cultural sites' },
+  { id: 'neighborhood', emoji: '🏘️', label: 'The Neighborhood', desc: 'Walkable areas, shops, boutiques, markets, cafes, parks' },
 ];
 
 export const QUICK_FILTERS: { id: QuickFilter; label: string }[] = [

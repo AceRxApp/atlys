@@ -11,6 +11,7 @@ import type { EventItem } from '../types';
 import ContextHint from '../components/ContextHint';
 import { getSunsetGuardian, getRegionSafetyAlert } from '../utils/safetyEngine';
 import { fixPhotoUrl } from '../utils/photoUrl';
+import { getPreferences } from '../utils/preferences';
 import NativeImg from '../components/NativeImg';
 
 // ---------------------------------------------------------------------------
@@ -433,8 +434,8 @@ export default function DiscoverScreen() {
               key={vibe.id}
               aria-pressed={active}
               onClick={() => {
+                if (!active) setSearchRadius(1500);
                 toggleVibe(vibe.id);
-                setSearchRadius(1500);
               }}
               className={`chip ${
                 active ? 'bg-accent-gradient text-text-on-accent' : 'bg-bg-subtle-medium text-text-secondary'
@@ -625,13 +626,16 @@ export default function DiscoverScreen() {
               )}
 
               {/* For You — Personalized picks based on preference learning */}
-              {!placesLoading && forYouPlaces.length >= 3 && (
+              {!placesLoading && forYouPlaces.length >= 3 && (() => {
+                const prefs = getPreferences();
+                const isNewUser = prefs.tripCount === 0 && Object.keys(prefs.likedCategories).length === 0;
+                return (
                 <div className="mb-4">
                   <div className="flex justify-between items-center mb-2.5">
                     <h3 className="text-[15px] font-semibold flex items-center gap-1.5">
-                      For You
+                      {isNewUser ? 'Top Picks' : 'For You'}
                     </h3>
-                    <span className="text-xs text-text-tertiary">Based on your preferences</span>
+                    <span className="text-xs text-text-tertiary">{isNewUser ? 'Highest rated nearby' : 'Based on your preferences'}</span>
                   </div>
                   <div className="flex gap-3 overflow-x-auto pb-2 scroll-hidden">
                     {forYouPlaces.slice(0, 8).map(place => (
@@ -662,7 +666,8 @@ export default function DiscoverScreen() {
                     ))}
                   </div>
                 </div>
-              )}
+                );
+              })()}
 
               {/* Place Cards */}
               <div className="md:grid md:grid-cols-2 md:gap-4">

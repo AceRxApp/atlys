@@ -744,8 +744,11 @@ export default function PlanScreen() {
                             setPivotLoading(true);
                             try {
                               // For food/stacked vibes, always search for food places
+                              // For outdoor places (parks, beaches etc.), use 'thespot' to find similar outdoor alternatives
                               const isFoodPlan = lastPlanVibe === 'food' || lastPlanVibe === 'stacked';
-                              const vibe = isFoodPlan ? 'eatsip' : (TYPE_TO_VIBE[stop.place!.category] || stop.place!.tags?.[0] || 'eatsip');
+                              const OUTDOOR_CATEGORIES = ['park', 'hiking_area', 'national_park', 'garden', 'beach', 'campground', 'playground', 'zoo', 'marina'];
+                              const isOutdoor = OUTDOOR_CATEGORIES.includes(stop.place!.category);
+                              const vibe = isFoodPlan ? 'eatsip' : isOutdoor ? 'thespot' : (TYPE_TO_VIBE[stop.place!.category] || stop.place!.tags?.[0] || 'thespot');
                               const googlePlaces = await searchNearby(
                                 stop.place!.lat, stop.place!.lng,
                                 [vibe],

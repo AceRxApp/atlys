@@ -105,6 +105,7 @@ export function usePlaces(deps: {
     else if (selectedCity) {
       const c = CITY_COORDS[selectedCity.name.toLowerCase()];
       if (c) { lat = c.lat; lng = c.lng; }
+      else if (selectedCity.lat && selectedCity.lng) { lat = selectedCity.lat; lng = selectedCity.lng; }
     }
     if (!lat || !lng) return;
 
@@ -326,8 +327,15 @@ export function usePlaces(deps: {
 
   const forYouPlaces = useMemo(() => {
     const prefs = getPreferences();
-    // Need at least some data to personalize
-    if (prefs.tripCount === 0 && Object.keys(prefs.likedCategories).length === 0) return [];
+    const hasPrefs = prefs.tripCount > 0 || Object.keys(prefs.likedCategories).length > 0;
+
+    if (!hasPrefs) {
+      // New users: show top-rated, well-reviewed places as "Top Picks"
+      return filteredPlaces
+        .filter(p => p.rating >= 4.3 && p.reviewCount >= 30)
+        .sort((a, b) => b.rating - a.rating || b.reviewCount - a.reviewCount)
+        .slice(0, 10);
+    }
 
     const swappedSet = new Set(prefs.swappedAwayIds);
     const scored = filteredPlaces
@@ -353,6 +361,7 @@ export function usePlaces(deps: {
     else if (selectedCity) {
       const c = CITY_COORDS[selectedCity.name.toLowerCase()];
       if (c) { lat = c.lat; lng = c.lng; }
+      else if (selectedCity.lat && selectedCity.lng) { lat = selectedCity.lat; lng = selectedCity.lng; }
     }
     if (!lat || !lng) return;
     setIsSearching(true);
