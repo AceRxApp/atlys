@@ -1006,8 +1006,8 @@ export default function App() {
           );
         })()}
 
-        {/* Floating AI Chat Button */}
-        {!isInfoPage && !selectedPlace && !showChat && (
+        {/* Floating AI Chat Button — hidden on Plan screen which has its own plan-aware chat */}
+        {!isInfoPage && !selectedPlace && !showChat && screen !== 'plan' && (
           <div className="fixed bottom-[90px] right-[calc(50%-195px)] z-50">
             <button
               onClick={() => setShowChat(true)}
