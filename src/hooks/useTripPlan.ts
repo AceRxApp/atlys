@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { track } from '@vercel/analytics';
 import { createSharedPlan } from '../supabase';
-import type { City, EventItem, Stop, PlanDuration } from '../types';
+import type { City, EventItem, Stop, PlanDuration, TripHistoryEntry } from '../types';
 import type { Place } from '../services/places';
 import { formatDistance } from '../services/places';
 import { calcWalkMinutes, calcDriveMinutes, buildMapsUrl, haversineKm } from '../utils/transport';
@@ -190,29 +190,105 @@ export function useTripPlan(deps: {
   const isInPlan = (placeId: string) => Object.values(tripDays).flat().some(s => s.place?.placeId === placeId);
 
   // Trip history — save snapshots of cleared plans
-  const [tripHistory, setTripHistory] = useState<{
-    id: string; city: string; title: string | null;
-    totalStops: number; dayCount: number; savedAt: string;
-    stops: { name: string; photoUrl?: string | null }[];
-  }[]>(() => {
+  const [tripHistory, setTripHistory] = useState<TripHistoryEntry[]>(() => {
     try {
       const raw = localStorage.getItem('nxstops_trip_history');
       return raw ? JSON.parse(raw) : [];
     } catch { return []; }
   });
 
+  // Plan title/vibe (declared early for use in confirmClearPlan)
+  const [lastPlanTitle, setLastPlanTitle] = useState<string | null>(null);
+  const [lastPlanVibe, setLastPlanVibe] = useState<string | null>(null);
+
+  // Wrap-up flow state
+  const [wrapUpOpen, setWrapUpOpen] = useState(false);
+
+  const startWrapUp = useCallback(() => {
+    if (totalStops === 0) {
+      setTripDays({ 1: [] });
+      setActiveDay(1);
+      showToast('Plan cleared');
+      return;
+    }
+    hapticImpact('Medium');
+    setWrapUpOpen(true);
+  }, [totalStops, showToast]);
+
+  const dismissWrapUp = useCallback(() => {
+    setWrapUpOpen(false);
+  }, []);
+
+  const confirmClearPlan = useCallback((pendingRatings: Record<string, 'up' | 'down'>) => {
+    hapticNotification('Success');
+    const allStops = Object.values(tripDays).flat();
+
+    // Compute total spend
+    const totalSpend = allStops.reduce((sum, s) => {
+      if (s.estimatedSpend && s.estimatedSpend > 0) return sum + s.estimatedSpend;
+      if (s.type === 'event') return sum + 20;
+      const pl = s.place?.priceLevel ?? -1;
+      return sum + (PRICE_LEVEL_ESTIMATE[pl] ?? 15);
+    }, 0);
+
+    // Category breakdown
+    const categories: Record<string, number> = {};
+    allStops.forEach(s => {
+      const cat = s.type === 'event' ? 'event' : (s.place?.categoryDisplay || 'other');
+      categories[cat] = (categories[cat] || 0) + 1;
+    });
+
+    const entry: TripHistoryEntry = {
+      id: Date.now().toString(36),
+      city: cityLabel,
+      title: lastPlanTitle,
+      totalStops,
+      dayCount,
+      savedAt: new Date().toISOString(),
+      tripStartDate,
+      totalEstimatedSpend: totalSpend,
+      categoryBreakdown: categories,
+      ratings: pendingRatings,
+      stops: allStops.map(s => ({
+        name: s.place?.name || s.event?.name || 'Stop',
+        photoUrl: s.place?.photoUrl || null,
+        category: s.type === 'event' ? (s.event?.category || 'Event') : (s.place?.categoryDisplay || ''),
+        placeId: s.place?.placeId,
+        rating: pendingRatings[s.id],
+        estimatedSpend: s.estimatedSpend,
+      })),
+    };
+
+    const updated = [entry, ...tripHistory].slice(0, 10);
+    setTripHistory(updated);
+    localStorage.setItem('nxstops_trip_history', JSON.stringify(updated));
+
+    // Reset
+    setTripDays({ 1: [] });
+    setActiveDay(1);
+    setLastPlanTitle(null);
+    setLastPlanVibe(null);
+    setWrapUpOpen(false);
+    showToast('Trip saved to history!');
+    track('trip_wrap_up', { city: cityLabel, stops: String(totalStops), rated: String(Object.keys(pendingRatings).length) });
+  }, [tripDays, dayCount, cityLabel, lastPlanTitle, totalStops, tripStartDate, tripHistory, showToast]);
+
   const clearPlan = () => {
     hapticNotification('Warning');
-    // Save snapshot to history before clearing (if there are stops)
+    // Save basic snapshot to history before clearing (if there are stops)
     if (totalStops > 0) {
       const allStops = Object.values(tripDays).flat();
-      const entry = {
+      const entry: TripHistoryEntry = {
         id: Date.now().toString(36),
         city: cityLabel,
         title: lastPlanTitle,
         totalStops,
         dayCount,
         savedAt: new Date().toISOString(),
+        tripStartDate,
+        totalEstimatedSpend: 0,
+        categoryBreakdown: {},
+        ratings: {},
         stops: allStops.slice(0, 4).map(s => ({
           name: s.place?.name || s.event?.name || 'Stop',
           photoUrl: s.place?.photoUrl || null,
@@ -482,9 +558,6 @@ export function useTripPlan(deps: {
 
   const [autoPlanLoading, setAutoPlanLoading] = useState(false);
   const [autoPlanError, setAutoPlanError] = useState<string | null>(null);
-  const [lastPlanTitle, setLastPlanTitle] = useState<string | null>(null);
-  const [lastPlanVibe, setLastPlanVibe] = useState<string | null>(null);
-
   const planMyDay = useCallback(async (mood: string, duration: PlanDuration, vibe?: string, subVibe?: string): Promise<boolean> => {
     if (!lat || !lng) {
       showToast('Location needed — pick a city or enable GPS');
@@ -582,16 +655,34 @@ export function useTripPlan(deps: {
 
       // Schedule a "morning of" push notification
       if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
+        // Compute the correct notification date based on trip start date
+        const notifDate = new Date();
+        if (tripStartDate) {
+          const start = new Date(tripStartDate + 'T00:00:00');
+          start.setDate(start.getDate() + (activeDay - 1));
+          // Only schedule if the day hasn't passed yet
+          if (start.getTime() >= new Date().setHours(0, 0, 0, 0)) {
+            notifDate.setTime(start.getTime());
+          } else {
+            notifDate.setDate(notifDate.getDate() + 1);
+          }
+        } else {
+          notifDate.setDate(notifDate.getDate() + 1);
+        }
+        const firstStop = stops[0];
+        const firstStopName = firstStop?.place?.name || firstStop?.event?.name || null;
         import('../supabase').then(({ scheduleNotification }) => {
           scheduleNotification(
             'morning_of',
-            tomorrow.toISOString().split('T')[0],
+            notifDate.toISOString().split('T')[0],
             citySlug,
             {
-              title: `Good morning! Your ${cityLabel} day awaits`,
-              body: weather ? `${weather.emoji} ${weather.temp}°F — ${stops.length} stops planned!` : `${stops.length} stops planned for today!`,
+              title: `Your Day ${activeDay} in ${cityLabel} starts!`,
+              body: firstStopName
+                ? `First stop: ${firstStopName}. ${stops.length} stops planned!`
+                : weather
+                ? `${weather.emoji} ${weather.temp}°F — ${stops.length} stops planned!`
+                : `${stops.length} stops planned for today!`,
               url: '/plan',
             },
           ).catch(() => {});
@@ -626,5 +717,6 @@ export function useTripPlan(deps: {
     autoPlanLoading, autoPlanError, lastPlanTitle, lastPlanVibe, planMyDay,
     tripStartDate, setTripStartDate,
     tripHistory, clearTripHistory,
+    wrapUpOpen, startWrapUp, dismissWrapUp, confirmClearPlan,
   };
 }

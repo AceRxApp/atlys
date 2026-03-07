@@ -28,6 +28,7 @@ import { useEvents } from './hooks/useEvents';
 import { useTripPlan } from './hooks/useTripPlan';
 import { useStopRatings } from './hooks/useStopRatings';
 import { useOfflineSave } from './hooks/useOfflineSave';
+import { useLiveDay } from './hooks/useLiveDay';
 
 type Screen = 'home' | 'discover' | 'events' | 'currency' | 'plan' | 'tastelens';
 
@@ -372,6 +373,15 @@ export default function App() {
     events: events.events,
   });
 
+  // --- Live Day ---
+  const liveDay = useLiveDay({
+    tripDays: trip.tripDays,
+    activeDay: trip.activeDay,
+    tripStartDate: trip.tripStartDate,
+    dayCount: trip.dayCount,
+    citySlug: location.citySlug,
+  });
+
   // --- Stop Ratings ---
   const stopRatings = useStopRatings(location.citySlug, auth.user);
 
@@ -544,6 +554,8 @@ export default function App() {
     ...events,
     // Trip plan + crew
     ...trip,
+    // Live Day
+    ...liveDay,
     // Stop ratings
     ...stopRatings,
     // Offline save

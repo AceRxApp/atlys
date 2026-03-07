@@ -30,6 +30,8 @@ import {
 } from '@dnd-kit/sortable';
 import SortableStopCard from '../components/SortableStopCard';
 import AddFromLinkModal from '../components/AddFromLinkModal';
+import WrapUpModal from '../components/WrapUpModal';
+import QuickReviewPrompt from '../components/QuickReviewPrompt';
 
 // Local helpers (not on context)
 const getStopName = (stop: Stop) =>
@@ -184,6 +186,17 @@ export default function PlanScreen() {
     tripStartDate,
     setTripStartDate,
     selectedCity,
+    startWrapUp,
+    wrapUpOpen,
+    isLiveDay,
+    liveDayNumber,
+    checkIn,
+    isCheckedIn,
+    checkedInCount,
+    totalStopsToday,
+    progressPercent,
+    spentSoFar,
+    reviewPromptStopId,
   } = useApp();
 
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -515,6 +528,27 @@ export default function PlanScreen() {
           <p className="text-text-secondary text-sm">No stops on Day {activeDay} yet. Explore to add some!</p>
         </div>
       ) : (<>
+        {/* Live Day progress bar */}
+        {isLiveDay && (
+          <div className="mb-3 p-3 rounded-xl bg-green-tint-bg border border-green-tint-border">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-sm font-semibold text-status-green flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-status-green animate-pulse" />
+                Live Day {liveDayNumber}
+              </span>
+              <span className="text-xs text-text-secondary">
+                {checkedInCount}/{totalStopsToday} visited
+              </span>
+            </div>
+            <div className="h-2 rounded-full bg-bg-subtle-strong overflow-hidden">
+              <div
+                className="h-full rounded-full bg-status-green transition-all duration-500"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         {dayPlan.length > 1 && (
           <div className="flex items-center gap-1.5 mb-2 py-1.5 px-2.5 rounded-lg bg-amber-tint-bg06">
             <span className="text-xs">{'\u2630'}</span>
@@ -537,13 +571,15 @@ export default function PlanScreen() {
                 {/* Stop number circle */}
                 <div
                   className={`absolute -left-8 top-4 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold z-[1] ${
-                    stop.type === 'event'
+                    isLiveDay && isCheckedIn(stop.id)
+                      ? 'bg-status-green text-white'
+                      : stop.type === 'event'
                       ? 'bg-events-gradient text-text-primary'
                       : 'bg-accent-gradient text-text-on-accent'
                   }`}
                   style={{ boxShadow: `0 0 0 4px var(--bg-body)` }}
                 >
-                  {index + 1}
+                  {isLiveDay && isCheckedIn(stop.id) ? '\u2713' : index + 1}
                 </div>
 
                 {/* Stop card */}
@@ -685,6 +721,19 @@ export default function PlanScreen() {
 
                   {/* Mini actions */}
                   <div className="flex gap-1.5 mt-2 flex-wrap">
+                    {isLiveDay && !isCheckedIn(stop.id) && (
+                      <button
+                        onClick={() => checkIn(stop.id)}
+                        className="py-[5px] px-2.5 rounded-lg text-xs bg-green-tint-bg text-status-green border border-green-tint-border cursor-pointer flex items-center gap-1 font-semibold"
+                      >
+                        {'\u{1F4CD}'} Check In
+                      </button>
+                    )}
+                    {isLiveDay && isCheckedIn(stop.id) && (
+                      <span className="py-[5px] px-2.5 rounded-lg text-xs bg-green-tint-bg text-status-green border border-green-tint-border font-semibold flex items-center gap-1">
+                        {'\u2713'} Visited
+                      </span>
+                    )}
                     {stop.type === 'place' && stop.place?.googleMapsUrl && (
                       <a href={stop.place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
                         className="py-[5px] px-2.5 rounded-lg text-xs bg-amber-tint-bg10 text-accent-amber no-underline flex items-center gap-1">
@@ -1037,7 +1086,7 @@ export default function PlanScreen() {
           {showClearConfirm ? (
             <span className="flex items-center gap-2">
               <span className="text-[13px] text-status-red font-medium">Clear all stops?</span>
-              <button onClick={() => { clearPlan(); setShowClearConfirm(false); }}
+              <button onClick={() => { startWrapUp(); setShowClearConfirm(false); }}
                 className="bg-status-red text-white border-none text-[12px] font-semibold cursor-pointer py-1 px-2.5 rounded-lg">
                 Yes, clear
               </button>
@@ -1065,6 +1114,38 @@ export default function PlanScreen() {
 
       {/* Add from Link modal */}
       {showAddLinkModal && <AddFromLinkModal onClose={() => setShowAddLinkModal(false)} />}
+
+      {/* Live Day summary bar */}
+      {isLiveDay && checkedInCount > 0 && (
+        <div className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+70px)] left-1/2 -translate-x-1/2 max-w-[400px] w-[calc(100%-40px)] z-30">
+          <div className="bg-bg-elevated/95 backdrop-blur-md rounded-2xl border border-green-tint-border py-3 px-4 flex items-center justify-around shadow-lg">
+            <div className="text-center">
+              <div className="text-sm font-bold text-status-green">{checkedInCount}/{totalStopsToday}</div>
+              <div className="text-[11px] text-text-tertiary">visited</div>
+            </div>
+            <div className="w-px h-6 bg-border-subtle" />
+            <div className="text-center">
+              <div className="text-sm font-bold text-text-primary">~${spentSoFar}</div>
+              <div className="text-[11px] text-text-tertiary">spent</div>
+            </div>
+            <div className="w-px h-6 bg-border-subtle" />
+            <div className="text-center">
+              <div className="text-sm font-bold text-text-primary">{progressPercent}%</div>
+              <div className="text-[11px] text-text-tertiary">complete</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick review prompt after check-in */}
+      {reviewPromptStopId && (() => {
+        const stop = dayPlan.find(s => s.id === reviewPromptStopId);
+        if (!stop) return null;
+        return <QuickReviewPrompt stop={stop} />;
+      })()}
+
+      {/* Wrap-up modal */}
+      {wrapUpOpen && <WrapUpModal />}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, Suspense, lazy } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { useModalA11y } from '../hooks/useModalA11y';
@@ -7,6 +7,9 @@ import { uploadAvatar, deleteAccount, authSignInWithGoogle } from '../supabase';
 import { useSubscription } from '../hooks/useSubscription';
 import { fixPhotoUrl } from '../utils/photoUrl';
 import NativeImg from '../components/NativeImg';
+import { CITY_COORDS } from '../data/cityCoords';
+
+const TravelMap = lazy(() => import('../components/TravelMap'));
 
 export default function ProfileScreen() {
   const {
@@ -19,6 +22,7 @@ export default function ProfileScreen() {
     showToast,
     useCelsius, setUseCelsius,
     tripHistory, clearTripHistory,
+    MAPS_API_KEY,
     // Auth
     authScreen, setAuthScreen,
     authEmail, setAuthEmail,
@@ -962,47 +966,108 @@ export default function ProfileScreen() {
               </div>
               <div className="flex flex-col gap-2">
                 {tripHistory.map(trip => (
-                  <div
-                    key={trip.id}
-                    className="flex items-center justify-between py-3 px-3.5 rounded-xl bg-bg-subtle border border-border-subtle"
-                  >
-                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                      <div className="w-9 h-9 rounded-[10px] bg-purple-tint-bg12 flex items-center justify-center text-base shrink-0">
-                        {'\u{1F4CD}'}
+                  <details key={trip.id} className="rounded-xl bg-bg-subtle border border-border-subtle overflow-hidden">
+                    <summary className="flex items-center justify-between py-3 px-3.5 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                      <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                        <div className="w-9 h-9 rounded-[10px] bg-purple-tint-bg12 flex items-center justify-center text-base shrink-0">
+                          {'\u{1F4CD}'}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-text-primary truncate">
+                            {trip.title || trip.city || 'Trip'}
+                          </div>
+                          <div className="text-xs text-text-tertiary">
+                            {trip.city} · {trip.totalStops} {trip.totalStops === 1 ? 'stop' : 'stops'}
+                            {trip.totalEstimatedSpend > 0 ? ` · ~$${trip.totalEstimatedSpend}` : ''}
+                          </div>
+                          <div className="text-[11px] text-text-muted mt-0.5">
+                            {new Date(trip.savedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </div>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold text-text-primary truncate">
-                          {trip.title || trip.city || 'Trip'}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex gap-1">
+                          {trip.stops.slice(0, 3).map((s, i) => (
+                            <div key={i}
+                              className="w-6 h-6 rounded-md overflow-hidden border border-border-subtle"
+                              style={{
+                                background: fixPhotoUrl(s.photoUrl)
+                                  ? `url(${fixPhotoUrl(s.photoUrl)}) center/cover no-repeat`
+                                  : undefined,
+                              }}
+                            >
+                              {!s.photoUrl && (
+                                <div className="w-full h-full bg-purple-tint-bg15" />
+                              )}
+                            </div>
+                          ))}
                         </div>
-                        <div className="text-xs text-text-tertiary">
-                          {trip.city} · {trip.totalStops} {trip.totalStops === 1 ? 'stop' : 'stops'} · {trip.dayCount} {trip.dayCount === 1 ? 'day' : 'days'}
-                        </div>
-                        <div className="text-[11px] text-text-muted mt-0.5">
-                          {new Date(trip.savedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </div>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
                       </div>
-                    </div>
-                    <div className="flex gap-1 shrink-0">
-                      {trip.stops.slice(0, 3).map((s, i) => (
-                        <div key={i}
-                          className="w-6 h-6 rounded-md overflow-hidden border border-border-subtle"
-                          style={{
-                            background: fixPhotoUrl(s.photoUrl)
-                              ? `url(${fixPhotoUrl(s.photoUrl)}) center/cover no-repeat`
-                              : undefined,
-                          }}
-                        >
-                          {!s.photoUrl && (
-                            <div className="w-full h-full bg-purple-tint-bg15" />
-                          )}
+                    </summary>
+                    {/* Expanded detail */}
+                    <div className="px-3.5 pb-3 border-t border-border-subtle">
+                      {trip.stops.length > 0 && (
+                        <div className="mt-2.5 flex flex-col gap-1.5">
+                          {trip.stops.map((s, i) => (
+                            <div key={i} className="flex items-center gap-2 text-[13px]">
+                              <span className="w-5 h-5 rounded-full bg-accent-gradient text-text-on-accent flex items-center justify-center text-[10px] font-bold shrink-0">
+                                {i + 1}
+                              </span>
+                              <span className="text-text-primary truncate flex-1">{s.name}</span>
+                              {s.category && <span className="text-text-muted text-[11px] shrink-0">{s.category}</span>}
+                              {s.rating === 'up' && <span className="shrink-0">{'\u{1F44D}'}</span>}
+                              {s.rating === 'down' && <span className="shrink-0">{'\u{1F44E}'}</span>}
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      )}
+                      {/* Category breakdown */}
+                      {trip.categoryBreakdown && Object.keys(trip.categoryBreakdown).length > 0 && (
+                        <div className="mt-2.5 flex flex-wrap gap-1">
+                          {Object.entries(trip.categoryBreakdown)
+                            .sort((a, b) => b[1] - a[1])
+                            .slice(0, 4)
+                            .map(([cat, count]) => (
+                              <span key={cat} className="text-[11px] px-2 py-0.5 rounded-md bg-amber-tint-bg10 text-accent-amber">
+                                {cat} ({count})
+                              </span>
+                            ))}
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  </details>
                 ))}
               </div>
             </div>
           )}
+
+          {/* Travel Map */}
+          {tripHistory.length > 0 && (() => {
+            const visitedCities = [...new Set(tripHistory.map(t => t.city.toLowerCase()))]
+              .map(cityName => {
+                const coords = CITY_COORDS[cityName];
+                if (!coords) return null;
+                return { name: cityName, lat: coords.lat, lng: coords.lng };
+              })
+              .filter(Boolean) as { name: string; lat: number; lng: number }[];
+
+            if (visitedCities.length === 0) return null;
+
+            return (
+              <div className="mb-6">
+                <div className="section-label">Your Travel Map</div>
+                <Suspense fallback={<div className="w-full h-[200px] rounded-2xl bg-bg-subtle animate-pulse" />}>
+                  <TravelMap cities={visitedCities} apiKey={MAPS_API_KEY} />
+                </Suspense>
+                <div className="text-xs text-text-tertiary text-center mt-2">
+                  {visitedCities.length} {visitedCities.length === 1 ? 'city' : 'cities'} explored
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Sign Out Button & Danger Zone */}
           {user && (

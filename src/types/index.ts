@@ -55,3 +55,34 @@ export type Vibe = 'thespot' | 'eatsip' | 'nightlife' | 'cultureart' | 'neighbor
 export type QuickFilter = 'open' | 'walking' | 'topRated' | 'budget' | 'family' | 'solo' | 'chainBreaker' | '15min' | 'lateNight' | 'rainyDay' | 'goldenHour';
 export type TravelGroup = 'solo' | 'couple' | 'family' | 'friends' | 'girls' | 'boys' | 'bachelorette';
 export type CommunityTag = 'black-owned' | 'women-owned' | 'hispanic-owned' | 'asian-owned' | 'lgbtq-friendly' | 'kid-friendly' | 'baby-friendly' | 'wheelchair-accessible' | 'solo-friendly';
+
+export interface TripHistoryStop {
+  name: string;
+  photoUrl?: string | null;
+  category?: string;
+  placeId?: string;
+  rating?: 'up' | 'down';
+  estimatedSpend?: number;
+}
+
+export interface TripHistoryEntry {
+  id: string;
+  city: string;
+  title: string | null;
+  totalStops: number;
+  dayCount: number;
+  savedAt: string;
+  tripStartDate: string | null;
+  totalEstimatedSpend: number;
+  categoryBreakdown: Record<string, number>;
+  ratings: Record<string, 'up' | 'down'>;
+  stops: TripHistoryStop[];
+}
+
+export interface StopCheckIn {
+  stopId: string;
+  checkedInAt: string;
+  rating?: number;
+  comment?: string;
+  actualSpend?: number;
+}

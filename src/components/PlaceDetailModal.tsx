@@ -628,6 +628,33 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
               </div>
             )}
 
+            {/* Community Photos — aggregated from user reviews */}
+            {(() => {
+              const communityPhotos = placeReviews
+                .filter(r => r.photo_urls && r.photo_urls.length > 0)
+                .flatMap(r => r.photo_urls!)
+                .slice(0, 10);
+              if (communityPhotos.length === 0) return null;
+              return (
+                <div className="mb-3">
+                  <div className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.05em] mb-2">
+                    Community Photos
+                  </div>
+                  <div className="flex gap-2 overflow-x-auto scroll-hidden pb-1">
+                    {communityPhotos.map((url, i) => (
+                      <NativeImg
+                        key={i}
+                        src={url}
+                        alt={`Community photo ${i + 1}`}
+                        loading="lazy"
+                        className="w-20 h-20 rounded-xl object-cover shrink-0 border border-border-subtle"
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Existing Reviews */}
             {placeReviews.length > 0 ? (
               placeReviews.slice(0, 5).map(review => (

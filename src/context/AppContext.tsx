@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { City, EventItem, Stop, AdminSignup, Vibe, QuickFilter, TravelGroup, CommunityTag, PlanDuration } from '../types';
+import type { City, EventItem, Stop, AdminSignup, Vibe, QuickFilter, TravelGroup, CommunityTag, PlanDuration, TripHistoryEntry, StopCheckIn } from '../types';
 import type { Place } from '../services/places';
 import type { Review } from '../supabase';
 import type { User } from '@supabase/supabase-js';
@@ -282,12 +282,28 @@ export interface AppContextType {
   planMyDay: (mood: string, duration: PlanDuration, vibe?: string, subVibe?: string) => Promise<boolean>;
   tripStartDate: string | null;
   setTripStartDate: (date: string | null) => void;
-  tripHistory: {
-    id: string; city: string; title: string | null;
-    totalStops: number; dayCount: number; savedAt: string;
-    stops: { name: string; photoUrl?: string | null }[];
-  }[];
+  tripHistory: TripHistoryEntry[];
   clearTripHistory: () => void;
+
+  // --- Wrap Up ---
+  wrapUpOpen: boolean;
+  startWrapUp: () => void;
+  dismissWrapUp: () => void;
+  confirmClearPlan: (ratings: Record<string, 'up' | 'down'>) => void;
+
+  // --- Live Day ---
+  isLiveDay: boolean;
+  liveDayNumber: number | null;
+  checkIn: (stopId: string) => void;
+  addQuickReview: (stopId: string, rating: number, comment?: string) => void;
+  isCheckedIn: (stopId: string) => boolean;
+  getCheckIn: (stopId: string) => StopCheckIn | null;
+  checkedInCount: number;
+  totalStopsToday: number;
+  progressPercent: number;
+  spentSoFar: number;
+  reviewPromptStopId: string | null;
+  setReviewPromptStopId: (id: string | null) => void;
 
   // --- Fetch triggers ---
   fetchPlaces: () => Promise<void>;
