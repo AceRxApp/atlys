@@ -582,7 +582,7 @@ export default function App() {
     // DishLens
     dishLensContext, setDishLensContext,
   }), [
-    screen, setScreen, location, auth, places, events, trip, stopRatings, offlineSave,
+    screen, setScreen, location, auth, places, events, trip, liveDay, stopRatings, offlineSave,
     selectedPlace, activePhotoIndex,
     showSafety, showProfile, showAdmin, showCulture, avatarUrl,
     showToast, getGreeting, getTimeSuggestion, getDistanceReference, currentTime, requireAuth,

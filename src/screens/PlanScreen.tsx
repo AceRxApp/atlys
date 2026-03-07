@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { track } from '@vercel/analytics';
 import { useApp } from '../context/AppContext';
 import { DirectionsIcon, ShareIcon, DragHandleIcon } from '../components/icons';
@@ -1115,8 +1116,8 @@ export default function PlanScreen() {
       {/* Add from Link modal */}
       {showAddLinkModal && <AddFromLinkModal onClose={() => setShowAddLinkModal(false)} />}
 
-      {/* Live Day summary bar */}
-      {isLiveDay && checkedInCount > 0 && (
+      {/* Live Day summary bar — portal to escape .page-enter transform */}
+      {isLiveDay && checkedInCount > 0 && createPortal(
         <div className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+70px)] left-1/2 -translate-x-1/2 max-w-[400px] w-[calc(100%-40px)] z-30">
           <div className="bg-bg-elevated/95 backdrop-blur-md rounded-2xl border border-green-tint-border py-3 px-4 flex items-center justify-around shadow-lg">
             <div className="text-center">
@@ -1134,18 +1135,19 @@ export default function PlanScreen() {
               <div className="text-[11px] text-text-tertiary">complete</div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Quick review prompt after check-in */}
+      {/* Quick review prompt — portal to escape .page-enter transform */}
       {reviewPromptStopId && (() => {
         const stop = dayPlan.find(s => s.id === reviewPromptStopId);
         if (!stop) return null;
-        return <QuickReviewPrompt stop={stop} />;
+        return createPortal(<QuickReviewPrompt stop={stop} />, document.body);
       })()}
 
-      {/* Wrap-up modal */}
-      {wrapUpOpen && <WrapUpModal />}
+      {/* Wrap-up modal — portal to escape .page-enter transform */}
+      {wrapUpOpen && createPortal(<WrapUpModal />, document.body)}
     </div>
   );
 }
