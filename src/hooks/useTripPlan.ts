@@ -268,6 +268,7 @@ export function useTripPlan(deps: {
     setActiveDay(1);
     setLastPlanTitle(null);
     setLastPlanVibe(null);
+    setTripStartDate(null);
     setWrapUpOpen(false);
     showToast('Trip saved to history!');
     track('trip_wrap_up', { city: cityLabel, stops: String(totalStops), rated: String(Object.keys(pendingRatings).length) });
@@ -302,7 +303,18 @@ export function useTripPlan(deps: {
     setActiveDay(1);
     setLastPlanTitle(null);
     setLastPlanVibe(null);
+    setTripStartDate(null);
     showToast('Plan cleared');
+  };
+
+  const deleteTripHistoryEntry = (entryId: string) => {
+    setTripHistory(prev => {
+      const updated = prev.filter(e => e.id !== entryId);
+      if (updated.length > 0) localStorage.setItem('nxstops_trip_history', JSON.stringify(updated));
+      else localStorage.removeItem('nxstops_trip_history');
+      return updated;
+    });
+    showToast('Trip removed');
   };
 
   const clearTripHistory = () => {
@@ -716,7 +728,7 @@ export function useTripPlan(deps: {
     estimatedSpend,
     autoPlanLoading, autoPlanError, lastPlanTitle, lastPlanVibe, planMyDay,
     tripStartDate, setTripStartDate,
-    tripHistory, clearTripHistory,
+    tripHistory, clearTripHistory, deleteTripHistoryEntry,
     wrapUpOpen, startWrapUp, dismissWrapUp, confirmClearPlan,
   };
 }

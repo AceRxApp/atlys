@@ -24,10 +24,17 @@ export default function AdminPanel() {
   const [dishMsg, setDishMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [adminError, setAdminError] = useState<string | null>(null);
+
   useEffect(() => {
-    fetchReports().then(setAdminReports);
-    fetchPendingStops().then(setPendingStops);
-    fetchDishImages().then(setDishImages);
+    Promise.all([
+      fetchReports().then(setAdminReports),
+      fetchPendingStops().then(setPendingStops),
+      fetchDishImages().then(setDishImages),
+    ]).catch(err => {
+      console.error('Admin panel data load error:', err);
+      setAdminError('Some admin data failed to load. Check Supabase RLS policies.');
+    });
   }, []);
 
   const handleResolveReport = useCallback(async (reportId: string, status: 'resolved' | 'dismissed') => {
@@ -99,6 +106,11 @@ export default function AdminPanel() {
       </div>
 
       <div className="p-5">
+        {adminError && (
+          <div className="mb-4 p-3 rounded-xl bg-red-tint-bg border border-red-tint-border text-status-red text-xs">
+            {adminError}
+          </div>
+        )}
         {adminLoading ? (
           <div className="text-center p-10">
             <div className="text-text-tertiary text-sm">Loading admin data...</div>

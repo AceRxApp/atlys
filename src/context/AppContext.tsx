@@ -284,6 +284,7 @@ export interface AppContextType {
   setTripStartDate: (date: string | null) => void;
   tripHistory: TripHistoryEntry[];
   clearTripHistory: () => void;
+  deleteTripHistoryEntry: (entryId: string) => void;
 
   // --- Wrap Up ---
   wrapUpOpen: boolean;

@@ -155,22 +155,37 @@ export function usePlaces(deps: {
   }, [savedPlaces]);
 
   // Cloud sync: pull saved places when user logs in
+  // Local state is authoritative — deletions locally should stick
   const hasSynced = useRef(false);
   useEffect(() => {
     if (!user || hasSynced.current) return;
     hasSynced.current = true;
+    const rawLocal = localStorage.getItem('nxstops_saved_places');
+    const isFirstDevice = rawLocal === null;
     fetchSavedPlaces().then(cloudPlaces => {
       if (cloudPlaces.length === 0 && savedPlaces.length > 0) {
         // Push local to cloud on first login
         upsertSavedPlaces(savedPlaces.map(p => ({ placeId: p.placeId, data: p as unknown as Record<string, unknown> })));
       } else if (cloudPlaces.length > 0) {
-        // Merge: cloud wins for conflicts, add local-only places
-        const cloudMap = new Map(cloudPlaces.map(cp => [cp.place_id, cp.place_data as unknown as Place]));
-        const localOnly = savedPlaces.filter(p => !cloudMap.has(p.placeId));
-        const merged = [...cloudMap.values(), ...localOnly];
-        setSavedPlaces(merged);
-        if (localOnly.length > 0) {
-          upsertSavedPlaces(localOnly.map(p => ({ placeId: p.placeId, data: p as unknown as Record<string, unknown> })));
+        if (isFirstDevice) {
+          // Fresh device — pull everything from cloud
+          const cloudData = cloudPlaces.map(cp => cp.place_data as unknown as Place);
+          setSavedPlaces(cloudData);
+        } else {
+          // Existing device — local is authoritative
+          // Only push local-only places to cloud; don't pull cloud-deleted-locally places back
+          const cloudMap = new Map(cloudPlaces.map(cp => [cp.place_id, cp.place_data as unknown as Place]));
+          const localOnly = savedPlaces.filter(p => !cloudMap.has(p.placeId));
+          if (localOnly.length > 0) {
+            upsertSavedPlaces(localOnly.map(p => ({ placeId: p.placeId, data: p as unknown as Record<string, unknown> })));
+          }
+          // Clean up cloud: remove places that were deleted locally
+          const localIds = new Set(savedPlaces.map(p => p.placeId));
+          for (const cp of cloudPlaces) {
+            if (!localIds.has(cp.place_id)) {
+              deleteSavedPlace(cp.place_id);
+            }
+          }
         }
       }
     }).catch(() => { /* silently fail — local still works */ });

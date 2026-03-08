@@ -1370,11 +1370,11 @@ export default function PlanScreen() {
       {tripPhase !== 'posttrip' && totalStops > 0 && createPortal(
         <button
           onClick={() => setShowChat(true)}
-          className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+80px)] right-5 w-14 h-14 rounded-full bg-accent-gradient text-text-on-accent border-none cursor-pointer shadow-lg flex items-center justify-center text-xl z-40"
+          className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+80px)] right-2 w-9 h-9 rounded-full border-none cursor-pointer flex items-center justify-center z-40 opacity-50 hover:opacity-90 transition-opacity"
           aria-label="Open AI assistant"
-          style={{ boxShadow: '0 4px 20px var(--amber-tint-shadow)' }}
+          style={{ background: 'var(--bg-elevated)' }}
         >
-          {'\u{1F916}'}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         </button>,
         document.body
       )}

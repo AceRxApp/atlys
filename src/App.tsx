@@ -547,10 +547,16 @@ export default function App() {
   const openAdmin = async () => {
     setShowAdmin(true);
     setAdminLoading(true);
-    const [signups, allCities] = await Promise.all([fetchEmailSignups(), fetchAllCities()]);
-    setAdminSignups(signups as AdminSignup[]);
-    setAdminCities(allCities as import('./types').City[]);
-    setAdminLoading(false);
+    try {
+      const [signups, allCities] = await Promise.all([fetchEmailSignups(), fetchAllCities()]);
+      setAdminSignups(signups as AdminSignup[]);
+      setAdminCities(allCities as import('./types').City[]);
+    } catch (err) {
+      console.error('Admin data load error:', err);
+      showToast('Failed to load admin data', 'error');
+    } finally {
+      setAdminLoading(false);
+    }
   };
 
   const handleToggleCity = async (cityId: string, isActive: boolean) => {
@@ -1008,15 +1014,15 @@ export default function App() {
 
         {/* Floating AI Chat Button — hidden on Plan screen which has its own plan-aware chat */}
         {!isInfoPage && !selectedPlace && !showChat && screen !== 'plan' && (
-          <div className="fixed bottom-[90px] right-[calc(50%-195px)] z-50">
+          <div className="fixed bottom-[90px] right-2 z-50">
             <button
               onClick={() => setShowChat(true)}
               aria-label="Open AI travel assistant"
-              className="w-[42px] h-[42px] rounded-full border-none cursor-pointer text-white text-[17px] flex items-center justify-center shadow-[0_4px_16px_rgba(196,138,90,0.35)]"
-              style={{ background: 'linear-gradient(135deg, #C48A5A, #A06830)' }}
+              className="w-9 h-9 rounded-full border-none cursor-pointer text-white/80 text-sm flex items-center justify-center opacity-50 hover:opacity-90 transition-opacity"
+              style={{ background: 'var(--bg-elevated)' }}
               title="AI Travel Assistant"
             >
-              {'\u{1F4AC}'}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             </button>
           </div>
         )}

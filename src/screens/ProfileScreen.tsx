@@ -22,7 +22,7 @@ export default function ProfileScreen() {
     tripDays,
     showToast,
     useCelsius, setUseCelsius,
-    tripHistory, clearTripHistory,
+    tripHistory, clearTripHistory, deleteTripHistoryEntry,
     MAPS_API_KEY,
     // Auth
     authScreen, setAuthScreen,
@@ -1128,13 +1128,21 @@ export default function ProfileScreen() {
                             ))}
                         </div>
                       )}
-                      {/* View Timeline button */}
-                      <button
-                        onClick={() => setViewingTrip(trip)}
-                        className="mt-2.5 w-full py-2 rounded-xl bg-amber-tint-bg10 border border-amber-tint-border20 text-accent-amber text-xs font-semibold cursor-pointer"
-                      >
-                        {'\u{1F4F8}'} View Timeline
-                      </button>
+                      {/* View Timeline & Delete buttons */}
+                      <div className="flex gap-2 mt-2.5">
+                        <button
+                          onClick={() => setViewingTrip(trip)}
+                          className="flex-1 py-2 rounded-xl bg-amber-tint-bg10 border border-amber-tint-border20 text-accent-amber text-xs font-semibold cursor-pointer"
+                        >
+                          View Timeline
+                        </button>
+                        <button
+                          onClick={() => deleteTripHistoryEntry(trip.id)}
+                          className="py-2 px-3 rounded-xl bg-red-tint-bg border border-red-tint-border text-status-red text-xs font-semibold cursor-pointer"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   </details>
                 ))}
