@@ -226,8 +226,10 @@ export interface AppContextType {
   adminSignups: AdminSignup[];
   adminCities: City[];
   adminLoading: boolean;
-  adminTab: 'dashboard' | 'signups' | 'cities' | 'reports' | 'stops' | 'dish-images';
-  setAdminTab: (tab: 'dashboard' | 'signups' | 'cities' | 'reports' | 'stops' | 'dish-images') => void;
+  adminTab: 'dashboard' | 'signups' | 'users' | 'cities' | 'reports' | 'stops' | 'dish-images' | 'health';
+  setAdminTab: (tab: 'dashboard' | 'signups' | 'users' | 'cities' | 'reports' | 'stops' | 'dish-images' | 'health') => void;
+  adminUsers: { id: string; email?: string; created_at: string; last_sign_in_at: string | null; confirmed_at: string | null; user_metadata: Record<string, unknown> }[];
+  adminHealth: { name: string; status: 'ok' | 'error'; detail?: string; ms?: number }[];
   openAdmin: () => Promise<void>;
   handleToggleCity: (cityId: string, isActive: boolean) => Promise<void>;
 

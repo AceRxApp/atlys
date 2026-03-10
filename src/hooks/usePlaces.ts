@@ -155,37 +155,49 @@ export function usePlaces(deps: {
   }, [savedPlaces]);
 
   // Cloud sync: pull saved places when user logs in
-  // Local state is authoritative — deletions locally should stick
+  // Deletion tracker prevents cloud from overriding local deletions (even after localStorage wipe)
   const hasSynced = useRef(false);
   useEffect(() => {
     if (!user || hasSynced.current) return;
     hasSynced.current = true;
-    const rawLocal = localStorage.getItem('nxstops_saved_places');
-    const isFirstDevice = rawLocal === null;
+
+    // Permanent deletion tracker — survives even if localStorage for saved_places gets wiped
+    const deletedIds = new Set<string>(
+      JSON.parse(localStorage.getItem('nxstops_deleted_saved') || '[]')
+    );
+
     fetchSavedPlaces().then(cloudPlaces => {
-      if (cloudPlaces.length === 0 && savedPlaces.length > 0) {
+      // Always clean up cloud: remove any places the user has deleted
+      for (const cp of cloudPlaces) {
+        if (deletedIds.has(cp.place_id)) {
+          deleteSavedPlace(cp.place_id);
+        }
+      }
+
+      // Filter out deleted places from cloud data
+      const validCloud = cloudPlaces.filter(cp => !deletedIds.has(cp.place_id));
+
+      if (validCloud.length === 0 && savedPlaces.length > 0) {
         // Push local to cloud on first login
         upsertSavedPlaces(savedPlaces.map(p => ({ placeId: p.placeId, data: p as unknown as Record<string, unknown> })));
-      } else if (cloudPlaces.length > 0) {
-        if (isFirstDevice) {
-          // Fresh device — pull everything from cloud
-          const cloudData = cloudPlaces.map(cp => cp.place_data as unknown as Place);
-          setSavedPlaces(cloudData);
-        } else {
-          // Existing device — local is authoritative
-          // Only push local-only places to cloud; don't pull cloud-deleted-locally places back
-          const cloudMap = new Map(cloudPlaces.map(cp => [cp.place_id, cp.place_data as unknown as Place]));
-          const localOnly = savedPlaces.filter(p => !cloudMap.has(p.placeId));
-          if (localOnly.length > 0) {
-            upsertSavedPlaces(localOnly.map(p => ({ placeId: p.placeId, data: p as unknown as Record<string, unknown> })));
-          }
-          // Clean up cloud: remove places that were deleted locally
-          const localIds = new Set(savedPlaces.map(p => p.placeId));
-          for (const cp of cloudPlaces) {
-            if (!localIds.has(cp.place_id)) {
-              deleteSavedPlace(cp.place_id);
-            }
-          }
+      } else if (validCloud.length > 0) {
+        // Merge: cloud + local-only, respecting deletions
+        const cloudMap = new Map(validCloud.map(cp => [cp.place_id, cp.place_data as unknown as Place]));
+        const localIds = new Set(savedPlaces.map(p => p.placeId));
+
+        // Places only in cloud (not deleted, not already local) — pull them in
+        const cloudOnly = validCloud
+          .filter(cp => !localIds.has(cp.place_id))
+          .map(cp => cp.place_data as unknown as Place);
+
+        if (cloudOnly.length > 0) {
+          setSavedPlaces(prev => [...prev, ...cloudOnly]);
+        }
+
+        // Push local-only places to cloud
+        const localOnly = savedPlaces.filter(p => !cloudMap.has(p.placeId));
+        if (localOnly.length > 0) {
+          upsertSavedPlaces(localOnly.map(p => ({ placeId: p.placeId, data: p as unknown as Record<string, unknown> })));
         }
       }
     }).catch(() => { /* silently fail — local still works */ });
@@ -401,11 +413,25 @@ export function usePlaces(deps: {
       setSavedPlaces(prev => prev.filter(p => p.placeId !== place.placeId));
       showToast('Removed from saved');
       track('unsave_place', { place: place.name });
+      // Track deletion permanently so cloud sync never brings it back
+      try {
+        const deleted: string[] = JSON.parse(localStorage.getItem('nxstops_deleted_saved') || '[]');
+        if (!deleted.includes(place.placeId)) {
+          deleted.push(place.placeId);
+          localStorage.setItem('nxstops_deleted_saved', JSON.stringify(deleted));
+        }
+      } catch { /* ignore */ }
       if (user) deleteSavedPlace(place.placeId);
     } else {
       setSavedPlaces(prev => [...prev, place]);
       showToast('Saved for later');
       track('save_place', { place: place.name, category: place.categoryDisplay || '' });
+      // Remove from deletion tracker if re-saving
+      try {
+        const deleted: string[] = JSON.parse(localStorage.getItem('nxstops_deleted_saved') || '[]');
+        const updated = deleted.filter(id => id !== place.placeId);
+        localStorage.setItem('nxstops_deleted_saved', JSON.stringify(updated));
+      } catch { /* ignore */ }
       if (user) upsertSavedPlaces([{ placeId: place.placeId, data: place as unknown as Record<string, unknown> }]);
     }
   };

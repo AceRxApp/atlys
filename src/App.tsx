@@ -303,8 +303,10 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminSignups, setAdminSignups] = useState<AdminSignup[]>([]);
   const [adminCities, setAdminCities] = useState<import('./types').City[]>([]);
+  const [adminUsers, setAdminUsers] = useState<{ id: string; email?: string; created_at: string; last_sign_in_at: string | null; confirmed_at: string | null; user_metadata: Record<string, unknown> }[]>([]);
+  const [adminHealth, setAdminHealth] = useState<{ name: string; status: 'ok' | 'error'; detail?: string; ms?: number }[]>([]);
   const [adminLoading, setAdminLoading] = useState(false);
-  const [adminTab, setAdminTab] = useState<'dashboard' | 'signups' | 'cities' | 'reports' | 'stops' | 'dish-images'>('dashboard');
+  const [adminTab, setAdminTab] = useState<'dashboard' | 'signups' | 'users' | 'cities' | 'reports' | 'stops' | 'dish-images' | 'health'>('dashboard');
 
   // Check admin status server-side when user changes
   useEffect(() => {
@@ -548,9 +550,27 @@ export default function App() {
     setShowAdmin(true);
     setAdminLoading(true);
     try {
-      const [signups, allCities] = await Promise.all([fetchEmailSignups(), fetchAllCities()]);
-      setAdminSignups(signups as AdminSignup[]);
+      // Fetch cities from Supabase directly (works with anon key)
+      const allCities = await fetchAllCities();
       setAdminCities(allCities as import('./types').City[]);
+
+      // Fetch signups, users, health from server-side endpoint (bypasses RLS)
+      const { data: { session } } = await (await import('./supabase')).supabase.auth.getSession();
+      if (session?.access_token) {
+        const res = await fetch(`${API_URL}/api/admin-data`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.signups) setAdminSignups(json.signups as AdminSignup[]);
+          if (json.users) setAdminUsers(json.users);
+          if (json.health) setAdminHealth(json.health);
+        } else {
+          // Fallback to direct Supabase (may return empty if RLS blocks)
+          const signups = await fetchEmailSignups();
+          setAdminSignups(signups as AdminSignup[]);
+        }
+      }
     } catch (err) {
       console.error('Admin data load error:', err);
       showToast('Failed to load admin data', 'error');
@@ -604,7 +624,7 @@ export default function App() {
     // Notifications
     showNotificationPrompt, notificationPermission, requestNotificationPermission, dismissNotificationPrompt,
     // Admin
-    adminSignups, adminCities, adminLoading, adminTab, setAdminTab, openAdmin, handleToggleCity,
+    adminSignups, adminCities, adminUsers, adminHealth, adminLoading, adminTab, setAdminTab, openAdmin, handleToggleCity,
     // App state
     loading: location.loading, isOffline,
     // Onboarding
@@ -642,7 +662,7 @@ export default function App() {
     showSafety, showProfile, showAdmin, showCulture, avatarUrl,
     showToast, getGreeting, getTimeSuggestion, getDistanceReference, currentTime, requireAuth,
     showNotificationPrompt, notificationPermission, requestNotificationPermission, dismissNotificationPrompt,
-    adminSignups, adminCities, adminLoading, adminTab, openAdmin, handleToggleCity,
+    adminSignups, adminCities, adminUsers, adminHealth, adminLoading, adminTab, openAdmin, handleToggleCity,
     isOffline, showOnboarding, onboardingStep,
     dishLensContext,
   ]);

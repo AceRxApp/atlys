@@ -12,6 +12,8 @@ export default function AdminPanel() {
     adminLoading,
     adminSignups,
     adminCities,
+    adminUsers,
+    adminHealth,
     handleToggleCity,
   } = useApp();
 
@@ -96,7 +98,7 @@ export default function AdminPanel() {
 
       {/* Admin Tabs */}
       <div className="flex border-b border-border-subtle overflow-x-auto scroll-hidden">
-        {(['dashboard', 'signups', 'cities', 'reports', 'stops', 'dish-images'] as const).map(tab => (
+        {(['dashboard', 'signups', 'users', 'cities', 'reports', 'stops', 'dish-images', 'health'] as const).map(tab => (
           <button key={tab}
             onClick={() => setAdminTab(tab)}
             className={`flex-1 p-3 text-[13px] font-medium bg-transparent border-none cursor-pointer border-b-2 whitespace-nowrap ${adminTab === tab ? 'text-accent-amber border-b-accent-amber' : 'text-text-tertiary border-b-transparent'}`}>
@@ -122,10 +124,12 @@ export default function AdminPanel() {
               <div>
                 <div className="grid grid-cols-2 gap-3 mb-5">
                   {[
-                    { label: 'Email Signups', value: adminSignups.length, emoji: '📬' },
-                    { label: 'Total Cities', value: adminCities.length, emoji: '🏙️' },
-                    { label: 'Active Cities', value: adminCities.filter(c => c.is_active).length, emoji: '✅' },
-                    { label: 'Inactive Cities', value: adminCities.filter(c => !c.is_active).length, emoji: '⏸️' },
+                    { label: 'Email Signups', value: adminSignups.length, emoji: '\u{1F4EC}' },
+                    { label: 'Registered Users', value: adminUsers.length, emoji: '\u{1F465}' },
+                    { label: 'Total Cities', value: adminCities.length, emoji: '\u{1F3D9}\u{FE0F}' },
+                    { label: 'Active Cities', value: adminCities.filter(c => c.is_active).length, emoji: '\u{2705}' },
+                    { label: 'Pending Reports', value: adminReports.filter(r => r.status === 'pending').length, emoji: '\u{26A0}\u{FE0F}' },
+                    { label: 'Pending Stops', value: pendingStops.length, emoji: '\u{1F4CD}' },
                   ].map(stat => (
                     <div key={stat.label} className="card">
                       <div className="text-2xl mb-1">{stat.emoji}</div>
@@ -144,6 +148,18 @@ export default function AdminPanel() {
                 ))}
                 {adminSignups.length === 0 && (
                   <p className="text-text-tertiary text-[13px]">No signups yet</p>
+                )}
+
+                {adminUsers.length > 0 && (
+                  <>
+                    <h3 className="text-sm font-semibold mb-3 mt-5 text-text-secondary">Recent Users</h3>
+                    {adminUsers.slice(0, 5).map(u => (
+                      <div key={u.id} className="flex justify-between py-2.5 border-b border-bg-subtle text-[13px]">
+                        <span className="text-text-primary">{u.email || 'No email'}</span>
+                        <span className="text-text-tertiary">{new Date(u.created_at).toLocaleDateString()}</span>
+                      </div>
+                    ))}
+                  </>
                 )}
               </div>
             )}
@@ -168,6 +184,44 @@ export default function AdminPanel() {
                       <div className="text-[11px] text-text-tertiary">
                         {new Date(s.signed_up_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Users Tab — Registered Supabase Auth users */}
+            {adminTab === 'users' && (
+              <div>
+                <div className="flex justify-between mb-4">
+                  <h3 className="text-base font-semibold">Registered Users ({adminUsers.length})</h3>
+                </div>
+                <p className="text-xs text-text-tertiary mb-4">
+                  Users who created accounts via Supabase Auth. Fetched server-side with service role key.
+                </p>
+                {adminUsers.length === 0 ? (
+                  <p className="text-text-tertiary text-sm text-center p-10">No registered users yet.</p>
+                ) : (
+                  adminUsers.map(u => (
+                    <div key={u.id} className="card flex flex-col gap-1">
+                      <div className="flex justify-between items-start">
+                        <div className="font-semibold text-sm text-text-primary">{u.email || 'No email'}</div>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
+                          u.confirmed_at ? 'bg-green-tint-bg text-status-green' : 'bg-amber-tint-bg10 text-accent-amber'
+                        }`}>
+                          {u.confirmed_at ? 'Verified' : 'Unverified'}
+                        </span>
+                      </div>
+                      <div className="text-xs text-text-tertiary">
+                        Joined: {new Date(u.created_at).toLocaleDateString()}
+                        {u.last_sign_in_at && ` · Last active: ${new Date(u.last_sign_in_at).toLocaleDateString()}`}
+                      </div>
+                      {u.user_metadata?.name != null && (
+                        <div className="text-xs text-text-secondary">
+                          Name: {String(u.user_metadata.name as string)}
+                        </div>
+                      )}
+                      <div className="text-[10px] text-text-muted font-mono truncate">{u.id}</div>
                     </div>
                   ))
                 )}
@@ -209,6 +263,9 @@ export default function AdminPanel() {
                 <div className="flex justify-between mb-4">
                   <h3 className="text-base font-semibold">Pending Stops ({pendingStops.length})</h3>
                 </div>
+                <p className="text-xs text-text-tertiary mb-4">
+                  User-submitted places awaiting approval. Approve to make them visible, reject to hide, or delete permanently.
+                </p>
                 {pendingStops.length === 0 ? (
                   <p className="text-text-tertiary text-sm text-center p-10">No pending stops to review.</p>
                 ) : (
@@ -401,6 +458,65 @@ export default function AdminPanel() {
                       )}
                     </div>
                   ))
+                )}
+              </div>
+            )}
+
+            {/* Health Tab — System health checks */}
+            {adminTab === 'health' && (
+              <div>
+                <div className="flex justify-between mb-4">
+                  <h3 className="text-base font-semibold">System Health</h3>
+                </div>
+                <p className="text-xs text-text-tertiary mb-4">
+                  Server-side health checks run each time you open the admin panel. Each check tests Supabase table access and auth service connectivity.
+                </p>
+                {adminHealth.length === 0 ? (
+                  <p className="text-text-tertiary text-sm text-center p-10">No health data available. Close and reopen admin to run checks.</p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {adminHealth.map((check, i) => (
+                      <div key={i} className={`card flex items-center gap-3 ${
+                        check.status === 'ok' ? '!border-green-tint-border' : '!border-red-tint-border'
+                      }`}>
+                        <div className={`w-3 h-3 rounded-full shrink-0 ${
+                          check.status === 'ok' ? 'bg-status-green' : 'bg-status-red'
+                        }`} />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-sm text-text-primary">{check.name}</div>
+                          {check.detail && (
+                            <div className="text-[11px] text-text-tertiary truncate">{check.detail}</div>
+                          )}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className={`text-xs font-semibold ${check.status === 'ok' ? 'text-status-green' : 'text-status-red'}`}>
+                            {check.status.toUpperCase()}
+                          </div>
+                          {check.ms != null && (
+                            <div className="text-[10px] text-text-muted">{check.ms}ms</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Summary */}
+                    <div className="card mt-2">
+                      <div className="text-center">
+                        <div className="text-2xl mb-1">
+                          {adminHealth.every(c => c.status === 'ok') ? '\u{2705}' : '\u{26A0}\u{FE0F}'}
+                        </div>
+                        <div className="text-sm font-semibold text-text-primary">
+                          {adminHealth.every(c => c.status === 'ok')
+                            ? 'All systems operational'
+                            : `${adminHealth.filter(c => c.status === 'error').length} service(s) have issues`
+                          }
+                        </div>
+                        <div className="text-[11px] text-text-tertiary mt-1">
+                          {adminHealth.filter(c => c.status === 'ok').length}/{adminHealth.length} checks passed
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
             )}
