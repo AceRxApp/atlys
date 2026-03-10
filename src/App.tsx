@@ -1038,11 +1038,11 @@ export default function App() {
             <button
               onClick={() => setShowChat(true)}
               aria-label="Open AI travel assistant"
-              className="w-9 h-9 rounded-full border-none cursor-pointer text-white/80 text-sm flex items-center justify-center opacity-50 hover:opacity-90 transition-opacity"
-              style={{ background: 'var(--bg-elevated)' }}
+              className="w-10 h-10 rounded-2xl border-none cursor-pointer flex items-center justify-center opacity-60 hover:opacity-100 transition-opacity"
+              style={{ background: 'linear-gradient(135deg, #E8940A, #D85A18)', boxShadow: '0 2px 8px rgba(232,148,10,0.3)' }}
               title="AI Travel Assistant"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="white" opacity="0.95" /></svg>
             </button>
           </div>
         )}

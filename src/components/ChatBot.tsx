@@ -36,8 +36,8 @@ function getInitialMessage(city: string | null): ChatMessage {
   return {
     role: 'assistant',
     content: city
-      ? `Hey! I'm your NxStops travel assistant. You're exploring ${city} — ask me anything about the city, restaurants, things to do, or trip planning!`
-      : `Hey! I'm your NxStops travel assistant. Pick a city first, then ask me anything about dining, activities, hidden gems, or trip planning!`,
+      ? `Welcome to ${city}! I'm here to help you discover the best spots, plan your day, and make every moment count. What are you in the mood for?`
+      : `Welcome! Pick a city to explore and I'll help you find the best restaurants, hidden gems, and experiences. Where are you headed?`,
   };
 }
 
@@ -185,16 +185,42 @@ export default function ChatBot({ city, onClose, planContext, onModification }: 
         className="modal-sheet bg-bg-surface rounded-t-3xl max-w-[430px] md:max-w-[600px] lg:max-w-[700px] w-full h-[40vh] flex flex-col border border-border-subtle border-b-0"
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
+        {/* Header — premium branded */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-accent-gradient flex items-center justify-center text-lg">
-              {'\u{1F916}'}
+          <div className="flex items-center gap-3">
+            {/* Avatar: glowing compass-sparkle icon */}
+            <div className="relative">
+              <div
+                className="w-10 h-10 rounded-2xl flex items-center justify-center"
+                style={{
+                  background: 'linear-gradient(135deg, #E8940A 0%, #D85A18 50%, #C04810 100%)',
+                  boxShadow: '0 2px 12px rgba(232, 148, 10, 0.35)',
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  {/* Sparkle / compass star */}
+                  <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="white" opacity="0.95" />
+                  <circle cx="12" cy="12" r="2.5" fill="rgba(232,148,10,0.9)" />
+                </svg>
+              </div>
+              {/* Online pulse dot */}
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-status-green border-2 border-bg-surface" />
             </div>
             <div>
-              <div className="text-[15px] font-bold text-text-primary">NxStops AI</div>
-              <div className="text-[11px] text-text-tertiary">
-                {city ? `Exploring ${city}` : 'Your travel assistant'}
+              <div className="flex items-center gap-1.5">
+                <span className="text-[15px] font-bold text-text-primary tracking-tight">NxStops</span>
+                <span
+                  className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-[1px] rounded"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(232,148,10,0.15), rgba(216,90,24,0.15))',
+                    color: 'var(--accent-amber)',
+                  }}
+                >
+                  AI
+                </span>
+              </div>
+              <div className="text-[11px] text-text-tertiary mt-0.5">
+                {city ? `Exploring ${city}` : 'Your travel concierge'}
               </div>
             </div>
           </div>
@@ -212,8 +238,20 @@ export default function ChatBot({ city, onClose, planContext, onModification }: 
           {messages.map((msg, i) => (
             <div
               key={i}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start gap-2'}`}
             >
+              {msg.role === 'assistant' && (
+                <div
+                  className="w-6 h-6 rounded-lg shrink-0 mt-1 flex items-center justify-center"
+                  style={{
+                    background: 'linear-gradient(135deg, #E8940A, #D85A18)',
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="white" opacity="0.95" />
+                  </svg>
+                </div>
+              )}
               <div className={`max-w-[80%] px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap break-words ${
                 msg.role === 'user'
                   ? 'rounded-[18px_18px_4px_18px] bg-accent-gradient text-text-on-accent border-none'
@@ -237,11 +275,19 @@ export default function ChatBot({ city, onClose, planContext, onModification }: 
           )}
 
           {loading && (
-            <div className="flex justify-start">
-              <div className="px-5 py-3 rounded-[18px_18px_18px_4px] bg-bg-elevated border border-border-subtle flex gap-1 items-center">
-                <span className="w-1.5 h-1.5 rounded-full bg-text-tertiary animate-[fadeIn_0.6s_ease-in-out_infinite_alternate]" style={{ animationDelay: '0s' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-text-tertiary animate-[fadeIn_0.6s_ease-in-out_infinite_alternate]" style={{ animationDelay: '0.2s' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-text-tertiary animate-[fadeIn_0.6s_ease-in-out_infinite_alternate]" style={{ animationDelay: '0.4s' }} />
+            <div className="flex justify-start gap-2">
+              <div
+                className="w-6 h-6 rounded-lg shrink-0 mt-1 flex items-center justify-center"
+                style={{ background: 'linear-gradient(135deg, #E8940A, #D85A18)' }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="white" opacity="0.95" />
+                </svg>
+              </div>
+              <div className="px-5 py-3 rounded-[18px_18px_18px_4px] bg-bg-elevated border border-border-subtle flex gap-1.5 items-center">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent-amber animate-[fadeIn_0.6s_ease-in-out_infinite_alternate]" style={{ animationDelay: '0s' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-accent-amber animate-[fadeIn_0.6s_ease-in-out_infinite_alternate]" style={{ animationDelay: '0.2s' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-accent-amber animate-[fadeIn_0.6s_ease-in-out_infinite_alternate]" style={{ animationDelay: '0.4s' }} />
               </div>
             </div>
           )}
