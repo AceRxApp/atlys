@@ -94,8 +94,8 @@ export interface AppContextType {
   setSelectedVibes: (vibes: Vibe[]) => void;
   quickFilters: QuickFilter[];
   setQuickFilters: React.Dispatch<React.SetStateAction<QuickFilter[]>>;
-  viewMode: 'list' | 'map';
-  setViewMode: (mode: 'list' | 'map') => void;
+  viewMode: 'list' | 'map' | 'lume';
+  setViewMode: (mode: 'list' | 'map' | 'lume') => void;
   activeMapPin: string | null;
   setActiveMapPin: (id: string | null) => void;
   activeEventPin: string | null;
@@ -226,8 +226,8 @@ export interface AppContextType {
   adminSignups: AdminSignup[];
   adminCities: City[];
   adminLoading: boolean;
-  adminTab: 'dashboard' | 'signups' | 'users' | 'cities' | 'reports' | 'stops' | 'dish-images' | 'health';
-  setAdminTab: (tab: 'dashboard' | 'signups' | 'users' | 'cities' | 'reports' | 'stops' | 'dish-images' | 'health') => void;
+  adminTab: 'dashboard' | 'signups' | 'users' | 'cities' | 'reports' | 'stops' | 'dish-images' | 'health' | 'api-keys';
+  setAdminTab: (tab: 'dashboard' | 'signups' | 'users' | 'cities' | 'reports' | 'stops' | 'dish-images' | 'health' | 'api-keys') => void;
   adminUsers: { id: string; email?: string; created_at: string; last_sign_in_at: string | null; confirmed_at: string | null; user_metadata: Record<string, unknown> }[];
   adminHealth: { name: string; status: 'ok' | 'error'; detail?: string; ms?: number }[];
   openAdmin: () => Promise<void>;
@@ -251,6 +251,8 @@ export interface AppContextType {
   // --- TasteLens ---
   dishLensContext: { dish?: string; city?: string; restaurant?: string };
   setDishLensContext: (ctx: { dish?: string; city?: string; restaurant?: string }) => void;
+  dishHistory: { name: string; category: string; city: string; restaurant: string; spiceLevel: number; dietaryTags: string[]; culturalNote: string; identifiedAt: string }[];
+  addDishToHistory: (dish: { name: string; category: string; city: string; restaurant: string; spiceLevel: number; dietaryTags: string[]; culturalNote: string }) => void;
 
   // --- Auth gate ---
   requireAuth: () => boolean;
@@ -340,6 +342,7 @@ export interface AppContextType {
   nextExploreStop: Stop | null;
   nextStopDistance: string | null;
   nextStopWalkMin: number | null;
+  nextStopDriveMin: number | null;
   shouldLeaveNow: boolean;
   leaveByMessage: string | null;
   tripComplete: boolean;

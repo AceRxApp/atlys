@@ -1,14 +1,16 @@
-// Vercel Serverless API Route — User Actions (account-delete + report + extract-link)
+// Vercel Serverless API Route — User Actions (account-delete + report + extract-link + api-keys)
 // Combined to stay within Hobby plan serverless function limit
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors.js';
+import crypto from 'crypto';
 
 const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim();
 const SUPABASE_ANON_KEY = (process.env.SUPABASE_ANON_KEY || '').trim();
 const SUPABASE_SERVICE_ROLE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || '').trim();
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || '').trim();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const corsOk = setCorsHeaders(res, req.headers.origin as string | undefined, 'GET, POST, OPTIONS');
@@ -26,6 +28,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     return handleExtractLink(req, res);
   }
+
+  // video actions use GET (public reads) and POST (admin writes)
+  if (action === 'get-video') return handleGetVideo(req, res);
+  if (action === 'get-city-videos') return handleGetCityVideos(req, res);
+  if (action === 'upsert-video' && req.method === 'POST') return handleUpsertVideo(req, res);
+
+  // API key management actions
+  if (action === 'register-api-key' && req.method === 'POST') return handleRegisterApiKey(req, res);
+  if (action === 'check-api-key') return handleCheckApiKey(req, res);
+  if (action === 'list-api-keys') return handleListApiKeys(req, res);
+  if (action === 'approve-api-key' && req.method === 'POST') return handleApproveApiKey(req, res);
+  if (action === 'revoke-api-key' && req.method === 'POST') return handleRevokeApiKey(req, res);
+  if (action === 'update-api-tier' && req.method === 'POST') return handleUpdateApiTier(req, res);
 
   // All other actions require POST
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -511,4 +526,341 @@ async function aiExtract(html: string, url: string): Promise<{
   } catch {
     return null;
   }
+}
+
+// =========================================================================
+// Video Clips — place-level video management
+// =========================================================================
+
+const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
+
+async function handleGetVideo(req: VercelRequest, res: VercelResponse) {
+  const placeId = req.query.placeId as string;
+  if (!placeId) return res.status(400).json({ error: 'placeId required' });
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return res.status(200).json({ video: null });
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const { data, error } = await supabase
+    .from('place_videos')
+    .select('*')
+    .eq('place_id', placeId)
+    .limit(1)
+    .maybeSingle();
+  if (error) { console.error('[Videos] get error:', error); return res.status(500).json({ error: 'DB error' }); }
+  return res.status(200).json({ video: data || null });
+}
+
+async function handleGetCityVideos(req: VercelRequest, res: VercelResponse) {
+  const city = req.query.city as string;
+  if (!city) return res.status(400).json({ error: 'city required' });
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return res.status(200).json({ videos: [] });
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const { data, error } = await supabase
+    .from('place_videos')
+    .select('*')
+    .ilike('city', city)
+    .order('created_at', { ascending: false });
+  if (error) { console.error('[Videos] city error:', error); return res.status(500).json({ error: 'DB error' }); }
+  return res.status(200).json({ videos: data || [] });
+}
+
+async function handleUpsertVideo(req: VercelRequest, res: VercelResponse) {
+  const authHeader = req.headers.authorization;
+  if (!ADMIN_SECRET || authHeader !== `Bearer ${ADMIN_SECRET}`) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+
+  const { place_id, place_name, city, video_url, thumbnail_url, duration, caption, source, source_url } = req.body;
+  if (!place_id || !video_url || !city) {
+    return res.status(400).json({ error: 'place_id, video_url, and city are required' });
+  }
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const { data, error } = await supabase
+    .from('place_videos')
+    .upsert({
+      place_id,
+      place_name: place_name || '',
+      city,
+      video_url,
+      thumbnail_url: thumbnail_url || null,
+      duration: duration || 0,
+      caption: caption || null,
+      source: source || 'self',
+      source_url: source_url || null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'place_id' })
+    .select()
+    .single();
+
+  if (error) { console.error('[Videos] upsert error:', error); return res.status(500).json({ error: 'DB error' }); }
+  return res.status(200).json({ video: data });
+}
+
+// =========================================================================
+// API Key Management
+// =========================================================================
+
+const TIER_LIMITS: Record<string, number> = {
+  free: 100,
+  basic: 5000,
+  pro: 50000,
+};
+
+/** Verify admin via Supabase auth token */
+async function verifyAdmin(token: string): Promise<boolean> {
+  if (!ADMIN_EMAIL) return false;
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) return false;
+  return user.email === ADMIN_EMAIL;
+}
+
+/** Generate a prefixed API key: nxs_live_... */
+function generateApiKey(): string {
+  return `nxs_live_${crypto.randomBytes(24).toString('hex')}`;
+}
+
+// ── Register: Developer requests a new API key ──────────────────────────
+
+async function handleRegisterApiKey(req: VercelRequest, res: VercelResponse) {
+  const clientIp = getClientIp(req.headers);
+  if (!(await checkRateLimit(clientIp, 5, 60_000))) {
+    return res.status(429).json({ error: 'Too many requests' });
+  }
+
+  const { email, name, app_name, app_description } = req.body || {};
+  if (!email || !app_name) {
+    return res.status(400).json({ error: 'email and app_name are required' });
+  }
+
+  // Validate email format
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'Invalid email format' });
+  }
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  // Check if developer already has a key
+  const { data: existing } = await supabase
+    .from('api_keys')
+    .select('id, status, key')
+    .eq('developer_email', email)
+    .limit(1)
+    .maybeSingle();
+
+  if (existing) {
+    if (existing.status === 'revoked') {
+      return res.status(403).json({ error: 'Your access has been revoked. Contact support for assistance.' });
+    }
+    return res.status(409).json({
+      error: 'An API key already exists for this email',
+      status: existing.status,
+      hint: existing.status === 'pending'
+        ? 'Your application is being reviewed. You will receive an email when approved.'
+        : 'Use the check-api-key endpoint to view your key details.',
+    });
+  }
+
+  const apiKey = generateApiKey();
+
+  const { data, error } = await supabase
+    .from('api_keys')
+    .insert({
+      key: apiKey,
+      developer_email: email,
+      developer_name: name || null,
+      app_name,
+      app_description: app_description ? String(app_description).slice(0, 500) : null,
+      status: 'pending',
+      tier: 'free',
+      monthly_limit: TIER_LIMITS.free,
+    })
+    .select('id, status, tier, monthly_limit, created_at')
+    .single();
+
+  if (error) {
+    console.error('[API Keys] register error:', error);
+    return res.status(500).json({ error: 'Failed to register API key' });
+  }
+
+  return res.status(201).json({
+    message: 'API key registered! Your application is pending admin approval.',
+    key_preview: `${apiKey.slice(0, 12)}...${apiKey.slice(-4)}`,
+    ...data,
+  });
+}
+
+// ── Check: Developer checks their key status and usage ──────────────────
+
+async function handleCheckApiKey(req: VercelRequest, res: VercelResponse) {
+  const apiKey = (req.query.key as string) || (req.headers['x-api-key'] as string);
+  if (!apiKey) {
+    return res.status(400).json({ error: 'key parameter or X-API-Key header required' });
+  }
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const { data, error } = await supabase
+    .from('api_keys')
+    .select('id, developer_email, app_name, status, tier, monthly_limit, monthly_usage, usage_reset_at, created_at, approved_at, last_used_at')
+    .eq('key', apiKey)
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) {
+    return res.status(404).json({ error: 'API key not found' });
+  }
+
+  return res.status(200).json(data);
+}
+
+// ── Admin: List all API keys ────────────────────────────────────────────
+
+async function handleListApiKeys(req: VercelRequest, res: VercelResponse) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authorization required' });
+  }
+  if (!(await verifyAdmin(authHeader.slice(7)))) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const status = req.query.status as string | undefined;
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  let query = supabase
+    .from('api_keys')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (status) {
+    query = query.eq('status', status);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('[API Keys] list error:', error);
+    return res.status(500).json({ error: 'Failed to fetch API keys' });
+  }
+
+  // Mask keys for security — only show prefix and last 4
+  const masked = (data || []).map((k: Record<string, unknown>) => ({
+    ...k,
+    key: `${String(k.key).slice(0, 12)}...${String(k.key).slice(-4)}`,
+  }));
+
+  return res.status(200).json({ keys: masked });
+}
+
+// ── Admin: Approve a pending API key ────────────────────────────────────
+
+async function handleApproveApiKey(req: VercelRequest, res: VercelResponse) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authorization required' });
+  }
+  if (!(await verifyAdmin(authHeader.slice(7)))) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const { key_id } = req.body || {};
+  if (!key_id) return res.status(400).json({ error: 'key_id is required' });
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const { data, error } = await supabase
+    .from('api_keys')
+    .update({
+      status: 'approved',
+      approved_at: new Date().toISOString(),
+    })
+    .eq('id', key_id)
+    .eq('status', 'pending')
+    .select('id, developer_email, app_name, status, key')
+    .single();
+
+  if (error || !data) {
+    return res.status(404).json({ error: 'Pending key not found' });
+  }
+
+  return res.status(200).json({
+    message: 'API key approved',
+    id: data.id,
+    developer_email: data.developer_email,
+    app_name: data.app_name,
+  });
+}
+
+// ── Admin: Revoke an API key ────────────────────────────────────────────
+
+async function handleRevokeApiKey(req: VercelRequest, res: VercelResponse) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authorization required' });
+  }
+  if (!(await verifyAdmin(authHeader.slice(7)))) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const { key_id } = req.body || {};
+  if (!key_id) return res.status(400).json({ error: 'key_id is required' });
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const { data, error } = await supabase
+    .from('api_keys')
+    .update({ status: 'revoked' })
+    .eq('id', key_id)
+    .select('id, developer_email, app_name, status')
+    .single();
+
+  if (error || !data) {
+    return res.status(404).json({ error: 'API key not found' });
+  }
+
+  return res.status(200).json({ message: 'API key revoked', ...data });
+}
+
+// ── Admin: Update API key tier (after Stripe payment or manually) ───────
+
+async function handleUpdateApiTier(req: VercelRequest, res: VercelResponse) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authorization required' });
+  }
+  if (!(await verifyAdmin(authHeader.slice(7)))) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const { key_id, tier, stripe_customer_id, stripe_subscription_id } = req.body || {};
+  if (!key_id || !tier) return res.status(400).json({ error: 'key_id and tier are required' });
+
+  if (!TIER_LIMITS[tier as string]) {
+    return res.status(400).json({ error: 'tier must be free, basic, or pro' });
+  }
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const updateData: Record<string, unknown> = {
+    tier,
+    monthly_limit: TIER_LIMITS[tier as string],
+  };
+  if (stripe_customer_id) updateData.stripe_customer_id = stripe_customer_id;
+  if (stripe_subscription_id) updateData.stripe_subscription_id = stripe_subscription_id;
+
+  const { data, error } = await supabase
+    .from('api_keys')
+    .update(updateData)
+    .eq('id', key_id)
+    .select('id, developer_email, tier, monthly_limit')
+    .single();
+
+  if (error || !data) {
+    return res.status(404).json({ error: 'API key not found' });
+  }
+
+  return res.status(200).json({ message: `Tier updated to ${tier}`, ...data });
 }

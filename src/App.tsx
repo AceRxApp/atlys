@@ -13,6 +13,7 @@ import type { Place } from './services/places';
 import { useLocation as useGeoLocation } from './hooks/useLocation';
 import type { AdminSignup } from './types';
 import { CITY_COORDS, EMERGENCY_BY_COUNTRY } from './data';
+import { setBookingCountry } from './data/bookingLinks';
 
 import { AppContext } from './context/AppContext';
 import { HomeIcon, DiscoverIcon, EventsIcon, TasteLensIcon, PlanIcon, ShieldIcon, GearIcon, CloseIcon, SearchIcon } from './components/icons';
@@ -163,6 +164,7 @@ const BrandsScreen = lazy(() => import('./screens/BrandsScreen'));
 const BrandTripScreen = lazy(() => import('./screens/BrandTripScreen'));
 const WorldCupScreen = lazy(() => import('./screens/WorldCupScreen'));
 const WorldCupTripScreen = lazy(() => import('./screens/WorldCupTripScreen'));
+const DeveloperPortal = lazy(() => import('./screens/DeveloperPortal'));
 
 // ============================================================================
 // DEEP LINK — /place/:placeId
@@ -229,7 +231,7 @@ export default function App() {
     return (['home', 'discover', 'events', 'currency', 'plan', 'tastelens'].includes(path) ? path : 'home') as Screen;
   })();
 
-  const isInfoPage = ['/about', '/privacy', '/terms', '/contact', '/brands', '/worldcup'].includes(routerLocation.pathname) || routerLocation.pathname.startsWith('/cities/') || routerLocation.pathname.startsWith('/brands/') || routerLocation.pathname.startsWith('/worldcup/');
+  const isInfoPage = ['/about', '/privacy', '/terms', '/contact', '/brands', '/worldcup', '/developers'].includes(routerLocation.pathname) || routerLocation.pathname.startsWith('/cities/') || routerLocation.pathname.startsWith('/brands/') || routerLocation.pathname.startsWith('/worldcup/');
 
   const setScreen = useCallback((s: string) => {
     navigate(s === 'home' ? '/' : `/${s}`);
@@ -249,6 +251,11 @@ export default function App() {
   const auth = useAuth(showToast, () => setScreen('home'));
   const location = useLocationWeather(loc);
   const events = useEvents({ useGps: location.useGps, loc, selectedCity: location.selectedCity, screen });
+
+  // Keep booking links region-aware
+  useEffect(() => {
+    if (location.selectedCity?.country) setBookingCountry(location.selectedCity.country);
+  }, [location.selectedCity]);
 
   // --- UI state (modals, onboarding, offline, time, notifications, admin) ---
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
@@ -285,6 +292,22 @@ export default function App() {
   // TasteLens context (for navigating to TasteLens tab with restaurant context)
   const [dishLensContext, setDishLensContext] = useState<{ dish?: string; city?: string; restaurant?: string }>({});
 
+  // Dish history (Taste Passport)
+  type DishHistoryEntry = { name: string; category: string; city: string; restaurant: string; spiceLevel: number; dietaryTags: string[]; culturalNote: string; identifiedAt: string };
+  const [dishHistory, setDishHistory] = useState<DishHistoryEntry[]>(() => {
+    try { return JSON.parse(localStorage.getItem('nxstops_dish_history') || '[]'); } catch { return []; }
+  });
+  const addDishToHistory = useCallback((dish: Omit<DishHistoryEntry, 'identifiedAt'>) => {
+    setDishHistory(prev => {
+      // Avoid duplicates by name+restaurant
+      if (prev.some(d => d.name === dish.name && d.restaurant === dish.restaurant)) return prev;
+      const entry = { ...dish, identifiedAt: new Date().toISOString() };
+      const updated = [entry, ...prev];
+      try { localStorage.setItem('nxstops_dish_history', JSON.stringify(updated)); } catch { /* ignore */ }
+      return updated;
+    });
+  }, []);
+
   // GDPR consent — skip on native iOS/Android (no browser cookies in native apps)
   const [showConsent, setShowConsent] = useState(() => {
     if (localStorage.getItem('nxstops_consent')) return false;
@@ -306,7 +329,7 @@ export default function App() {
   const [adminUsers, setAdminUsers] = useState<{ id: string; email?: string; created_at: string; last_sign_in_at: string | null; confirmed_at: string | null; user_metadata: Record<string, unknown> }[]>([]);
   const [adminHealth, setAdminHealth] = useState<{ name: string; status: 'ok' | 'error'; detail?: string; ms?: number }[]>([]);
   const [adminLoading, setAdminLoading] = useState(false);
-  const [adminTab, setAdminTab] = useState<'dashboard' | 'signups' | 'users' | 'cities' | 'reports' | 'stops' | 'dish-images' | 'health'>('dashboard');
+  const [adminTab, setAdminTab] = useState<'dashboard' | 'signups' | 'users' | 'cities' | 'reports' | 'stops' | 'dish-images' | 'health' | 'api-keys'>('dashboard');
 
   // Check admin status server-side when user changes
   useEffect(() => {
@@ -631,6 +654,7 @@ export default function App() {
     showOnboarding, onboardingStep, setOnboardingStep, setShowOnboarding,
     // DishLens
     dishLensContext, setDishLensContext,
+    dishHistory, addDishToHistory,
     // Logistics
     ...logistics,
     // City Progress & Achievements
@@ -645,6 +669,7 @@ export default function App() {
     nextExploreStop: exploreMode.nextStop,
     nextStopDistance: exploreMode.nextStopDistance,
     nextStopWalkMin: exploreMode.nextStopWalkMin,
+    nextStopDriveMin: exploreMode.nextStopDriveMin,
     shouldLeaveNow: exploreMode.shouldLeaveNow,
     leaveByMessage: exploreMode.leaveByMessage,
     tripComplete: exploreMode.tripComplete,
@@ -664,7 +689,7 @@ export default function App() {
     showNotificationPrompt, notificationPermission, requestNotificationPermission, dismissNotificationPrompt,
     adminSignups, adminCities, adminUsers, adminHealth, adminLoading, adminTab, openAdmin, handleToggleCity,
     isOffline, showOnboarding, onboardingStep,
-    dishLensContext,
+    dishLensContext, dishHistory,
   ]);
 
   // ==========================================================================
@@ -850,6 +875,7 @@ export default function App() {
                 <Route path="/cities/:slug" element={<CityScreen />} />
                 <Route path="/place/:placeId" element={<PlaceDeepLink />} />
                 <Route path="/trip/:slug" element={<SharedPlanScreen />} />
+                <Route path="/developers" element={<DeveloperPortal />} />
                 <Route path="*" element={
                   <div className="text-center px-5 py-[60px]">
                     <div className="text-5xl mb-3">🗺️</div>

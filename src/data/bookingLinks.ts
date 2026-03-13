@@ -107,21 +107,138 @@ export function getPlaceBookingUrl(placeName: string, placeCategory: string, cit
 }
 
 // --------------------------------------------------------------------------
-// Restaurant reservation links (OpenTable + Resy with affiliate tracking)
+// Region-aware restaurant reservation links
 // --------------------------------------------------------------------------
+
+// Country → reservation platform mapping
+const REGION_PLATFORMS: Record<string, { name: string; buildUrl: (place: string, city: string) => string }> = {
+  // North America — OpenTable + Resy
+  US: { name: 'OpenTable', buildUrl: (place, city) => {
+    const base = `https://www.opentable.com/s?term=${encodeURIComponent(place)}&covers=2&queryUnderstandingType=location&rawQuery=${encodeURIComponent(place + ' ' + city)}`;
+    return OPENTABLE_REF ? `${base}&ref=${OPENTABLE_REF}` : base;
+  }},
+  CA: { name: 'OpenTable', buildUrl: (place, city) => {
+    const base = `https://www.opentable.com/s?term=${encodeURIComponent(place)}&covers=2&rawQuery=${encodeURIComponent(place + ' ' + city)}`;
+    return OPENTABLE_REF ? `${base}&ref=${OPENTABLE_REF}` : base;
+  }},
+  MX: { name: 'OpenTable', buildUrl: (place, city) => {
+    const base = `https://www.opentable.com/s?term=${encodeURIComponent(place)}&covers=2&rawQuery=${encodeURIComponent(place + ' ' + city)}`;
+    return OPENTABLE_REF ? `${base}&ref=${OPENTABLE_REF}` : base;
+  }},
+  // Europe — TheFork (owned by TripAdvisor, covers 22+ countries)
+  FR: { name: 'TheFork', buildUrl: (place, city) => `https://www.thefork.com/search?queryText=${encodeURIComponent(place + ' ' + city)}` },
+  ES: { name: 'TheFork', buildUrl: (place, city) => `https://www.thefork.es/search?queryText=${encodeURIComponent(place + ' ' + city)}` },
+  IT: { name: 'TheFork', buildUrl: (place, city) => `https://www.thefork.it/search?queryText=${encodeURIComponent(place + ' ' + city)}` },
+  DE: { name: 'TheFork', buildUrl: (place, city) => `https://www.thefork.de/search?queryText=${encodeURIComponent(place + ' ' + city)}` },
+  NL: { name: 'TheFork', buildUrl: (place, city) => `https://www.thefork.nl/search?queryText=${encodeURIComponent(place + ' ' + city)}` },
+  BE: { name: 'TheFork', buildUrl: (place, city) => `https://www.thefork.be/search?queryText=${encodeURIComponent(place + ' ' + city)}` },
+  PT: { name: 'TheFork', buildUrl: (place, city) => `https://www.thefork.pt/search?queryText=${encodeURIComponent(place + ' ' + city)}` },
+  CH: { name: 'TheFork', buildUrl: (place, city) => `https://www.thefork.ch/search?queryText=${encodeURIComponent(place + ' ' + city)}` },
+  AT: { name: 'TheFork', buildUrl: (place, city) => `https://www.thefork.at/search?queryText=${encodeURIComponent(place + ' ' + city)}` },
+  SE: { name: 'TheFork', buildUrl: (place, city) => `https://www.thefork.se/search?queryText=${encodeURIComponent(place + ' ' + city)}` },
+  DK: { name: 'TheFork', buildUrl: (place, city) => `https://www.thefork.dk/search?queryText=${encodeURIComponent(place + ' ' + city)}` },
+  // UK — OpenTable UK
+  GB: { name: 'OpenTable', buildUrl: (place, city) => {
+    const base = `https://www.opentable.co.uk/s?term=${encodeURIComponent(place)}&covers=2&rawQuery=${encodeURIComponent(place + ' ' + city)}`;
+    return OPENTABLE_REF ? `${base}&ref=${OPENTABLE_REF}` : base;
+  }},
+  IE: { name: 'OpenTable', buildUrl: (place, city) => {
+    const base = `https://www.opentable.co.uk/s?term=${encodeURIComponent(place)}&covers=2&rawQuery=${encodeURIComponent(place + ' ' + city)}`;
+    return OPENTABLE_REF ? `${base}&ref=${OPENTABLE_REF}` : base;
+  }},
+  // Australia + NZ — OpenTable AU
+  AU: { name: 'OpenTable', buildUrl: (place, city) => {
+    const base = `https://www.opentable.com.au/s?term=${encodeURIComponent(place)}&covers=2&rawQuery=${encodeURIComponent(place + ' ' + city)}`;
+    return OPENTABLE_REF ? `${base}&ref=${OPENTABLE_REF}` : base;
+  }},
+  NZ: { name: 'OpenTable', buildUrl: (place, city) => {
+    const base = `https://www.opentable.com.au/s?term=${encodeURIComponent(place)}&covers=2&rawQuery=${encodeURIComponent(place + ' ' + city)}`;
+    return OPENTABLE_REF ? `${base}&ref=${OPENTABLE_REF}` : base;
+  }},
+  // Japan — Tabelog
+  JP: { name: 'Tabelog', buildUrl: (place, city) => `https://tabelog.com/en/rstLst/?vs=1&sa=&sk=${encodeURIComponent(place + ' ' + city)}` },
+  // SE Asia — Chope
+  SG: { name: 'Chope', buildUrl: (place, city) => `https://www.chope.co/singapore-restaurants/search?keyword=${encodeURIComponent(place)}` },
+  TH: { name: 'Chope', buildUrl: (place, city) => `https://www.chope.co/bangkok-restaurants/search?keyword=${encodeURIComponent(place)}` },
+  HK: { name: 'Chope', buildUrl: (place, city) => `https://www.chope.co/hong-kong-restaurants/search?keyword=${encodeURIComponent(place)}` },
+  ID: { name: 'Chope', buildUrl: (place, city) => `https://www.chope.co/jakarta-restaurants/search?keyword=${encodeURIComponent(place)}` },
+  MY: { name: 'Chope', buildUrl: (place, city) => `https://www.chope.co/kuala-lumpur-restaurants/search?keyword=${encodeURIComponent(place)}` },
+  PH: { name: 'Chope', buildUrl: (place, city) => `https://www.chope.co/manila-restaurants/search?keyword=${encodeURIComponent(place)}` },
+  // South Korea — Catchtable
+  KR: { name: 'Catchtable', buildUrl: (place) => `https://app.catchtable.co.kr/ct/search?keyword=${encodeURIComponent(place)}` },
+  // India — Dineout
+  IN: { name: 'Dineout', buildUrl: (place, city) => `https://www.dineout.co.in/search?q=${encodeURIComponent(place + ' ' + city)}` },
+  // Middle East — OpenTable (limited) → Google Maps fallback
+  AE: { name: 'Google Maps', buildUrl: (place, city) => `https://www.google.com/maps/search/${encodeURIComponent(place + ' ' + city + ' reservation')}` },
+  SA: { name: 'Google Maps', buildUrl: (place, city) => `https://www.google.com/maps/search/${encodeURIComponent(place + ' ' + city + ' reservation')}` },
+  QA: { name: 'Google Maps', buildUrl: (place, city) => `https://www.google.com/maps/search/${encodeURIComponent(place + ' ' + city + ' reservation')}` },
+  // South America — Google Maps (no dominant platform)
+  BR: { name: 'Google Maps', buildUrl: (place, city) => `https://www.google.com/maps/search/${encodeURIComponent(place + ' ' + city + ' reserva')}` },
+  AR: { name: 'Google Maps', buildUrl: (place, city) => `https://www.google.com/maps/search/${encodeURIComponent(place + ' ' + city + ' reserva')}` },
+  CO: { name: 'Google Maps', buildUrl: (place, city) => `https://www.google.com/maps/search/${encodeURIComponent(place + ' ' + city + ' reserva')}` },
+  CL: { name: 'Google Maps', buildUrl: (place, city) => `https://www.google.com/maps/search/${encodeURIComponent(place + ' ' + city + ' reserva')}` },
+  PE: { name: 'Google Maps', buildUrl: (place, city) => `https://www.google.com/maps/search/${encodeURIComponent(place + ' ' + city + ' reserva')}` },
+  // Africa — Google Maps
+  GH: { name: 'Google Maps', buildUrl: (place, city) => `https://www.google.com/maps/search/${encodeURIComponent(place + ' ' + city)}` },
+  NG: { name: 'Google Maps', buildUrl: (place, city) => `https://www.google.com/maps/search/${encodeURIComponent(place + ' ' + city)}` },
+  ZA: { name: 'Google Maps', buildUrl: (place, city) => `https://www.google.com/maps/search/${encodeURIComponent(place + ' ' + city)}` },
+  KE: { name: 'Google Maps', buildUrl: (place, city) => `https://www.google.com/maps/search/${encodeURIComponent(place + ' ' + city)}` },
+  MA: { name: 'Google Maps', buildUrl: (place, city) => `https://www.google.com/maps/search/${encodeURIComponent(place + ' ' + city)}` },
+  EG: { name: 'Google Maps', buildUrl: (place, city) => `https://www.google.com/maps/search/${encodeURIComponent(place + ' ' + city)}` },
+};
+
+// Country name → ISO code for region lookup
+const COUNTRY_NAME_TO_CODE: Record<string, string> = {
+  'united states': 'US', 'usa': 'US', 'canada': 'CA', 'mexico': 'MX',
+  'france': 'FR', 'spain': 'ES', 'italy': 'IT', 'germany': 'DE',
+  'netherlands': 'NL', 'belgium': 'BE', 'portugal': 'PT', 'switzerland': 'CH',
+  'austria': 'AT', 'sweden': 'SE', 'denmark': 'DK',
+  'united kingdom': 'GB', 'uk': 'GB', 'england': 'GB', 'ireland': 'IE',
+  'australia': 'AU', 'new zealand': 'NZ',
+  'japan': 'JP', 'south korea': 'KR', 'india': 'IN',
+  'singapore': 'SG', 'thailand': 'TH', 'hong kong': 'HK',
+  'indonesia': 'ID', 'malaysia': 'MY', 'philippines': 'PH',
+  'uae': 'AE', 'united arab emirates': 'AE', 'saudi arabia': 'SA', 'qatar': 'QA',
+  'brazil': 'BR', 'argentina': 'AR', 'colombia': 'CO', 'chile': 'CL', 'peru': 'PE',
+  'ghana': 'GH', 'nigeria': 'NG', 'south africa': 'ZA', 'kenya': 'KE',
+  'morocco': 'MA', 'egypt': 'EG',
+  'china': 'CN', 'taiwan': 'TW', 'vietnam': 'VN',
+  'turkey': 'TR', 'greece': 'GR', 'czech republic': 'CZ', 'czechia': 'CZ',
+  'poland': 'PL', 'hungary': 'HU', 'croatia': 'HR', 'norway': 'NO',
+};
+
+function resolveCountryCode(countryNameOrCode?: string): string | null {
+  if (!countryNameOrCode) return null;
+  const upper = countryNameOrCode.toUpperCase();
+  if (upper.length === 2) return upper;
+  return COUNTRY_NAME_TO_CODE[countryNameOrCode.toLowerCase()] || null;
+}
+
+// Set from App.tsx when city changes
+let _countryCode: string | null = null;
+export function setBookingCountry(countryNameOrCode: string) {
+  _countryCode = resolveCountryCode(countryNameOrCode);
+}
 
 export function getRestaurantBookingUrl(
   placeName: string,
   cityName?: string,
+  countryCode?: string,
 ): { url: string; label: string; service: string } {
-  const term = encodeURIComponent(placeName);
-  const city = cityName ? encodeURIComponent(cityName) : '';
+  const code = resolveCountryCode(countryCode) || _countryCode;
+  const platform = code ? REGION_PLATFORMS[code] : null;
 
-  // OpenTable (primary — largest reservation network)
-  const otBase = `https://www.opentable.com/s?term=${term}&covers=2${city ? `&queryUnderstandingType=location&rawQuery=${term}+${city}` : ''}`;
-  const otUrl = OPENTABLE_REF ? `${otBase}&ref=${OPENTABLE_REF}` : otBase;
+  if (platform) {
+    return {
+      url: platform.buildUrl(placeName, cityName || ''),
+      label: platform.name === 'Google Maps' ? 'Find Restaurant' : 'Reserve Table',
+      service: platform.name,
+    };
+  }
 
-  return { url: otUrl, label: 'Reserve Table', service: 'OpenTable' };
+  // Fallback: Google Maps search (works globally)
+  const query = encodeURIComponent(`${placeName}${cityName ? ' ' + cityName : ''}`);
+  return { url: `https://www.google.com/maps/search/${query}`, label: 'Find Restaurant', service: 'Google Maps' };
 }
 
 export function getResyBookingUrl(

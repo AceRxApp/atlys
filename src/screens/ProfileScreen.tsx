@@ -11,6 +11,9 @@ import { CITY_COORDS } from '../data/cityCoords';
 
 const TravelMap = lazy(() => import('../components/TravelMap'));
 import TripMomentsModal from '../components/TripMomentsModal';
+import TastePassport from '../components/TastePassport';
+import PassportStamps from '../components/PassportStamps';
+import TripWrapped from '../components/TripWrapped';
 
 export default function ProfileScreen() {
   const {
@@ -35,6 +38,8 @@ export default function ProfileScreen() {
     avatarUrl, setAvatarUrl,
     // City Progress & Achievements
     categoryProgress, achievements, totalCitiesExplored, totalPlacesVisited,
+    // Taste Passport & Stamps
+    dishHistory, checkIns,
   } = useApp();
   const { theme, themePreference, setThemePreference } = useTheme();
   const closeProfile = useCallback(() => setShowProfile(false), [setShowProfile]);
@@ -59,6 +64,7 @@ export default function ProfileScreen() {
   const [billingError, setBillingError] = useState<string | null>(null);
   const [billingPlan, setBillingPlan] = useState<'monthly' | 'yearly'>('monthly');
   const [viewingTrip, setViewingTrip] = useState<typeof tripHistory[number] | null>(null);
+  const [wrappedTrip, setWrappedTrip] = useState<typeof tripHistory[number] | null>(null);
 
   const handleAvatarChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -647,28 +653,22 @@ export default function ProfileScreen() {
             </div>
           )}
 
-          {/* Achievements */}
-          {achievements.length > 0 && (
+          {/* Taste Passport */}
+          {user && (
             <div className="mb-6">
-              <div className="section-label">Achievements</div>
-              <div className="grid grid-cols-3 gap-2">
-                {achievements.map(ach => (
-                  <div
-                    key={ach.id}
-                    className={`text-center p-3 rounded-xl border ${
-                      ach.unlockedAt
-                        ? 'bg-amber-tint-bg10 border-amber-tint-border20'
-                        : 'bg-bg-subtle border-border-subtle opacity-50'
-                    }`}
-                  >
-                    <div className="text-2xl mb-1">{ach.unlockedAt ? ach.emoji : '?'}</div>
-                    <div className="text-[11px] font-semibold text-text-primary truncate">{ach.title}</div>
-                    <div className="text-[10px] text-text-tertiary mt-0.5">
-                      {ach.unlockedAt ? 'Unlocked!' : `${ach.progress}/${ach.requirement}`}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <div className="section-label">Taste Passport</div>
+              <TastePassport dishes={dishHistory} />
+            </div>
+          )}
+
+          {/* Passport Stamps */}
+          {user && (
+            <div className="mb-6">
+              <PassportStamps
+                tripHistory={tripHistory}
+                checkIns={checkIns}
+                totalDishes={dishHistory.length}
+              />
             </div>
           )}
 
@@ -1134,7 +1134,14 @@ export default function ProfileScreen() {
                           onClick={() => setViewingTrip(trip)}
                           className="flex-1 py-2 rounded-xl bg-amber-tint-bg10 border border-amber-tint-border20 text-accent-amber text-xs font-semibold cursor-pointer"
                         >
-                          View Timeline
+                          Timeline
+                        </button>
+                        <button
+                          onClick={() => setWrappedTrip(trip)}
+                          className="flex-1 py-2 rounded-xl border text-xs font-semibold cursor-pointer"
+                          style={{ background: 'linear-gradient(135deg, rgba(232,148,10,0.12), rgba(216,90,24,0.12))', borderColor: 'rgba(232,148,10,0.25)', color: 'var(--accent-amber)' }}
+                        >
+                          Trip Wrapped
                         </button>
                         <button
                           onClick={() => deleteTripHistoryEntry(trip.id)}
@@ -1214,6 +1221,14 @@ export default function ProfileScreen() {
         <TripMomentsModal
           trip={viewingTrip}
           onClose={() => setViewingTrip(null)}
+        />
+      )}
+
+      {/* Trip Wrapped Modal */}
+      {wrappedTrip && (
+        <TripWrapped
+          trip={wrappedTrip}
+          onClose={() => setWrappedTrip(null)}
         />
       )}
     </div>

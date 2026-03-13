@@ -2,12 +2,15 @@
 // Proxies requests to open.er-api.com for full ISO 4217 currency support (160+ currencies)
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors.js';
+import { setCorsHeaders, checkRateLimit, getClientIp, validateApiKey } from './_lib/cors.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const corsOk = setCorsHeaders(res, req.headers.origin as string | undefined, 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (!corsOk) return res.status(403).json({ error: 'Origin not allowed' });
+  if (!corsOk) {
+    const apiKeyInfo = await validateApiKey(req.headers as Record<string, string | string[] | undefined>, res, 'currency');
+    if (!apiKeyInfo) return res.status(403).json({ error: 'Origin not allowed. Use X-API-Key header for API access.' });
+  }
 
   const clientIp = getClientIp(req.headers);
   if (!(await checkRateLimit(clientIp, 20, 60_000))) {

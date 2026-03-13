@@ -108,8 +108,9 @@ export function useExploreMode(deps: {
               const diffMs = closeDate.getTime() - now.getTime();
               const diffMin = Math.round(diffMs / (1000 * 60));
               const bufferMin = 30; // 30-minute buffer once you arrive
-
-              const timeNeeded = nextStopWalkMin + bufferMin;
+              // Use drive time if walk would exceed 10 minutes
+              const travelMin = nextStopWalkMin <= 10 ? nextStopWalkMin : (nextStopDriveMin ?? nextStopWalkMin);
+              const timeNeeded = travelMin + bufferMin;
 
               if (diffMin > 0 && diffMin <= timeNeeded) {
                 return {

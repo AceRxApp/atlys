@@ -12,7 +12,7 @@ import type { PackingItem } from '../data/packingItems';
 import { getNightRisk, getPlaceSafety, isNightTime } from '../utils/safetyEngine';
 import { fetchTravelAdvisory, getAdvisoryDisplay } from '../services/travelAdvisory';
 import type { TravelAdvisory } from '../services/travelAdvisory';
-import type { Stop } from '../types';
+import type { Stop, PlanDuration } from '../types';
 import { BOOKING_SERVICES } from '../data/bookingLinks';
 import { fixPhotoUrl } from '../utils/photoUrl';
 import NativeImg from '../components/NativeImg';
@@ -39,6 +39,9 @@ import ItineraryAlertBanner from '../components/ItineraryAlertBanner';
 import ExploreModeBanner from '../components/ExploreModeBanner';
 import ChatBot from '../components/ChatBot';
 import CheckInCelebration from '../components/CheckInCelebration';
+import GoldenHourCard from '../components/GoldenHourCard';
+import LocalRhythm from '../components/LocalRhythm';
+import { useTripNotifications } from '../hooks/useTripNotifications';
 
 // Local helpers (not on context)
 const getStopName = (stop: Stop) =>
@@ -215,11 +218,14 @@ export default function PlanScreen() {
     nextExploreStop,
     nextStopDistance,
     nextStopWalkMin,
+    nextStopDriveMin,
     shouldLeaveNow,
     leaveByMessage,
     addToPlan,
     checkIns,
     currentStreak,
+    planMyDay,
+    autoPlanLoading,
   } = useApp();
 
   // Compute trip phase for context-aware UI
@@ -237,6 +243,29 @@ export default function PlanScreen() {
 
   const dateInputRef = useRef<HTMLInputElement>(null);
   const [showAddLinkModal, setShowAddLinkModal] = useState(false);
+
+  // Mini "Plan This Day" inline planner state
+  const [inlinePlanDuration, setInlinePlanDuration] = useState<PlanDuration>('full');
+  const inlineVibes = (() => {
+    const food = { id: 'food', emoji: '\u{1F37D}\u{FE0F}', label: 'Food Tour' };
+    const adventure = { id: 'adventure', emoji: '\u{1F33F}', label: 'Adventure' };
+    const bestOf = { id: 'surprise', emoji: '\u{1F3D9}\u{FE0F}', label: 'Best of City' };
+    if (inlinePlanDuration === 'morning') return [{ id: 'chill', emoji: '\u{2615}', label: 'Chill Vibes' }, food, adventure, bestOf];
+    if (inlinePlanDuration === 'afternoon') return [{ id: 'daydrinks', emoji: '\u{1F379}', label: 'Day Drinks' }, food, adventure, bestOf];
+    if (inlinePlanDuration === 'evening') return [{ id: 'nightout', emoji: '\u{1F319}', label: 'Night Out' }, food, adventure, bestOf];
+    return [{ id: 'stacked', emoji: '\u{1F525}', label: 'Full Experience' }, food, adventure, bestOf];
+  })();
+
+  // Schedule trip notifications when date is set
+  const notifications = useTripNotifications();
+  useEffect(() => {
+    if (tripStartDate && cityLabel && totalStops > 0) {
+      notifications.scheduleTripReminder(tripStartDate, cityLabel, totalStops);
+      notifications.scheduleEveningReminder(tripStartDate, cityLabel);
+    } else {
+      notifications.cancelAllReminders();
+    }
+  }, [tripStartDate, cityLabel, totalStops]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sortedDays = Object.keys(tripDays).map(Number).sort((a, b) => a - b);
 
@@ -522,8 +551,8 @@ export default function PlanScreen() {
       {/* Logistics Panel — pretrip & live only */}
       {(tripPhase === 'pretrip' || tripPhase === 'live') && totalStops > 0 && <LogisticsPanel />}
 
-      {/* Post-trip summary card */}
-      {tripPhase === 'posttrip' && (
+      {/* Post-trip summary card — only show if user actually checked in to stops */}
+      {tripPhase === 'posttrip' && Object.keys(checkIns).length > 0 && (
         <div className="mb-4 p-5 rounded-2xl border border-green-tint-border"
           style={{ background: 'linear-gradient(135deg, var(--green-tint-bg), var(--bg-subtle))' }}>
           <div className="text-center mb-3">
@@ -591,6 +620,7 @@ export default function PlanScreen() {
           totalStops={dayPlan.length}
           nextStopDistance={nextStopDistance}
           nextStopWalkMin={nextStopWalkMin}
+          nextStopDriveMin={nextStopDriveMin}
           shouldLeaveNow={shouldLeaveNow}
           leaveByMessage={leaveByMessage}
           tripComplete={false}
@@ -688,8 +718,66 @@ export default function PlanScreen() {
 
       {/* Active day stops */}
       {dayPlan.length === 0 ? (
-        <div className="card text-center py-8 px-5">
-          <p className="text-text-secondary text-sm">No stops on Day {activeDay} yet. Explore to add some!</p>
+        <div className="card py-5 px-4">
+          <p className="text-text-primary text-[15px] font-semibold text-center mb-3">Plan Day {activeDay}</p>
+          <p className="text-text-tertiary text-xs text-center mb-4">Pick a duration and vibe to auto-generate</p>
+
+          {/* Duration pills */}
+          <div className="flex gap-1.5 mb-3 justify-center">
+            {([
+              { id: 'full' as PlanDuration, emoji: '\u{2600}\u{FE0F}', label: 'Full Day' },
+              { id: 'morning' as PlanDuration, emoji: '\u{1F305}', label: 'Morning' },
+              { id: 'afternoon' as PlanDuration, emoji: '\u{26C5}', label: 'Afternoon' },
+              { id: 'evening' as PlanDuration, emoji: '\u{1F319}', label: 'Evening' },
+            ]).map(d => (
+              <button key={d.id} onClick={() => setInlinePlanDuration(d.id)}
+                className={`py-1.5 px-3 rounded-lg text-[12px] font-medium border-none cursor-pointer ${
+                  inlinePlanDuration === d.id
+                    ? 'bg-accent-gradient text-text-on-accent'
+                    : 'bg-bg-subtle text-text-secondary'
+                }`}>
+                {d.emoji} {d.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Vibe cards */}
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            {inlineVibes.map(v => (
+              <button key={v.id}
+                onClick={() => {
+                  if (autoPlanLoading) return;
+                  planMyDay('excited', inlinePlanDuration, v.id);
+                }}
+                disabled={autoPlanLoading}
+                className="py-3 px-3 rounded-xl border border-border-medium bg-bg-subtle text-left cursor-pointer disabled:opacity-50">
+                <div className="text-[18px] mb-1">{v.emoji}</div>
+                <div className="text-[13px] font-semibold text-text-primary">{v.label}</div>
+              </button>
+            ))}
+          </div>
+
+          {autoPlanLoading && (
+            <div className="text-center text-xs text-accent-amber animate-pulse">
+              Building your plan...
+            </div>
+          )}
+
+          <div className="flex items-center gap-3 mt-3">
+            <div className="flex-1 h-px bg-border-subtle" />
+            <span className="text-[11px] text-text-tertiary">or add manually</span>
+            <div className="flex-1 h-px bg-border-subtle" />
+          </div>
+          <div className="flex gap-2 mt-3 justify-center">
+            <button onClick={() => setScreen('discover')}
+              className="py-2 px-4 rounded-xl text-[13px] font-semibold bg-bg-subtle text-text-secondary border border-border-medium cursor-pointer">
+              Explore Places
+            </button>
+            <button onClick={() => { if (!requireAuth()) return; setShowAddLinkModal(true); }}
+              className="py-2 px-4 rounded-xl text-[13px] font-semibold bg-transparent text-accent-amber border border-dashed border-accent-amber cursor-pointer">
+              Quick Add
+            </button>
+          </div>
         </div>
       ) : (<>
         {/* Live Day progress bar */}
@@ -722,6 +810,22 @@ export default function PlanScreen() {
             <span className="text-xs text-accent-amber-dark font-medium">Hold and drag to reorder your stops</span>
           </div>
         )}
+        {/* Golden Hour Card */}
+        {dayPlan.length > 0 && selectedCity?.lat && (
+          <GoldenHourCard
+            dayPlan={dayPlan}
+            cityLat={selectedCity.lat}
+            timezoneOffset={(() => {
+              try {
+                const now = new Date();
+                const utc = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+                const local = new Date(now.toLocaleString('en-US', { timeZone: selectedCity.timezone || undefined }));
+                return (local.getTime() - utc.getTime()) / 3600000;
+              } catch { return -(new Date().getTimezoneOffset() / 60); }
+            })()}
+          />
+        )}
+
         <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={dayPlan.map(s => s.id)} strategy={verticalListSortingStrategy}>
         <div className="relative pl-8">
@@ -749,63 +853,135 @@ export default function PlanScreen() {
                   {isLiveDay && isCheckedIn(stop.id) ? '\u2713' : index + 1}
                 </div>
 
-                {/* Stop card */}
-                <div className={`card mb-0 overflow-hidden ${
+                {/* Stop card — photo-first story layout */}
+                <div className={`card mb-0 overflow-hidden !p-0 ${
                   stop.type === 'event'
                     ? 'border border-purple-tint-border15'
                     : 'border border-amber-tint-bg10'
                 }`}>
-                  {/* Top row: clickable content + drag controls */}
-                  <div className="flex gap-3">
-                    {/* Clickable area: image + info */}
-                    <div className="flex gap-3 flex-1 min-w-0 cursor-pointer"
-                      onClick={() => {
-                        if (stop.type === 'place' && stop.place) setSelectedPlace(stop.place);
-                      }}
-                      role={stop.type === 'place' ? 'button' : undefined}
-                      tabIndex={stop.type === 'place' ? 0 : undefined}
-                      aria-label={stop.type === 'place' ? `View details for ${getStopName(stop)}` : undefined}
+                  {/* Hero photo banner */}
+                  {stop.type === 'place' && stop.place?.photoUrl && (
+                    <div className="relative h-[140px] w-full cursor-pointer"
+                      onClick={() => { if (stop.place) setSelectedPlace(stop.place); }}
+                      role="button" tabIndex={0}
+                      aria-label={`View details for ${getStopName(stop)}`}
                     >
-                      {stop.type === 'place' && stop.place?.photoUrl && (
-                        <NativeImg src={fixPhotoUrl(stop.place.photoUrl)!} alt={stop.place.name} loading="lazy" decoding="async"
-                          className="w-20 h-20 rounded-xl shrink-0 object-cover" />
+                      <NativeImg src={fixPhotoUrl(stop.place.photoUrl)!} alt={stop.place.name} loading="lazy" decoding="async"
+                        className="w-full h-full object-cover" />
+                      <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.7))' }} />
+                      {stop.timeSlot && (
+                        <div className="absolute top-2.5 left-3 text-[11px] font-bold text-white/90 uppercase tracking-[0.05em] bg-black/30 px-2 py-0.5 rounded-md backdrop-blur-sm">
+                          {stop.timeSlot}
+                        </div>
                       )}
-                      {stop.type === 'event' && stop.event?.imageUrl && (
-                        <NativeImg src={stop.event.imageUrl} alt={stop.event.name} loading="lazy" decoding="async"
-                          referrerPolicy="no-referrer"
-                          className="w-20 h-20 rounded-xl shrink-0 object-cover" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        {stop.timeSlot && (
-                          <div className="text-[11px] font-semibold text-accent-amber uppercase tracking-[0.04em] mb-0.5">
-                            {stop.timeSlot}
-                          </div>
-                        )}
-                        <h3 className="text-[15px] font-semibold mb-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                      <div className="absolute bottom-2.5 left-3 right-3">
+                        <h3 className="text-[16px] font-bold text-white leading-tight drop-shadow-sm">
                           {getStopName(stop)}
                         </h3>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs text-white/80">{stop.place.categoryDisplay}</span>
+                          {stop.place.rating > 0 && (
+                            <span className="text-xs text-amber-300">{'\u2605'} {stop.place.rating.toFixed(1)}</span>
+                          )}
+                        </div>
+                      </div>
+                      {/* Drag + remove overlay */}
+                      <div className="absolute top-2.5 right-2.5 flex gap-1.5">
+                        <div {...listeners} className="cursor-grab active:cursor-grabbing touch-none p-1.5 rounded-lg bg-black/40 backdrop-blur-sm"
+                          aria-label="Drag to reorder" onClick={e => e.stopPropagation()}>
+                          <DragHandleIcon color="white" />
+                        </div>
+                        <button onClick={(e) => { e.stopPropagation(); removeFromPlan(stop.id); }}
+                          aria-label="Remove stop"
+                          className="bg-black/40 backdrop-blur-sm border-none text-white cursor-pointer text-xs font-semibold p-1.5 rounded-lg min-h-7 min-w-7 flex items-center justify-center">
+                          {'\u2715'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {stop.type === 'event' && stop.event?.imageUrl && (
+                    <div className="relative h-[140px] w-full">
+                      <NativeImg src={stop.event.imageUrl} alt={stop.event.name} loading="lazy" decoding="async"
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover" />
+                      <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.7))' }} />
+                      {stop.timeSlot && (
+                        <div className="absolute top-2.5 left-3 text-[11px] font-bold text-white/90 uppercase tracking-[0.05em] bg-black/30 px-2 py-0.5 rounded-md backdrop-blur-sm">
+                          {stop.timeSlot}
+                        </div>
+                      )}
+                      <div className="absolute bottom-2.5 left-3 right-3">
+                        <h3 className="text-[16px] font-bold text-white leading-tight drop-shadow-sm">
+                          {getStopName(stop)}
+                        </h3>
+                      </div>
+                      <div className="absolute top-2.5 right-2.5 flex gap-1.5">
+                        <div {...listeners} className="cursor-grab active:cursor-grabbing touch-none p-1.5 rounded-lg bg-black/40 backdrop-blur-sm"
+                          aria-label="Drag to reorder">
+                          <DragHandleIcon color="white" />
+                        </div>
+                        <button onClick={() => removeFromPlan(stop.id)}
+                          aria-label="Remove stop"
+                          className="bg-black/40 backdrop-blur-sm border-none text-white cursor-pointer text-xs font-semibold p-1.5 rounded-lg min-h-7 min-w-7 flex items-center justify-center">
+                          {'\u2715'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {/* No-photo fallback: inline layout */}
+                  {!((stop.type === 'place' && stop.place?.photoUrl) || (stop.type === 'event' && stop.event?.imageUrl)) && (
+                    <div className="flex gap-3 p-3.5">
+                      <div className="flex gap-3 flex-1 min-w-0 cursor-pointer"
+                        onClick={() => { if (stop.type === 'place' && stop.place) setSelectedPlace(stop.place); }}
+                        role={stop.type === 'place' ? 'button' : undefined}
+                        tabIndex={stop.type === 'place' ? 0 : undefined}
+                        aria-label={stop.type === 'place' ? `View details for ${getStopName(stop)}` : undefined}
+                      >
+                        <div className="w-14 h-14 rounded-xl shrink-0 flex items-center justify-center text-xl"
+                          style={{ background: stop.type === 'event' ? 'var(--events-gradient)' : 'linear-gradient(135deg, var(--amber-tint-bg15), var(--bg-subtle))' }}>
+                          {stop.type === 'event' ? '\u{1F3AB}' : '\u{1F4CD}'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          {stop.timeSlot && (
+                            <div className="text-[11px] font-semibold text-accent-amber uppercase tracking-[0.04em] mb-0.5">
+                              {stop.timeSlot}
+                            </div>
+                          )}
+                          <h3 className="text-[15px] font-semibold mb-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                            {getStopName(stop)}
+                          </h3>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1 items-center justify-center min-w-[44px]">
+                        <div {...listeners} className="cursor-grab active:cursor-grabbing touch-none p-2 rounded-lg bg-amber-tint-bg06 border border-amber-tint-border20"
+                          aria-label="Drag to reorder">
+                          <DragHandleIcon color="var(--accent-amber)" />
+                        </div>
+                        <button onClick={() => removeFromPlan(stop.id)}
+                          aria-label="Remove stop"
+                          className="bg-red-tint-bg border border-red-tint-border text-status-red cursor-pointer text-xs font-semibold py-1.5 px-2 rounded-lg min-h-8 min-w-[44px] flex items-center justify-center">
+                          {'\u2715'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {/* Details section */}
+                  <div className="px-3.5 py-2.5">
+                  <div className="flex gap-3 flex-1 min-w-0">
+                      <div className="flex-1 min-w-0">
                         {stop.type === 'place' && stop.place && (
                           <>
-                            <p className="text-xs text-text-secondary mb-1">
-                              {stop.place.categoryDisplay}
-                              {stop.place.priceLevel >= 0 ? (
-                                <span className={stop.place.priceLevel >= 3 ? 'text-accent-amber' : 'text-text-tertiary'}>
-                                  {' '}· {'$'.repeat(Math.max(1, stop.place.priceLevel))}
-                                </span>
-                              ) : null}
-                              {stop.place.distance != null && ` · ${formatDistance(stop.place.distance, useMiles)} ${getDistanceReference()}`}
-                            </p>
-                            {stop.place.rating > 0 && (
-                              <div className="text-xs">
-                                <span className="text-accent-amber">{'\u2605'} {stop.place.rating.toFixed(1)}</span>
-                                <span className="text-text-tertiary"> ({stop.place.reviewCount})</span>
-                              </div>
+                            {/* Compact details — only show what's NOT on the photo banner */}
+                            {stop.place.distance != null && (
+                              <p className="text-xs text-text-secondary mb-1">
+                                {formatDistance(stop.place.distance, useMiles)} {getDistanceReference()}
+                              </p>
                             )}
                             {/* Hours status */}
                             {(() => {
                               const hs = getHoursStatus(stop.place.hours, stop.place.openNow);
                               return (
-                                <div className="flex items-center gap-1.5 mt-1">
+                                <div className="flex items-center gap-1.5">
                                   <div className={`w-1.5 h-1.5 rounded-full ${stop.place.openNow ? 'bg-status-green' : 'bg-status-red'}`} />
                                   <span className={`text-[11px] font-medium ${
                                     hs.urgent ? 'text-status-red' : stop.place.openNow ? 'text-status-green' : 'text-status-red'
@@ -819,7 +995,7 @@ export default function PlanScreen() {
                             {stop.reason && (
                               <p className="text-xs text-text-tertiary mt-1 italic leading-snug">{stop.reason}</p>
                             )}
-                            {/* Safety indicator — always visible */}
+                            {/* Safety indicator */}
                             {(() => {
                               const night = isNightTime(weather?.sunset);
                               const warning = getPlaceSafety(stop.place.category, stop.place.rating, stop.place.reviewCount, stop.place.openNow, night);
@@ -856,6 +1032,11 @@ export default function PlanScreen() {
                               }
                               return null;
                             })()}
+                            <LocalRhythm
+                              category={stop.place.category || stop.place.categoryDisplay || ''}
+                              name={stop.place.name}
+                              hours={stop.place.hours || undefined}
+                            />
                           </>
                         )}
                         {stop.type === 'event' && stop.event && (
@@ -870,19 +1051,6 @@ export default function PlanScreen() {
                           </>
                         )}
                       </div>
-                    </div>
-
-                    {/* Right controls: drag handle + remove */}
-                    <div className="flex flex-col gap-1 items-center justify-center min-w-[44px]">
-                      <div {...listeners} className="cursor-grab active:cursor-grabbing touch-none p-2 rounded-lg bg-amber-tint-bg06 border border-amber-tint-border20"
-                        aria-label="Drag to reorder">
-                        <DragHandleIcon color="var(--accent-amber)" />
-                      </div>
-                      <button onClick={() => removeFromPlan(stop.id)}
-                        aria-label="Remove stop"
-                        className="bg-red-tint-bg border border-red-tint-border text-status-red cursor-pointer text-xs font-semibold py-1.5 px-2 rounded-lg min-h-8 min-w-[44px] flex items-center justify-center">
-                        ✕
-                      </button>
                     </div>
                   </div>
 
@@ -1034,9 +1202,6 @@ export default function PlanScreen() {
                               {alt.rating > 0 && (
                                 <span className="text-xs text-accent-amber font-semibold">{'\u{2B50}'} {alt.rating.toFixed(1)}</span>
                               )}
-                              {alt.priceLevel > 0 && (
-                                <span className="text-xs text-text-tertiary">{'$'.repeat(alt.priceLevel)}</span>
-                              )}
                               {alt.distance != null && (
                                 <span className="text-[11px] text-text-muted">{formatDistance(alt.distance)}</span>
                               )}
@@ -1097,14 +1262,25 @@ export default function PlanScreen() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <a href={transport.walkMapsUrl} target="_blank" rel="noopener noreferrer"
-                        className="flex-1 py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-amber-tint-bg10 text-accent-amber no-underline text-center flex items-center justify-center gap-1">
-                        {'\u{1F6B6}'} Walk {transport.walkMinutes}m
-                      </a>
-                      <a href={transport.driveMapsUrl} target="_blank" rel="noopener noreferrer"
-                        className="flex-1 py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-bg-subtle-medium text-text-secondary no-underline text-center flex items-center justify-center gap-1">
-                        {'\u{1F697}'} Drive {transport.driveMinutes}m
-                      </a>
+                      {transport.walkMinutes <= 10 ? (
+                        <>
+                          <a href={transport.walkMapsUrl} target="_blank" rel="noopener noreferrer"
+                            className="flex-1 py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-amber-tint-bg10 text-accent-amber no-underline text-center flex items-center justify-center gap-1">
+                            {'\u{1F6B6}'} Walk {transport.walkMinutes}m
+                          </a>
+                          <a href={transport.driveMapsUrl} target="_blank" rel="noopener noreferrer"
+                            className="flex-1 py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-bg-subtle-medium text-text-secondary no-underline text-center flex items-center justify-center gap-1">
+                            {'\u{1F697}'} Drive {transport.driveMinutes}m
+                          </a>
+                        </>
+                      ) : (
+                        <>
+                          <a href={transport.driveMapsUrl} target="_blank" rel="noopener noreferrer"
+                            className="flex-1 py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-amber-tint-bg10 text-accent-amber no-underline text-center flex items-center justify-center gap-1">
+                            {'\u{1F695}'} Taxi/Drive {transport.driveMinutes}m
+                          </a>
+                        </>
+                      )}
                     </div>
                   </div>
                 );

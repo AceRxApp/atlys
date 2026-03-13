@@ -2,7 +2,7 @@
 // Aggregates: Ticketmaster + SeatGeek + PredictHQ + TheSportsDB + API-Football + GetYourGuide + Eventbrite
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors.js';
+import { setCorsHeaders, checkRateLimit, getClientIp, validateApiKey } from './_lib/cors.js';
 
 const TICKETMASTER_API_KEY = (process.env.TICKETMASTER_API_KEY || '').trim();
 const SEATGEEK_CLIENT_ID = (process.env.SEATGEEK_CLIENT_ID || '').trim();
@@ -31,7 +31,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const corsOk = setCorsHeaders(res, req.headers.origin as string | undefined, 'GET, OPTIONS');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (!corsOk) return res.status(403).json({ error: 'Origin not allowed' });
+  if (!corsOk) {
+    const apiKeyInfo = await validateApiKey(req.headers as Record<string, string | string[] | undefined>, res, 'events');
+    if (!apiKeyInfo) return res.status(403).json({ error: 'Origin not allowed. Use X-API-Key header for API access.' });
+    // Events requires Basic tier or higher
+    if (apiKeyInfo.tier === 'free') return res.status(403).json({ error: 'Events API requires Basic tier or higher. Upgrade at nxstops.com/developers' });
+  }
 
   const clientIp = getClientIp(req.headers);
   if (!(await checkRateLimit(clientIp, 60, 60_000))) {

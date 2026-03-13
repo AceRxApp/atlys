@@ -40,6 +40,7 @@ interface Props {
   currentStopIndex: number;
   totalStops: number;
   nextStopWalkMin: number | null;
+  nextStopDriveMin: number | null;
   nextStopDistance: string | null;
   shouldLeaveNow: boolean;
   leaveByMessage: string | null;
@@ -95,6 +96,7 @@ export default function ExploreModeBanner({
   currentStopIndex,
   totalStops,
   nextStopWalkMin,
+  nextStopDriveMin,
   nextStopDistance,
   shouldLeaveNow,
   leaveByMessage,
@@ -286,7 +288,9 @@ export default function ExploreModeBanner({
               </span>
               {nextStopWalkMin != null && nextStopDistance != null && (
                 <span className="text-xs text-text-tertiary ml-auto shrink-0">
-                  {nextStopDistance} {'\u00B7'} {nextStopWalkMin}min walk
+                  {nextStopDistance} {'\u00B7'} {nextStopWalkMin <= 10
+                    ? `${nextStopWalkMin}min walk`
+                    : `${nextStopDriveMin ?? Math.ceil(nextStopWalkMin / 3)}min drive`}
                 </span>
               )}
             </>

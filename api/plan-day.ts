@@ -2,7 +2,7 @@
 // Uses GPT-4o-mini + Google Places to generate personalized day itineraries
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors.js';
+import { setCorsHeaders, checkRateLimit, getClientIp, validateApiKey } from './_lib/cors.js';
 
 const OPENAI_API_KEY = (process.env.OPENAI_API_KEY || '').trim();
 const GOOGLE_API_KEY = (process.env.GOOGLE_PLACES_API_KEY || '').trim();
@@ -108,7 +108,27 @@ const DIVERSE_TEXT_SEARCHES: Record<string, string[]> = {
     'cultural festival event local', 'architecture tour unique buildings',
     'beach club oceanfront bar', 'beach seafood restaurant waterfront',
   ],
+  // Hidden gems — dedicated searches for off-the-beaten-path discoveries
+  hiddengems: [
+    'hole in the wall restaurant', 'neighborhood gem cafe',
+    'local favorite restaurant off beaten path', 'family owned restaurant authentic',
+    'dive bar neighborhood local', 'mom and pop restaurant local',
+    'underrated restaurant hidden', 'locals only spot neighborhood',
+    'tucked away cafe secret', 'back alley bar hidden speakeasy',
+    'neighborhood bakery local favorite', 'authentic ethnic food hole in wall',
+    'hidden courtyard garden park', 'secret viewpoint scenic overlook',
+    'unknown museum gallery quirky', 'neighborhood street art mural alley',
+  ],
 };
+
+// Gem score: favors high-rated places with fewer reviews (the "hidden gem" signal)
+// A 4.7-star place with 80 reviews is more of a gem than a 4.7 with 5000 reviews
+function gemScore(p: { rating: number; reviewCount: number }): number {
+  if (!p.rating || p.rating < 3.5) return 0;
+  // Diminishing returns on review count — more reviews = less "hidden"
+  const discoveryFactor = 1 / (1 + Math.log10(Math.max(p.reviewCount || 1, 1)));
+  return p.rating * (0.6 + 0.4 * discoveryFactor);
+}
 
 // ── Region-aware local cuisine ──
 // Non-Western cities get HEAVY local cuisine with a sprinkle of international
@@ -602,7 +622,7 @@ const VIBE_CONFIG: Record<string, {
     activityTypes: ADVENTURE_TYPES,
     textSearchKey: 'adventure',
     textSearchCount: 4,
-    aiHint: 'This is an ADVENTURE day. Mix outdoor spots, museums, galleries, landmarks, scenic walks, and BEACHES (if any beaches appear in the places list) — but ALWAYS weave food in between activities. Never have 3 non-food stops in a row. The food should match the neighborhood vibe (e.g., tacos near a cultural district, cafe near a park, seafood near a beach). BEACH RULE: If the city has beaches in the places list, you MUST include at least one beach stop — people visiting coastal cities want to experience the ocean. Schedule beach time for late morning or afternoon when it\'s warmest. Pair it with a nearby beach bar, seafood spot, or waterfront restaurant.',
+    aiHint: 'This is an ADVENTURE day — about DOING things, SEEING things, and EXPLORING — not just eating. The MAJORITY of stops (at least 60-70%) must be ACTIVITIES: parks, beaches, hiking trails, museums, galleries, landmarks, scenic viewpoints, markets, historic neighborhoods, waterfront walks. Food is fuel between adventures — weave in just 1-2 food stops for half day, 2-3 for full day. The food should match the adventure context (beach → nearby seafood shack, park → local cafe, cultural district → neighborhood ethnic food). BEACH RULE: If the city has beaches, MUST include at least one beach stop. NEVER let the plan become 4+ restaurants with one museum tacked on — that\'s a food tour, not an adventure.',
     structureHint: {
       morning: 'Breakfast/brunch → outdoor activity, museum, or beach → coffee or snack stop',
       afternoon: 'Lunch → museum or landmark → beach or scenic walk → market or snack',
@@ -615,7 +635,7 @@ const VIBE_CONFIG: Record<string, {
     activityTypes: ADVENTURE_TYPES.concat(NIGHTLIFE_TYPES).concat(['shopping_mall', 'clothing_store', 'spa']),
     textSearchKey: 'surprise',
     textSearchCount: 6,
-    aiHint: 'THE CURATED CITY — you are an elite city discovery concierge creating a plan for EVERYONE (all nationalities, races, genders, ages). This plan showcases each city\'s ABSOLUTE BEST and most iconic experiences. UPSCALE RESTAURANTS: Include the city\'s most celebrated fine dining (think Tre Dita / RPM Italian caliber in Chicago, Carbone in NYC, Nobu in Miami). REAL MUSEUMS & ATTRACTIONS: Include MAJOR, well-known museums and attractions people actually visit — places like the Museum of Science and Industry, Art Institute, Field Museum in Chicago; MoMA, Met in NYC; Smithsonian in DC. These must be REAL, verified, popular places with reviews — not obscure or closed locations. TOURIST LANDMARKS: Include the iconic sights visitors come for (observation decks, monuments, famous parks, waterfronts). Mix upscale dining + world-class museums + iconic tourist landmarks + celebrated bars. NEVER make the plan all restaurants or all museums — always a rich MIX of both. Every stop must be a real, operating, well-reviewed place that people actually go to.',
+    aiHint: 'BEST OF THE CITY — a curated highlight reel of what makes this city SPECIAL. This is the #1 plan visitors ask for, so it MUST be a rich, balanced mix — NOT just restaurants. THE MIX IS MANDATORY: At least HALF the stops must be NON-FOOD experiences (museums, landmarks, parks, viewpoints, galleries, cultural sites, scenic neighborhoods). The food stops should be the city\'s most celebrated dining — not chains or generic spots. Think: what would a proud local show a first-time visitor in ONE perfect day? The answer is the iconic museum, the famous landmark, the hidden viewpoint, the scenic waterfront walk, AND the legendary restaurant. NEVER make the plan all restaurants or all museums — it must be the BEST OF EVERYTHING this city offers. Every stop must be REAL, well-reviewed, and currently operating.',
     structureHint: {
       morning: 'Best brunch or upscale café → iconic cultural landmark or gallery → artisan bakery or coffee',
       afternoon: 'Top-rated lunch (upscale casual or fine dining) → world-class museum or luxury shopping district → scenic neighborhood or cultural landmark',
@@ -681,11 +701,17 @@ async function fetchNearbyPlaces(
 
   if (!response.ok) {
     const errText = await response.text().catch(() => 'no body');
-    console.error('[NxStops Plan] Google Places error:', response.status, errText.slice(0, 300));
+    console.error('[NxStops Plan] Google Nearby error:', response.status, errText.slice(0, 500));
     return [];
   }
   const data = await response.json();
-  return data.places || [];
+  const places = data.places || [];
+  if (places.length === 0) {
+    console.error(`[NxStops Plan] Nearby returned 0! status=${response.status} body=${JSON.stringify(data).slice(0, 500)}`);
+  } else {
+    console.log(`[NxStops Plan] Nearby search: types=${types.slice(0, 3).join(',')}... radius=${radius} → ${places.length} results`);
+  }
+  return places;
 }
 
 async function textSearchPlaces(
@@ -714,7 +740,11 @@ async function textSearchPlaces(
     },
     body: JSON.stringify(body),
   });
-  if (!response.ok) return [];
+  if (!response.ok) {
+    const errText = await response.text().catch(() => 'no body');
+    console.error(`[NxStops Plan] Text search error: query="${query}" status=${response.status}`, errText.slice(0, 300));
+    return [];
+  }
   const data = await response.json();
   return data.places || [];
 }
@@ -842,7 +872,7 @@ async function callOpenAI(messages: { role: string; content: string }[]): Promis
         model: 'gpt-4o-mini',
         messages,
         temperature: 0.8,
-        max_tokens: 800,
+        max_tokens: 1200,
         response_format: { type: 'json_object' },
       }),
     });
@@ -874,7 +904,7 @@ async function callGemini(systemPrompt: string, userPrompt: string): Promise<str
           contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
           generationConfig: {
             temperature: 0.8,
-            maxOutputTokens: 800,
+            maxOutputTokens: 1200,
             responseMimeType: 'application/json',
           },
         }),
@@ -899,7 +929,12 @@ async function callGemini(systemPrompt: string, userPrompt: string): Promise<str
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const corsOk = setCorsHeaders(res, req.headers.origin as string | undefined, 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (!corsOk) return res.status(403).json({ error: 'Origin not allowed' });
+  if (!corsOk) {
+    const apiKeyInfo = await validateApiKey(req.headers as Record<string, string | string[] | undefined>, res, 'plan-day');
+    if (!apiKeyInfo) return res.status(403).json({ error: 'Origin not allowed. Use X-API-Key header for API access.' });
+    // Plan-day requires Basic tier or higher
+    if (apiKeyInfo.tier === 'free') return res.status(403).json({ error: 'Plan API requires Basic tier or higher. Upgrade at nxstops.com/developers' });
+  }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const ip = getClientIp(req.headers);
@@ -915,6 +950,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const {
       lat, lng, city, vibe, mood, travelGroup, duration,
       weather, preferences, events, advisory, jetLagContext,
+      localTime,
     } = req.body as {
       lat: number; lng: number; city?: string;
       vibe?: string; mood?: string;
@@ -923,6 +959,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       events?: { name: string; category: string; time: string; venue: string }[];
       advisory?: string;
       jetLagContext?: string;
+      localTime?: string; // e.g. "14:30" — user's local time
     };
 
     if (!lat || !lng) {
@@ -949,6 +986,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const rawResults = await Promise.all(fetches);
     let allRaw = rawResults.flat();
+    console.log(`[NxStops Plan] Initial nearby: ${rawResults.map((r, i) => `${fetchLabels[i]}=${r.length}`).join(', ')} total=${allRaw.length}`);
 
     // Fallback for small/island/remote cities: if nearby search returned too few,
     // retry with much larger radius (25km covers most islands and small cities)
@@ -1003,19 +1041,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const localNight = localRegion.nightlifeSearches.sort(() => Math.random() - 0.5).slice(0, 2);
         shuffledSearches.push(...localNight);
       }
+
+      // ALWAYS add hidden gem searches — the secret sauce for unique discoveries
+      const gemSearches = DIVERSE_TEXT_SEARCHES.hiddengems.sort(() => Math.random() - 0.5).slice(0, 2);
+      shuffledSearches.push(...gemSearches);
     } else {
       // WESTERN / DEFAULT: diverse multicultural mix (existing behavior)
       const vibeSearches = DIVERSE_TEXT_SEARCHES[config.textSearchKey] || [];
       shuffledSearches.push(...vibeSearches.sort(() => Math.random() - 0.5).slice(0, config.textSearchCount));
 
-      // Always add a few diverse food searches for non-food vibes
-      if (vibeKey !== 'food') {
-        const foodSearches = DIVERSE_TEXT_SEARCHES.food.sort(() => Math.random() - 0.5).slice(0, 2);
+      // For activity-focused vibes: add MORE activity/cultural searches, NOT more food
+      // The food already comes from fetchNearbyPlaces — no need to inflate it further
+      if (vibeKey === 'surprise' || vibeKey === 'adventure' || vibeKey === 'cultural') {
+        const culturalSearches = DIVERSE_TEXT_SEARCHES.cultural.sort(() => Math.random() - 0.5).slice(0, 4);
+        shuffledSearches.push(...culturalSearches);
+      } else if (vibeKey !== 'food') {
+        // Other vibes (chill, daydrinks, nightout): light food + cultural mix
+        const foodSearches = DIVERSE_TEXT_SEARCHES.food.sort(() => Math.random() - 0.5).slice(0, 1);
         shuffledSearches.push(...foodSearches);
-        // Always add cultural/ethnic place searches too
         const culturalSearches = DIVERSE_TEXT_SEARCHES.cultural.sort(() => Math.random() - 0.5).slice(0, 2);
         shuffledSearches.push(...culturalSearches);
       }
+
+      // ALWAYS add hidden gem searches — neighborhood spots tourists miss
+      const gemSearches = DIVERSE_TEXT_SEARCHES.hiddengems.sort(() => Math.random() - 0.5).slice(0, 2);
+      shuffledSearches.push(...gemSearches);
 
       // Stacked vibe: add nightlife text searches for evening portion
       if (vibeKey === 'stacked') {
@@ -1120,10 +1170,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (baseName) seenNames.add(baseName);
       allPlaces.push(p);
     }
-    allPlaces.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-    const topPlaces = allPlaces.slice(0, 30);
+    // Sort by gem score (balances rating with discoverability — hidden gems rank higher)
+    allPlaces.sort((a, b) => gemScore(b) - gemScore(a));
 
-    console.log(`[NxStops Plan] vibe="${vibeKey}" duration="${duration || 'full'}" region="${localRegion?.label || 'diverse'}" fetched=[${fetchLabels}] totalPlaces=${topPlaces.length}`);
+    // Balance candidate pool: activity-focused vibes need plenty of non-food options
+    const FOOD_CAT_SET = new Set([...FOOD_TYPES, 'bar', 'wine_bar']);
+    const isPlaceFood = (p: PlanPlace) => FOOD_CAT_SET.has(p.category);
+
+    // Identify hidden gems: high-rated (4.0+) but under 300 reviews — the sweet spot
+    const isHiddenGem = (p: PlanPlace) => p.rating >= 4.0 && p.reviewCount > 0 && p.reviewCount < 300;
+
+    let topPlaces: PlanPlace[];
+
+    if (vibeKey === 'surprise' || vibeKey === 'adventure' || vibeKey === 'cultural') {
+      const foodCandidates = allPlaces.filter(p => isPlaceFood(p));
+      const activityCandidates = allPlaces.filter(p => !isPlaceFood(p));
+      const activityCount = Math.min(activityCandidates.length, 18);
+      const foodCount = Math.min(foodCandidates.length, 30 - activityCount);
+      topPlaces = [...activityCandidates.slice(0, activityCount), ...foodCandidates.slice(0, foodCount)]
+        .sort((a, b) => gemScore(b) - gemScore(a))
+        .slice(0, 30);
+    } else if (vibeKey === 'stacked') {
+      const foodCandidates = allPlaces.filter(p => isPlaceFood(p));
+      const activityCandidates = allPlaces.filter(p => !isPlaceFood(p));
+      const activityCount = Math.min(activityCandidates.length, 16);
+      const foodCount = Math.min(foodCandidates.length, 30 - activityCount);
+      topPlaces = [...activityCandidates.slice(0, activityCount), ...foodCandidates.slice(0, foodCount)]
+        .sort((a, b) => gemScore(b) - gemScore(a))
+        .slice(0, 30);
+    } else {
+      topPlaces = allPlaces.slice(0, 30);
+    }
+
+    // Ensure at least ~20% of candidates are hidden gems (swap out lowest-scored popular places)
+    const gems = allPlaces.filter(p => isHiddenGem(p) && !topPlaces.includes(p));
+    const gemTarget = Math.max(Math.floor(topPlaces.length * 0.2), 3);
+    const currentGems = topPlaces.filter(p => isHiddenGem(p)).length;
+    if (currentGems < gemTarget && gems.length > 0) {
+      const needed = Math.min(gemTarget - currentGems, gems.length);
+      // Replace lowest-scored places with gems
+      const gemsToAdd = gems.slice(0, needed);
+      topPlaces = [...topPlaces.slice(0, topPlaces.length - needed), ...gemsToAdd];
+    }
+
+    const gemCount = topPlaces.filter(p => isHiddenGem(p)).length;
+    console.log(`[NxStops Plan] vibe="${vibeKey}" duration="${duration || 'full'}" region="${localRegion?.label || 'diverse'}" fetched=[${fetchLabels}] totalPlaces=${topPlaces.length} hiddenGems=${gemCount}`);
 
     if (topPlaces.length < 3) {
       return res.status(200).json({
@@ -1141,13 +1232,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       price: p.priceLevel,
       open: p.openNow,
       dist: p.distance ? `${p.distance.toFixed(1)}km` : '?',
+      lat: Math.round(p.lat * 10000) / 10000,
+      lng: Math.round(p.lng * 10000) / 10000,
+      ...(isHiddenGem(p) ? { gem: true } : {}),
     }));
 
     // 3. Build events section if available
     let eventsSection = '';
     if (events && events.length > 0) {
       const todayEvents = events.slice(0, 5);
-      eventsSection = `\n\nTODAY'S EVENTS (can include 0-1 in the plan):\n${todayEvents.map((e, i) => `E${i}: ${e.name} at ${e.venue} (${e.time}) [${e.category}]`).join('\n')}`;
+      eventsSection = `\n\nTODAY'S EVENTS (include 2-3 in the plan — weave them between food/activity stops as natural highlights):\n${todayEvents.map((e, i) => `E${i}: ${e.name} at ${e.venue} (${e.time}) [${e.category}]`).join('\n')}`;
     }
 
     // 4. Build AI prompt — curated itinerary with food woven in
@@ -1158,8 +1252,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const stopCount = jetLagActive
       ? (isStackedVibe ? 6 : isFullDay ? 4 : 2)
       : (isStackedVibe ? 8 : isFullDay ? 6 : 3);
-    const now = new Date();
-    const timeLabel = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+    // Use the client's local time (they pass it from the browser)
+    const timeLabel = localTime || `${new Date().getHours()}:${String(new Date().getMinutes()).padStart(2, '0')}`;
+    const localHour = parseInt(timeLabel.split(':')[0], 10);
 
     const vibeLabels: Record<string, string> = {
       nightout: 'Night Out', food: 'Food Tour',
@@ -1173,12 +1268,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const durationKey = (['morning', 'afternoon', 'evening'].includes(durationLabel) ? durationLabel : 'full') as keyof typeof config.structureHint;
     const structureGuide = config.structureHint[durationKey] || config.structureHint.full;
 
-    // Duration-specific time windows
+    // Duration-specific time windows — start from NOW if the window would've already started
+    const formatHour = (h: number) => {
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+      return `${h12}:00 ${ampm}`;
+    };
+    const startNowLabel = formatHour(Math.max(localHour, 8));
     const timeWindows: Record<string, string> = {
-      morning: '8:00 AM – 12:00 PM',
-      afternoon: '12:00 PM – 5:00 PM',
-      evening: '5:00 PM – 12:00 AM',
-      full: isStackedVibe ? '9:00 AM – 2:00 AM' : '9:00 AM – 11:00 PM',
+      morning: localHour >= 8 ? `${startNowLabel} – 12:00 PM` : '8:00 AM – 12:00 PM',
+      afternoon: localHour >= 12 ? `${startNowLabel} – 5:00 PM` : '12:00 PM – 5:00 PM',
+      evening: localHour >= 17 ? `${startNowLabel} – 12:00 AM` : '5:00 PM – 12:00 AM',
+      full: localHour >= 9 ? `${startNowLabel} – ${isStackedVibe ? '2:00 AM' : '11:00 PM'}` : (isStackedVibe ? '9:00 AM – 2:00 AM' : '9:00 AM – 11:00 PM'),
     };
     const timeWindow = timeWindows[durationKey] || timeWindows.full;
 
@@ -1197,72 +1298,59 @@ ${JSON.stringify(condensed)}${eventsSection}
 
 CRITICAL RULES:
 
+0. START FROM NOW: The current local time is ${timeLabel}. Your FIRST stop must be scheduled for RIGHT NOW or within the next 30 minutes. Do NOT start the plan earlier than the current time. If it's 2 PM, your first stop should be around 2:00-2:30 PM (lunch or afternoon activity), NOT 9 AM breakfast. The plan should feel like "what should I do starting NOW." Match the first meal to the current time of day — if it's afternoon, start with lunch; if it's evening, start with dinner; if it's morning, start with breakfast/coffee.
+
 1. Pick exactly ${stopCount} stops. EVERY stop must be a DIFFERENT place — never pick the same idx twice. Each stop must be a unique, distinct location.
 
 2. ${config.aiHint}
 
-2b. UNIQUE EXPERIENCES: Do NOT just pick the most obvious tourist attractions. Mix 1-2 iconic landmarks with hidden gems, underrated local favorites, and unique experiences most visitors wouldn't find on their own. A great plan feels like a local insider curated it — not like a Google "top 10" list. Vary the neighborhoods — don't cluster all stops in the same tourist district.
+2b. HIDDEN GEMS ARE MANDATORY: At least ${isFullDay ? '1-2' : '1'} stop(s) MUST be a hidden gem — a place marked with "gem":true in the list, or any high-rated place with fewer reviews that most tourists would never find. These are the neighborhood spots, hole-in-the-wall restaurants, tucked-away cafes, and local favorites that make a plan feel like a friend who lives there curated it. DO NOT make every stop a famous landmark or top-rated tourist destination — the magic is in mixing iconic spots with local discoveries.
 
-3. FOOD IS ALWAYS WOVEN IN: ${vibeKey === 'food'
-  ? 'Every stop is food/drink. Create a GLOBAL TASTING JOURNEY — each stop MUST be a different cuisine/culture (e.g., Mexican → Chinese → Ethiopian → Korean → Indian → Caribbean). NEVER two stops from the same cuisine, culture, or restaurant name/brand. Vary price points and vibes. If two places have similar names or are the same brand, only pick ONE.'
-  : isStackedVibe
-    ? 'At least 3-4 stops MUST be food/drink — breakfast, lunch, dinner, and late-night eats. Food goes BETWEEN activities, not lumped together. Match the food to the neighborhood and time of day. Every food stop MUST be a DIFFERENT cuisine — if you pick pizza, do NOT pick another pizza place. If you pick Chinese, do NOT pick another Chinese spot. Each food stop = different cultural cuisine.'
-    : `At least ${isFullDay ? '2-3' : '1'} stop(s) MUST be food/drink. Food goes BETWEEN activities, not lumped at the start or end. Match the food to the neighborhood and time of day. Every food stop MUST be a DIFFERENT cuisine — if you pick pizza, do NOT pick another pizza place. If you pick Chinese, do NOT pick another Chinese spot. Each food stop = different cultural cuisine.`}
+3. CATEGORY MIX — THIS IS THE MOST IMPORTANT RULE:
+${vibeKey === 'food'
+  ? 'Every stop is food/drink. Create a GLOBAL TASTING JOURNEY — each stop MUST be a different cuisine/culture (e.g., Mexican → Chinese → Ethiopian → Korean). NEVER two stops from the same cuisine. Vary price points.'
+  : vibeKey === 'adventure'
+    ? `ADVENTURE RATIO: At MOST ${isFullDay ? '2-3' : '1-2'} stops can be food/drink. The rest (${isFullDay ? '3-4' : '1-2'}) MUST be activities — parks, beaches, museums, landmarks, scenic walks, viewpoints, markets, galleries. If you pick 4+ food spots, YOU HAVE FAILED. Food is fuel between adventures, not the main event. Count your food stops before responding — if more than ${isFullDay ? '3' : '2'}, remove food and add an activity.`
+    : vibeKey === 'surprise'
+      ? `BEST OF THE CITY RATIO: At MOST ${isFullDay ? '2-3' : '1-2'} stops can be food/drink. The rest (${isFullDay ? '3-4' : '1-2'}) MUST be experiences — the best museum, the iconic landmark, the scenic viewpoint, the famous park, a cultural site. This is a HIGHLIGHT REEL of the city, not a restaurant crawl. If you pick 4+ food spots, YOU HAVE FAILED. Count your food vs non-food stops before responding.`
+      : isStackedVibe
+        ? 'STACKED RATIO: 3-4 stops food/drink (breakfast, lunch, dinner, late-night) + 2-3 activities (museum, landmark, scenic) + 2-3 nightlife (bar, lounge, club). Food goes BETWEEN activities. Every food stop = different cuisine.'
+        : `At least ${isFullDay ? '2-3' : '1'} stop(s) MUST be food/drink. Food goes BETWEEN activities. Every food stop MUST be a DIFFERENT cuisine.`}
 
-${isStackedVibe ? `3b. STACKED NIGHTLIFE IS MANDATORY: The evening portion (after dinner) MUST include at least 2-3 nightlife stops — a lounge or rooftop bar, a nightclub or live music venue, and late-night eats. The day should arc from chill morning → active afternoon → elevated dinner → nightlife escalation → late-night wind-down. This is a premium concierge-level full day-to-night experience.` : ''}
-${vibeKey !== 'food' ? `3c. REAL MUSEUMS & ATTRACTIONS ARE MANDATORY: At least ${isFullDay ? '2' : '1'} stop(s) MUST be a REAL, well-known, verified museum, attraction, or cultural landmark that people actually visit (e.g., science museums, art museums, aquariums, zoos, botanical gardens, observation decks, historic landmarks, performing arts theaters). Pick places with high review counts that are clearly open and operating. Do NOT make every stop a restaurant or bar. The plan should feel like you're EXPERIENCING the city — museums, landmarks, culture, AND great food. This app is for EVERYONE — all nationalities, races, genders, ages — so choose safe, inclusive, welcoming places.` : ''}
+${isStackedVibe ? `3b. STACKED NIGHTLIFE IS MANDATORY: After dinner, include 2-3 nightlife stops — lounge/rooftop, nightclub/live music, late-night eats. Arc: chill morning → active afternoon → elevated dinner → nightlife escalation → wind-down.` : ''}
+${vibeKey !== 'food' ? `3c. NON-FOOD STOPS ARE MANDATORY: At least ${isFullDay ? (vibeKey === 'adventure' || vibeKey === 'surprise' ? '3-4' : '2') : '1'} stop(s) MUST be a non-food experience — museum, park, landmark, gallery, viewpoint, market, cultural site, scenic walk, beach. Look at the "cat" field in the places list — anything that is NOT a restaurant/cafe/bar/bakery counts as an activity. DO NOT default to all restaurants just because they have higher ratings. A plan with only restaurants is a FAILED plan (unless it's a Food Tour vibe).` : ''}
 
-4. ${localRegion
-  ? `LOCAL CULTURE IS KING: You are in ${localRegion.label} territory. HEAVILY prioritize authentic ${localRegion.label} food, drinks, and culture — this is what travelers come here for. At least ${isStackedVibe ? '4 out of 8' : isFullDay ? '3 out of 6' : '2 out of 3'} food stops should be ${localRegion.label} cuisine. Include at least 1 cultural/heritage stop (museum, landmark, cultural center). You may sprinkle in 1 international option if it's genuinely great.`
-  : 'CULTURAL DIVERSITY IS CORE: NxStops is NOT a generic travel app. Mix cultures — Black-owned, Hispanic-owned, Asian-owned, Caribbean, Middle Eastern, African, and other culturally diverse businesses. Include ethnic neighborhoods, cultural landmarks, and heritage museums — not just restaurants. Never pick 2 places from the same cuisine or culture back-to-back.'}
+4. TELL A STORY — GEOGRAPHIC FLOW: Your plan must tell a coherent story as a journey through the city. Use the lat/lng coordinates to pick stops that are NEAR each other and flow in a logical geographic path — don't zigzag across town. Group nearby stops together. Each "reason" should connect to the journey: "Start your ${localHour < 12 ? 'morning' : localHour < 17 ? 'afternoon' : 'evening'} with..." → "A short walk brings you to..." → "After exploring, refuel at..." → "As the ${localHour < 17 ? 'afternoon' : 'evening'} unfolds..." The plan should feel like ONE continuous adventure through connected neighborhoods, not a random list of unrelated pins on a map.
 
-5. VIBE NOTE: For each stop, write a "reason" that is a vivid 1-sentence description making someone EXCITED to go. Examples:
-   - "A tucked-away speakeasy with killer mezcal cocktails and dim jazz lighting"
-   - "Grandma's recipe Ethiopian injera that locals line up for every Saturday"
-   - "Rooftop views of the skyline with craft cocktails at golden hour"
-   Do NOT write generic reasons like "highly rated restaurant" or "popular bar."
+5. ${localRegion
+  ? `LOCAL CULTURE IS KING: You are in ${localRegion.label} territory. HEAVILY prioritize authentic ${localRegion.label} food, drinks, and culture. At least ${isStackedVibe ? '3 out of 4' : isFullDay ? '2 out of 3' : '1 out of 2'} food stops should be ${localRegion.label} cuisine. Include at least 1 cultural/heritage stop. You may sprinkle in 1 international option if genuinely great.`
+  : 'CULTURAL DIVERSITY IS CORE: Mix cultures — include diverse businesses, ethnic neighborhoods, cultural landmarks, and heritage museums. Never pick 2 places from the same cuisine or culture back-to-back.'}
 
-6. MEAL-APPROPRIATE FOOD: Match food to the time of day. This is critical:
-   - BREAKFAST (before 11 AM): ONLY pick cafés, bakeries, brunch spots, breakfast restaurants, coffee shops, diners, or places known for breakfast/brunch. NEVER recommend pizza, BBQ, steakhouses, sushi, or dinner-style restaurants for breakfast.
-   - LUNCH (11 AM – 3 PM): Any restaurant is fine — tacos, sandwiches, sit-down, casual, etc.
-   - DINNER (6 PM – 10 PM): Elevated dining, sit-down restaurants, steakhouses, etc.
-   - LATE-NIGHT (after 10 PM): Tacos, pizza, diners, food trucks, 24-hour spots are perfect here.
-   If a place's category is "pizza_restaurant", "steak_house", "sushi_restaurant", or "seafood_restaurant", do NOT schedule it before 11 AM.
+6. VIBE NOTE: Each "reason" must be a vivid 1-sentence description making someone EXCITED to go AND connecting it to the story. Good: "A tucked-away speakeasy with killer mezcal cocktails — the perfect nightcap after exploring the arts district." Bad: "highly rated restaurant" or "popular bar."
 
-7. REALISTIC TIMING: Each timeSlot must be a specific time (e.g., "7:30 PM") that accounts for how long people ACTUALLY spend at each stop PLUS travel time between them. Use these minimums:
-   - Coffee/cafe/bakery: 30-45 min at the spot
-   - Quick bite (tacos, street food, snack stop): 45 min
-   - Sit-down restaurant/dinner: 1.5 hours (ordering, waiting, eating, paying)
-   - Bar/lounge/cocktail spot: 1-1.5 hours
-   - Movie theater: 2.5-3 hours (trailers + film + exit)
-   - Museum/gallery/activity: 2-3 hours
-   - Park/scenic walk/market: 1.5-2 hours
-   - Beach/waterfront: 1.5-2.5 hours (swimming, relaxing, walking the shore)
-   - Travel between stops: add 20-30 min buffer for transit, parking, walking, delays
+7. MEAL-APPROPRIATE FOOD: Match food to the time of day:
+   - BREAKFAST (before 11 AM): cafés, bakeries, brunch spots, coffee shops only. NEVER pizza, BBQ, steakhouse, sushi.
+   - LUNCH (11 AM – 3 PM): any restaurant.
+   - DINNER (6 PM – 10 PM): sit-down, elevated dining.
+   - LATE-NIGHT (after 10 PM): casual — tacos, pizza, diners.
 
-   Example: If dinner starts at 7:00 PM (1.5h) + 25 min travel = next stop no earlier than 8:55 PM → round to 9:00 PM.
-   NEVER schedule the next stop less than the activity duration + travel buffer after the previous one. Dinner isn't at 2 PM. Coffee isn't at 10 PM.
-${vibeKey === 'food' ? `
-   FOOD TOUR SPACING (CRITICAL): On a food tour, you MUST leave AT LEAST 2.5-3 HOURS between each food stop. People need time to digest, walk around, and build appetite again. Fill the gaps with scenic walks, window shopping, coffee/tea (not food), or casual strolling through neighborhoods. Example: brunch at 10:00 AM → next food stop no earlier than 12:30-1:00 PM → next food stop no earlier than 3:30-4:00 PM. NEVER schedule food stops only 1-1.5 hours apart — that's way too rushed and uncomfortable.` : ''}
+8. REALISTIC TIMING: Each timeSlot = specific time (e.g., "7:30 PM") accounting for:
+   - Coffee/cafe: 30-45 min | Quick bite: 45 min | Sit-down dinner: 1.5h | Bar: 1-1.5h
+   - Museum/gallery: 2-3h | Park/market: 1.5-2h | Beach: 1.5-2.5h
+   - Travel between stops: 20-30 min buffer
+   NEVER schedule next stop sooner than activity duration + travel buffer.
+${vibeKey === 'food' ? `\n   FOOD TOUR SPACING: AT LEAST 2.5-3 HOURS between food stops. Fill gaps with walks, window shopping, coffee.` : ''}
 
-8. NO DUPLICATE NAMES, BRANDS, OR CUISINES: NEVER pick two places with the same name or brand (e.g., "Ramen San" and "Ramen San Whiskey Bar" are the SAME restaurant — pick only one). If two places look like the same chain or brand, only pick ONE. NEVER pick two food stops serving the same cuisine type — no two pizza places, no two Chinese restaurants, no two sushi spots, no two burger joints. Each food stop should be a completely different culinary culture (e.g., Italian → Ethiopian → Korean → Mexican). Spread your picks across DIFFERENT restaurants, bars, and venues.
+9. NO DUPLICATES: Never same name, brand, or cuisine twice. Each food stop = different cultural cuisine.
 
-9. MIX PRICE POINTS: Not everything expensive. Include at least one affordable/casual stop.
+10. MIX PRICE POINTS: Include at least one affordable/casual stop.
 
-10. SPEND: Realistic per-person USD (coffee=$5, tacos=$12, nice dinner=$45, museum=$20, bar=$18).
+11. SPEND: Realistic per-person USD (coffee=$5, tacos=$12, dinner=$45, museum=$20, bar=$18).
 
-11. WALKABILITY: Keep stops reasonably close together.
-
-12. GROUP: family=kid-friendly no nightlife; couple=intimate/romantic; solo=flexible/chill; friends=social/fun.${eventsSection ? `\n\n13. Include at most 1 event if it fits the vibe and timing.` : ''}${advisory ? `\n\n${eventsSection ? '14' : '13'}. TRAVEL ADVISORY: ${advisory}. Factor this into your recommendations — prefer well-lit, busy, indoor venues. For any outdoor stops after 6 PM, mention safety awareness in the reason.` : ''}${jetLagContext ? `\n\n${eventsSection ? (advisory ? '15' : '14') : (advisory ? '14' : '13')}. JET LAG ADJUSTMENT: The traveler is adjusting to a new timezone. Plan a LIGHTER, gentler itinerary:
-   - Start the day LATER (no stops before 10-11 AM — they may sleep in)
-   - Include at least 1 relaxing stop (cafe, park, scenic walk) between activities
-   - Avoid back-to-back high-energy activities
-   - Prioritize comfortable food spots with good seating over rushed street food
-   - Keep evening stops mellow — no late-night past 10 PM
-   The traveler should still have a great time, just at a gentler pace.` : ''}
+12. GROUP: family=kid-friendly no nightlife; couple=romantic; solo=flexible; friends=social.${eventsSection ? `\n\n13. Include at most 1 event if it fits.` : ''}${advisory ? `\n\n${eventsSection ? '14' : '13'}. TRAVEL ADVISORY: ${advisory}. Prefer well-lit, busy venues.` : ''}${jetLagContext ? `\n\n${eventsSection ? (advisory ? '15' : '14') : (advisory ? '14' : '13')}. JET LAG: Plan lighter — start later (10-11 AM), include relaxing stops, no late-night past 10 PM.` : ''}
 
 Return ONLY this JSON:
-{"stops":[{"idx":0,"timeSlot":"7:30 PM","reason":"Vivid 1-sentence vibe description","spend":25}],"dayTitle":"Catchy 3-5 word title"}`;
+{"stops":[{"idx":0,"timeSlot":"7:30 PM","reason":"Vivid 1-sentence connecting to journey","spend":25}],"dayTitle":"Catchy 3-5 word title"}`;
 
     const systemMsg = 'You are NxStops, a curated itinerary planner that feels like a local friend who knows all the best spots. You prioritize culturally diverse, locally-owned businesses and create itineraries with a narrative arc — not just a list of places. Every plan should make someone excited to go out. Return ONLY valid JSON.';
     const messages = [

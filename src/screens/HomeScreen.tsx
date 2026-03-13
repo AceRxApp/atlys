@@ -9,6 +9,8 @@ import PaywallModal from '../components/PaywallModal';
 import { fixPhotoUrl } from '../utils/photoUrl';
 import NativeImg from '../components/NativeImg';
 import CommunityRoutesSection from '../components/CommunityRoutesSection';
+import SocialProof from '../components/SocialProof';
+import PlanLoadingAnimation from '../components/PlanLoadingAnimation';
 
 // ── Vibe Cards ──
 interface VibeOption {
@@ -83,8 +85,8 @@ const LOADING_MESSAGES = [
   'Almost ready...',
 ];
 
-// 8 major tourist attractions across all continents
-const FEATURED_DESTINATIONS = [
+// Expanded destination pool — 8 shown per day, rotated daily
+const ALL_DESTINATIONS = [
   {
     city: 'Paris', country: 'France', landmark: 'Eiffel Tower', continent: 'Europe',
     image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Tour_Eiffel_Wikimedia_Commons_%28cropped%29.jpg/600px-Tour_Eiffel_Wikimedia_Commons_%28cropped%29.jpg',
@@ -117,7 +119,56 @@ const FEATURED_DESTINATIONS = [
     city: 'Cartagena', country: 'Colombia', landmark: 'Castillo San Felipe', continent: 'S. America',
     image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/62_-_Carthag%C3%A8ne_-_D%C3%A9cembre_2008.jpg/600px-62_-_Carthag%C3%A8ne_-_D%C3%A9cembre_2008.jpg',
   },
+  {
+    city: 'London', country: 'England', landmark: 'Tower Bridge', continent: 'Europe',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/63/Tower_Bridge_from_Shad_Thames.jpg/600px-Tower_Bridge_from_Shad_Thames.jpg',
+  },
+  {
+    city: 'Bangkok', country: 'Thailand', landmark: 'Grand Palace', continent: 'Asia',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Bangkok_Grand_Palace.JPG/600px-Bangkok_Grand_Palace.JPG',
+  },
+  {
+    city: 'Rome', country: 'Italy', landmark: 'Colosseum', continent: 'Europe',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/de/Colosseo_2020.jpg/600px-Colosseo_2020.jpg',
+  },
+  {
+    city: 'Istanbul', country: 'Turkey', landmark: 'Hagia Sophia', continent: 'Europe',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Hagia_Sophia_Mars_2013.jpg/600px-Hagia_Sophia_Mars_2013.jpg',
+  },
+  {
+    city: 'Mexico City', country: 'Mexico', landmark: 'Palacio de Bellas Artes', continent: 'N. America',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/Palacio_bellas_artes_mexico_df.JPG/600px-Palacio_bellas_artes_mexico_df.JPG',
+  },
+  {
+    city: 'Cape Town', country: 'South Africa', landmark: 'Table Mountain', continent: 'Africa',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Table_mountain_and_the_ocean_cape_town.JPG/600px-Table_mountain_and_the_ocean_cape_town.JPG',
+  },
+  {
+    city: 'Barcelona', country: 'Spain', landmark: 'Sagrada Familia', continent: 'Europe',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6a/Sagrada_Familia_%28Barcelona%29.JPG/600px-Sagrada_Familia_%28Barcelona%29.JPG',
+  },
+  {
+    city: 'Marrakech', country: 'Morocco', landmark: 'Jemaa el-Fnaa', continent: 'Africa',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7f/Maroc_Marrakech_Jemaa-el-Fna_Luc_Viatour.JPG/600px-Maroc_Marrakech_Jemaa-el-Fna_Luc_Viatour.JPG',
+  },
 ];
+
+// Deterministic daily shuffle — same 8 cities all day, different tomorrow
+function getDailyDestinations() {
+  const today = new Date();
+  const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+  const shuffled = [...ALL_DESTINATIONS];
+  // Simple seeded shuffle (Lehmer LCG)
+  let s = seed;
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    s = (s * 16807 + 0) % 2147483647;
+    const j = s % (i + 1);
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled.slice(0, 8);
+}
+
+const FEATURED_DESTINATIONS = getDailyDestinations();
 
 // ============================================================================
 // City Search Autocomplete
@@ -371,36 +422,47 @@ export default function HomeScreen() {
   };
 
   const handlePlanMyDay = async () => {
-    // Require sign-in
+    // "Try before sign up" — allow 1 free plan without an account
+    const FREE_TRIAL_KEY = 'nxstops_free_trial_used';
+    const trialUsed = localStorage.getItem(FREE_TRIAL_KEY) === '1';
+
     if (!user) {
-      setShowProfile(true);
-      setAuthScreen('signup');
-      return;
-    }
-    // Check free tier usage
-    if (!subscription.canUseFeature('plan_my_day')) {
-      setShowPaywall(true);
-      return;
+      if (trialUsed) {
+        // Already used their free trial — require sign-up
+        setShowProfile(true);
+        setAuthScreen('signup');
+        return;
+      }
+      // First-time anonymous user — let them try it
+    } else {
+      // Signed-in user — check subscription limits
+      if (!subscription.canUseFeature('plan_my_day')) {
+        setShowPaywall(true);
+        return;
+      }
     }
 
     const vibe = selectedVibe || 'surprise';
     const vibeLabel = currentVibes.find(v => v.id === vibe)?.label || 'Best of the City';
     const success = await planMyDay(vibeLabel, planDuration, vibe);
     if (success) {
-      subscription.useFeature('plan_my_day');
+      if (user) {
+        subscription.useFeature('plan_my_day');
+      } else {
+        localStorage.setItem(FREE_TRIAL_KEY, '1');
+      }
       setScreen('plan');
     }
   };
 
-  // Full-page loading state
+  // Full-page loading state — fun animated progress
   if (autoPlanLoading) {
+    const vibeLabel = currentVibes.find(v => v.id === (selectedVibe || 'surprise'))?.label || 'Best of the City';
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh]">
-        <div className="w-16 h-[3px] rounded-sm mx-auto mb-6 animate-shimmer"
-          style={{ background: 'linear-gradient(90deg, var(--amber-tint-border30) 25%, var(--accent-amber) 50%, var(--amber-tint-border30) 75%)', backgroundSize: '200% 100%' }} />
-        <div className="text-lg font-bold text-text-primary mb-2">Planning your day...</div>
-        <div className="text-sm text-text-tertiary">{LOADING_MESSAGES[loadingMsgIdx]}</div>
-      </div>
+      <PlanLoadingAnimation
+        cityName={cityLabel || loc.city || 'your city'}
+        vibe={vibeLabel}
+      />
     );
   }
 
@@ -660,12 +722,24 @@ export default function HomeScreen() {
       >
         Plan My Day
       </button>
-      {!subscription.isPro && (
+      {!user ? (
+        <div className="text-center text-xs text-text-tertiary mt-1.5">
+          {localStorage.getItem('nxstops_free_trial_used') === '1'
+            ? <>Sign up to keep planning {' '}<button onClick={() => { setShowProfile(true); setAuthScreen('signup'); }} className="text-accent-amber bg-transparent border-none cursor-pointer text-xs p-0 underline">Create free account</button></>
+            : 'No account needed — try your first plan free'
+          }
+        </div>
+      ) : !subscription.isPro ? (
         <div className="text-center text-xs text-text-tertiary mt-1.5">
           {subscription.getRemainingUses('plan_my_day')} of {subscription.getLimit('plan_my_day')} free plans left this month
           {' '}<button onClick={() => setShowPaywall(true)} className="text-accent-amber bg-transparent border-none cursor-pointer text-xs p-0 underline">Upgrade</button>
         </div>
-      )}
+      ) : null}
+
+      {/* Social Proof */}
+      <div className="mt-5">
+        <SocialProof />
+      </div>
 
       {/* ── Discover — Community Routes + Quick Actions ── */}
       {hasLocation && <CommunityRoutesSection citySlug={citySlug} />}

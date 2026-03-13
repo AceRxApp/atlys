@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { CloseIcon } from '../components/icons';
-import { fetchReports, updateReportStatus, deleteReviewById, fetchPendingStops, updateStopStatus, deleteUserStop, uploadDishImage, fetchDishImages, deleteDishImage } from '../supabase';
+import { fetchReports, updateReportStatus, deleteReviewById, fetchPendingStops, updateStopStatus, deleteUserStop, uploadDishImage, fetchDishImages, deleteDishImage, authGetSession } from '../supabase';
 import type { UserStop, DishImageRecord } from '../supabase';
 
 export default function AdminPanel() {
@@ -98,11 +98,11 @@ export default function AdminPanel() {
 
       {/* Admin Tabs */}
       <div className="flex border-b border-border-subtle overflow-x-auto scroll-hidden">
-        {(['dashboard', 'signups', 'users', 'cities', 'reports', 'stops', 'dish-images', 'health'] as const).map(tab => (
+        {(['dashboard', 'signups', 'users', 'cities', 'reports', 'stops', 'dish-images', 'health', 'api-keys'] as const).map(tab => (
           <button key={tab}
             onClick={() => setAdminTab(tab)}
             className={`flex-1 p-3 text-[13px] font-medium bg-transparent border-none cursor-pointer border-b-2 whitespace-nowrap ${adminTab === tab ? 'text-accent-amber border-b-accent-amber' : 'text-text-tertiary border-b-transparent'}`}>
-            {tab === 'dish-images' ? 'Dishes' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {tab === 'dish-images' ? 'Dishes' : tab === 'api-keys' ? 'API Keys' : tab.charAt(0).toUpperCase() + tab.slice(1)}
           </button>
         ))}
       </div>
@@ -463,6 +463,10 @@ export default function AdminPanel() {
             )}
 
             {/* Health Tab — System health checks */}
+            {adminTab === 'api-keys' && (
+              <ApiKeysTab />
+            )}
+
             {adminTab === 'health' && (
               <div>
                 <div className="flex justify-between mb-4">
@@ -523,6 +527,222 @@ export default function AdminPanel() {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// =========================================================================
+// API Keys Management Tab
+// =========================================================================
+
+interface ApiKey {
+  id: string;
+  key: string;
+  developer_email: string;
+  developer_name: string | null;
+  app_name: string;
+  app_description: string | null;
+  status: string;
+  tier: string;
+  monthly_limit: number;
+  monthly_usage: number;
+  created_at: string;
+  approved_at: string | null;
+  last_used_at: string | null;
+}
+
+function ApiKeysTab() {
+  const [keys, setKeys] = useState<ApiKey[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<string>('');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const fetchKeys = useCallback(async () => {
+    setLoading(true);
+    try {
+      const session = await authGetSession();
+      if (!session) return;
+      const url = filter
+        ? `/api/user-actions?action=list-api-keys&status=${filter}`
+        : '/api/user-actions?action=list-api-keys';
+      const resp = await fetch(url, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setKeys(data.keys || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch API keys:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [filter]);
+
+  useEffect(() => { fetchKeys(); }, [fetchKeys]);
+
+  const handleApprove = useCallback(async (keyId: string) => {
+    setActionLoading(keyId);
+    try {
+      const session = await authGetSession();
+      if (!session) return;
+      const resp = await fetch('/api/user-actions?action=approve-api-key', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ key_id: keyId }),
+      });
+      if (resp.ok) {
+        setKeys(prev => prev.map(k => k.id === keyId ? { ...k, status: 'approved', approved_at: new Date().toISOString() } : k));
+      }
+    } catch (err) {
+      console.error('Approve error:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  }, []);
+
+  const handleRevoke = useCallback(async (keyId: string) => {
+    setActionLoading(keyId);
+    try {
+      const session = await authGetSession();
+      if (!session) return;
+      const resp = await fetch('/api/user-actions?action=revoke-api-key', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ key_id: keyId }),
+      });
+      if (resp.ok) {
+        setKeys(prev => prev.map(k => k.id === keyId ? { ...k, status: 'revoked' } : k));
+      }
+    } catch (err) {
+      console.error('Revoke error:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  }, []);
+
+  const statusBadge = (status: string) => {
+    const colors: Record<string, string> = {
+      pending: 'bg-yellow-400/20 text-yellow-400',
+      approved: 'bg-green-400/20 text-green-400',
+      revoked: 'bg-red-400/20 text-red-400',
+      suspended: 'bg-orange-400/20 text-orange-400',
+    };
+    return colors[status] || 'bg-gray-400/20 text-gray-400';
+  };
+
+  const tierBadge = (tier: string) => {
+    const colors: Record<string, string> = {
+      free: 'bg-gray-400/20 text-gray-400',
+      basic: 'bg-blue-400/20 text-blue-400',
+      pro: 'bg-purple-400/20 text-purple-400',
+    };
+    return colors[tier] || 'bg-gray-400/20 text-gray-400';
+  };
+
+  const pendingCount = keys.filter(k => k.status === 'pending').length;
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-base font-semibold">
+          API Keys {pendingCount > 0 && <span className="text-yellow-400 text-sm">({pendingCount} pending)</span>}
+        </h3>
+        <select
+          value={filter}
+          onChange={e => setFilter(e.target.value)}
+          className="bg-bg-input border border-border-subtle rounded-lg px-2 py-1.5 text-xs text-text-primary outline-none"
+        >
+          <option value="">All</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="revoked">Revoked</option>
+        </select>
+      </div>
+
+      {loading ? (
+        <p className="text-text-tertiary text-sm text-center p-10">Loading API keys...</p>
+      ) : keys.length === 0 ? (
+        <p className="text-text-tertiary text-sm text-center p-10">No API keys found.</p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {keys.map(k => (
+            <div key={k.id} className="card">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="min-w-0">
+                  <div className="font-semibold text-sm text-text-primary truncate">{k.app_name}</div>
+                  <div className="text-[11px] text-text-tertiary truncate">
+                    {k.developer_email} {k.developer_name && `(${k.developer_name})`}
+                  </div>
+                </div>
+                <div className="flex gap-1.5 shrink-0">
+                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${statusBadge(k.status)}`}>
+                    {k.status}
+                  </span>
+                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${tierBadge(k.tier)}`}>
+                    {k.tier}
+                  </span>
+                </div>
+              </div>
+
+              {k.app_description && (
+                <p className="text-[11px] text-text-secondary mb-2 line-clamp-2">{k.app_description}</p>
+              )}
+
+              <div className="flex items-center gap-4 text-[11px] text-text-tertiary mb-2">
+                <span>Key: <code className="text-text-secondary">{k.key}</code></span>
+              </div>
+
+              <div className="flex items-center gap-4 text-[11px] text-text-tertiary mb-3">
+                <span>Usage: {k.monthly_usage.toLocaleString()}/{k.monthly_limit.toLocaleString()}</span>
+                <span>Created: {new Date(k.created_at).toLocaleDateString()}</span>
+                {k.last_used_at && <span>Last used: {new Date(k.last_used_at).toLocaleDateString()}</span>}
+              </div>
+
+              {/* Usage bar */}
+              <div className="h-1.5 bg-bg-surface rounded-full overflow-hidden mb-3">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${Math.min(100, (k.monthly_usage / k.monthly_limit) * 100)}%`,
+                    background: k.monthly_usage / k.monthly_limit > 0.9
+                      ? '#ef4444'
+                      : 'linear-gradient(135deg, #E8940A, #F5A623)',
+                  }}
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2">
+                {k.status === 'pending' && (
+                  <button
+                    onClick={() => handleApprove(k.id)}
+                    disabled={actionLoading === k.id}
+                    className="flex-1 py-2 rounded-lg text-xs font-semibold border-none cursor-pointer bg-green-400/20 text-green-400 disabled:opacity-50"
+                  >
+                    {actionLoading === k.id ? '...' : 'Approve'}
+                  </button>
+                )}
+                {(k.status === 'pending' || k.status === 'approved') && (
+                  <button
+                    onClick={() => handleRevoke(k.id)}
+                    disabled={actionLoading === k.id}
+                    className="flex-1 py-2 rounded-lg text-xs font-semibold border-none cursor-pointer bg-red-400/20 text-red-400 disabled:opacity-50"
+                  >
+                    {actionLoading === k.id ? '...' : 'Revoke'}
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

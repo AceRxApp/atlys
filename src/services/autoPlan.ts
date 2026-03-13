@@ -31,6 +31,7 @@ export interface AutoPlanRequest {
   events?: { name: string; category: string; time: string; venue: string }[];
   advisory?: string;
   jetLagContext?: string;
+  localTime?: string;
 }
 
 export async function generateDayPlan(request: AutoPlanRequest): Promise<AutoPlanResult> {

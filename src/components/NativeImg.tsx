@@ -55,7 +55,7 @@ const NativeImg = memo(function NativeImg(
     return <div className={rest.className as string} style={{ ...rest.style as object, background: 'var(--bg-elevated)' }} />;
   }
 
-  return <img {...rest} src={blobSrc} />;
+  return <img {...rest} src={blobSrc} onError={(e) => { setFailed(true); if (rest.onError) rest.onError(e); }} />;
 });
 
 export default NativeImg;

@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { useApp } from '../context/AppContext';
 import { Place, formatDistance, getHoursStatus } from '../services/places';
-import { PriceDots, StarRating } from './ui';
+import { StarRating } from './ui';
 import { DirectionsIcon, PhoneIcon, ShareIcon } from './icons';
 import { COMMUNITY_TAGS } from '../data';
 import { getNightRisk, isNightTime, getPlaceSafety } from '../utils/safetyEngine';
@@ -75,7 +75,6 @@ export default memo(function PlaceCard({ place }: { place: Place }) {
               Popular
             </span>
           )}
-          <PriceDots level={place.priceLevel} />
           {!place.photoUrl && place.distance != null && (
             <span className="text-xs text-text-secondary">{formatDistance(place.distance, useMiles)} {getDistanceReference()}</span>
           )}

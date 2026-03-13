@@ -201,6 +201,16 @@ export function useTripPlan(deps: {
   const [lastPlanTitle, setLastPlanTitle] = useState<string | null>(null);
   const [lastPlanVibe, setLastPlanVibe] = useState<string | null>(null);
 
+  // Reset plan title/vibe when city changes — prevents stale "plan completed" state
+  const prevCityLabel = useRef(cityLabel);
+  useEffect(() => {
+    if (prevCityLabel.current !== cityLabel) {
+      setLastPlanTitle(null);
+      setLastPlanVibe(null);
+      prevCityLabel.current = cityLabel;
+    }
+  }, [cityLabel]);
+
   // Wrap-up flow state
   const [wrapUpOpen, setWrapUpOpen] = useState(false);
 
@@ -518,17 +528,14 @@ export function useTripPlan(deps: {
 
     let emoji: string;
     let text: string;
-    if (km < 0.5) {
+    // Walking capped at 10 minutes — anything longer recommends driving
+    if (walkMin <= 10) {
       emoji = '\u{1F6B6}';
-      text = `${walkMin} min walk`;
-    } else if (km < 1.5) {
-      emoji = '\u{1F6B6}';
-      text = `${walkMin} min walk · ${driveMin} min drive`;
-    } else if (km < 5) {
-      emoji = '\u{1F695}';
-      text = `${driveMin} min drive · ${walkMin} min walk`;
+      text = walkMin <= 5
+        ? `${walkMin} min walk`
+        : `${walkMin} min walk · ${driveMin} min drive`;
     } else {
-      emoji = '\u{1F697}';
+      emoji = '\u{1F695}';
       text = `${driveMin} min drive`;
     }
 
@@ -630,6 +637,24 @@ export function useTripPlan(deps: {
         .slice(0, 5)
         .map(e => ({ name: e.name, category: e.category, time: e.time, venue: e.venue }));
 
+      // Compute user's local time in the destination timezone
+      const now = new Date();
+      let localTimeStr: string | undefined;
+      try {
+        if (selectedCity?.timezone) {
+          const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: selectedCity.timezone,
+            hour: 'numeric', minute: 'numeric', hour12: false,
+          }).formatToParts(now);
+          const h = parts.find(p => p.type === 'hour')?.value || '';
+          const m = parts.find(p => p.type === 'minute')?.value || '';
+          if (h && m) localTimeStr = `${h.padStart(2, '0')}:${m.padStart(2, '0')}`;
+        }
+      } catch { /* fall back to browser local time */ }
+      if (!localTimeStr) {
+        localTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      }
+
       const result = await generateDayPlan({
         lat,
         lng,
@@ -644,6 +669,7 @@ export function useTripPlan(deps: {
         events: todayEvents.length > 0 ? todayEvents : undefined,
         advisory: advisoryStr,
         jetLagContext: jetLagStr,
+        localTime: localTimeStr,
       });
 
       // Convert plan stops to Stop objects
@@ -661,6 +687,9 @@ export function useTripPlan(deps: {
       setTripDays(prev => ({ ...prev, [activeDay]: stops }));
       setLastPlanTitle(result.dayTitle);
       setLastPlanVibe(vibe || null);
+
+      // Clear old trip start date so the new plan starts fresh (no stale "posttrip" state)
+      setTripStartDate(null);
 
       // Record in preference memory
       recordTripGenerated(mood);

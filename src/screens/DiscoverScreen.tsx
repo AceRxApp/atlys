@@ -2,196 +2,26 @@ import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { VIBES, QUICK_FILTERS, SMART_FILTERS, COMMUNITY_TAGS } from '../data';
-import { formatDistance } from '../services/places';
 import { SkeletonCard } from '../components/ui';
 import PlaceCard from '../components/PlaceCard';
-import { APIProvider, Map, Marker, AdvancedMarker, Pin, InfoWindow } from '@vis.gl/react-google-maps';
-import type { Place } from '../services/places';
 import type { EventItem } from '../types';
 import ContextHint from '../components/ContextHint';
 import { getSunsetGuardian, getRegionSafetyAlert } from '../utils/safetyEngine';
 import { fixPhotoUrl } from '../utils/photoUrl';
 import { getPreferences } from '../utils/preferences';
 import NativeImg from '../components/NativeImg';
+import NearbyEvents from '../components/NearbyEvents';
+import LumeMap from '../components/LumeMap';
+import { getCityMedia } from '../data/cityMedia';
+import { Capacitor } from '@capacitor/core';
 
-// ---------------------------------------------------------------------------
-// PlacesMapView (local component -- only used within DiscoverScreen)
-// ---------------------------------------------------------------------------
-
-function PlacesMapView({ places: mapPlaces }: { places: Place[] }) {
-  const {
-    setActiveMapPin,
-    activeMapPin,
-    setSelectedPlace,
-    addToPlan,
-    useMiles,
-    MAPS_API_KEY,
-    getMapCenter,
-    events,
-    formatEventTime,
-    addEventToPlan,
-    isEventInPlan,
-  } = useApp();
-
-  const { theme } = useTheme();
-  const [showEventPins, setShowEventPins] = useState(false);
-  const [activeEventId, setActiveEventId] = useState<string | null>(null);
-
-  const center = getMapCenter();
-
-  // Today's events with valid coordinates
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todayEvents = events.filter(
-    (e: EventItem) => e.date === todayStr && e.lat != null && e.lng != null
-  );
-
-  if (!MAPS_API_KEY) {
-    return (
-      <div className="text-center py-10 px-5">
-        <div className="text-[32px] mb-2">🗺️</div>
-        <p className="text-text-secondary text-sm mb-2">Map view requires Google Maps API key</p>
-        <p className="text-text-muted text-xs">Set VITE_GOOGLE_MAPS_API_KEY in your environment variables and enable Maps JavaScript API in Google Cloud Console.</p>
-      </div>
-    );
+/** Open URL in system browser — uses Capacitor Browser plugin on native */
+function openExternal(url: string) {
+  if (Capacitor.isNativePlatform()) {
+    import('@capacitor/browser').then(({ Browser }) => Browser.open({ url })).catch(() => window.open(url, '_blank'));
+  } else {
+    window.open(url, '_blank', 'noopener');
   }
-
-  return (
-    <div className="relative h-[calc(100vh-280px)] rounded-2xl overflow-hidden border border-border-subtle">
-      {/* Live Pulse toggle — only shows when events exist today */}
-      {todayEvents.length > 0 && (
-        <button
-          onClick={() => { setShowEventPins(v => !v); if (showEventPins) setActiveEventId(null); }}
-          className={`absolute top-3 right-3 z-10 flex items-center gap-1.5 py-2 px-3 rounded-xl text-xs font-medium cursor-pointer border shadow-sm transition-colors ${
-            showEventPins
-              ? 'bg-[rgba(196,138,90,0.15)] border-[rgba(196,138,90,0.4)] text-[#C48A5A]'
-              : 'bg-bg-card border-border-medium text-text-secondary'
-          }`}
-        >
-          🎫 Today
-          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-            showEventPins ? 'bg-[rgba(196,138,90,0.2)] text-[#C48A5A]' : 'bg-bg-subtle text-text-tertiary'
-          }`}>
-            {todayEvents.length}
-          </span>
-        </button>
-      )}
-
-      <APIProvider apiKey={MAPS_API_KEY}>
-        <Map
-          defaultCenter={center}
-          defaultZoom={14}
-          gestureHandling="greedy"
-          disableDefaultUI={true}
-          mapId="discover-map"
-          style={{ width: '100%', height: '100%' }}
-          colorScheme={theme.mapColorScheme}
-        >
-          {/* Place markers */}
-          {mapPlaces.filter(p => p.lat && p.lng).map(place => (
-            <Marker
-              key={place.placeId}
-              position={{ lat: place.lat!, lng: place.lng! }}
-              onClick={() => { setActiveMapPin(activeMapPin === place.placeId ? null : place.placeId); setActiveEventId(null); }}
-              title={place.name}
-            />
-          ))}
-
-          {/* Event markers — bronze pins, only when toggle is on */}
-          {showEventPins && todayEvents.map(event => (
-            <AdvancedMarker
-              key={event.id}
-              position={{ lat: event.lat!, lng: event.lng! }}
-              onClick={() => { setActiveEventId(activeEventId === event.id ? null : event.id); setActiveMapPin(null); }}
-              title={event.name}
-            >
-              <Pin background="#C48A5A" borderColor="#A0714A" glyphColor="#FFF" scale={0.9} />
-            </AdvancedMarker>
-          ))}
-
-          {/* Place InfoWindow */}
-          {activeMapPin && !activeEventId && (() => {
-            const place = mapPlaces.find(p => p.placeId === activeMapPin);
-            if (!place || !place.lat || !place.lng) return null;
-            return (
-              <InfoWindow
-                position={{ lat: place.lat, lng: place.lng }}
-                onCloseClick={() => setActiveMapPin(null)}
-              >
-                <div className="p-1 min-w-[160px]" style={{ color: '#1C1917' }}>
-                  <div className="font-bold text-sm mb-1">{place.name}</div>
-                  <div className="text-xs mb-1" style={{ color: '#57534E' }}>
-                    {place.categoryDisplay}
-                    {place.rating > 0 && ` · ★ ${place.rating.toFixed(1)}`}
-                    {place.distance != null && ` · ${formatDistance(place.distance, useMiles)}`}
-                  </div>
-                  <div className="flex gap-1.5 mt-2">
-                    <button
-                      onClick={() => { setSelectedPlace(place); setActiveMapPin(null); }}
-                      className="flex-1 p-1.5 rounded-md border-none text-xs font-semibold cursor-pointer"
-                      style={{ background: 'var(--accent-amber)', color: '#0C0A09' }}
-                    >
-                      Details
-                    </button>
-                    <button
-                      onClick={() => { addToPlan(place); setActiveMapPin(null); }}
-                      className="flex-1 p-1.5 rounded-md text-xs font-semibold cursor-pointer"
-                      style={{ border: '1px solid #D6D3D1', background: 'white', color: '#1C1917' }}
-                    >
-                      + Plan
-                    </button>
-                  </div>
-                </div>
-              </InfoWindow>
-            );
-          })()}
-
-          {/* Event InfoWindow */}
-          {activeEventId && (() => {
-            const event = todayEvents.find(e => e.id === activeEventId);
-            if (!event || !event.lat || !event.lng) return null;
-            return (
-              <InfoWindow
-                position={{ lat: event.lat, lng: event.lng }}
-                onCloseClick={() => setActiveEventId(null)}
-              >
-                <div className="p-1 min-w-[160px]" style={{ color: '#1C1917' }}>
-                  <div className="font-bold text-sm mb-1">{event.name}</div>
-                  <div className="text-xs mb-0.5" style={{ color: '#57534E' }}>
-                    {formatEventTime(event.time)} · {event.category}
-                  </div>
-                  <div className="text-xs mb-2 truncate max-w-[200px]" style={{ color: '#78716C' }}>{event.venue}</div>
-                  <div className="flex gap-1.5">
-                    {event.url && (
-                      <a
-                        href={event.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 p-1.5 rounded-md border-none text-white text-xs font-semibold cursor-pointer text-center no-underline"
-                        style={{ background: 'var(--event-bronze, #C48A5A)' }}
-                      >
-                        Tickets
-                      </a>
-                    )}
-                    <button
-                      onClick={() => { addEventToPlan(event); setActiveEventId(null); }}
-                      disabled={isEventInPlan(event.id)}
-                      className="flex-1 p-1.5 rounded-md text-xs font-semibold cursor-pointer"
-                      style={isEventInPlan(event.id)
-                        ? { border: '1px solid #D6D3D1', background: '#F5F5F4', color: '#A8A29E' }
-                        : { border: '1px solid #D6D3D1', background: 'white', color: '#1C1917' }
-                      }
-                    >
-                      {isEventInPlan(event.id) ? 'Added' : '+ Plan'}
-                    </button>
-                  </div>
-                </div>
-              </InfoWindow>
-            );
-          })()}
-        </Map>
-      </APIProvider>
-    </div>
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -228,8 +58,6 @@ export default function DiscoverScreen() {
     placesError,
     places,
     setSelectedPlace,
-    setActiveMapPin,
-    activeMapPin,
     useGps,
     loc,
     addToPlan,
@@ -243,6 +71,9 @@ export default function DiscoverScreen() {
     requireAuth,
     setScreen,
     isInPlan,
+    events,
+    addEventToPlan,
+    isEventInPlan,
   } = useApp();
 
   // Filter out places already in the user's plan to avoid duplicates across tabs
@@ -345,13 +176,13 @@ export default function DiscoverScreen() {
             }`}>
             List
           </button>
-          <button onClick={() => setViewMode('map')}
-            aria-label="Map view"
-            aria-pressed={viewMode === 'map'}
+          <button onClick={() => setViewMode('lume')}
+            aria-label="Lume map view"
+            aria-pressed={viewMode === 'lume'}
             className={`py-2.5 px-3.5 text-xs font-medium border-none cursor-pointer min-h-[44px] border-l border-border-strong ${
-              viewMode === 'map' ? 'bg-amber-tint-border15 text-accent-amber' : 'bg-transparent text-text-tertiary'
+              viewMode === 'lume' ? 'bg-amber-tint-border15 text-accent-amber' : 'bg-transparent text-text-tertiary'
             }`}>
-            Map
+            ✨ Lume
           </button>
         </div>
       </div>
@@ -545,9 +376,18 @@ export default function DiscoverScreen() {
       )}
 
 
-      {/* Map View */}
-      {viewMode === 'map' ? (
-        <PlacesMapView places={showSearch ? searchResults : filteredPlaces} />
+      {/* Lume Map / List View */}
+      {viewMode === 'lume' ? (
+        <LumeMap
+          places={showSearch ? searchResults : filteredPlaces}
+          events={events}
+          apiKey={MAPS_API_KEY}
+          center={getMapCenter()}
+          colorScheme={theme.mapColorScheme}
+          useMiles={useMiles}
+          onSelectPlace={setSelectedPlace}
+          onAddToPlan={addToPlan}
+        />
       ) : (
         <>
           {/* Search Results */}
@@ -666,6 +506,83 @@ export default function DiscoverScreen() {
                     ))}
                   </div>
                 </div>
+                );
+              })()}
+
+              {/* Events happening now — woven into places discovery */}
+              {!placesLoading && events.length > 0 && (
+                <div className="mb-3">
+                  <NearbyEvents
+                    events={events.filter((e: EventItem) => {
+                      const today = new Date().toISOString().split('T')[0];
+                      const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+                      return e.date === today || e.date === tomorrow;
+                    }).slice(0, 8).map((e: EventItem) => ({
+                      id: e.id, name: e.name, date: e.date, time: e.time,
+                      venue: e.venue, imageUrl: e.imageUrl, category: e.category, url: e.url,
+                    }))}
+                    onAddToPlan={(eventId: string) => {
+                      const event = events.find((e: EventItem) => e.id === eventId);
+                      if (event) addEventToPlan(event);
+                    }}
+                    isInPlan={isEventInPlan}
+                  />
+                </div>
+              )}
+
+              {/* Social — Watch on TikTok */}
+              {!placesLoading && cityLabel && (() => {
+                const media = getCityMedia(cityLabel);
+                const videos = media.tiktokVideos;
+                if (!videos || videos.length === 0) {
+                  // Fallback: single link to profile/city
+                  if (!media.tiktokUrl) return null;
+                  return (
+                    <div className="mb-3">
+                      <button
+                        onClick={() => openExternal(media.tiktokUrl!)}
+                        className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border-subtle cursor-pointer no-underline w-full text-left"
+                        style={{ background: 'linear-gradient(135deg, rgba(0,0,0,0.9), rgba(37,36,35,0.9))' }}
+                      >
+                        <span className="text-2xl shrink-0">🎬</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[13px] font-bold text-white">Watch {cityLabel} on TikTok</div>
+                          <div className="text-[11px] text-white/60">{media.tiktokHandle} — City guides, hidden gems & food finds</div>
+                        </div>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 opacity-50">
+                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
+                        </svg>
+                      </button>
+                    </div>
+                  );
+                }
+                // Multiple videos — horizontal scroll
+                return (
+                  <div className="mb-3">
+                    <div className="text-[13px] font-bold text-text-primary mb-2 flex items-center gap-2">
+                      <span>🎬</span> {cityLabel} on TikTok
+                      <span className="text-[11px] font-normal text-text-tertiary">({videos.length} clips)</span>
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto scroll-hidden pb-1">
+                      {videos.map((v, i) => (
+                        <button
+                          key={i}
+                          onClick={() => openExternal(v.url)}
+                          className="shrink-0 flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border border-border-subtle cursor-pointer no-underline"
+                          style={{ background: 'linear-gradient(135deg, rgba(0,0,0,0.9), rgba(37,36,35,0.9))' }}
+                        >
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                            style={{ background: 'linear-gradient(135deg, #E8940A, #F5A623)' }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="#000" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-[12px] font-semibold text-white truncate max-w-[140px]">{v.caption}</div>
+                            <div className="text-[10px] text-white/50">{media.tiktokHandle}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 );
               })()}
 

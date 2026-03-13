@@ -352,7 +352,7 @@ function ResultCard({
 
 // ---------- Main TasteLens Screen (Tab) ----------
 export default function DishLensScreen() {
-  const { dishLensContext, setDishLensContext, cityLabel, user, setShowProfile, setAuthScreen } = useApp();
+  const { dishLensContext, setDishLensContext, cityLabel, user, setShowProfile, setAuthScreen, addDishToHistory } = useApp();
   const subscription = useSubscription(user);
 
   const restaurant = dishLensContext.restaurant;
@@ -380,6 +380,21 @@ export default function DishLensScreen() {
       setDishName(dishLensContext.dish);
     }
   }, [dishLensContext.dish]);
+
+  // Save identified dish to Taste Passport history
+  useEffect(() => {
+    if (result) {
+      addDishToHistory({
+        name: result.name,
+        category: result.category || '',
+        city: city || '',
+        restaurant: result.restaurant || restaurant || '',
+        spiceLevel: result.spiceLevel || 0,
+        dietaryTags: result.dietaryTags || [],
+        culturalNote: result.culturalNote || '',
+      });
+    }
+  }, [result]);
 
   const handleAnalyze = () => {
     const name = dishName.trim();

@@ -58,7 +58,7 @@ export function usePlaces(deps: {
     setSelectedVibesRaw(vibes);
   }, []);
   const [quickFilters, setQuickFilters] = useState<QuickFilter[]>(['open']);
-  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'map' | 'lume'>('list');
   const [activeMapPin, setActiveMapPin] = useState<string | null>(null);
 
   // --- Community ---
@@ -155,7 +155,7 @@ export function usePlaces(deps: {
   }, [savedPlaces]);
 
   // Cloud sync: pull saved places when user logs in
-  // Deletion tracker prevents cloud from overriding local deletions (even after localStorage wipe)
+  // Deletion tracker prevents cloud from EVER bringing back deleted places
   const hasSynced = useRef(false);
   useEffect(() => {
     if (!user || hasSynced.current) return;
@@ -166,12 +166,22 @@ export function usePlaces(deps: {
       JSON.parse(localStorage.getItem('nxstops_deleted_saved') || '[]')
     );
 
-    fetchSavedPlaces().then(cloudPlaces => {
-      // Always clean up cloud: remove any places the user has deleted
-      for (const cp of cloudPlaces) {
-        if (deletedIds.has(cp.place_id)) {
-          deleteSavedPlace(cp.place_id);
-        }
+    // Also remove any locally-stored places that are in the deletion tracker
+    // (handles edge case where deletion happened but state wasn't updated)
+    if (deletedIds.size > 0) {
+      setSavedPlaces(prev => {
+        const cleaned = prev.filter(p => !deletedIds.has(p.placeId));
+        return cleaned.length !== prev.length ? cleaned : prev;
+      });
+    }
+
+    fetchSavedPlaces().then(async (cloudPlaces) => {
+      // FIRST: await all cloud deletions before doing any merging
+      const deletionPromises = cloudPlaces
+        .filter(cp => deletedIds.has(cp.place_id))
+        .map(cp => deleteSavedPlace(cp.place_id));
+      if (deletionPromises.length > 0) {
+        await Promise.allSettled(deletionPromises);
       }
 
       // Filter out deleted places from cloud data

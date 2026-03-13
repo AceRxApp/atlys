@@ -14,6 +14,18 @@ const PRICE_IDS: Record<string, string> = {
   yearly: process.env.STRIPE_PRICE_ID_YEARLY || '',
 };
 
+// API tier pricing (set these in Vercel env vars after creating Stripe products)
+const API_TIER_PRICE_IDS: Record<string, string> = {
+  basic: process.env.STRIPE_API_BASIC_PRICE_ID || '',
+  pro: process.env.STRIPE_API_PRO_PRICE_ID || '',
+};
+
+const API_TIER_LIMITS: Record<string, number> = {
+  free: 100,
+  basic: 5000,
+  pro: 50000,
+};
+
 function mapPlan(priceId: string): string {
   if (priceId === process.env.STRIPE_PRICE_ID_MONTHLY) return 'pro_monthly';
   if (priceId === process.env.STRIPE_PRICE_ID_YEARLY) return 'pro_yearly';
@@ -59,6 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (action === 'checkout') return handleCheckout(req, res);
   if (action === 'billing') return handleBilling(req, res);
+  if (action === 'api-checkout') return handleApiCheckout(req, res);
   return res.status(400).json({ error: 'Invalid action' });
 }
 
@@ -147,6 +160,63 @@ async function handleBilling(req: VercelRequest, res: VercelResponse) {
 }
 
 // =========================================================================
+// API Key Tier Checkout — Developers upgrading to paid API tier
+// =========================================================================
+async function handleApiCheckout(req: VercelRequest, res: VercelResponse) {
+  const { api_key, tier } = req.body as { api_key?: string; tier?: string };
+  if (!api_key || !tier || !API_TIER_PRICE_IDS[tier]) {
+    return res.status(400).json({ error: 'api_key and tier (basic or pro) are required' });
+  }
+
+  try {
+    // Look up the API key
+    const { data: keyRow, error: keyErr } = await supabase
+      .from('api_keys')
+      .select('id, developer_email, status, stripe_customer_id')
+      .eq('key', api_key)
+      .limit(1)
+      .maybeSingle();
+
+    if (keyErr || !keyRow) {
+      return res.status(404).json({ error: 'API key not found' });
+    }
+    if (keyRow.status !== 'approved') {
+      return res.status(403).json({ error: 'API key must be approved before upgrading' });
+    }
+
+    // Create or reuse Stripe customer
+    let customerId = keyRow.stripe_customer_id;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: keyRow.developer_email,
+        metadata: { api_key_id: keyRow.id, type: 'api_developer' },
+      });
+      customerId = customer.id;
+      await supabase.from('api_keys')
+        .update({ stripe_customer_id: customerId })
+        .eq('id', keyRow.id);
+    }
+
+    const appUrl = getAppUrl(req);
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      mode: 'subscription',
+      line_items: [{ price: API_TIER_PRICE_IDS[tier], quantity: 1 }],
+      success_url: `${appUrl}/developers?upgraded=true`,
+      cancel_url: `${appUrl}/developers?upgrade_canceled=true`,
+      subscription_data: {
+        metadata: { api_key_id: keyRow.id, tier, type: 'api_tier' },
+      },
+    });
+
+    return res.status(200).json({ url: session.url });
+  } catch (err) {
+    console.error('API tier checkout error:', err);
+    return res.status(500).json({ error: 'Failed to create checkout session' });
+  }
+}
+
+// =========================================================================
 // Stripe Webhook
 // =========================================================================
 export const config = { api: { bodyParser: false } };
@@ -180,6 +250,22 @@ async function handleWebhook(req: VercelRequest, res: VercelResponse) {
         const session = event.data.object as Stripe.Checkout.Session;
         if (session.mode === 'subscription' && session.subscription) {
           const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
+
+          // Check if this is an API tier subscription
+          if (subscription.metadata.type === 'api_tier') {
+            const apiKeyId = subscription.metadata.api_key_id;
+            const tier = subscription.metadata.tier || 'basic';
+            if (apiKeyId) {
+              await supabase.from('api_keys').update({
+                tier,
+                monthly_limit: API_TIER_LIMITS[tier] || 5000,
+                stripe_subscription_id: subscription.id,
+              }).eq('id', apiKeyId);
+            }
+            break;
+          }
+
+          // Regular user subscription
           const userId = subscription.metadata.supabase_user_id;
           const priceId = subscription.items.data[0]?.price?.id || '';
           const start = subscription.items.data[0]?.created
@@ -224,6 +310,21 @@ async function handleWebhook(req: VercelRequest, res: VercelResponse) {
 
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription;
+
+        // Handle API tier cancellation
+        if (subscription.metadata.type === 'api_tier') {
+          const apiKeyId = subscription.metadata.api_key_id;
+          if (apiKeyId) {
+            await supabase.from('api_keys').update({
+              tier: 'free',
+              monthly_limit: API_TIER_LIMITS.free,
+              stripe_subscription_id: null,
+            }).eq('id', apiKeyId);
+          }
+          break;
+        }
+
+        // Regular user subscription cancellation
         const userId = subscription.metadata.supabase_user_id;
         if (!userId) break;
 
