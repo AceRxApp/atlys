@@ -595,7 +595,7 @@ const VIBE_CONFIG: Record<string, {
     activityTypes: ADVENTURE_TYPES.concat(NIGHTLIFE_TYPES),
     textSearchKey: 'stacked',
     textSearchCount: 6,
-    aiHint: 'This is the STACKED FULL EXPERIENCE — a premium day-to-night concierge itinerary. CRITICAL: This is NOT a food tour. The arc goes: morning fuel → daytime culture/adventure → lunch → afternoon activity/landmark → dinner → lounge/rooftop → nightclub or live music → late-night eats. MANDATORY MIX: You MUST include 2-3 NON-FOOD activities (museums, landmarks, scenic viewpoints, parks, cultural sites, galleries) AND 2-3 nightlife stops (bars, lounges, clubs, live music). Food is 3-4 stops MAX spread across the day. If more than half the stops are restaurants, YOU HAVE FAILED. Mix iconic must-see landmarks with hidden gems. At least half the stops should be places most tourists would NOT know about.',
+    aiHint: 'This is the FULL EXPERIENCE — a premium day-to-night concierge itinerary covering EVERYTHING the city offers. CRITICAL: This is NOT a food tour. Think of it as: breakfast → EXPLORE (museum, temple, landmark) → lunch → ADVENTURE (park, viewpoint, cultural site) → dinner → NIGHTLIFE (rooftop bar, speakeasy, live music). The plan must feel like a COMPLETE day — eating, exploring, discovering, AND going out. Food is just the fuel between experiences. If the plan reads like a restaurant crawl with one museum, YOU HAVE FAILED. A great Full Experience plan has 3 meals woven between 2-3 iconic activities and 2 nightlife stops.',
     structureHint: {
       morning: 'Breakfast → activity → coffee stop',
       afternoon: 'Lunch → cultural experience → scenic walk',
@@ -1196,11 +1196,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .sort((a, b) => gemScore(b) - gemScore(a))
         .slice(0, 30);
     } else if (vibeKey === 'stacked') {
-      const foodCandidates = allPlaces.filter(p => isPlaceFood(p));
-      const activityCandidates = allPlaces.filter(p => !isPlaceFood(p));
-      const activityCount = Math.min(activityCandidates.length, 16);
-      const foodCount = Math.min(foodCandidates.length, 30 - activityCount);
-      topPlaces = [...activityCandidates.slice(0, activityCount), ...foodCandidates.slice(0, foodCount)]
+      // Stacked needs 3 categories: restaurants, activities, AND nightlife
+      const NIGHTLIFE_CAT_SET = new Set(['bar', 'wine_bar', 'night_club', 'casino', 'performing_arts_theater']);
+      const RESTAURANT_CAT_SET = new Set([...FOOD_TYPES].filter(t => !NIGHTLIFE_CAT_SET.has(t)));
+      const restaurantCandidates = allPlaces.filter(p => RESTAURANT_CAT_SET.has(p.category));
+      const nightlifeCandidates = allPlaces.filter(p => NIGHTLIFE_CAT_SET.has(p.category));
+      const activityCandidates = allPlaces.filter(p => !isPlaceFood(p) && !NIGHTLIFE_CAT_SET.has(p.category));
+      // Guarantee strong representation of all 3 categories
+      const activityCount = Math.min(activityCandidates.length, 12);
+      const nightlifeCount = Math.min(nightlifeCandidates.length, 8);
+      const restaurantCount = Math.min(restaurantCandidates.length, 30 - activityCount - nightlifeCount);
+      topPlaces = [
+        ...activityCandidates.slice(0, activityCount),
+        ...nightlifeCandidates.slice(0, nightlifeCount),
+        ...restaurantCandidates.slice(0, restaurantCount),
+      ]
         .sort((a, b) => gemScore(b) - gemScore(a))
         .slice(0, 30);
     } else {
@@ -1319,11 +1329,15 @@ ${vibeKey === 'food'
     : vibeKey === 'surprise'
       ? `LUXURY CITY'S BEST RATIO: At MOST ${isFullDay ? '2-3' : '1-2'} stops can be food/drink — and every food stop MUST be UPSCALE (fine dining, celebrity chef, Michelin-starred, premium steakhouse — NOT casual cafes or budget spots). The rest (${isFullDay ? '3-4' : '1-2'}) MUST be PREMIUM experiences — world-class museums, iconic landmarks, scenic viewpoints, luxury shopping districts, prestigious cultural sites. This is the LUXURY edition — every single stop should feel elevated, exclusive, and high-end. If you pick 4+ food spots, YOU HAVE FAILED. If any stop feels budget or casual, YOU HAVE FAILED. Count your food vs non-food stops before responding.`
       : isStackedVibe
-        ? 'STACKED RATIO IS STRICT: MAXIMUM 3-4 stops food/drink (breakfast, lunch, dinner, late-night) + MINIMUM 2-3 activities (museum, landmark, scenic viewpoint, park, cultural site) + MINIMUM 2-3 nightlife (bar, lounge, club, live music). Count your stops by category before responding — if more than 4 are food/drink, REMOVE food and ADD an activity or nightlife stop. Food goes BETWEEN activities. Every food stop = different cuisine. This is the FULL EXPERIENCE of a city — food, culture, adventure, AND nightlife all in one day.'
+        ? `STACKED FULL EXPERIENCE — EXACT CATEGORY BREAKDOWN FOR ${stopCount} STOPS:
+   - EXACTLY 3 RESTAURANTS (breakfast/brunch, lunch, dinner). No more. A late-night food stop counts as the 3rd if needed.
+   - EXACTLY ${stopCount >= 8 ? '2-3' : '1-2'} ACTIVITIES (museum, landmark, park, scenic viewpoint, cultural site, gallery, market, temple, monument). These are MANDATORY — not optional.
+   - EXACTLY ${stopCount >= 8 ? '2-3' : '1'} NIGHTLIFE (cocktail bar, rooftop lounge, nightclub, live music, speakeasy). Bars count as nightlife, NOT as food.
+   VALIDATION: Before responding, count each stop's category. If you have more than 3 restaurants/cafes, YOU HAVE FAILED — delete a food stop and replace it with an activity or nightlife stop. This is the FULL EXPERIENCE — food, culture, adventure, AND nightlife. NOT a food tour with a bar at the end.`
         : `At least ${isFullDay ? '2-3' : '1'} stop(s) MUST be food/drink. Food goes BETWEEN activities. Every food stop MUST be a DIFFERENT cuisine.`}
 
-${isStackedVibe ? `3b. STACKED NIGHTLIFE IS MANDATORY: After dinner, include 2-3 nightlife stops — lounge/rooftop, nightclub/live music, late-night eats. Arc: chill morning → active afternoon → elevated dinner → nightlife escalation → wind-down.` : ''}
-${vibeKey !== 'food' ? `3c. NON-FOOD STOPS ARE MANDATORY: At least ${isFullDay ? (vibeKey === 'adventure' || vibeKey === 'surprise' ? '3-4' : '2') : '1'} stop(s) MUST be a non-food experience — museum, park, landmark, gallery, viewpoint, market, cultural site, scenic walk, beach. Look at the "cat" field in the places list — anything that is NOT a restaurant/cafe/bar/bakery counts as an activity. DO NOT default to all restaurants just because they have higher ratings. A plan with only restaurants is a FAILED plan (unless it's a Food Tour vibe).` : ''}
+${isStackedVibe ? `3b. STACKED NIGHTLIFE IS MANDATORY: After dinner, include 2-3 nightlife stops — cocktail bar/rooftop lounge, then nightclub/live music/speakeasy. These are NOT restaurants — they are bars, clubs, and music venues. The arc of the FULL day: relaxed morning → active afternoon exploring → elevated dinner → nightlife escalation → wind-down.` : ''}
+${vibeKey !== 'food' ? `3c. NON-FOOD STOPS ARE MANDATORY: At least ${isFullDay ? (vibeKey === 'adventure' || vibeKey === 'surprise' || vibeKey === 'stacked' ? '4-5' : '2') : '1-2'} stop(s) MUST be a non-food experience — museum, park, landmark, gallery, viewpoint, market, cultural site, scenic walk, beach, temple, monument. Look at the "cat" field in the places list — anything that is NOT a restaurant/cafe/bakery counts as a non-food experience. Bars, lounges, and nightclubs count as NIGHTLIFE (non-food). DO NOT default to all restaurants just because they have higher ratings. A plan with mostly restaurants is a FAILED plan (unless it's a Food Tour vibe).` : ''}
 
 4. TELL A STORY — GEOGRAPHIC FLOW: Your plan must tell a coherent story as a journey through the city. Use the lat/lng coordinates to pick stops that are NEAR each other and flow in a logical geographic path — don't zigzag across town. Group nearby stops together. Each "reason" should connect to the journey: "Start your ${localHour < 12 ? 'morning' : localHour < 17 ? 'afternoon' : 'evening'} with..." → "A short walk brings you to..." → "After exploring, refuel at..." → "As the ${localHour < 17 ? 'afternoon' : 'evening'} unfolds..." The plan should feel like ONE continuous adventure through connected neighborhoods, not a random list of unrelated pins on a map.
 
