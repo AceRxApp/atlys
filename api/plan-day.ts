@@ -60,6 +60,9 @@ const DIVERSE_TEXT_SEARCHES: Record<string, string[]> = {
     'cultural center heritage museum', 'farmers market outdoor market',
     'neighborhood walking tour', 'iconic landmark must see',
     'beach oceanfront seaside', 'beach bar restaurant waterfront',
+    'temple shrine palace historic visit', 'wildlife sanctuary nature park',
+    'adventure outdoor activity zipline kayak', 'river cruise boat tour',
+    'national park nature reserve hiking', 'famous monument memorial site',
   ],
   surprise: [
     'Michelin star restaurant tasting menu fine dining', 'award winning chef restaurant upscale',
@@ -103,9 +106,11 @@ const DIVERSE_TEXT_SEARCHES: Record<string, string[]> = {
     'underground music venue live show', 'nightclub dance club DJ',
     'comedy show improv theater', 'jazz club live music venue',
     'hidden gem restaurant local favorite', 'chef owned restaurant tasting menu',
-    'artisan coffee roaster cafe', 'food hall market multiple vendors',
     'interactive art installation museum', 'architecture tour unique buildings',
     'beach club oceanfront bar', 'street art mural district walking',
+    'temple shrine sacred site visit', 'wildlife sanctuary nature experience',
+    'palace royal historic tour', 'famous market bazaar shopping experience',
+    'river cruise boat tour waterfront', 'adventure outdoor activity excursion',
   ],
   // Hidden gems — dedicated searches for off-the-beaten-path discoveries
   hiddengems: [
@@ -978,8 +983,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     fetchLabels.push('food');
 
     // Activity types — fetched if the vibe has them
+    // Activities get a WIDER radius than food — people will travel further for landmarks/museums/parks
     if (config.activityTypes.length > 0) {
-      fetches.push(fetchNearbyPlaces(lat, lng, config.activityTypes, 6000));
+      const activityRadius = (vibeKey === 'stacked' || vibeKey === 'adventure' || vibeKey === 'surprise') ? 15000 : 6000;
+      fetches.push(fetchNearbyPlaces(lat, lng, config.activityTypes, activityRadius));
       fetchLabels.push('activity');
     }
 
