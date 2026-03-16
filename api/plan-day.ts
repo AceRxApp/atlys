@@ -62,16 +62,16 @@ const DIVERSE_TEXT_SEARCHES: Record<string, string[]> = {
     'beach oceanfront seaside', 'beach bar restaurant waterfront',
   ],
   surprise: [
-    'best fine dining restaurant upscale', 'award winning chef restaurant',
-    'Michelin star restaurant tasting menu', 'luxury rooftop bar cocktails',
-    'best rated restaurant city', 'trendy cocktail bar speakeasy',
-    'science museum interactive exhibits', 'natural history museum',
-    'art museum gallery modern contemporary', 'children museum family',
-    'history museum heritage center', 'aquarium ocean exhibit',
-    'botanical garden conservatory', 'zoo wildlife sanctuary',
-    'popular tourist attraction top rated', 'best things to do sightseeing tour',
-    'observation deck skyline viewpoint', 'historic theater performing arts',
-    'famous landmark monument must visit', 'scenic waterfront boardwalk pier',
+    'Michelin star restaurant tasting menu fine dining', 'award winning chef restaurant upscale',
+    'luxury rooftop bar cocktails panoramic views', 'five star hotel restaurant bar lounge',
+    'premium steakhouse fine dining upscale', 'omakase sushi high end restaurant',
+    'champagne bar wine lounge upscale', 'exclusive members club restaurant',
+    'world class art museum gallery', 'iconic landmark monument must visit',
+    'luxury shopping district designer boutiques', 'scenic observation deck skyline views',
+    'historic theater performing arts opera', 'famous landmark cultural heritage site',
+    'botanical garden conservatory scenic', 'waterfront promenade scenic boardwalk',
+    'penthouse rooftop lounge city views', 'celebrity chef restaurant signature dining',
+    'spa wellness luxury treatment', 'yacht club marina waterfront dining',
   ],
   chill: [
     'cozy coffee shop cafe', 'indie bookstore cafe', 'botanical garden park scenic',
@@ -96,17 +96,16 @@ const DIVERSE_TEXT_SEARCHES: Record<string, string[]> = {
     'national monument memorial landmark', 'historic architecture landmark tour',
   ],
   stacked: [
-    'hidden gem restaurant local favorite', 'underrated bar speakeasy cocktail',
-    'off the beaten path attraction', 'locals only restaurant neighborhood',
-    'boutique hotel rooftop bar', 'secret garden park hidden',
-    'underground music venue live show', 'artisan coffee roaster cafe',
-    'independent bookstore cafe wine', 'neighborhood dive bar local',
-    'pop up restaurant food experience', 'chef owned restaurant tasting',
-    'interactive art installation museum', 'historic speakeasy hidden bar',
-    'waterfront restaurant scenic dining', 'comedy show improv theater',
-    'craft cocktail bar mixology', 'food hall market multiple vendors',
-    'cultural festival event local', 'architecture tour unique buildings',
-    'beach club oceanfront bar', 'beach seafood restaurant waterfront',
+    'iconic landmark must visit attraction', 'world class museum gallery exhibition',
+    'scenic viewpoint observation deck skyline', 'famous park botanical garden',
+    'cultural district historic neighborhood tour', 'waterfront boardwalk scenic walk',
+    'rooftop bar lounge panoramic views', 'speakeasy hidden cocktail bar',
+    'underground music venue live show', 'nightclub dance club DJ',
+    'comedy show improv theater', 'jazz club live music venue',
+    'hidden gem restaurant local favorite', 'chef owned restaurant tasting menu',
+    'artisan coffee roaster cafe', 'food hall market multiple vendors',
+    'interactive art installation museum', 'architecture tour unique buildings',
+    'beach club oceanfront bar', 'street art mural district walking',
   ],
   // Hidden gems — dedicated searches for off-the-beaten-path discoveries
   hiddengems: [
@@ -596,7 +595,7 @@ const VIBE_CONFIG: Record<string, {
     activityTypes: ADVENTURE_TYPES.concat(NIGHTLIFE_TYPES),
     textSearchKey: 'stacked',
     textSearchCount: 6,
-    aiHint: 'This is the STACKED concierge itinerary — a premium day-to-night experience planned like a personal concierge. The arc goes: morning fuel → daytime culture/adventure → lunch → afternoon activity → dinner → lounge/rooftop → nightclub or live music → late-night eats. Every stop should feel intentional, elevated, and exciting. Mix iconic must-see landmarks with hidden gems, underrated spots, and unique local-only experiences. At least half the stops should be places most tourists would NOT know about — the kind of spot a well-connected local friend would take you to. This is the ULTIMATE full-day experience.',
+    aiHint: 'This is the STACKED FULL EXPERIENCE — a premium day-to-night concierge itinerary. CRITICAL: This is NOT a food tour. The arc goes: morning fuel → daytime culture/adventure → lunch → afternoon activity/landmark → dinner → lounge/rooftop → nightclub or live music → late-night eats. MANDATORY MIX: You MUST include 2-3 NON-FOOD activities (museums, landmarks, scenic viewpoints, parks, cultural sites, galleries) AND 2-3 nightlife stops (bars, lounges, clubs, live music). Food is 3-4 stops MAX spread across the day. If more than half the stops are restaurants, YOU HAVE FAILED. Mix iconic must-see landmarks with hidden gems. At least half the stops should be places most tourists would NOT know about.',
     structureHint: {
       morning: 'Breakfast → activity → coffee stop',
       afternoon: 'Lunch → cultural experience → scenic walk',
@@ -631,16 +630,16 @@ const VIBE_CONFIG: Record<string, {
     },
   },
   surprise: {
-    foodTypes: FOOD_TYPES.concat(['fine_dining_restaurant', 'steak_house', 'seafood_restaurant']),
+    foodTypes: ['fine_dining_restaurant', 'steak_house', 'seafood_restaurant', 'restaurant', 'sushi_restaurant', 'wine_bar', 'brunch_restaurant'],
     activityTypes: ADVENTURE_TYPES.concat(NIGHTLIFE_TYPES).concat(['shopping_mall', 'clothing_store', 'spa']),
     textSearchKey: 'surprise',
     textSearchCount: 6,
-    aiHint: 'BEST OF THE CITY — a curated highlight reel of what makes this city SPECIAL. This is the #1 plan visitors ask for, so it MUST be a rich, balanced mix — NOT just restaurants. THE MIX IS MANDATORY: At least HALF the stops must be NON-FOOD experiences (museums, landmarks, parks, viewpoints, galleries, cultural sites, scenic neighborhoods). The food stops should be the city\'s most celebrated dining — not chains or generic spots. Think: what would a proud local show a first-time visitor in ONE perfect day? The answer is the iconic museum, the famous landmark, the hidden viewpoint, the scenic waterfront walk, AND the legendary restaurant. NEVER make the plan all restaurants or all museums — it must be the BEST OF EVERYTHING this city offers. Every stop must be REAL, well-reviewed, and currently operating.',
+    aiHint: 'CITY\'S BEST — a LUXURY curated experience of the city\'s most prestigious and elevated offerings. This should feel like a high-end concierge planned it for a VIP. Every stop should feel PREMIUM and UPSCALE — think Michelin-starred restaurants, award-winning fine dining, exclusive rooftop lounges, world-class museums, iconic cultural landmarks, luxury shopping districts, and scenic viewpoints. NO chains, no casual fast food, no budget spots. THE MIX IS MANDATORY: At least HALF the stops must be NON-FOOD experiences (world-class museums, iconic landmarks, scenic viewpoints, luxury shopping, cultural sites). Food stops must be the city\'s FINEST dining — celebrity chef restaurants, Michelin-starred spots, upscale steakhouses, signature tasting menus. Drinks should be at the most exclusive cocktail bars, rooftop lounges, or champagne bars. Every stop should make someone feel like they\'re living their BEST, most elevated life. This is not a budget tour — this is the LUXURY edition.',
     structureHint: {
-      morning: 'Best brunch or upscale café → iconic cultural landmark or gallery → artisan bakery or coffee',
-      afternoon: 'Top-rated lunch (upscale casual or fine dining) → world-class museum or luxury shopping district → scenic neighborhood or cultural landmark',
-      evening: 'Award-winning dinner (fine dining caliber) → celebrated cocktail bar or rooftop lounge → nightlife or late-night bite',
-      full: 'Upscale brunch or café → iconic landmark or gallery → best lunch (chef-driven) → world-class museum or luxury shopping → scenic neighborhood → fine dining dinner → top cocktail bar or rooftop → nightlife or late-night bite',
+      morning: 'Luxury brunch or upscale café → iconic cultural landmark or world-class gallery → premium patisserie or artisan coffee',
+      afternoon: 'Fine dining lunch (Michelin-caliber or celebrity chef) → world-class museum or luxury shopping district → scenic viewpoint or prestigious cultural landmark',
+      evening: 'Award-winning fine dining (tasting menu or signature restaurant) → exclusive rooftop lounge or champagne bar → premium nightlife or VIP late-night',
+      full: 'Luxury brunch → iconic landmark or world-class gallery → finest lunch (chef-driven, upscale) → premier museum or luxury shopping district → scenic viewpoint → fine dining dinner (Michelin-caliber) → exclusive rooftop bar or lounge → premium nightlife',
     },
   },
   chill: {
@@ -1028,18 +1027,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const adventureSearches = (DIVERSE_TEXT_SEARCHES.adventure || []).sort(() => Math.random() - 0.5).slice(0, 3);
         const localFood = localRegion.foodSearches.sort(() => Math.random() - 0.5).slice(0, 2);
         shuffledSearches.push(...adventureSearches, ...localFood);
+      } else if (vibeKey === 'stacked') {
+        // Stacked in local region: balanced mix — local food + activities + nightlife
+        const localFood = localRegion.foodSearches.sort(() => Math.random() - 0.5).slice(0, 2);
+        const adventureSearches = (DIVERSE_TEXT_SEARCHES.adventure || []).sort(() => Math.random() - 0.5).slice(0, 3);
+        const culturalSearches = (DIVERSE_TEXT_SEARCHES.cultural || []).sort(() => Math.random() - 0.5).slice(0, 2);
+        const localNight = localRegion.nightlifeSearches.sort(() => Math.random() - 0.5).slice(0, 2);
+        shuffledSearches.push(...localFood, ...adventureSearches, ...culturalSearches, ...localNight);
       } else {
         // Surprise/chill/daydrinks: heavy local + cultural mix
         const localFood = localRegion.foodSearches.sort(() => Math.random() - 0.5).slice(0, 3);
         const globalSurprise = (DIVERSE_TEXT_SEARCHES.surprise || []).sort(() => Math.random() - 0.5).slice(0, 1);
         const culturalSearches = (DIVERSE_TEXT_SEARCHES.cultural || []).sort(() => Math.random() - 0.5).slice(0, 2);
         shuffledSearches.push(...localFood, ...globalSurprise, ...culturalSearches);
-      }
-
-      // Stacked vibe: add nightlife searches for evening portion
-      if (vibeKey === 'stacked') {
-        const localNight = localRegion.nightlifeSearches.sort(() => Math.random() - 0.5).slice(0, 2);
-        shuffledSearches.push(...localNight);
       }
 
       // ALWAYS add hidden gem searches — the secret sauce for unique discoveries
@@ -1052,9 +1052,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // For activity-focused vibes: add MORE activity/cultural searches, NOT more food
       // The food already comes from fetchNearbyPlaces — no need to inflate it further
-      if (vibeKey === 'surprise' || vibeKey === 'adventure' || vibeKey === 'cultural') {
+      if (vibeKey === 'surprise' || vibeKey === 'adventure' || vibeKey === 'cultural' || vibeKey === 'stacked') {
         const culturalSearches = DIVERSE_TEXT_SEARCHES.cultural.sort(() => Math.random() - 0.5).slice(0, 4);
         shuffledSearches.push(...culturalSearches);
+        // Stacked also needs adventure searches for daytime activities
+        if (vibeKey === 'stacked') {
+          const adventureSearches = DIVERSE_TEXT_SEARCHES.adventure.sort(() => Math.random() - 0.5).slice(0, 3);
+          shuffledSearches.push(...adventureSearches);
+        }
       } else if (vibeKey !== 'food') {
         // Other vibes (chill, daydrinks, nightout): light food + cultural mix
         const foodSearches = DIVERSE_TEXT_SEARCHES.food.sort(() => Math.random() - 0.5).slice(0, 1);
@@ -1312,9 +1317,9 @@ ${vibeKey === 'food'
   : vibeKey === 'adventure'
     ? `ADVENTURE RATIO: At MOST ${isFullDay ? '2-3' : '1-2'} stops can be food/drink. The rest (${isFullDay ? '3-4' : '1-2'}) MUST be activities — parks, beaches, museums, landmarks, scenic walks, viewpoints, markets, galleries. If you pick 4+ food spots, YOU HAVE FAILED. Food is fuel between adventures, not the main event. Count your food stops before responding — if more than ${isFullDay ? '3' : '2'}, remove food and add an activity.`
     : vibeKey === 'surprise'
-      ? `BEST OF THE CITY RATIO: At MOST ${isFullDay ? '2-3' : '1-2'} stops can be food/drink. The rest (${isFullDay ? '3-4' : '1-2'}) MUST be experiences — the best museum, the iconic landmark, the scenic viewpoint, the famous park, a cultural site. This is a HIGHLIGHT REEL of the city, not a restaurant crawl. If you pick 4+ food spots, YOU HAVE FAILED. Count your food vs non-food stops before responding.`
+      ? `LUXURY CITY'S BEST RATIO: At MOST ${isFullDay ? '2-3' : '1-2'} stops can be food/drink — and every food stop MUST be UPSCALE (fine dining, celebrity chef, Michelin-starred, premium steakhouse — NOT casual cafes or budget spots). The rest (${isFullDay ? '3-4' : '1-2'}) MUST be PREMIUM experiences — world-class museums, iconic landmarks, scenic viewpoints, luxury shopping districts, prestigious cultural sites. This is the LUXURY edition — every single stop should feel elevated, exclusive, and high-end. If you pick 4+ food spots, YOU HAVE FAILED. If any stop feels budget or casual, YOU HAVE FAILED. Count your food vs non-food stops before responding.`
       : isStackedVibe
-        ? 'STACKED RATIO: 3-4 stops food/drink (breakfast, lunch, dinner, late-night) + 2-3 activities (museum, landmark, scenic) + 2-3 nightlife (bar, lounge, club). Food goes BETWEEN activities. Every food stop = different cuisine.'
+        ? 'STACKED RATIO IS STRICT: MAXIMUM 3-4 stops food/drink (breakfast, lunch, dinner, late-night) + MINIMUM 2-3 activities (museum, landmark, scenic viewpoint, park, cultural site) + MINIMUM 2-3 nightlife (bar, lounge, club, live music). Count your stops by category before responding — if more than 4 are food/drink, REMOVE food and ADD an activity or nightlife stop. Food goes BETWEEN activities. Every food stop = different cuisine. This is the FULL EXPERIENCE of a city — food, culture, adventure, AND nightlife all in one day.'
         : `At least ${isFullDay ? '2-3' : '1'} stop(s) MUST be food/drink. Food goes BETWEEN activities. Every food stop MUST be a DIFFERENT cuisine.`}
 
 ${isStackedVibe ? `3b. STACKED NIGHTLIFE IS MANDATORY: After dinner, include 2-3 nightlife stops — lounge/rooftop, nightclub/live music, late-night eats. Arc: chill morning → active afternoon → elevated dinner → nightlife escalation → wind-down.` : ''}
@@ -1326,7 +1331,7 @@ ${vibeKey !== 'food' ? `3c. NON-FOOD STOPS ARE MANDATORY: At least ${isFullDay ?
   ? `LOCAL CULTURE IS KING: You are in ${localRegion.label} territory. HEAVILY prioritize authentic ${localRegion.label} food, drinks, and culture. At least ${isStackedVibe ? '3 out of 4' : isFullDay ? '2 out of 3' : '1 out of 2'} food stops should be ${localRegion.label} cuisine. Include at least 1 cultural/heritage stop. You may sprinkle in 1 international option if genuinely great.`
   : 'CULTURAL DIVERSITY IS CORE: Mix cultures — include diverse businesses, ethnic neighborhoods, cultural landmarks, and heritage museums. Never pick 2 places from the same cuisine or culture back-to-back.'}
 
-6. VIBE NOTE: Each "reason" must be a vivid 1-sentence description making someone EXCITED to go AND connecting it to the story. Good: "A tucked-away speakeasy with killer mezcal cocktails — the perfect nightcap after exploring the arts district." Bad: "highly rated restaurant" or "popular bar."
+6. VIBE NOTE: Each "reason" must be a vivid 1-sentence description making someone EXCITED to go AND connecting it to the story.${vibeKey === 'surprise' ? ' For City\'s Best, use LUXURY language — words like "prestigious", "world-renowned", "award-winning", "exclusive", "stunning", "premier". Good: "A Michelin-starred tasting menu where the chef\'s omakase rivals Tokyo\'s finest — the pinnacle of the city\'s dining scene." Bad: "highly rated restaurant" or "popular spot."' : ' Good: "A tucked-away speakeasy with killer mezcal cocktails — the perfect nightcap after exploring the arts district." Bad: "highly rated restaurant" or "popular bar."'}
 
 7. MEAL-APPROPRIATE FOOD: Match food to the time of day:
    - BREAKFAST (before 11 AM): cafés, bakeries, brunch spots, coffee shops only. NEVER pizza, BBQ, steakhouse, sushi.
