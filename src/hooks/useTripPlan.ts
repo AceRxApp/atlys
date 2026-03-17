@@ -604,9 +604,10 @@ export function useTripPlan(deps: {
         } catch { /* advisory is optional */ }
       }
 
-      // Compute jet lag context for the AI
+      // Compute jet lag context for the AI — only when user has set a trip start date
+      // (otherwise they're just planning/exploring, not actually jet-lagged)
       let jetLagStr: string | undefined;
-      if (selectedCity?.timezone) {
+      if (selectedCity?.timezone && tripStartDate) {
         try {
           const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
           const destTz = selectedCity.timezone;
@@ -616,12 +617,9 @@ export function useTripPlan(deps: {
             const destOffset = getTimezoneOffsetHours(refDate, destTz);
             const hourDiff = Math.abs(destOffset - userOffset);
             if (hourDiff >= 5) {
-              let tripDay = activeDay;
-              if (tripStartDate) {
-                const startMs = new Date(tripStartDate + 'T00:00:00').getTime();
-                const todayMs = new Date().setHours(0, 0, 0, 0);
-                tripDay = Math.max(1, Math.floor((todayMs - startMs) / 86400000) + 1);
-              }
+              const startMs = new Date(tripStartDate + 'T00:00:00').getTime();
+              const todayMs = new Date().setHours(0, 0, 0, 0);
+              const tripDay = Math.max(1, Math.floor((todayMs - startMs) / 86400000) + 1);
               if (tripDay <= 2) {
                 jetLagStr = `Day ${tripDay} of trip with ${Math.round(hourDiff)}-hour timezone shift (${userTz} → ${destTz}). Traveler is likely jet-lagged.`;
               }

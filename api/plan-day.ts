@@ -1272,7 +1272,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const isStackedVibe = vibeKey === 'stacked';
     const jetLagActive = !!jetLagContext;
     const stopCount = jetLagActive
-      ? (isStackedVibe ? 6 : isFullDay ? 4 : 2)
+      ? (isStackedVibe ? 6 : isFullDay ? 4 : 3)
       : (isStackedVibe ? 8 : isFullDay ? 6 : 3);
     // Use the client's local time (they pass it from the browser)
     const timeLabel = localTime || `${new Date().getHours()}:${String(new Date().getMinutes()).padStart(2, '0')}`;
