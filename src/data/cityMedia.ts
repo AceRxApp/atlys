@@ -1,105 +1,109 @@
 // ---------------------------------------------------------------------------
-// City-level media links: TikTok profiles, video clips, social handles
+// City-level media: self-hosted video clips and social handles
 // ---------------------------------------------------------------------------
-// Add your TikTok video URLs per city as you film them.
-// The app will show a "Watch on TikTok" section when a city has content.
+// Add your self-hosted video URLs per city as you film and upload them.
+// Videos should be hosted on Cloudflare Stream, Supabase Storage, Mux, or
+// any CDN that serves direct mp4 files.
+// The app will show an in-app video player section when a city has content.
 // ---------------------------------------------------------------------------
 
+import type { CityVideoClip } from '../components/CityVideoPlayer';
+
 export interface CityMedia {
-  tiktokUrl?: string;       // Your TikTok profile or city-specific playlist URL
-  tiktokHandle?: string;    // e.g. "@nxstops"
-  tiktokVideos?: { url: string; caption: string }[]; // Multiple TikTok videos for this city
-  instagramUrl?: string;    // Instagram profile/highlight URL
-  instagramHandle?: string; // e.g. "@nxstops"
-  youtubeUrl?: string;      // YouTube channel or city playlist URL
-  heroVideoUrl?: string;    // Self-hosted city sizzle reel (Cloudflare Stream / Mux / direct mp4)
-  heroVideoThumb?: string;  // Thumbnail for the hero video
+  videos?: CityVideoClip[];       // Self-hosted video clips (mp4 / HLS)
+  instagramUrl?: string;          // Instagram profile/highlight URL
+  instagramHandle?: string;       // e.g. "@nxstops"
 }
 
 // Map: lowercase city slug → media links
 // Update this as you create content for each city
+
 // DC media shared across slug variants
 const DC_MEDIA: CityMedia = {
-  tiktokVideos: [
-    { url: 'https://www.tiktok.com/@nxstops/video/7610934219291856159', caption: 'Balos Esiatorio' },
-    { url: 'https://www.tiktok.com/@nxstops/video/7610541168903900446', caption: 'The Parks at 14th' },
+  videos: [
+    // Upload your DC clips and add the mp4 URLs here:
+    // { url: 'https://your-cdn.com/dc-balos.mp4', thumbnail: '...', caption: 'Balos Esiatorio', duration: 30 },
+    // { url: 'https://your-cdn.com/dc-parks.mp4', thumbnail: '...', caption: 'The Parks at 14th', duration: 25 },
   ],
 };
 
 // Accra media shared across slug variants
 const ACCRA_MEDIA: CityMedia = {
-  tiktokVideos: [
-    { url: 'https://www.tiktok.com/@nxstops/video/7614167071479450911', caption: 'Kwame Nkrumah Mausoleum' },
-    { url: 'https://www.tiktok.com/@nxstops/video/7611291737528601887', caption: 'Sandbox Beach Club' },
-    { url: 'https://www.tiktok.com/@nxstops/video/7610031758888815902', caption: 'Mad Skyz' },
+  videos: [
+    // { url: 'https://your-cdn.com/accra-mausoleum.mp4', thumbnail: '...', caption: 'Kwame Nkrumah Mausoleum', duration: 35 },
+    // { url: 'https://your-cdn.com/accra-sandbox.mp4', thumbnail: '...', caption: 'Sandbox Beach Club', duration: 28 },
+    // { url: 'https://your-cdn.com/accra-madskyz.mp4', thumbnail: '...', caption: 'Mad Skyz', duration: 22 },
   ],
 };
 
 const CITY_MEDIA: Record<string, CityMedia> = {
-  // ── Live cities with TikTok content (full video URLs) ──
+  // ── Cities with video content ──
+  // Add self-hosted mp4 URLs as you upload them.
+  // Format: { url: 'https://cdn.../video.mp4', thumbnail: 'https://cdn.../thumb.jpg', caption: 'Title', duration: 30 }
+
   'barcelona': {
-    tiktokVideos: [
-      { url: 'https://www.tiktok.com/@nxstops/video/7616514111744003358', caption: 'City Discovery' },
+    videos: [
+      // { url: '...', thumbnail: '...', caption: 'City Discovery', duration: 30 },
     ],
   },
   'cartagena': {
-    tiktokVideos: [
-      { url: 'https://www.tiktok.com/@nxstops/video/7616057632746409246', caption: 'Why Cartagena should be on your list' },
-      { url: 'https://www.tiktok.com/@nxstops/video/7616117118655827230', caption: 'Plan Cartagena with me' },
+    videos: [
+      // { url: '...', thumbnail: '...', caption: 'Why Cartagena should be on your list', duration: 45 },
+      // { url: '...', thumbnail: '...', caption: 'Plan Cartagena with me', duration: 35 },
     ],
   },
   'cape-town': {
-    tiktokVideos: [
-      { url: 'https://www.tiktok.com/@nxstops/video/7615468776384941342', caption: 'The beauty of Cape Town' },
-      { url: 'https://www.tiktok.com/@nxstops/video/7615402749835988255', caption: 'NxStops takes Cape Town' },
+    videos: [
+      // { url: '...', thumbnail: '...', caption: 'The beauty of Cape Town', duration: 40 },
+      // { url: '...', thumbnail: '...', caption: 'NxStops takes Cape Town', duration: 30 },
     ],
   },
   'capetown': {
-    tiktokVideos: [
-      { url: 'https://www.tiktok.com/@nxstops/video/7615468776384941342', caption: 'The beauty of Cape Town' },
-      { url: 'https://www.tiktok.com/@nxstops/video/7615402749835988255', caption: 'NxStops takes Cape Town' },
+    videos: [
+      // { url: '...', thumbnail: '...', caption: 'The beauty of Cape Town', duration: 40 },
+      // { url: '...', thumbnail: '...', caption: 'NxStops takes Cape Town', duration: 30 },
     ],
   },
   'nairobi': {
-    tiktokVideos: [
-      { url: 'https://www.tiktok.com/@nxstops/video/7614606160435449119', caption: 'Ololo Safari Lodge' },
+    videos: [
+      // { url: '...', thumbnail: '...', caption: 'Ololo Safari Lodge', duration: 25 },
     ],
   },
   'accra': ACCRA_MEDIA,
   'busan': {
-    tiktokVideos: [
-      { url: 'https://www.tiktok.com/@nxstops/video/7613888071532121374', caption: 'Hidden Gems of Busan' },
+    videos: [
+      // { url: '...', thumbnail: '...', caption: 'Hidden Gems of Busan', duration: 30 },
     ],
   },
   'sydney': {
-    tiktokVideos: [
-      { url: 'https://www.tiktok.com/@nxstops/video/7613514870322973983', caption: 'Sydney Opera House' },
+    videos: [
+      // { url: '...', thumbnail: '...', caption: 'Sydney Opera House', duration: 28 },
     ],
   },
   'chicago': {
-    tiktokVideos: [
-      { url: 'https://www.tiktok.com/@nxstops/video/7609746218167651615', caption: 'Your night, curated' },
-      { url: 'https://www.tiktok.com/@nxstops/video/7613141280733842718', caption: 'Crying Tiger' },
+    videos: [
+      // { url: '...', thumbnail: '...', caption: 'Your night, curated', duration: 35 },
+      // { url: '...', thumbnail: '...', caption: 'Crying Tiger', duration: 25 },
     ],
   },
   'kyoto': {
-    tiktokVideos: [
-      { url: 'https://www.tiktok.com/@nxstops/video/7612807420951219487', caption: 'K36 Rooftop Views' },
+    videos: [
+      // { url: '...', thumbnail: '...', caption: 'K36 Rooftop Views', duration: 30 },
     ],
   },
   'atlanta': {
-    tiktokVideos: [
-      { url: 'https://www.tiktok.com/@nxstops/video/7612676643215248671', caption: 'Mercedes-Benz Stadium' },
+    videos: [
+      // { url: '...', thumbnail: '...', caption: 'Mercedes-Benz Stadium', duration: 28 },
     ],
   },
   'london': {
-    tiktokVideos: [
-      { url: 'https://www.tiktok.com/@nxstops/video/7611765664985926942', caption: 'Exploring London' },
+    videos: [
+      // { url: '...', thumbnail: '...', caption: 'Exploring London', duration: 35 },
     ],
   },
   'houston': {
-    tiktokVideos: [
-      { url: 'https://www.tiktok.com/@nxstops/video/7610972975491190047', caption: 'Toca Madera' },
+    videos: [
+      // { url: '...', thumbnail: '...', caption: 'Toca Madera', duration: 30 },
     ],
   },
   'washington-dc': DC_MEDIA,
@@ -109,8 +113,6 @@ const CITY_MEDIA: Record<string, CityMedia> = {
 
 // Default social links (shown when no city-specific content exists)
 const DEFAULT_MEDIA: CityMedia = {
-  tiktokUrl: 'https://www.tiktok.com/@nxstops',
-  tiktokHandle: '@nxstops',
   instagramUrl: 'https://www.instagram.com/nxstops/',
   instagramHandle: '@nxstops',
 };
@@ -123,23 +125,18 @@ export function getCityMedia(citySlug: string): CityMedia {
   const slug = citySlug.toLowerCase().replace(/\s+/g, '-');
   const citySpecific = CITY_MEDIA[slug];
   if (citySpecific) {
-    const merged = { ...DEFAULT_MEDIA, ...citySpecific };
-    // Auto-set tiktokUrl from first video if not explicitly set
-    if (!merged.tiktokUrl && merged.tiktokVideos && merged.tiktokVideos.length > 0) {
-      merged.tiktokUrl = merged.tiktokVideos[0].url;
-    }
-    return merged;
+    return { ...DEFAULT_MEDIA, ...citySpecific };
   }
   return DEFAULT_MEDIA;
 }
 
 /**
- * Check if a city has dedicated video content (not just social links)
+ * Check if a city has self-hosted video content
  */
 export function cityHasVideo(citySlug: string): boolean {
   const slug = citySlug.toLowerCase().replace(/\s+/g, '-');
   const media = CITY_MEDIA[slug];
-  return !!(media?.heroVideoUrl);
+  return !!(media?.videos && media.videos.length > 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -153,8 +150,7 @@ export interface PlaceVideo {
   thumbnailUrl: string;   // Video thumbnail
   duration: number;       // Duration in seconds
   caption?: string;       // Short caption overlay
-  source: 'self' | 'tiktok' | 'youtube'; // Where it's hosted
-  sourceUrl?: string;     // Original source URL (for attribution)
+  source: 'self';         // Self-hosted only
 }
 
 // Place ID → video clip

@@ -628,9 +628,9 @@ const VIBE_CONFIG: Record<string, {
     textSearchCount: 4,
     aiHint: 'This is an ADVENTURE day — about DOING things, SEEING things, and EXPLORING — not just eating. The MAJORITY of stops (at least 60-70%) must be ACTIVITIES: parks, beaches, hiking trails, museums, galleries, landmarks, scenic viewpoints, markets, historic neighborhoods, waterfront walks. Food is fuel between adventures — weave in just 1-2 food stops for half day, 2-3 for full day. The food should match the adventure context (beach → nearby seafood shack, park → local cafe, cultural district → neighborhood ethnic food). BEACH RULE: If the city has beaches, MUST include at least one beach stop. NEVER let the plan become 4+ restaurants with one museum tacked on — that\'s a food tour, not an adventure.',
     structureHint: {
-      morning: 'Breakfast/brunch → outdoor activity, museum, or beach → coffee or snack stop',
-      afternoon: 'Lunch → museum or landmark → beach or scenic walk → market or snack',
-      evening: 'Dinner → cultural venue or viewpoint → dessert or drinks',
+      morning: '3 stops required: Breakfast/brunch (FOOD — mandatory) → outdoor activity, museum, temple, or beach (ACTIVITY) → coffee or scenic walk (ACTIVITY). Start with food, then explore.',
+      afternoon: '3 stops required: Lunch (FOOD — mandatory) → museum, landmark, or nature (ACTIVITY) → beach, scenic walk, or market (ACTIVITY).',
+      evening: '3 stops required: Cultural venue, viewpoint, or sunset spot (ACTIVITY) → Dinner at local restaurant (FOOD — mandatory) → dessert or drinks (ACTIVITY).',
       full: 'Breakfast → morning activity → lunch (local spot) → beach or afternoon adventure → snack/coffee → dinner or sunset spot',
     },
   },
@@ -1291,16 +1291,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const structureGuide = config.structureHint[durationKey] || config.structureHint.full;
 
     // Duration-specific time windows — start from NOW if the window would've already started
+    // Ensure at least 3 hours for half-day plans so AI can fit all stops
     const formatHour = (h: number) => {
       const ampm = h >= 12 ? 'PM' : 'AM';
       const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
       return `${h12}:00 ${ampm}`;
     };
     const startNowLabel = formatHour(Math.max(localHour, 8));
+    const morningEnd = Math.max(12, localHour + 3);   // At least 3 hours from now
+    const afternoonEnd = Math.max(17, localHour + 3);
+    const eveningEnd = Math.max(22, localHour + 3);
     const timeWindows: Record<string, string> = {
-      morning: localHour >= 8 ? `${startNowLabel} – 12:00 PM` : '8:00 AM – 12:00 PM',
-      afternoon: localHour >= 12 ? `${startNowLabel} – 5:00 PM` : '12:00 PM – 5:00 PM',
-      evening: localHour >= 17 ? `${startNowLabel} – 12:00 AM` : '5:00 PM – 12:00 AM',
+      morning: localHour >= 8 ? `${startNowLabel} – ${formatHour(morningEnd)}` : '8:00 AM – 12:00 PM',
+      afternoon: localHour >= 12 ? `${startNowLabel} – ${formatHour(afternoonEnd)}` : '12:00 PM – 5:00 PM',
+      evening: localHour >= 17 ? `${startNowLabel} – ${formatHour(eveningEnd > 23 ? 0 : eveningEnd)}` : '5:00 PM – 12:00 AM',
       full: localHour >= 9 ? `${startNowLabel} – ${isStackedVibe ? '2:00 AM' : '11:00 PM'}` : (isStackedVibe ? '9:00 AM – 2:00 AM' : '9:00 AM – 11:00 PM'),
     };
     const timeWindow = timeWindows[durationKey] || timeWindows.full;
@@ -1322,7 +1326,7 @@ CRITICAL RULES:
 
 0. START FROM NOW: The current local time is ${timeLabel}. Your FIRST stop must be scheduled for RIGHT NOW or within the next 30 minutes. Do NOT start the plan earlier than the current time. If it's 2 PM, your first stop should be around 2:00-2:30 PM (lunch or afternoon activity), NOT 9 AM breakfast. The plan should feel like "what should I do starting NOW." Match the first meal to the current time of day — if it's afternoon, start with lunch; if it's evening, start with dinner; if it's morning, start with breakfast/coffee.
 
-1. Pick exactly ${stopCount} stops. EVERY stop must be a DIFFERENT place — never pick the same idx twice. Each stop must be a unique, distinct location.
+1. Pick EXACTLY ${stopCount} stops — no more, no fewer. You MUST return exactly ${stopCount} entries in the stops array. EVERY stop must be a DIFFERENT place — never pick the same idx twice. Each stop must be a unique, distinct location. If you return fewer than ${stopCount} stops, YOU HAVE FAILED.
 
 2. ${config.aiHint}
 
@@ -1332,7 +1336,7 @@ CRITICAL RULES:
 ${vibeKey === 'food'
   ? 'Every stop is food/drink. Create a GLOBAL TASTING JOURNEY — each stop MUST be a different cuisine/culture (e.g., Mexican → Chinese → Ethiopian → Korean). NEVER two stops from the same cuisine. Vary price points.'
   : vibeKey === 'adventure'
-    ? `ADVENTURE RATIO: At MOST ${isFullDay ? '2-3' : '1-2'} stops can be food/drink. The rest (${isFullDay ? '3-4' : '1-2'}) MUST be activities — parks, beaches, museums, landmarks, scenic walks, viewpoints, markets, galleries. If you pick 4+ food spots, YOU HAVE FAILED. Food is fuel between adventures, not the main event. Count your food stops before responding — if more than ${isFullDay ? '3' : '2'}, remove food and add an activity.`
+    ? `ADVENTURE RATIO FOR ${stopCount} STOPS: EXACTLY ${isFullDay ? '2' : '1'} stop(s) MUST be food/drink (meal or coffee — you MUST include food, people need to eat). The rest (${isFullDay ? '4' : '2'}) MUST be activities — parks, beaches, museums, landmarks, scenic walks, viewpoints, markets, galleries, temples, nature. Food goes between adventures as fuel. NEVER skip food entirely — always include at least 1 food stop. Count: ${isFullDay ? '2 food + 4 activities' : '1 food + 2 activities'} = ${stopCount} total.`
     : vibeKey === 'surprise'
       ? `LUXURY CITY'S BEST RATIO: At MOST ${isFullDay ? '2-3' : '1-2'} stops can be food/drink — and every food stop MUST be UPSCALE (fine dining, celebrity chef, Michelin-starred, premium steakhouse — NOT casual cafes or budget spots). The rest (${isFullDay ? '3-4' : '1-2'}) MUST be PREMIUM experiences — world-class museums, iconic landmarks, scenic viewpoints, luxury shopping districts, prestigious cultural sites. This is the LUXURY edition — every single stop should feel elevated, exclusive, and high-end. If you pick 4+ food spots, YOU HAVE FAILED. If any stop feels budget or casual, YOU HAVE FAILED. Count your food vs non-food stops before responding.`
       : isStackedVibe

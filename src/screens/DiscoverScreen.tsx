@@ -13,16 +13,7 @@ import NativeImg from '../components/NativeImg';
 import NearbyEvents from '../components/NearbyEvents';
 import LumeMap from '../components/LumeMap';
 import { getCityMedia } from '../data/cityMedia';
-import { Capacitor } from '@capacitor/core';
-
-/** Open URL in system browser — uses Capacitor Browser plugin on native */
-function openExternal(url: string) {
-  if (Capacitor.isNativePlatform()) {
-    import('@capacitor/browser').then(({ Browser }) => Browser.open({ url })).catch(() => window.open(url, '_blank'));
-  } else {
-    window.open(url, '_blank', 'noopener');
-  }
-}
+import CityVideoPlayer from '../components/CityVideoPlayer';
 
 // ---------------------------------------------------------------------------
 // DiscoverScreen
@@ -530,60 +521,11 @@ export default function DiscoverScreen() {
                 </div>
               )}
 
-              {/* Social — Watch on TikTok */}
+              {/* City Videos — in-app self-hosted video player */}
               {!placesLoading && cityLabel && (() => {
                 const media = getCityMedia(cityLabel);
-                const videos = media.tiktokVideos;
-                if (!videos || videos.length === 0) {
-                  // Fallback: single link to profile/city
-                  if (!media.tiktokUrl) return null;
-                  return (
-                    <div className="mb-3">
-                      <button
-                        onClick={() => openExternal(media.tiktokUrl!)}
-                        className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border-subtle cursor-pointer no-underline w-full text-left"
-                        style={{ background: 'linear-gradient(135deg, rgba(0,0,0,0.9), rgba(37,36,35,0.9))' }}
-                      >
-                        <span className="text-2xl shrink-0">🎬</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[13px] font-bold text-white">Watch {cityLabel} on TikTok</div>
-                          <div className="text-[11px] text-white/60">{media.tiktokHandle} — City guides, hidden gems & food finds</div>
-                        </div>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 opacity-50">
-                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
-                        </svg>
-                      </button>
-                    </div>
-                  );
-                }
-                // Multiple videos — horizontal scroll
-                return (
-                  <div className="mb-3">
-                    <div className="text-[13px] font-bold text-text-primary mb-2 flex items-center gap-2">
-                      <span>🎬</span> {cityLabel} on TikTok
-                      <span className="text-[11px] font-normal text-text-tertiary">({videos.length} clips)</span>
-                    </div>
-                    <div className="flex gap-2 overflow-x-auto scroll-hidden pb-1">
-                      {videos.map((v, i) => (
-                        <button
-                          key={i}
-                          onClick={() => openExternal(v.url)}
-                          className="shrink-0 flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border border-border-subtle cursor-pointer no-underline"
-                          style={{ background: 'linear-gradient(135deg, rgba(0,0,0,0.9), rgba(37,36,35,0.9))' }}
-                        >
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                            style={{ background: 'linear-gradient(135deg, #E8940A, #F5A623)' }}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="#000" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-[12px] font-semibold text-white truncate max-w-[140px]">{v.caption}</div>
-                            <div className="text-[10px] text-white/50">{media.tiktokHandle}</div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
+                if (!media.videos || media.videos.length === 0) return null;
+                return <CityVideoPlayer cityName={cityLabel} videos={media.videos} />;
               })()}
 
               {/* Place Cards */}

@@ -14,7 +14,7 @@ import NativeImg from './NativeImg';
 import { getNightRisk, isNightTime, getPlaceSafety, getNightSafetyTips, getRegionSafetyAlert } from '../utils/safetyEngine';
 import { API_URL } from '../utils/api';
 import type { Place } from '../services/places';
-import { getPlaceVideo, getCityMedia } from '../data/cityMedia';
+import { getPlaceVideo } from '../data/cityMedia';
 
 export default function PlaceDetailModal({ place }: { place: Place }) {
   const {
@@ -208,57 +208,29 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
             {place.rating > 0 && <StarRating rating={place.rating} count={place.reviewCount} />}
           </div>
 
-          {/* Video Preview — shows TikTok clip if available for this place */}
+          {/* Video Preview — shows self-hosted clip if available for this place */}
           {(() => {
             const video = getPlaceVideo(place.placeId);
-            if (video) {
-              return (
-                <div className="mb-4 rounded-xl overflow-hidden border border-border-subtle">
-                  <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
-                    <video
-                      src={video.videoUrl}
-                      poster={video.thumbnailUrl}
-                      controls
-                      playsInline
-                      preload="metadata"
-                      className="absolute inset-0 w-full h-full object-cover"
-                    />
-                  </div>
-                  {video.caption && (
-                    <div className="px-3 py-2 bg-bg-subtle">
-                      <span className="text-xs text-text-secondary">{video.caption}</span>
-                      {video.source === 'tiktok' && video.sourceUrl && (
-                        <a href={video.sourceUrl} target="_blank" rel="noopener noreferrer"
-                          className="text-xs text-accent-amber ml-2 no-underline">Watch on TikTok</a>
-                      )}
-                    </div>
-                  )}
+            if (!video) return null;
+            return (
+              <div className="mb-4 rounded-xl overflow-hidden border border-border-subtle">
+                <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                  <video
+                    src={video.videoUrl}
+                    poster={video.thumbnailUrl}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
                 </div>
-              );
-            }
-            // No place-specific video — show TikTok link for the city
-            const media = getCityMedia(cityLabel || '');
-            if (media.tiktokUrl) {
-              return (
-                <a
-                  href={media.tiktokUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2.5 mb-4 px-3.5 py-2.5 rounded-xl border border-border-subtle no-underline"
-                  style={{ background: 'linear-gradient(135deg, rgba(0,0,0,0.85), rgba(37,36,35,0.85))' }}
-                >
-                  <span className="text-lg">🎬</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-semibold text-white">See {cityLabel} on TikTok</div>
-                    <div className="text-[10px] text-white/50">{media.tiktokHandle}</div>
+                {video.caption && (
+                  <div className="px-3 py-2 bg-bg-subtle">
+                    <span className="text-xs text-text-secondary">{video.caption}</span>
                   </div>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-40 shrink-0">
-                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
-                  </svg>
-                </a>
-              );
-            }
-            return null;
+                )}
+              </div>
+            );
           })()}
 
           {/* Hours status */}
