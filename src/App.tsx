@@ -286,6 +286,18 @@ export default function App() {
   const deferredInstallPrompt = useRef<BeforeInstallPromptEvent | null>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
 
+  // App Store download banner — only on web, not native
+  // TODO: Replace YOUR_APP_ID with your numeric App Store ID from App Store Connect
+  const APP_STORE_URL = 'https://apps.apple.com/app/nxstops/idYOUR_APP_ID';
+  const [showAppBanner, setShowAppBanner] = useState(() => {
+    if (localStorage.getItem('nxstops_app_banner_dismissed')) return false;
+    try {
+      const { Capacitor } = require('@capacitor/core');
+      if (Capacitor.isNativePlatform()) return false; // Already in the app
+    } catch { /* fine */ }
+    return true;
+  });
+
   // AI Chatbox
   const [showChat, setShowChat] = useState(false);
 
@@ -1227,6 +1239,29 @@ export default function App() {
                 className="px-3.5 py-2 rounded-[10px] bg-accent-gradient border-none text-[#0C0A09] text-xs font-semibold cursor-pointer">
                 Install
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* App Store Download Banner — web visitors only */}
+        {showAppBanner && !showInstallBanner && (
+          <div className="fixed bottom-[90px] left-1/2 -translate-x-1/2 max-w-[400px] md:max-w-[600px] w-[calc(100%-40px)] bg-bg-surface border border-amber-tint-border30 rounded-2xl p-4 z-[250] shadow-[0_8px_30px_rgba(0,0,0,0.4)] animate-toast-in flex items-center gap-3">
+            <div className="w-[44px] h-[44px] rounded-xl shrink-0 bg-accent-gradient flex items-center justify-center text-xl text-[#0C0A09] font-bold">
+              N
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-text-primary">Get the NxStops App</div>
+              <div className="text-xs text-text-secondary">Your city, curated. Download free.</div>
+            </div>
+            <div className="flex gap-1.5 shrink-0">
+              <button onClick={() => { localStorage.setItem('nxstops_app_banner_dismissed', '1'); setShowAppBanner(false); }}
+                className="px-3 py-2 rounded-[10px] bg-transparent border border-border-medium text-text-tertiary text-xs cursor-pointer min-h-[44px]">
+                Later
+              </button>
+              <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer"
+                className="px-3.5 py-2 rounded-[10px] bg-accent-gradient border-none text-[#0C0A09] text-xs font-semibold cursor-pointer no-underline flex items-center min-h-[44px]">
+                Get
+              </a>
             </div>
           </div>
         )}
