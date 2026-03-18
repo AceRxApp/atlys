@@ -1203,7 +1203,7 @@ export default function PlanScreen() {
                                 <span className="text-xs text-accent-amber font-semibold">{'\u{2B50}'} {alt.rating.toFixed(1)}</span>
                               )}
                               {alt.distance != null && (
-                                <span className="text-[11px] text-text-muted">{formatDistance(alt.distance)}</span>
+                                <span className="text-[11px] text-text-muted">{formatDistance(alt.distance, useMiles)}</span>
                               )}
                             </div>
                           </div>

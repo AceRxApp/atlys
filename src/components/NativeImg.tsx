@@ -49,7 +49,18 @@ const NativeImg = memo(function NativeImg(
     return () => { cancelled = true; };
   }, [src]);
 
-  if (failed) return null;
+  // When the image fails, render a subtle fallback placeholder instead of null
+  // so parent layout doesn't collapse to a blank space
+  if (failed) {
+    return (
+      <div
+        className={rest.className as string}
+        style={{ ...rest.style as object, background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      >
+        <span style={{ fontSize: '1.25rem', opacity: 0.35 }}>{'\u{1F4CD}'}</span>
+      </div>
+    );
+  }
   if (!blobSrc && isNative) {
     // Loading placeholder
     return <div className={rest.className as string} style={{ ...rest.style as object, background: 'var(--bg-elevated)' }} />;

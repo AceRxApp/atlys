@@ -274,7 +274,7 @@ export default function EventsScreen() {
           </p>
         </div>
         <div className="flex rounded-[10px] overflow-hidden border border-border-strong shrink-0">
-          <button onClick={() => setEventsViewMode('list')}
+          <button onClick={() => { setEventsViewMode('list'); setActiveEventPin(null); }}
             aria-label="List view"
             className={`py-2.5 px-3.5 text-xs font-medium border-none cursor-pointer min-h-[44px] ${
               eventsViewMode === 'list' ? 'bg-purple-tint-bg15 text-events-active' : 'bg-transparent text-text-tertiary'
