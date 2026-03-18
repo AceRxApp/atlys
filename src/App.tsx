@@ -350,7 +350,7 @@ export default function App() {
       try {
         const { data: { session } } = await (await import('./supabase')).supabase.auth.getSession();
         if (!session?.access_token) return;
-        const res = await fetch(`${API_URL}/api/admin`, {
+        const res = await fetch(`${API_URL}/api/admin-data?section=verify`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
         if (!cancelled && res.ok) {

@@ -35,10 +35,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Auth check
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) {
+    // For verify requests, return isAdmin: false instead of 401
+    const section = (req.query.section as string) || 'all';
+    if (section === 'verify') return res.status(200).json({ isAdmin: false });
     return res.status(401).json({ error: 'Unauthorized' });
   }
   const token = authHeader.slice(7);
   const isAdmin = await verifyAdmin(token);
+
+  // Lightweight admin verification — replaces the old /api/admin endpoint
+  const section0 = (req.query.section as string) || 'all';
+  if (section0 === 'verify') return res.status(200).json({ isAdmin });
+
   if (!isAdmin) return res.status(403).json({ error: 'Not an admin' });
 
   // Service role client — bypasses RLS
