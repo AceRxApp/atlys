@@ -287,8 +287,7 @@ export default function App() {
   const [showInstallBanner, setShowInstallBanner] = useState(false);
 
   // App Store download banner — only on web, not native
-  // TODO: Replace YOUR_APP_ID with your numeric App Store ID from App Store Connect
-  const APP_STORE_URL = 'https://apps.apple.com/app/nxstops/idYOUR_APP_ID';
+  const APP_STORE_URL = 'https://apps.apple.com/app/nxstops/id6759206723';
   const [showAppBanner, setShowAppBanner] = useState(() => {
     if (localStorage.getItem('nxstops_app_banner_dismissed')) return false;
     try {
