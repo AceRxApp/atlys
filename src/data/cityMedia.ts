@@ -8,6 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import type { CityVideoClip } from '../components/CityVideoPlayer';
+import { fetchCityVideos as fetchSupabaseVideos } from '../supabase';
 
 export interface CityMedia {
   videos?: CityVideoClip[];       // Self-hosted video clips (mp4 / HLS)
@@ -131,12 +132,51 @@ export function getCityMedia(citySlug: string): CityMedia {
 }
 
 /**
- * Check if a city has self-hosted video content
+ * Check if a city has self-hosted video content (static only — for quick checks)
  */
 export function cityHasVideo(citySlug: string): boolean {
   const slug = citySlug.toLowerCase().replace(/\s+/g, '-');
   const media = CITY_MEDIA[slug];
   return !!(media?.videos && media.videos.length > 0);
+}
+
+// In-memory cache for Supabase video fetches (avoids re-fetching every render)
+const _supabaseVideoCache = new Map<string, { clips: CityVideoClip[]; fetchedAt: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Fetch city videos from Supabase, merge with any hardcoded clips.
+ * Returns combined list ready for CityVideoPlayer.
+ */
+export async function fetchCityVideoClips(citySlug: string): Promise<CityVideoClip[]> {
+  const slug = citySlug.toLowerCase().replace(/\s+/g, '-');
+
+  // Check cache
+  const cached = _supabaseVideoCache.get(slug);
+  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL) {
+    return cached.clips;
+  }
+
+  // Hardcoded clips from CITY_MEDIA
+  const staticMedia = CITY_MEDIA[slug];
+  const staticClips = staticMedia?.videos?.filter((v) => v.url && !v.url.startsWith('//')) || [];
+
+  // Fetch from Supabase
+  let supabaseClips: CityVideoClip[] = [];
+  try {
+    const rows = await fetchSupabaseVideos(slug);
+    supabaseClips = rows.map((r) => ({
+      url: r.video_url,
+      thumbnail: r.thumbnail_url || undefined,
+      caption: r.caption,
+      duration: r.duration,
+    }));
+  } catch { /* offline or error — use static only */ }
+
+  // Merge: Supabase videos first, then any static ones
+  const combined = [...supabaseClips, ...staticClips];
+  _supabaseVideoCache.set(slug, { clips: combined, fetchedAt: Date.now() });
+  return combined;
 }
 
 // ---------------------------------------------------------------------------

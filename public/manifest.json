@@ -1,7 +1,7 @@
 {
   "name": "NxStops",
   "short_name": "NxStops",
-  "description": "Discover what to do right now, wherever you are. Vibe-based travel for modern explorers.",
+  "description": "Discover what to do right now, wherever you are. AI-powered city discovery for modern explorers.",
   "start_url": "/",
   "scope": "/",
   "id": "nxstops-pwa",
@@ -40,7 +40,7 @@
       "type": "image/svg+xml"
     }
   ],
-  "categories": ["travel", "lifestyle"],
+  "categories": ["lifestyle", "entertainment"],
   "shortcuts": [
     {
       "name": "Discover Places",

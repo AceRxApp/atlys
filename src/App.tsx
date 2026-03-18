@@ -340,7 +340,7 @@ export default function App() {
   const [adminUsers, setAdminUsers] = useState<{ id: string; email?: string; created_at: string; last_sign_in_at: string | null; confirmed_at: string | null; user_metadata: Record<string, unknown> }[]>([]);
   const [adminHealth, setAdminHealth] = useState<{ name: string; status: 'ok' | 'error'; detail?: string; ms?: number }[]>([]);
   const [adminLoading, setAdminLoading] = useState(false);
-  const [adminTab, setAdminTab] = useState<'dashboard' | 'signups' | 'users' | 'cities' | 'reports' | 'stops' | 'dish-images' | 'health' | 'api-keys'>('dashboard');
+  const [adminTab, setAdminTab] = useState<'dashboard' | 'signups' | 'users' | 'cities' | 'reports' | 'stops' | 'dish-images' | 'videos' | 'health' | 'api-keys'>('dashboard');
 
   // Check admin status server-side when user changes
   useEffect(() => {

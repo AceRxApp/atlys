@@ -49,7 +49,7 @@ export default function AboutScreen() {
             by Nav&eacute;
           </div>
           <p className="text-[17px] text-text-secondary leading-relaxed max-w-[440px] mx-auto">
-            Your travel companion for discovering places, planning trips, and exploring cities — wherever you are.
+            Your city discovery companion for finding places, planning your day, and exploring — wherever you are.
           </p>
         </div>
 
@@ -57,7 +57,7 @@ export default function AboutScreen() {
         <div className="mb-8">
           <h2 className="text-lg font-bold text-text-primary mb-3">What is NxStops?</h2>
           <p className="text-sm leading-[1.7] text-text-body">
-            NxStops is a modern travel companion built for explorers, friend groups, solo travelers, and everyone in between. Whether you're visiting a new city or rediscovering your own, NxStops helps you find what's around you, plan your day, and make the most of every stop.
+            NxStops is a city discovery app built for explorers, friend groups, solo adventurers, and everyone in between. Whether you're visiting a new city or rediscovering your own, NxStops helps you find what's around you, plan your day, and make the most of every stop.
           </p>
           <p className="text-sm leading-[1.7] text-text-body mt-3">
             We combine real-time data from Google Maps and Places with curated vibes and community tags so you can discover places that match your mood — from cozy brunch spots to late-night rooftops, family-friendly parks to hidden local gems.
@@ -92,7 +92,7 @@ export default function AboutScreen() {
             NxStops
           </p>
           <p className="text-[13px] text-text-secondary mt-2 leading-relaxed">
-            A creative studio building tools for modern travelers.
+            A creative studio building tools for modern explorers.
           </p>
         </div>
 

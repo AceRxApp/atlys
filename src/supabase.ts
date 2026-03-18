@@ -1026,3 +1026,118 @@ export async function deleteDishImage(id: string, imageUrl: string): Promise<boo
   }
   return true;
 }
+
+// ---------------------------------------------------------------------------
+// City Videos — admin-uploaded video clips per city
+// ---------------------------------------------------------------------------
+
+export interface CityVideoRecord {
+  id: string;
+  city_slug: string;
+  video_url: string;
+  thumbnail_url: string | null;
+  caption: string;
+  duration: number;
+  sort_order: number;
+  created_at: string;
+}
+
+export async function uploadCityVideo(
+  citySlug: string,
+  videoFile: File,
+  caption: string,
+  duration: number,
+  thumbnailFile?: File,
+): Promise<{ success: boolean; error: string | null }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: 'Not authenticated' };
+
+  const slug = citySlug.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const ts = Date.now();
+  const videoPath = `${slug}/${ts}-${videoFile.name.replace(/[^a-z0-9._-]/gi, '')}`;
+
+  // Upload video to Supabase Storage
+  const { error: videoErr } = await supabase.storage
+    .from('city-videos')
+    .upload(videoPath, videoFile, { upsert: false, contentType: videoFile.type || 'video/mp4' });
+
+  if (videoErr) {
+    console.error('City video upload error:', videoErr);
+    return { success: false, error: videoErr.message };
+  }
+
+  const { data: videoUrlData } = supabase.storage.from('city-videos').getPublicUrl(videoPath);
+  const videoUrl = videoUrlData.publicUrl;
+
+  // Upload thumbnail if provided
+  let thumbnailUrl: string | null = null;
+  if (thumbnailFile) {
+    const thumbPath = `${slug}/${ts}-thumb.jpg`;
+    const compressed = await compressImage(thumbnailFile, 800, 0.85);
+    const { error: thumbErr } = await supabase.storage
+      .from('city-videos')
+      .upload(thumbPath, compressed, { upsert: false, contentType: 'image/jpeg' });
+    if (!thumbErr) {
+      const { data: thumbUrlData } = supabase.storage.from('city-videos').getPublicUrl(thumbPath);
+      thumbnailUrl = thumbUrlData.publicUrl;
+    }
+  }
+
+  // Insert metadata row
+  const { error: insertErr } = await supabase.from('city_videos').insert({
+    city_slug: slug,
+    video_url: videoUrl,
+    thumbnail_url: thumbnailUrl,
+    caption: caption.trim(),
+    duration,
+    uploaded_by: user.id,
+  });
+
+  if (insertErr) {
+    console.error('City video metadata insert error:', insertErr);
+    return { success: false, error: insertErr.message };
+  }
+
+  return { success: true, error: null };
+}
+
+export async function fetchCityVideos(citySlug?: string): Promise<CityVideoRecord[]> {
+  let query = supabase
+    .from('city_videos')
+    .select('*')
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: false });
+
+  if (citySlug) {
+    query = query.eq('city_slug', citySlug.toLowerCase().replace(/\s+/g, '-'));
+  }
+
+  const { data, error } = await query.limit(100);
+  if (error) {
+    console.error('Error fetching city videos:', error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function deleteCityVideo(id: string, videoUrl: string, thumbnailUrl?: string | null): Promise<boolean> {
+  // Remove video file from storage
+  const videoMatch = videoUrl.match(/city-videos\/(.+)$/);
+  if (videoMatch) {
+    await supabase.storage.from('city-videos').remove([videoMatch[1]]);
+  }
+  // Remove thumbnail if exists
+  if (thumbnailUrl) {
+    const thumbMatch = thumbnailUrl.match(/city-videos\/(.+)$/);
+    if (thumbMatch) {
+      await supabase.storage.from('city-videos').remove([thumbMatch[1]]);
+    }
+  }
+
+  const { error } = await supabase.from('city_videos').delete().eq('id', id);
+  if (error) {
+    console.error('Error deleting city video:', error);
+    return false;
+  }
+  return true;
+}

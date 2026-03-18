@@ -226,8 +226,8 @@ export interface AppContextType {
   adminSignups: AdminSignup[];
   adminCities: City[];
   adminLoading: boolean;
-  adminTab: 'dashboard' | 'signups' | 'users' | 'cities' | 'reports' | 'stops' | 'dish-images' | 'health' | 'api-keys';
-  setAdminTab: (tab: 'dashboard' | 'signups' | 'users' | 'cities' | 'reports' | 'stops' | 'dish-images' | 'health' | 'api-keys') => void;
+  adminTab: 'dashboard' | 'signups' | 'users' | 'cities' | 'reports' | 'stops' | 'dish-images' | 'videos' | 'health' | 'api-keys';
+  setAdminTab: (tab: 'dashboard' | 'signups' | 'users' | 'cities' | 'reports' | 'stops' | 'dish-images' | 'videos' | 'health' | 'api-keys') => void;
   adminUsers: { id: string; email?: string; created_at: string; last_sign_in_at: string | null; confirmed_at: string | null; user_metadata: Record<string, unknown> }[];
   adminHealth: { name: string; status: 'ok' | 'error'; detail?: string; ms?: number }[];
   openAdmin: () => Promise<void>;

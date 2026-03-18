@@ -53,6 +53,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
     setDishLensContext,
     setScreen,
     cityLabel,
+    citySlug,
     weather,
     selectedCity,
   } = useApp();
@@ -789,6 +790,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
           <UserReviews
             placeId={place.placeId}
             placeName={place.name}
+            citySlug={citySlug}
             userId={user?.id}
             userName={user?.user_metadata?.full_name || user?.email?.split('@')[0]}
           />

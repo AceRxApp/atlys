@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { VIBES, QUICK_FILTERS, SMART_FILTERS, COMMUNITY_TAGS } from '../data';
@@ -12,8 +12,9 @@ import { getPreferences } from '../utils/preferences';
 import NativeImg from '../components/NativeImg';
 import NearbyEvents from '../components/NearbyEvents';
 import LumeMap from '../components/LumeMap';
-import { getCityMedia } from '../data/cityMedia';
+import { fetchCityVideoClips } from '../data/cityMedia';
 import CityVideoPlayer from '../components/CityVideoPlayer';
+import type { CityVideoClip } from '../components/CityVideoPlayer';
 
 // ---------------------------------------------------------------------------
 // DiscoverScreen
@@ -93,6 +94,13 @@ export default function DiscoverScreen() {
     if (f.id === 'goldenHour') return isGoldenHour;
     return true; // 15min always shows
   });
+
+  // Fetch city video clips (Supabase + hardcoded merge)
+  const [cityVideoClips, setCityVideoClips] = useState<CityVideoClip[]>([]);
+  useEffect(() => {
+    if (!cityLabel) { setCityVideoClips([]); return; }
+    fetchCityVideoClips(cityLabel).then(setCityVideoClips).catch(() => setCityVideoClips([]));
+  }, [cityLabel]);
 
   return (
     <div>
@@ -522,11 +530,9 @@ export default function DiscoverScreen() {
               )}
 
               {/* City Videos — in-app self-hosted video player */}
-              {!placesLoading && cityLabel && (() => {
-                const media = getCityMedia(cityLabel);
-                if (!media.videos || media.videos.length === 0) return null;
-                return <CityVideoPlayer cityName={cityLabel} videos={media.videos} />;
-              })()}
+              {!placesLoading && cityLabel && cityVideoClips.length > 0 && (
+                <CityVideoPlayer cityName={cityLabel} videos={cityVideoClips} />
+              )}
 
               {/* Place Cards */}
               <div className="md:grid md:grid-cols-2 md:gap-4">

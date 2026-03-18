@@ -476,7 +476,7 @@ export default function HomeScreen() {
         <ContextHint
           storageKey="home"
           title="Welcome to NxStops"
-          subtitle="Your all-in-one travel companion. Here's how to get started:"
+          subtitle="Your AI-powered city discovery app. Here's how to get started:"
           hints={[
             { emoji: '\u{1F4CD}', title: 'Pick your destination', description: 'Search for any city or tap "Use my location" to explore where you are right now.' },
             { emoji: '\u{1F3AF}', title: 'Choose your vibe', description: 'Pick a mood like Food Tour, Adventure, or Best of the City — then choose Full Day, Morning, Afternoon, or Evening.' },

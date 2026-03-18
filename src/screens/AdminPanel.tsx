@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { CloseIcon } from '../components/icons';
-import { fetchReports, updateReportStatus, deleteReviewById, fetchPendingStops, updateStopStatus, deleteUserStop, uploadDishImage, fetchDishImages, deleteDishImage, authGetSession } from '../supabase';
-import type { UserStop, DishImageRecord } from '../supabase';
+import { fetchReports, updateReportStatus, deleteReviewById, fetchPendingStops, updateStopStatus, deleteUserStop, uploadDishImage, fetchDishImages, deleteDishImage, uploadCityVideo, fetchCityVideos, deleteCityVideo, authGetSession } from '../supabase';
+import type { UserStop, DishImageRecord, CityVideoRecord } from '../supabase';
 
 export default function AdminPanel() {
   const {
@@ -26,6 +26,16 @@ export default function AdminPanel() {
   const [dishMsg, setDishMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // City videos state
+  const [cityVideos, setCityVideos] = useState<CityVideoRecord[]>([]);
+  const [videoCity, setVideoCity] = useState('');
+  const [videoCaption, setVideoCaption] = useState('');
+  const [videoDuration, setVideoDuration] = useState('');
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [videoMsg, setVideoMsg] = useState<string | null>(null);
+  const videoFileRef = useRef<HTMLInputElement>(null);
+  const videoThumbRef = useRef<HTMLInputElement>(null);
+
   const [adminError, setAdminError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -33,6 +43,7 @@ export default function AdminPanel() {
       fetchReports().then(setAdminReports),
       fetchPendingStops().then(setPendingStops),
       fetchDishImages().then(setDishImages),
+      fetchCityVideos().then(setCityVideos),
     ]).catch(err => {
       console.error('Admin panel data load error:', err);
       setAdminError('Some admin data failed to load. Check Supabase RLS policies.');
@@ -81,6 +92,36 @@ export default function AdminPanel() {
     if (ok) setDishImages(prev => prev.filter(d => d.id !== id));
   }, []);
 
+  const handleVideoUpload = useCallback(async () => {
+    const file = videoFileRef.current?.files?.[0];
+    if (!file || !videoCity.trim() || !videoCaption.trim()) {
+      setVideoMsg('Enter a city, caption, and select a video file.');
+      return;
+    }
+    setVideoUploading(true);
+    setVideoMsg(null);
+    const dur = parseInt(videoDuration, 10) || 30;
+    const thumbFile = videoThumbRef.current?.files?.[0];
+    const { success, error } = await uploadCityVideo(videoCity.trim(), file, videoCaption.trim(), dur, thumbFile);
+    if (error) {
+      setVideoMsg(`Error: ${error}`);
+    } else if (success) {
+      setVideoMsg(`Uploaded "${videoCaption.trim()}" for ${videoCity.trim()}`);
+      setVideoCity('');
+      setVideoCaption('');
+      setVideoDuration('');
+      if (videoFileRef.current) videoFileRef.current.value = '';
+      if (videoThumbRef.current) videoThumbRef.current.value = '';
+      fetchCityVideos().then(setCityVideos);
+    }
+    setVideoUploading(false);
+  }, [videoCity, videoCaption, videoDuration]);
+
+  const handleDeleteVideo = useCallback(async (id: string, videoUrl: string, thumbnailUrl?: string | null) => {
+    const ok = await deleteCityVideo(id, videoUrl, thumbnailUrl);
+    if (ok) setCityVideos(prev => prev.filter(v => v.id !== id));
+  }, []);
+
   return (
     <div className="fixed inset-0 bg-bg-body z-[200] overflow-auto max-w-[430px] md:max-w-[768px] lg:max-w-[1024px] mx-auto" style={{ paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       {/* Admin Header */}
@@ -98,11 +139,11 @@ export default function AdminPanel() {
 
       {/* Admin Tabs */}
       <div className="flex border-b border-border-subtle overflow-x-auto scroll-hidden">
-        {(['dashboard', 'signups', 'users', 'cities', 'reports', 'stops', 'dish-images', 'health', 'api-keys'] as const).map(tab => (
+        {(['dashboard', 'signups', 'users', 'cities', 'reports', 'stops', 'dish-images', 'videos', 'health', 'api-keys'] as const).map(tab => (
           <button key={tab}
             onClick={() => setAdminTab(tab)}
             className={`flex-1 p-3 text-[13px] font-medium bg-transparent border-none cursor-pointer border-b-2 whitespace-nowrap ${adminTab === tab ? 'text-accent-amber border-b-accent-amber' : 'text-text-tertiary border-b-transparent'}`}>
-            {tab === 'dish-images' ? 'Dishes' : tab === 'api-keys' ? 'API Keys' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {tab === 'dish-images' ? 'Dishes' : tab === 'api-keys' ? 'API Keys' : tab === 'videos' ? 'Videos' : tab.charAt(0).toUpperCase() + tab.slice(1)}
           </button>
         ))}
       </div>
@@ -391,6 +432,114 @@ export default function AdminPanel() {
                       </div>
                       <button
                         onClick={() => handleDeleteDishImage(img.id, img.image_url)}
+                        className="px-3 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer border-none bg-red-tint-bg text-status-red shrink-0"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* City Videos Tab */}
+            {adminTab === 'videos' && (
+              <div>
+                <h3 className="text-base font-semibold mb-4">City Videos</h3>
+                <p className="text-xs text-text-tertiary mb-4">
+                  Upload short video clips per city. These appear on the Discover screen when a user is browsing that city.
+                  Videos are stored in Supabase Storage.
+                </p>
+
+                {/* Upload form */}
+                <div className="card !border-amber-tint-border20 mb-5">
+                  <label className="text-[11px] text-text-tertiary uppercase tracking-wider block mb-1.5">City Slug</label>
+                  <input
+                    type="text"
+                    value={videoCity}
+                    onChange={e => setVideoCity(e.target.value)}
+                    placeholder="e.g. washington-dc, accra, barcelona"
+                    className="w-full p-2.5 rounded-lg border border-border-medium bg-bg-body text-text-primary text-sm mb-3"
+                  />
+                  <label className="text-[11px] text-text-tertiary uppercase tracking-wider block mb-1.5">Caption</label>
+                  <input
+                    type="text"
+                    value={videoCaption}
+                    onChange={e => setVideoCaption(e.target.value)}
+                    placeholder="e.g. Balos Esiatorio, The Parks at 14th"
+                    className="w-full p-2.5 rounded-lg border border-border-medium bg-bg-body text-text-primary text-sm mb-3"
+                  />
+                  <label className="text-[11px] text-text-tertiary uppercase tracking-wider block mb-1.5">Duration (seconds)</label>
+                  <input
+                    type="number"
+                    value={videoDuration}
+                    onChange={e => setVideoDuration(e.target.value)}
+                    placeholder="30"
+                    className="w-full p-2.5 rounded-lg border border-border-medium bg-bg-body text-text-primary text-sm mb-3"
+                  />
+                  <label className="text-[11px] text-text-tertiary uppercase tracking-wider block mb-1.5">Video File (mp4)</label>
+                  <input
+                    ref={videoFileRef}
+                    type="file"
+                    accept="video/mp4,video/quicktime,video/*"
+                    className="w-full text-sm text-text-secondary mb-3"
+                  />
+                  <label className="text-[11px] text-text-tertiary uppercase tracking-wider block mb-1.5">Thumbnail (optional)</label>
+                  <input
+                    ref={videoThumbRef}
+                    type="file"
+                    accept="image/*"
+                    className="w-full text-sm text-text-secondary mb-3"
+                  />
+                  <button
+                    onClick={handleVideoUpload}
+                    disabled={videoUploading || !videoCity.trim() || !videoCaption.trim()}
+                    className={`w-full py-2.5 rounded-lg text-sm font-semibold border-none cursor-pointer ${
+                      videoUploading || !videoCity.trim() || !videoCaption.trim()
+                        ? 'bg-bg-subtle-strong text-text-tertiary opacity-50'
+                        : 'bg-accent-amber text-bg-body'
+                    }`}
+                  >
+                    {videoUploading ? 'Uploading...' : 'Upload Video'}
+                  </button>
+                  {videoMsg && (
+                    <p className={`text-xs mt-2 ${videoMsg.startsWith('Error') ? 'text-status-red' : 'text-status-green'}`}>
+                      {videoMsg}
+                    </p>
+                  )}
+                </div>
+
+                {/* Existing videos */}
+                <h4 className="text-sm font-semibold mb-3 text-text-secondary">
+                  Uploaded ({cityVideos.length})
+                </h4>
+                {cityVideos.length === 0 ? (
+                  <p className="text-text-tertiary text-sm text-center p-10">No city videos yet. Upload your first clip above.</p>
+                ) : (
+                  cityVideos.map(vid => (
+                    <div key={vid.id} className="card flex gap-3 items-center">
+                      {vid.thumbnail_url ? (
+                        <img
+                          src={vid.thumbnail_url}
+                          alt={vid.caption}
+                          className="w-20 h-14 rounded-lg object-cover shrink-0"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="w-20 h-14 rounded-lg bg-bg-elevated flex items-center justify-center shrink-0">
+                          <span className="text-xl opacity-40">{'\u{1F3AC}'}</span>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm text-text-primary">{vid.caption}</div>
+                        <div className="text-[11px] text-text-tertiary">
+                          <span className="text-accent-amber">{vid.city_slug}</span>
+                          {' \u00B7 '}{vid.duration}s
+                          {' \u00B7 '}{new Date(vid.created_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteVideo(vid.id, vid.video_url, vid.thumbnail_url)}
                         className="px-3 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer border-none bg-red-tint-bg text-status-red shrink-0"
                       >
                         Delete

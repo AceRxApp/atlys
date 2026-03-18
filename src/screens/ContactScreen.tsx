@@ -66,7 +66,7 @@ export default function ContactScreen() {
             NxStops
           </div>
           <p className="text-[13px] text-text-secondary leading-relaxed max-w-[360px] mx-auto mt-2">
-            A travel companion for discovering places, planning trips, and exploring cities. Built by NxStops.
+            A city discovery app for finding places, planning your day, and exploring anywhere. Built by NxStops.
           </p>
         </div>
 

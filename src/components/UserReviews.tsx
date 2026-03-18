@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { saveReview, fetchReviews as fetchSupabaseReviews } from '../supabase';
+import type { Review } from '../supabase';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -16,15 +18,16 @@ export interface UserReview {
 interface UserReviewsProps {
   placeId: string;
   placeName: string;
+  citySlug?: string;
   userId?: string;
   userName?: string;
 }
 
-// ─── localStorage helpers ────────────────────────────────────────────────────
+// ─── localStorage helpers (fallback for offline / unauthenticated) ──────────
 
 const STORAGE_KEY = 'nxstops_user_reviews';
 
-function loadReviews(): UserReview[] {
+function loadLocalReviews(): UserReview[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
@@ -33,12 +36,26 @@ function loadReviews(): UserReview[] {
   }
 }
 
-function persistReviews(reviews: UserReview[]): void {
+function persistLocalReviews(reviews: UserReview[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(reviews));
   } catch {
     /* storage full — silently fail */
   }
+}
+
+/** Convert a Supabase Review row into our local UserReview shape */
+function supabaseToLocal(r: Review): UserReview {
+  return {
+    id: r.id,
+    placeId: r.place_id,
+    placeName: '',
+    userId: r.user_id,
+    userName: r.user_id.slice(0, 8),
+    rating: r.rating,
+    text: r.review_text || '',
+    createdAt: r.created_at,
+  };
 }
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
@@ -165,21 +182,36 @@ function ReviewItem({ review }: { review: UserReview }) {
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
-export default function UserReviews({ placeId, placeName, userId, userName }: UserReviewsProps) {
+export default function UserReviews({ placeId, placeName, citySlug, userId, userName }: UserReviewsProps) {
   const [reviews, setReviews] = useState<UserReview[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [formRating, setFormRating] = useState(0);
   const [formText, setFormText] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Load reviews for this place
-  const refreshReviews = useCallback(() => {
-    const all = loadReviews();
-    setReviews(
-      all
-        .filter((r) => r.placeId === placeId)
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+  // Load reviews — Supabase first, merge with any local-only reviews
+  const refreshReviews = useCallback(async () => {
+    // 1. Fetch from Supabase
+    let supabaseReviews: UserReview[] = [];
+    try {
+      const rows = await fetchSupabaseReviews(placeId);
+      supabaseReviews = rows.map(supabaseToLocal);
+    } catch { /* offline or error — fall back to local */ }
+
+    // 2. Load local reviews for this place
+    const localAll = loadLocalReviews();
+    const localForPlace = localAll.filter((r) => r.placeId === placeId);
+
+    // 3. Merge: Supabase reviews take priority, add any local-only ones
+    const supabaseIds = new Set(supabaseReviews.map((r) => r.id));
+    const supabaseUserIds = new Set(supabaseReviews.map((r) => r.userId));
+    const localOnly = localForPlace.filter(
+      (r) => !supabaseIds.has(r.id) && !supabaseUserIds.has(r.userId),
     );
+    const merged = [...supabaseReviews, ...localOnly]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    setReviews(merged);
   }, [placeId]);
 
   useEffect(() => {
@@ -191,7 +223,7 @@ export default function UserReviews({ placeId, placeName, userId, userName }: Us
     ? reviews.find((r) => r.userId === userId)
     : undefined;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (formRating === 0 || !userId || !userName) return;
 
     setSubmitting(true);
@@ -207,18 +239,22 @@ export default function UserReviews({ placeId, placeName, userId, userName }: Us
       createdAt: new Date().toISOString(),
     };
 
-    // Persist
-    const all = loadReviews();
-
-    // Replace if user already has one, otherwise prepend
+    // 1. Always save locally as fallback
+    const all = loadLocalReviews();
     const idx = all.findIndex((r) => r.placeId === placeId && r.userId === userId);
     if (idx !== -1) {
       all[idx] = newReview;
     } else {
       all.unshift(newReview);
     }
+    persistLocalReviews(all);
 
-    persistReviews(all);
+    // 2. Sync to Supabase (best effort — works offline too via local fallback)
+    if (citySlug) {
+      try {
+        await saveReview(placeId, citySlug, formRating, formText.trim(), []);
+      } catch { /* offline — local save still succeeded */ }
+    }
 
     // Reset form
     setFormRating(0);
