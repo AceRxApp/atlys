@@ -41,67 +41,67 @@ const LOADING_MESSAGES = [
 const ALL_DESTINATIONS = [
   {
     city: 'Paris', country: 'France', landmark: 'Eiffel Tower', continent: 'Europe',
-    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Tour_Eiffel_Wikimedia_Commons_%28cropped%29.jpg/600px-Tour_Eiffel_Wikimedia_Commons_%28cropped%29.jpg',
+    image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=600&h=400&fit=crop',
   },
   {
     city: 'Tokyo', country: 'Japan', landmark: 'Senso-ji Temple', continent: 'Asia',
-    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Sensoji_2023.jpg/600px-Sensoji_2023.jpg',
+    image: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=600&h=400&fit=crop',
   },
   {
     city: 'New York', country: 'USA', landmark: 'Statue of Liberty', continent: 'N. America',
-    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Front_view_of_Statue_of_Liberty_%28cropped%29.jpg/600px-Front_view_of_Statue_of_Liberty_%28cropped%29.jpg',
+    image: 'https://images.unsplash.com/photo-1485738422979-f5c462d49f04?w=600&h=400&fit=crop',
   },
   {
     city: 'Rio de Janeiro', country: 'Brazil', landmark: 'Christ the Redeemer', continent: 'S. America',
-    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/Christ_the_Redeemer_-_Cristo_Redentor.jpg/600px-Christ_the_Redeemer_-_Cristo_Redentor.jpg',
+    image: 'https://images.unsplash.com/photo-1483729558449-99ef09a8c325?w=600&h=400&fit=crop',
   },
   {
     city: 'Accra', country: 'Ghana', landmark: 'Independence Arch', continent: 'Africa',
-    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Independence_Arch_Accra_Ghana.jpg/600px-Independence_Arch_Accra_Ghana.jpg',
+    image: 'https://images.unsplash.com/photo-1642255226557-1ee114040624?w=600&h=400&fit=crop',
   },
   {
     city: 'Sydney', country: 'Australia', landmark: 'Opera House', continent: 'Oceania',
-    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Sydney_Australia._%2821339175489%29.jpg/600px-Sydney_Australia._%2821339175489%29.jpg',
+    image: 'https://images.unsplash.com/photo-1524293581917-878a6d017c71?w=600&h=400&fit=crop',
   },
   {
     city: 'Dubai', country: 'UAE', landmark: 'Burj Khalifa', continent: 'Middle East',
-    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Burj_Khalifa_%28worlds_tallest_building%29_and_the_Dubai_skyline_%2825781049892%29.jpg/600px-Burj_Khalifa_%28worlds_tallest_building%29_and_the_Dubai_skyline_%2825781049892%29.jpg',
+    image: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=600&h=400&fit=crop',
   },
   {
     city: 'Cartagena', country: 'Colombia', landmark: 'Castillo San Felipe', continent: 'S. America',
-    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/62_-_Carthag%C3%A8ne_-_D%C3%A9cembre_2008.jpg/600px-62_-_Carthag%C3%A8ne_-_D%C3%A9cembre_2008.jpg',
+    image: 'https://images.unsplash.com/photo-1583997052301-0042b33fc598?w=600&h=400&fit=crop',
   },
   {
     city: 'London', country: 'England', landmark: 'Tower Bridge', continent: 'Europe',
-    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/63/Tower_Bridge_from_Shad_Thames.jpg/600px-Tower_Bridge_from_Shad_Thames.jpg',
+    image: 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=600&h=400&fit=crop',
   },
   {
     city: 'Bangkok', country: 'Thailand', landmark: 'Grand Palace', continent: 'Asia',
-    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Bangkok_Grand_Palace.JPG/600px-Bangkok_Grand_Palace.JPG',
+    image: 'https://images.unsplash.com/photo-1563492065599-3520f775eeed?w=600&h=400&fit=crop',
   },
   {
     city: 'Rome', country: 'Italy', landmark: 'Colosseum', continent: 'Europe',
-    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/de/Colosseo_2020.jpg/600px-Colosseo_2020.jpg',
+    image: 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=600&h=400&fit=crop',
   },
   {
     city: 'Istanbul', country: 'Turkey', landmark: 'Hagia Sophia', continent: 'Europe',
-    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Hagia_Sophia_Mars_2013.jpg/600px-Hagia_Sophia_Mars_2013.jpg',
+    image: 'https://images.unsplash.com/photo-1541432901042-2d8bd64b4a9b?w=600&h=400&fit=crop',
   },
   {
     city: 'Mexico City', country: 'Mexico', landmark: 'Palacio de Bellas Artes', continent: 'N. America',
-    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/Palacio_bellas_artes_mexico_df.JPG/600px-Palacio_bellas_artes_mexico_df.JPG',
+    image: 'https://images.unsplash.com/photo-1585464231875-d9ef1f5ad396?w=600&h=400&fit=crop',
   },
   {
     city: 'Cape Town', country: 'South Africa', landmark: 'Table Mountain', continent: 'Africa',
-    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Table_mountain_and_the_ocean_cape_town.JPG/600px-Table_mountain_and_the_ocean_cape_town.JPG',
+    image: 'https://images.unsplash.com/photo-1580060839134-75a5edca2e99?w=600&h=400&fit=crop',
   },
   {
     city: 'Barcelona', country: 'Spain', landmark: 'Sagrada Familia', continent: 'Europe',
-    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6a/Sagrada_Familia_%28Barcelona%29.JPG/600px-Sagrada_Familia_%28Barcelona%29.JPG',
+    image: 'https://images.unsplash.com/photo-1583422409516-2895a77efded?w=600&h=400&fit=crop',
   },
   {
     city: 'Marrakech', country: 'Morocco', landmark: 'Jemaa el-Fnaa', continent: 'Africa',
-    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7f/Maroc_Marrakech_Jemaa-el-Fna_Luc_Viatour.JPG/600px-Maroc_Marrakech_Jemaa-el-Fna_Luc_Viatour.JPG',
+    image: 'https://images.unsplash.com/photo-1597212618440-806262de4f6b?w=600&h=400&fit=crop',
   },
 ];
 
