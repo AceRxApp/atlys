@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import { track } from '@vercel/analytics';
 import { useApp } from '../context/AppContext';
@@ -9,13 +9,14 @@ import type { Place } from '../services/places';
 import { generatePackingList } from '../utils/packingList';
 import { findPivotAlternatives } from '../utils/surpriseFilter';
 import type { PackingItem } from '../data/packingItems';
-import { getNightRisk, getPlaceSafety, isNightTime } from '../utils/safetyEngine';
+// Safety engine removed from compact cards — details shown in PlaceDetailModal
 import { fetchTravelAdvisory, getAdvisoryDisplay } from '../services/travelAdvisory';
 import type { TravelAdvisory } from '../services/travelAdvisory';
-import type { Stop, PlanDuration } from '../types';
+import type { Stop } from '../types';
 import { BOOKING_SERVICES } from '../data/bookingLinks';
 import { fixPhotoUrl } from '../utils/photoUrl';
 import NativeImg from '../components/NativeImg';
+import PlanLoadingAnimation from '../components/PlanLoadingAnimation';
 import {
   DndContext,
   closestCenter,
@@ -27,7 +28,7 @@ import {
 } from '@dnd-kit/core';
 import {
   SortableContext,
-  verticalListSortingStrategy,
+  rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import SortableStopCard from '../components/SortableStopCard';
 import AddFromLinkModal from '../components/AddFromLinkModal';
@@ -40,7 +41,9 @@ import ExploreModeBanner from '../components/ExploreModeBanner';
 import ChatBot from '../components/ChatBot';
 import CheckInCelebration from '../components/CheckInCelebration';
 import GoldenHourCard from '../components/GoldenHourCard';
-import LocalRhythm from '../components/LocalRhythm';
+// LocalRhythm removed — collection view uses compact cards
+import VibePicker from '../components/VibePicker';
+import CuratedPicks from '../components/CuratedPicks';
 import { useTripNotifications } from '../hooks/useTripNotifications';
 
 // Local helpers (not on context)
@@ -187,6 +190,9 @@ export default function PlanScreen() {
     requireAuth,
     lastPlanTitle,
     lastPlanVibe,
+    lastPlanHeadline,
+    lastPlanDuration,
+    autoPlanLoading,
     shareAsLink,
     saveForOffline,
     offlineSaved,
@@ -224,8 +230,12 @@ export default function PlanScreen() {
     addToPlan,
     checkIns,
     currentStreak,
-    planMyDay,
-    autoPlanLoading,
+    curatedPicks,
+    curatedLoading,
+    curatedVibe,
+    curatedError,
+    loadCuratedPicks,
+    clearCuratedPicks,
   } = useApp();
 
   // Compute trip phase for context-aware UI
@@ -244,17 +254,11 @@ export default function PlanScreen() {
   const dateInputRef = useRef<HTMLInputElement>(null);
   const [showAddLinkModal, setShowAddLinkModal] = useState(false);
 
-  // Mini "Plan This Day" inline planner state
-  const [inlinePlanDuration, setInlinePlanDuration] = useState<PlanDuration>('full');
-  const inlineVibes = (() => {
-    const food = { id: 'food', emoji: '\u{1F37D}\u{FE0F}', label: 'Food Tour' };
-    const adventure = { id: 'adventure', emoji: '\u{1F33F}', label: 'Adventure' };
-    const bestOf = { id: 'surprise', emoji: '\u{1F3D9}\u{FE0F}', label: 'Best of City' };
-    if (inlinePlanDuration === 'morning') return [{ id: 'chill', emoji: '\u{2615}', label: 'Chill Vibes' }, food, adventure, bestOf];
-    if (inlinePlanDuration === 'afternoon') return [{ id: 'daydrinks', emoji: '\u{1F379}', label: 'Day Drinks' }, food, adventure, bestOf];
-    if (inlinePlanDuration === 'evening') return [{ id: 'nightout', emoji: '\u{1F319}', label: 'Night Out' }, food, adventure, bestOf];
-    return [{ id: 'stacked', emoji: '\u{1F525}', label: 'Full Experience' }, food, adventure, bestOf];
-  })();
+  // Place IDs already in the active day's plan (for curated picks "Added" state)
+  const addedPlaceIds = useMemo(
+    () => new Set(dayPlan.map(s => s.place?.placeId).filter(Boolean) as string[]),
+    [dayPlan],
+  );
 
   // Schedule trip notifications when date is set
   const notifications = useTripNotifications();
@@ -301,6 +305,7 @@ export default function PlanScreen() {
 
   // Nearby discoveries toggle
   const [expandedNearby, setExpandedNearby] = useState<string | null>(null);
+  const [expandedStopActions, setExpandedStopActions] = useState<string | null>(null);
   // Chat FAB
   const [showChat, setShowChat] = useState(false);
   // Logistics panel
@@ -377,27 +382,70 @@ export default function PlanScreen() {
 
   const daySummary = getDaySummary();
 
-  if (totalStops === 0) {
+  // Lock the plan view while AI is generating — don't show stale/partial content
+  if (autoPlanLoading) {
     return (
-      <div className="text-center pt-[60px]">
-        <div className="text-[64px] mb-4 opacity-60">&#x1f5fa;&#xfe0f;</div>
-        <h2 className="text-[22px] font-bold mb-2">No stops yet</h2>
-        <p className="text-text-secondary text-sm mb-6 leading-normal">
-          Explore places and tap &quot;+ Add&quot; to build your trip plan
-        </p>
-        <div className="flex flex-col gap-2.5 items-center">
-          <button
-            onClick={() => setScreen('discover')}
-            className="bg-accent-gradient text-text-on-accent border-none rounded-[14px] py-3.5 px-7 text-[15px] font-semibold cursor-pointer shadow-[0_4px_20px_var(--amber-tint-shadow)]"
-          >
-            Start Exploring →
-          </button>
-          <button
-            onClick={() => { if (!requireAuth()) return; setShowAddLinkModal(true); }}
-            className="flex items-center gap-2 py-2.5 px-5 rounded-xl border border-dashed border-accent-amber text-accent-amber text-[13px] font-semibold cursor-pointer bg-transparent"
-          >
-            {'\u2795'} Quick Add
-          </button>
+      <PlanLoadingAnimation
+        cityName={cityLabel || 'your city'}
+        vibe={lastPlanVibe || 'Explore'}
+      />
+    );
+  }
+
+  // Early return: no stops AND no curated picks loaded → show VibePicker as primary CTA
+  if (totalStops === 0 && !curatedPicks) {
+    return (
+      <div className="overscroll-contain">
+        {/* Empty state illustration */}
+        <div className="text-center pt-4 pb-2 animate-enter-up">
+          <div className="text-[48px] mb-2">{'\u{1F30D}'}</div>
+          <h2 className="font-heading text-[20px] font-bold text-text-primary mb-1">
+            {cityLabel ? `Plan your ${cityLabel} trip` : 'Start your adventure'}
+          </h2>
+          <p className="text-[13px] text-text-tertiary">
+            Pick a vibe and we'll curate the perfect day for you
+          </p>
+        </div>
+
+        <VibePicker
+          onPickVibe={loadCuratedPicks}
+          loading={curatedLoading}
+          cityName={cityLabel || undefined}
+          onManual={() => setScreen('discover')}
+        />
+
+        {curatedError && (
+          <div className="mt-3 p-3 rounded-xl bg-red-tint-bg border border-red-tint-border text-center">
+            <p className="text-sm text-status-red font-medium">{curatedError}</p>
+            <button
+              onClick={() => curatedVibe && loadCuratedPicks(curatedVibe)}
+              className="mt-2 text-xs text-text-secondary underline bg-transparent border-none cursor-pointer"
+            >
+              Try again
+            </button>
+          </div>
+        )}
+
+        <div className="text-center mt-6 animate-enter-up" style={{ animationDelay: '200ms' }}>
+          <div className="relative mx-auto mb-4 px-4 py-3 rounded-2xl" style={{ background: 'var(--bg-elevated)' }}>
+            <p className="text-text-secondary text-[13px] leading-relaxed">
+              Or explore and tap <span className="text-accent-amber font-semibold">+ Add</span> to build your plan manually
+            </p>
+          </div>
+          <div className="flex flex-col gap-2.5 items-center">
+            <button
+              onClick={() => setScreen('discover')}
+              className="bg-accent-gradient text-text-on-accent border-none rounded-[14px] py-3.5 px-7 text-[15px] font-semibold cursor-pointer shadow-[0_4px_20px_var(--amber-tint-shadow)] active:scale-[0.97] transition-transform"
+            >
+              Start Exploring
+            </button>
+            <button
+              onClick={() => { if (!requireAuth()) return; setShowAddLinkModal(true); }}
+              className="flex items-center gap-2 py-2.5 px-5 rounded-xl border border-dashed border-accent-amber text-accent-amber text-[13px] font-semibold cursor-pointer bg-transparent active:scale-[0.97] transition-transform"
+            >
+              {'\u2795'} Quick Add from Link
+            </button>
+          </div>
         </div>
         {showAddLinkModal && <AddFromLinkModal onClose={() => setShowAddLinkModal(false)} />}
       </div>
@@ -405,17 +453,22 @@ export default function PlanScreen() {
   }
 
   return (
-    <div>
+    <div className="overscroll-contain">
       {/* Header */}
       <div className="mb-4">
         <div className="flex justify-between items-center">
-          <h1 className="text-[22px] font-bold mb-1">
+          <h1 className="font-heading text-[22px] font-bold mb-1">
             {lastPlanTitle || 'Your Trip Plan'}
           </h1>
         </div>
         <p className="text-text-tertiary text-[13px]">
           {cityLabel} · {totalStops} stop{totalStops !== 1 ? 's' : ''} · {dayCount} day{dayCount !== 1 ? 's' : ''}
         </p>
+        {lastPlanHeadline && (
+          <p className="text-sm text-text-secondary italic mt-1.5 leading-snug">
+            {lastPlanHeadline}
+          </p>
+        )}
         {/* Trip date picker */}
         <div className="relative mt-2 inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-border-medium bg-bg-subtle text-text-secondary text-xs font-medium cursor-pointer">
           <span>{'\u{1F4C5}'}</span>
@@ -548,16 +601,15 @@ export default function PlanScreen() {
         );
       })()}
 
-      {/* Logistics Panel — pretrip & live only */}
-      {(tripPhase === 'pretrip' || tripPhase === 'live') && totalStops > 0 && <LogisticsPanel />}
+      {/* Logistics Panel moved to fixed footer — see portal below */}
 
       {/* Post-trip summary card — only show if user actually checked in to stops */}
       {tripPhase === 'posttrip' && Object.keys(checkIns).length > 0 && (
-        <div className="mb-4 p-5 rounded-2xl border border-green-tint-border"
+        <div className="mb-4 p-5 rounded-2xl border border-green-tint-border animate-enter-up"
           style={{ background: 'linear-gradient(135deg, var(--green-tint-bg), var(--bg-subtle))' }}>
           <div className="text-center mb-3">
             <div className="text-3xl mb-2">{'\u2705'}</div>
-            <h2 className="text-lg font-bold text-text-primary">Trip Complete!</h2>
+            <h2 className="font-heading text-lg font-bold text-text-primary">Trip Complete!</h2>
             <p className="text-sm text-text-secondary mt-1">
               {totalStops} stop{totalStops !== 1 ? 's' : ''} across {dayCount} day{dayCount !== 1 ? 's' : ''} in {cityLabel}
             </p>
@@ -587,13 +639,13 @@ export default function PlanScreen() {
           <div className="flex flex-col gap-2">
             <button
               onClick={() => { if (!requireAuth()) return; shareAsLink(); }}
-              className="w-full py-3 rounded-xl bg-accent-gradient text-text-on-accent border-none text-sm font-semibold cursor-pointer"
+              className="w-full py-3 rounded-xl bg-accent-gradient text-text-on-accent border-none text-sm font-semibold cursor-pointer active:scale-[0.97] transition-transform"
             >
               {'\u{1F4E4}'} Share Your Trip
             </button>
             <button
               onClick={startWrapUp}
-              className="w-full py-3 rounded-xl bg-bg-subtle-strong text-text-primary border border-border-medium text-sm font-semibold cursor-pointer"
+              className="w-full py-3 rounded-xl bg-bg-subtle-strong text-text-primary border border-border-medium text-sm font-semibold cursor-pointer active:scale-[0.97] transition-transform"
             >
               {'\u{2728}'} Start a New Trip
             </button>
@@ -605,7 +657,7 @@ export default function PlanScreen() {
       {isLiveDay && !exploreActive && dayPlan.length > 0 && (
         <button
           onClick={startExplore}
-          className="w-full mb-3 py-3.5 rounded-xl border-none text-sm font-bold cursor-pointer"
+          className="w-full mb-3 py-3.5 rounded-xl border-none text-sm font-bold cursor-pointer active:scale-[0.97] transition-transform"
           style={{ background: 'linear-gradient(135deg, #22C55E, #16A34A)', color: '#fff' }}
         >
           {'\u{1F680}'} Start Trip
@@ -716,59 +768,48 @@ export default function PlanScreen() {
         </div>
       )}
 
+      {/* ── Curated Picks browsing feed (stays visible while user adds places) ── */}
+      {curatedPicks && (
+        <div className="mb-4">
+          <CuratedPicks
+            sections={curatedPicks.sections}
+            vibeLabel={curatedPicks.vibeLabel}
+            cityName={cityLabel || 'your city'}
+            onAddPlace={(place) => addToPlan(place)}
+            addedPlaceIds={addedPlaceIds}
+            onViewPlace={(place) => setSelectedPlace(place)}
+          />
+
+          {/* Switch vibe / go back */}
+          <div className="flex items-center gap-3 mt-2">
+            <div className="flex-1 h-px bg-border-subtle" />
+            <button
+              onClick={clearCuratedPicks}
+              className="text-[12px] text-text-tertiary hover:text-accent-amber transition-colors bg-transparent border-none cursor-pointer"
+            >
+              Change vibe
+            </button>
+            <div className="flex-1 h-px bg-border-subtle" />
+          </div>
+        </div>
+      )}
+
+      {/* ── Vibe Picker when day is empty and no curated picks loaded ── */}
+      {dayPlan.length === 0 && !curatedPicks && (
+        <VibePicker
+          onPickVibe={loadCuratedPicks}
+          loading={curatedLoading}
+          cityName={cityLabel || undefined}
+          onManual={() => setScreen('discover')}
+          compact={totalStops > 0}
+        />
+      )}
+
       {/* Active day stops */}
       {dayPlan.length === 0 ? (
-        <div className="card py-5 px-4">
-          <p className="text-text-primary text-[15px] font-semibold text-center mb-3">Plan Day {activeDay}</p>
-          <p className="text-text-tertiary text-xs text-center mb-4">Pick a duration and vibe to auto-generate</p>
-
-          {/* Duration pills */}
-          <div className="flex gap-1.5 mb-3 justify-center">
-            {([
-              { id: 'full' as PlanDuration, emoji: '\u{2600}\u{FE0F}', label: 'Full Day' },
-              { id: 'morning' as PlanDuration, emoji: '\u{1F305}', label: 'Morning' },
-              { id: 'afternoon' as PlanDuration, emoji: '\u{26C5}', label: 'Afternoon' },
-              { id: 'evening' as PlanDuration, emoji: '\u{1F319}', label: 'Evening' },
-            ]).map(d => (
-              <button key={d.id} onClick={() => setInlinePlanDuration(d.id)}
-                className={`py-1.5 px-3 rounded-lg text-[12px] font-medium border-none cursor-pointer ${
-                  inlinePlanDuration === d.id
-                    ? 'bg-accent-gradient text-text-on-accent'
-                    : 'bg-bg-subtle text-text-secondary'
-                }`}>
-                {d.emoji} {d.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Vibe cards */}
-          <div className="grid grid-cols-2 gap-2 mb-4">
-            {inlineVibes.map(v => (
-              <button key={v.id}
-                onClick={() => {
-                  if (autoPlanLoading) return;
-                  planMyDay('excited', inlinePlanDuration, v.id);
-                }}
-                disabled={autoPlanLoading}
-                className="py-3 px-3 rounded-xl border border-border-medium bg-bg-subtle text-left cursor-pointer disabled:opacity-50">
-                <div className="text-[18px] mb-1">{v.emoji}</div>
-                <div className="text-[13px] font-semibold text-text-primary">{v.label}</div>
-              </button>
-            ))}
-          </div>
-
-          {autoPlanLoading && (
-            <div className="text-center text-xs text-accent-amber animate-pulse">
-              Building your plan...
-            </div>
-          )}
-
-          <div className="flex items-center gap-3 mt-3">
-            <div className="flex-1 h-px bg-border-subtle" />
-            <span className="text-[11px] text-text-tertiary">or add manually</span>
-            <div className="flex-1 h-px bg-border-subtle" />
-          </div>
-          <div className="flex gap-2 mt-3 justify-center">
+        !curatedPicks ? null : (
+          /* Show "or add manually" below curated picks when no stops yet */
+          <div className="flex gap-2 mt-1 mb-4 justify-center">
             <button onClick={() => setScreen('discover')}
               className="py-2 px-4 rounded-xl text-[13px] font-semibold bg-bg-subtle text-text-secondary border border-border-medium cursor-pointer">
               Explore Places
@@ -778,7 +819,7 @@ export default function PlanScreen() {
               Quick Add
             </button>
           </div>
-        </div>
+        )
       ) : (<>
         {/* Live Day progress bar */}
         {isLiveDay && (
@@ -804,12 +845,14 @@ export default function PlanScreen() {
           </div>
         )}
 
-        {dayPlan.length > 1 && (
-          <div className="flex items-center gap-1.5 mb-2 py-1.5 px-2.5 rounded-lg bg-amber-tint-bg06">
-            <span className="text-xs">{'\u2630'}</span>
-            <span className="text-xs text-accent-amber-dark font-medium">Hold and drag to reorder your stops</span>
-          </div>
-        )}
+        {/* Collection header */}
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-[13px] text-text-secondary">
+            {dayPlan.length} {dayPlan.length === 1 ? 'spot' : 'spots'} to hit
+            {dayPlan.length > 1 && <span className="text-text-tertiary"> {'\u00b7'} drag to reorder</span>}
+          </p>
+        </div>
+
         {/* Golden Hour Card */}
         {dayPlan.length > 0 && selectedCity?.lat && (
           <GoldenHourCard
@@ -827,467 +870,231 @@ export default function PlanScreen() {
         )}
 
         <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={dayPlan.map(s => s.id)} strategy={verticalListSortingStrategy}>
-        <div className="relative pl-8">
-          {/* Vertical route line */}
-          <div
-            className="absolute left-3.5 top-4 bottom-4 w-0.5 rounded-sm"
-            style={{ background: `linear-gradient(to bottom, var(--accent-amber), var(--amber-tint-bg10))` }}
-          />
+        <SortableContext items={dayPlan.map(s => s.id)} strategy={rectSortingStrategy}>
+        <div className="grid grid-cols-2 gap-2.5">
+          {dayPlan.map((stop, index) => {
+            const stopName = getStopName(stop);
+            const stopCategory = getStopCategory(stop);
+            const photoUrl = stop.type === 'place' ? stop.place?.photoUrl : stop.event?.imageUrl;
+            const stopRating = stop.type === 'place' ? (stop.place?.rating || 0) : 0;
 
-          {dayPlan.map((stop, index) => (
-            <SortableStopCard key={stop.id} id={stop.id}>
-            {(listeners) => (<div>
-              <div className={`relative ${index < dayPlan.length - 1 ? 'mb-1' : 'mb-4'}`}>
-                {/* Stop number circle */}
-                <div
-                  className={`absolute -left-8 top-4 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold z-[1] ${
-                    isLiveDay && isCheckedIn(stop.id)
-                      ? 'bg-status-green text-white checked-in-glow'
-                      : stop.type === 'event'
-                      ? 'bg-events-gradient text-text-primary'
-                      : 'bg-accent-gradient text-text-on-accent'
-                  }`}
-                  style={{ boxShadow: isLiveDay && isCheckedIn(stop.id) ? undefined : '0 0 0 4px var(--bg-body)' }}
-                >
-                  {isLiveDay && isCheckedIn(stop.id) ? '\u2713' : index + 1}
-                </div>
-
-                {/* Stop card — photo-first story layout */}
-                <div className={`card mb-0 overflow-hidden !p-0 ${
-                  stop.type === 'event'
-                    ? 'border border-purple-tint-border15'
-                    : 'border border-amber-tint-bg10'
-                }`}>
-                  {/* Hero photo banner */}
-                  {stop.type === 'place' && stop.place?.photoUrl && (
-                    <div className="relative h-[140px] w-full cursor-pointer"
-                      onClick={() => { if (stop.place) setSelectedPlace(stop.place); }}
-                      role="button" tabIndex={0}
-                      aria-label={`View details for ${getStopName(stop)}`}
-                    >
-                      <NativeImg src={fixPhotoUrl(stop.place.photoUrl)!} alt={stop.place.name} loading="lazy" decoding="async"
-                        className="w-full h-full object-cover" />
-                      <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.7))' }} />
-                      {stop.timeSlot && (
-                        <div className="absolute top-2.5 left-3 text-[11px] font-bold text-white/90 uppercase tracking-[0.05em] bg-black/30 px-2 py-0.5 rounded-md backdrop-blur-sm">
-                          {stop.timeSlot}
-                        </div>
-                      )}
-                      <div className="absolute bottom-2.5 left-3 right-3">
-                        <h3 className="text-[16px] font-bold text-white leading-tight drop-shadow-sm">
-                          {getStopName(stop)}
-                        </h3>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs text-white/80">{stop.place.categoryDisplay}</span>
-                          {stop.place.rating > 0 && (
-                            <span className="text-xs text-amber-300">{'\u2605'} {stop.place.rating.toFixed(1)}</span>
-                          )}
-                        </div>
-                      </div>
-                      {/* Drag + remove overlay */}
-                      <div className="absolute top-2.5 right-2.5 flex gap-1.5">
-                        <div {...listeners} className="cursor-grab active:cursor-grabbing touch-none p-1.5 rounded-lg bg-black/40 backdrop-blur-sm"
-                          aria-label="Drag to reorder" onClick={e => e.stopPropagation()}>
-                          <DragHandleIcon color="white" />
-                        </div>
-                        <button onClick={(e) => { e.stopPropagation(); removeFromPlan(stop.id); }}
-                          aria-label="Remove stop"
-                          className="bg-black/40 backdrop-blur-sm border-none text-white cursor-pointer text-xs font-semibold p-1.5 rounded-lg min-h-7 min-w-7 flex items-center justify-center">
-                          {'\u2715'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  {stop.type === 'event' && stop.event?.imageUrl && (
-                    <div className="relative h-[140px] w-full">
-                      <NativeImg src={stop.event.imageUrl} alt={stop.event.name} loading="lazy" decoding="async"
-                        referrerPolicy="no-referrer"
-                        className="w-full h-full object-cover" />
-                      <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.7))' }} />
-                      {stop.timeSlot && (
-                        <div className="absolute top-2.5 left-3 text-[11px] font-bold text-white/90 uppercase tracking-[0.05em] bg-black/30 px-2 py-0.5 rounded-md backdrop-blur-sm">
-                          {stop.timeSlot}
-                        </div>
-                      )}
-                      <div className="absolute bottom-2.5 left-3 right-3">
-                        <h3 className="text-[16px] font-bold text-white leading-tight drop-shadow-sm">
-                          {getStopName(stop)}
-                        </h3>
-                      </div>
-                      <div className="absolute top-2.5 right-2.5 flex gap-1.5">
-                        <div {...listeners} className="cursor-grab active:cursor-grabbing touch-none p-1.5 rounded-lg bg-black/40 backdrop-blur-sm"
-                          aria-label="Drag to reorder">
-                          <DragHandleIcon color="white" />
-                        </div>
-                        <button onClick={() => removeFromPlan(stop.id)}
-                          aria-label="Remove stop"
-                          className="bg-black/40 backdrop-blur-sm border-none text-white cursor-pointer text-xs font-semibold p-1.5 rounded-lg min-h-7 min-w-7 flex items-center justify-center">
-                          {'\u2715'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  {/* No-photo fallback: inline layout */}
-                  {!((stop.type === 'place' && stop.place?.photoUrl) || (stop.type === 'event' && stop.event?.imageUrl)) && (
-                    <div className="flex gap-3 p-3.5">
-                      <div className="flex gap-3 flex-1 min-w-0 cursor-pointer"
-                        onClick={() => { if (stop.type === 'place' && stop.place) setSelectedPlace(stop.place); }}
-                        role={stop.type === 'place' ? 'button' : undefined}
-                        tabIndex={stop.type === 'place' ? 0 : undefined}
-                        aria-label={stop.type === 'place' ? `View details for ${getStopName(stop)}` : undefined}
-                      >
-                        <div className="w-14 h-14 rounded-xl shrink-0 flex items-center justify-center text-xl"
+            return (
+              <Fragment key={stop.id}>
+                <SortableStopCard id={stop.id}>
+                {(listeners) => (
+                  <div className={`rounded-2xl overflow-hidden border ${
+                    stop.type === 'event' ? 'border-purple-tint-border15' : 'border-border-subtle'
+                  } bg-bg-elevated`}>
+                    {/* Photo */}
+                    <div className="relative h-[100px] w-full cursor-pointer"
+                      onClick={() => { if (stop.type === 'place' && stop.place) setSelectedPlace(stop.place); }}
+                      role="button" tabIndex={0}>
+                      {photoUrl ? (
+                        <>
+                          <NativeImg src={fixPhotoUrl(photoUrl)!} alt={stopName} loading="lazy" decoding="async"
+                            className="w-full h-full object-cover" />
+                          <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 20%, rgba(0,0,0,0.75))' }} />
+                        </>
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-2xl"
                           style={{ background: stop.type === 'event' ? 'var(--events-gradient)' : 'linear-gradient(135deg, var(--amber-tint-bg15), var(--bg-subtle))' }}>
                           {stop.type === 'event' ? '\u{1F3AB}' : '\u{1F4CD}'}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          {stop.timeSlot && (
-                            <div className="text-[11px] font-semibold text-accent-amber uppercase tracking-[0.04em] mb-0.5">
-                              {stop.timeSlot}
-                            </div>
-                          )}
-                          <h3 className="text-[15px] font-semibold mb-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                            {getStopName(stop)}
-                          </h3>
+                      )}
+                      {stop.timeSlot && !(isLiveDay && isCheckedIn(stop.id)) && (
+                        <div className="absolute top-1.5 left-1.5 text-[9px] font-bold text-white/90 uppercase tracking-wider bg-black/40 px-1.5 py-0.5 rounded backdrop-blur-sm">
+                          {stop.timeSlot}
                         </div>
-                      </div>
-                      <div className="flex flex-col gap-1 items-center justify-center min-w-[44px]">
-                        <div {...listeners} className="cursor-grab active:cursor-grabbing touch-none p-2 rounded-lg bg-amber-tint-bg06 border border-amber-tint-border20"
-                          aria-label="Drag to reorder">
-                          <DragHandleIcon color="var(--accent-amber)" />
+                      )}
+                      {isLiveDay && isCheckedIn(stop.id) && (
+                        <div className="absolute top-1.5 left-1.5 bg-status-green text-white text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                          {'\u2713'} Visited
+                        </div>
+                      )}
+                      <div className="absolute top-1.5 right-1.5 flex gap-1" onClick={e => e.stopPropagation()}>
+                        <div {...listeners} className="cursor-grab active:cursor-grabbing touch-none p-1 rounded bg-black/40 backdrop-blur-sm">
+                          <DragHandleIcon color="white" />
                         </div>
                         <button onClick={() => removeFromPlan(stop.id)}
-                          aria-label="Remove stop"
-                          className="bg-red-tint-bg border border-red-tint-border text-status-red cursor-pointer text-xs font-semibold py-1.5 px-2 rounded-lg min-h-8 min-w-[44px] flex items-center justify-center">
+                          className="bg-black/40 backdrop-blur-sm border-none text-white cursor-pointer text-[10px] p-1 rounded min-h-[22px] min-w-[22px] flex items-center justify-center">
                           {'\u2715'}
                         </button>
                       </div>
-                    </div>
-                  )}
-                  {/* Details section */}
-                  <div className="px-3.5 py-2.5">
-                  <div className="flex gap-3 flex-1 min-w-0">
-                      <div className="flex-1 min-w-0">
-                        {stop.type === 'place' && stop.place && (
-                          <>
-                            {/* Compact details — only show what's NOT on the photo banner */}
-                            {stop.place.distance != null && (
-                              <p className="text-xs text-text-secondary mb-1">
-                                {formatDistance(stop.place.distance, useMiles)} {getDistanceReference()}
-                              </p>
-                            )}
-                            {/* Hours status */}
-                            {(() => {
-                              const hs = getHoursStatus(stop.place.hours, stop.place.openNow);
-                              return (
-                                <div className="flex items-center gap-1.5">
-                                  <div className={`w-1.5 h-1.5 rounded-full ${stop.place.openNow ? 'bg-status-green' : 'bg-status-red'}`} />
-                                  <span className={`text-[11px] font-medium ${
-                                    hs.urgent ? 'text-status-red' : stop.place.openNow ? 'text-status-green' : 'text-status-red'
-                                  }`}>
-                                    {hs.text}
-                                  </span>
-                                  {hs.urgent && <span className="text-[10px] text-status-red font-semibold">Hurry!</span>}
-                                </div>
-                              );
-                            })()}
-                            {stop.reason && (
-                              <p className="text-xs text-text-tertiary mt-1 italic leading-snug">{stop.reason}</p>
-                            )}
-                            {/* Safety indicator */}
-                            {(() => {
-                              const night = isNightTime(weather?.sunset);
-                              const warning = getPlaceSafety(stop.place.category, stop.place.rating, stop.place.reviewCount, stop.place.openNow, night);
-                              if (warning) {
-                                return (
-                                  <div className="flex items-center gap-1 mt-1">
-                                    <span className="text-[11px]">{warning.emoji}</span>
-                                    <span className={`text-[11px] font-medium ${warning.level === 'warning' ? 'text-status-red' : 'text-accent-amber'}`}>
-                                      {warning.label}
-                                    </span>
-                                  </div>
-                                );
-                              }
-                              if (night) {
-                                const risk = getNightRisk(stop.place.category, stop.place.rating, stop.place.reviewCount, stop.place.openNow);
-                                return (
-                                  <div className="flex items-center gap-1 mt-1">
-                                    <span className="text-[11px]">{risk.emoji}</span>
-                                    <span className={`text-[11px] font-medium ${
-                                      risk.level === 'low' ? 'text-status-green' : risk.level === 'moderate' ? 'text-accent-amber' : 'text-status-red'
-                                    }`}>
-                                      {risk.label}
-                                    </span>
-                                  </div>
-                                );
-                              }
-                              if (stop.place.rating >= 4.0 && stop.place.reviewCount >= 50) {
-                                return (
-                                  <div className="flex items-center gap-1 mt-1">
-                                    <span className="text-[11px]">{'\u{1F6E1}\u{FE0F}'}</span>
-                                    <span className="text-[11px] font-medium text-status-green">Well-reviewed</span>
-                                  </div>
-                                );
-                              }
-                              return null;
-                            })()}
-                            <LocalRhythm
-                              category={stop.place.category || stop.place.categoryDisplay || ''}
-                              name={stop.place.name}
-                              hours={stop.place.hours || undefined}
-                            />
-                          </>
-                        )}
-                        {stop.type === 'event' && stop.event && (
-                          <>
-                            <p className="text-xs text-events-text mb-1">
-                              {formatEventDate(stop.event.date)}
-                              {stop.event.time && ` · ${formatEventTime(stop.event.time)}`}
-                            </p>
-                            <p className="text-xs text-text-secondary">
-                              {stop.event.venue}
-                            </p>
-                          </>
-                        )}
+                      <div className="absolute bottom-1.5 left-2 right-2">
+                        <h3 className="text-[13px] font-bold text-white leading-tight drop-shadow-sm line-clamp-2">
+                          {stopName}
+                        </h3>
                       </div>
                     </div>
-                  </div>
-
-                  {/* Mini actions */}
-                  <div className="flex gap-1.5 mt-2 flex-wrap">
-                    {isLiveDay && !isCheckedIn(stop.id) && (
-                      <button
-                        onClick={() => handleCheckInWithCelebration(stop.id)}
-                        className="py-[5px] px-2.5 rounded-lg text-xs bg-green-tint-bg text-status-green border border-green-tint-border cursor-pointer flex items-center gap-1 font-semibold"
-                      >
-                        {'\u{1F4CD}'} Check In
-                      </button>
-                    )}
-                    {isLiveDay && isCheckedIn(stop.id) && (
-                      <span className="py-[5px] px-2.5 rounded-lg text-xs bg-green-tint-bg text-status-green border border-green-tint-border font-semibold flex items-center gap-1">
-                        {'\u2713'} Visited
-                      </span>
-                    )}
-                    {stop.type === 'place' && stop.place?.googleMapsUrl && (
-                      <a href={stop.place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
-                        className="py-[5px] px-2.5 rounded-lg text-xs bg-amber-tint-bg10 text-accent-amber no-underline flex items-center gap-1">
-                        <DirectionsIcon /> Go
-                      </a>
-                    )}
-                    {stop.type === 'event' && stop.event?.url && (
-                      <a href={stop.event.url} target="_blank" rel="noopener noreferrer"
-                        className="py-[5px] px-2.5 rounded-lg text-xs bg-purple-tint-bg08 text-events-text no-underline flex items-center gap-1">
-                        &#x1f3ab; Tickets
-                      </a>
-                    )}
-                    {dayCount > 1 && (
-                      <select
-                        value=""
-                        onChange={e => { if (e.target.value) moveStopToDay(stop.id, activeDay, Number(e.target.value)); }}
-                        className="py-[5px] px-2 rounded-lg text-xs bg-bg-subtle-medium text-text-tertiary border border-border-medium cursor-pointer">
-                        <option value="">Move to...</option>
-                        {sortedDays.filter(d => d !== activeDay).map(d => (
-                          <option key={d} value={d}>{formatDayLabel(d)}</option>
-                        ))}
-                      </select>
-                    )}
-                    {stop.type === 'place' && stop.place && /restaurant|cafe|bakery|bar|food|pizza|sushi|burger|coffee|tea|ice.cream|dessert|brunch|bistro|diner|grill|bbq|seafood|steak/i.test(stop.place.category || '') && (
-                      <button
-                        onClick={() => {
-                          setDishLensContext({ dish: undefined, city: cityLabel, restaurant: stop.place!.name });
-                          setScreen('tastelens');
-                        }}
-                        className="py-[5px] px-2.5 rounded-lg text-xs bg-amber-tint-bg10 text-accent-amber border border-amber-tint-border20 cursor-pointer flex items-center gap-1"
-                      >
-                        {'\u{1F37D}\u{FE0F}'} TasteLens
-                      </button>
-                    )}
-                    {/* Nearby toggle */}
-                    <button
-                      onClick={() => setExpandedNearby(expandedNearby === stop.id ? null : stop.id)}
-                      className={`py-[5px] px-2.5 rounded-lg text-xs border cursor-pointer flex items-center gap-1 ${
-                        expandedNearby === stop.id
-                          ? 'bg-accent-amber text-text-on-accent border-accent-amber'
-                          : 'bg-amber-tint-bg10 text-accent-amber border-amber-tint-border20'
-                      }`}
-                    >
-                      {'\u{1F4CD}'} Nearby
-                    </button>
-                    {stop.type === 'place' && stop.place && (
-                      <button
-                        disabled={pivotLoading}
-                        onClick={async () => {
-                          // If already showing pivot for this stop, dismiss it
-                          if (pivotStopId === stop.id) {
-                            setPivotStopId(null);
-                            setPivotAlternatives([]);
-                            return;
-                          }
-                          const excludeIds = new Set(dayPlan.map(s => s.place?.placeId).filter(Boolean) as string[]);
-                          const stopData = {
-                            category: stop.place!.category,
-                            lat: stop.place!.lat,
-                            lng: stop.place!.lng,
-                            priceLevel: stop.place!.priceLevel,
-                            placeId: stop.place!.placeId,
-                          };
-                          // Try local alternatives first (instant, free)
-                          let alternatives = findPivotAlternatives(allPlaces, stopData, excludeIds, 3, lastPlanVibe || undefined, stop.timeSlot);
-                          // If none found locally, search Google Places for nearby similar places
-                          if (alternatives.length === 0) {
-                            setPivotLoading(true);
-                            try {
-                              // For food/stacked vibes, always search for food places
-                              // For outdoor places (parks, beaches etc.), use 'thespot' to find similar outdoor alternatives
-                              const isFoodPlan = lastPlanVibe === 'food' || lastPlanVibe === 'stacked';
-                              const OUTDOOR_CATEGORIES = ['park', 'hiking_area', 'national_park', 'garden', 'beach', 'campground', 'playground', 'zoo', 'marina'];
-                              const isOutdoor = OUTDOOR_CATEGORIES.includes(stop.place!.category);
-                              const vibe = isFoodPlan ? 'eatsip' : isOutdoor ? 'thespot' : (TYPE_TO_VIBE[stop.place!.category] || stop.place!.tags?.[0] || 'thespot');
-                              const googlePlaces = await searchNearby(
-                                stop.place!.lat, stop.place!.lng,
-                                [vibe],
-                                2000,
-                              );
-                              alternatives = googlePlaces
-                                .filter(p => !excludeIds.has(p.placeId) && p.placeId !== stop.place!.placeId)
-                                .slice(0, 8);
-                            } catch { /* ignore API errors */ }
-                            setPivotLoading(false);
-                          }
-                          if (alternatives.length > 0) {
-                            setPivotStopId(stop.id);
-                            setPivotAlternatives(alternatives);
-                            setPivotIndex(0);
-                          } else {
-                            showToast('No alternatives found nearby');
-                          }
-                          track('pivot_initiated', { place: stop.place!.name, day: String(activeDay) });
-                        }}
-                        className={`py-[5px] px-2.5 rounded-lg text-xs border cursor-pointer flex items-center gap-1 ${
-                          pivotStopId === stop.id
-                            ? 'bg-accent-amber text-text-on-accent border-accent-amber'
-                            : 'bg-amber-tint-bg10 text-accent-amber border-amber-tint-border20'
-                        }`}
-                      >
-                        {pivotLoading ? '\u23F3' : '\u{1F504}'} Swap
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Inline Pivot — shows alternative below the stop */}
-                  {pivotStopId === stop.id && pivotAlternatives.length > 0 && (() => {
-                    const alt = pivotAlternatives[pivotIndex];
-                    if (!alt) return null;
-                    return (
-                      <div className="mt-2 p-3 rounded-xl border border-amber-tint-border30 bg-amber-tint-bg06">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-xs font-semibold text-accent-amber">{'\u{1F504}'} Alternative</span>
-                          <span className="text-[11px] text-text-muted ml-auto">{pivotIndex + 1} of {pivotAlternatives.length}</span>
-                        </div>
-                        <div className="flex gap-3 items-center">
-                          {/* Photo */}
-                          <div className="w-14 h-14 rounded-xl shrink-0 overflow-hidden bg-bg-subtle-strong">
-                            {alt.photoUrl ? (
-                              <NativeImg src={fixPhotoUrl(alt.photoUrl)!} alt={alt.name} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-xl text-text-tertiary">{'\u{1F4CD}'}</div>
-                            )}
+                    {/* Info */}
+                    <div className="p-2.5">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-[11px] text-text-tertiary truncate">{stopCategory}</span>
+                        {stopRating > 0 && (
+                          <span className="text-[11px] text-accent-amber shrink-0">{'\u2605'} {stopRating.toFixed(1)}</span>
+                        )}
+                      </div>
+                      {stop.type === 'place' && stop.place && (() => {
+                        const hs = getHoursStatus(stop.place.hours, stop.place.openNow);
+                        return (
+                          <div className="flex items-center gap-1 mb-1">
+                            <div className={`w-1.5 h-1.5 rounded-full ${stop.place.openNow ? 'bg-status-green' : 'bg-status-red'}`} />
+                            <span className={`text-[10px] font-medium ${
+                              hs.urgent ? 'text-status-red' : stop.place.openNow ? 'text-status-green' : 'text-status-red'
+                            }`}>
+                              {hs.text}
+                            </span>
+                            {hs.urgent && <span className="text-[9px] text-status-red font-semibold">Hurry!</span>}
                           </div>
-                          {/* Info */}
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-semibold text-text-primary truncate">{alt.name}</div>
-                            <div className="text-xs text-text-secondary mt-0.5">{alt.categoryDisplay || alt.category}</div>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              {alt.rating > 0 && (
-                                <span className="text-xs text-accent-amber font-semibold">{'\u{2B50}'} {alt.rating.toFixed(1)}</span>
-                              )}
-                              {alt.distance != null && (
-                                <span className="text-[11px] text-text-muted">{formatDistance(alt.distance, useMiles)}</span>
-                              )}
+                        );
+                      })()}
+                      {stop.type === 'event' && stop.event && (
+                        <div className="text-[10px] text-events-text mb-1">
+                          {formatEventDate(stop.event.date)}{stop.event.time && <>{' \u00b7 '}{formatEventTime(stop.event.time)}</>}
+                        </div>
+                      )}
+                      {stop.knownFor && (
+                        <p className="text-[10px] text-text-tertiary italic leading-snug line-clamp-2 mb-1">{stop.knownFor}</p>
+                      )}
+                      {stop.reason && !stop.knownFor && (
+                        <p className="text-[10px] text-text-tertiary italic leading-snug line-clamp-1 mb-1">{stop.reason}</p>
+                      )}
+                      {/* Actions */}
+                      <div className="flex gap-1 mt-1.5 flex-wrap">
+                        {isLiveDay && !isCheckedIn(stop.id) && (
+                          <button onClick={() => handleCheckInWithCelebration(stop.id)}
+                            className="py-[3px] px-1.5 rounded text-[10px] bg-green-tint-bg text-status-green border border-green-tint-border cursor-pointer font-semibold active:scale-[0.93] transition-transform">
+                            {'\u{1F4CD}'} Check In
+                          </button>
+                        )}
+                        {stop.type === 'place' && stop.place?.googleMapsUrl && (
+                          <a href={stop.place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+                            className="py-[3px] px-1.5 rounded text-[10px] bg-amber-tint-bg10 text-accent-amber no-underline flex items-center gap-0.5">
+                            <DirectionsIcon /> Go
+                          </a>
+                        )}
+                        {stop.type === 'event' && stop.event?.url && (
+                          <a href={stop.event.url} target="_blank" rel="noopener noreferrer"
+                            className="py-[3px] px-1.5 rounded text-[10px] bg-purple-tint-bg08 text-events-text no-underline">
+                            {'\u{1F3AB}'} Tix
+                          </a>
+                        )}
+                        {stop.type === 'place' && stop.place && /restaurant|cafe|bakery|bar|food|pizza|sushi|burger|coffee|tea|ice.cream|dessert|brunch|bistro|diner|grill|bbq|seafood|steak/i.test(stop.place.category || '') && (
+                          <button
+                            onClick={() => {
+                              setDishLensContext({ dish: undefined, city: cityLabel, restaurant: stop.place!.name });
+                              setScreen('tastelens');
+                            }}
+                            className="py-[3px] px-1.5 rounded text-[10px] bg-amber-tint-bg10 text-accent-amber border border-amber-tint-border20 cursor-pointer">
+                            TasteLens
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setExpandedNearby(expandedNearby === stop.id ? null : stop.id)}
+                          className={`py-[3px] px-1.5 rounded text-[10px] border cursor-pointer ${
+                            expandedNearby === stop.id
+                              ? 'bg-accent-amber text-text-on-accent border-accent-amber'
+                              : 'bg-amber-tint-bg10 text-accent-amber border-amber-tint-border20'
+                          }`}>
+                          Nearby
+                        </button>
+                        {stop.type === 'place' && stop.place && (
+                          <button
+                            disabled={pivotLoading}
+                            onClick={async () => {
+                              if (pivotStopId === stop.id) {
+                                setPivotStopId(null); setPivotAlternatives([]); return;
+                              }
+                              const excludeIds = new Set(dayPlan.map(s => s.place?.placeId).filter(Boolean) as string[]);
+                              const stopData = {
+                                category: stop.place!.category, lat: stop.place!.lat, lng: stop.place!.lng,
+                                priceLevel: stop.place!.priceLevel, placeId: stop.place!.placeId,
+                              };
+                              let alternatives = findPivotAlternatives(allPlaces, stopData, excludeIds, 3, lastPlanVibe || undefined, stop.timeSlot);
+                              if (alternatives.length === 0) {
+                                setPivotLoading(true);
+                                try {
+                                  const isFoodPlan = lastPlanVibe === 'food' || lastPlanVibe === 'indulge' || lastPlanVibe === 'stacked';
+                                  const OUTDOOR_CATEGORIES = ['park','hiking_area','national_park','garden','beach','campground','playground','zoo','marina'];
+                                  const isOutdoor = OUTDOOR_CATEGORIES.includes(stop.place!.category);
+                                  const vibe = isFoodPlan ? 'eatsip' : isOutdoor ? 'thespot' : (TYPE_TO_VIBE[stop.place!.category] || stop.place!.tags?.[0] || 'thespot');
+                                  const googlePlaces = await searchNearby(stop.place!.lat, stop.place!.lng, [vibe], 2000);
+                                  alternatives = googlePlaces.filter(p => !excludeIds.has(p.placeId) && p.placeId !== stop.place!.placeId).slice(0, 8);
+                                } catch { /* ignore */ }
+                                setPivotLoading(false);
+                              }
+                              if (alternatives.length > 0) {
+                                setPivotStopId(stop.id); setPivotAlternatives(alternatives); setPivotIndex(0);
+                              } else { showToast('No alternatives found nearby'); }
+                              track('pivot_initiated', { place: stop.place!.name, day: String(activeDay) });
+                            }}
+                            className={`py-[3px] px-1.5 rounded text-[10px] border cursor-pointer ${
+                              pivotStopId === stop.id
+                                ? 'bg-accent-amber text-text-on-accent border-accent-amber'
+                                : 'bg-amber-tint-bg10 text-accent-amber border-amber-tint-border20'
+                            }`}>
+                            {pivotLoading ? '\u23F3' : '\u{1F504}'} Swap
+                          </button>
+                        )}
+                        {dayCount > 1 && (
+                          <select value=""
+                            onChange={e => { if (e.target.value) moveStopToDay(stop.id, activeDay, Number(e.target.value)); }}
+                            className="py-[3px] px-1.5 rounded text-[10px] bg-bg-subtle-medium text-text-tertiary border border-border-medium cursor-pointer">
+                            <option value="">Move...</option>
+                            {sortedDays.filter(d => d !== activeDay).map(d => (
+                              <option key={d} value={d}>{formatDayLabel(d)}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                      {/* Inline Pivot */}
+                      {pivotStopId === stop.id && pivotAlternatives.length > 0 && (() => {
+                        const alt = pivotAlternatives[pivotIndex];
+                        if (!alt) return null;
+                        return (
+                          <div className="mt-2 p-2 rounded-xl border border-amber-tint-border30 bg-amber-tint-bg06">
+                            <div className="flex items-center gap-1.5 mb-1.5">
+                              <span className="text-[10px] font-semibold text-accent-amber">{'\u{1F504}'} Alternative</span>
+                              <span className="text-[10px] text-text-muted ml-auto">{pivotIndex + 1}/{pivotAlternatives.length}</span>
+                            </div>
+                            <div className="flex gap-2 items-center">
+                              <div className="w-10 h-10 rounded-lg shrink-0 overflow-hidden bg-bg-subtle-strong">
+                                {alt.photoUrl ? (
+                                  <NativeImg src={fixPhotoUrl(alt.photoUrl)!} alt={alt.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-sm text-text-tertiary">{'\u{1F4CD}'}</div>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-[11px] font-semibold text-text-primary truncate">{alt.name}</div>
+                                <div className="text-[10px] text-text-secondary">{alt.categoryDisplay || alt.category}</div>
+                                {alt.rating > 0 && <span className="text-[10px] text-accent-amber">{'\u2605'} {alt.rating.toFixed(1)}</span>}
+                              </div>
+                            </div>
+                            <div className="flex gap-1.5 mt-2">
+                              <button onClick={() => { setPivotStopId(null); setPivotAlternatives([]); }}
+                                className="py-1 px-2 rounded text-[10px] font-medium bg-transparent border border-border-medium text-text-secondary cursor-pointer">Cancel</button>
+                              <button onClick={() => { setPivotIndex((pivotIndex + 1) % pivotAlternatives.length); track('pivot_next', { current: alt.name }); }}
+                                className="flex-1 py-1 px-2 rounded text-[10px] font-medium bg-bg-subtle-medium border border-border-medium text-text-primary cursor-pointer">Next {'\u2192'}</button>
+                              <button onClick={() => { pivotStop(pivotStopId, alt); track('pivot_swapped', { newPlace: alt.name }); setPivotStopId(null); setPivotAlternatives([]); }}
+                                className="flex-1 py-1 px-2 rounded text-[10px] font-semibold bg-accent-gradient text-text-on-accent border-none cursor-pointer">Swap {'\u2713'}</button>
                             </div>
                           </div>
-                        </div>
-                        {/* Actions */}
-                        <div className="flex gap-2 mt-2.5">
-                          <button
-                            onClick={() => {
-                              setPivotStopId(null);
-                              setPivotAlternatives([]);
-                            }}
-                            className="py-2 px-3 rounded-lg text-xs font-medium bg-transparent border border-border-medium text-text-secondary cursor-pointer">
-                            Cancel
-                          </button>
-                          <button
-                            onClick={() => {
-                              setPivotIndex((pivotIndex + 1) % pivotAlternatives.length);
-                              track('pivot_next', { current: alt.name });
-                            }}
-                            className="flex-1 py-2 px-3 rounded-lg text-xs font-medium bg-bg-subtle-medium border border-border-medium text-text-primary cursor-pointer">
-                            Next {'\u2192'}
-                          </button>
-                          <button
-                            onClick={() => {
-                              pivotStop(pivotStopId, alt);
-                              track('pivot_swapped', { newPlace: alt.name });
-                              setPivotStopId(null);
-                              setPivotAlternatives([]);
-                            }}
-                            className="flex-1 py-2 px-3 rounded-lg text-xs font-semibold bg-accent-gradient text-text-on-accent border-none cursor-pointer">
-                            Swap {'\u2713'}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-
-              {/* Nearby Discoveries */}
-              {expandedNearby === stop.id && (
-                <NearbyDiscoveries stop={stop} />
-              )}
-
-              {/* Transportation between stops */}
-              {index < dayPlan.length - 1 && (() => {
-                const transport = getTransportInfo(stop, dayPlan[index + 1]);
-                if (!transport) return null;
-                return (
-                  <div className="ml-0 mb-1 py-2.5 px-3 bg-bg-subtle rounded-[10px] border border-dashed border-border-subtle">
-                    <div className="flex items-center gap-2.5 mb-1.5">
-                      <span className="text-base">{transport.emoji}</span>
-                      <div className="flex-1">
-                        <div className="text-xs text-text-secondary">{transport.text}</div>
-                        <div className="text-xs text-text-muted">{transport.distance}</div>
-                      </div>
+                        );
+                      })()}
                     </div>
-                    <div className="flex gap-2">
-                      {transport.walkMinutes <= 10 ? (
-                        <>
-                          <a href={transport.walkMapsUrl} target="_blank" rel="noopener noreferrer"
-                            className="flex-1 py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-amber-tint-bg10 text-accent-amber no-underline text-center flex items-center justify-center gap-1">
-                            {'\u{1F6B6}'} Walk {transport.walkMinutes}m
-                          </a>
-                          <a href={transport.driveMapsUrl} target="_blank" rel="noopener noreferrer"
-                            className="flex-1 py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-bg-subtle-medium text-text-secondary no-underline text-center flex items-center justify-center gap-1">
-                            {'\u{1F697}'} Drive {transport.driveMinutes}m
-                          </a>
-                        </>
-                      ) : (
-                        <>
-                          <a href={transport.driveMapsUrl} target="_blank" rel="noopener noreferrer"
-                            className="flex-1 py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-amber-tint-bg10 text-accent-amber no-underline text-center flex items-center justify-center gap-1">
-                            {'\u{1F695}'} Taxi/Drive {transport.driveMinutes}m
-                          </a>
-                        </>
-                      )}
-                    </div>
+                    {/* Nearby Discoveries — full width within card */}
+                    {expandedNearby === stop.id && (
+                      <div className="px-2.5 pb-2.5">
+                        <NearbyDiscoveries stop={stop} />
+                      </div>
+                    )}
                   </div>
-                );
-              })()}
-            </div>)}
-            </SortableStopCard>
-          ))}
+                )}
+                </SortableStopCard>
+              </Fragment>
+            );
+          })}
         </div>
         </SortableContext>
         </DndContext>
@@ -1359,19 +1166,19 @@ export default function PlanScreen() {
           SHARE & EXPORT — planning, pretrip, posttrip (hidden during live)
           ══════════════════════════════════════════════════════════════ */}
       {tripPhase !== 'live' && <div className="flex flex-col gap-2.5 mt-5">
-        <div className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.05em]">Share & Export</div>
+        <div className="font-heading text-xs font-semibold text-text-tertiary uppercase tracking-[0.05em]">Share & Export</div>
 
         {/* Primary: Get Route + Share */}
         <div className="flex gap-2.5">
           {dayPlan.length > 0 && (
             <a href={getRouteUrl()} target="_blank" rel="noopener noreferrer"
-              className="flex-1 flex items-center justify-center gap-2 bg-accent-gradient text-text-on-accent border-none rounded-[14px] p-3.5 text-[15px] font-semibold no-underline shadow-[0_4px_20px_var(--amber-tint-shadow)]">
+              className="flex-1 flex items-center justify-center gap-2 bg-accent-gradient text-text-on-accent border-none rounded-[14px] p-3.5 text-[15px] font-semibold no-underline shadow-[0_4px_20px_var(--amber-tint-shadow)] active:scale-[0.97] transition-transform">
               <DirectionsIcon /> Get Route
             </a>
           )}
           <button onClick={() => { if (!requireAuth()) return; shareAsLink(); }}
             aria-label="Share plan as link"
-            className="flex-1 flex items-center justify-center gap-2 bg-bg-subtle-strong text-text-primary border border-border-medium rounded-[14px] p-3.5 text-[15px] font-semibold cursor-pointer">
+            className="flex-1 flex items-center justify-center gap-2 bg-bg-subtle-strong text-text-primary border border-border-medium rounded-[14px] p-3.5 text-[15px] font-semibold cursor-pointer active:scale-[0.97] transition-transform">
             <ShareIcon /> Share
           </button>
         </div>
@@ -1440,7 +1247,7 @@ export default function PlanScreen() {
           ══════════════════════════════════════════════════════════════ */}
       {tripPhase === 'pretrip' && totalStops > 0 && (
         <div className="mt-4 p-4 rounded-2xl bg-bg-elevated border border-border-subtle">
-          <div className="text-xs font-semibold text-text-tertiary uppercase tracking-[0.05em] mb-3">Book Your Trip</div>
+          <div className="font-heading text-xs font-semibold text-text-tertiary uppercase tracking-[0.05em] mb-3">Book Your Trip</div>
           <div className="flex gap-2 overflow-x-auto scroll-hidden pb-1">
             {BOOKING_SERVICES.map(s => (
               <a key={s.id} href={s.buildUrl(cityLabel)} target="_blank" rel="noopener noreferrer"
@@ -1461,7 +1268,11 @@ export default function PlanScreen() {
       {(tripPhase === 'planning' || tripPhase === 'pretrip') && <div className="mt-6">
         <div className="flex items-center justify-center gap-4 pt-1">
           {dayCount > 1 && (
-            <button onClick={() => removeDay(activeDay)}
+            <button onClick={() => {
+                if (window.confirm(`Delete Day ${activeDay}? This will remove all stops for this day.`)) {
+                  removeDay(activeDay);
+                }
+              }}
               aria-label={`Delete day ${activeDay} from trip`}
               className="bg-transparent border-none text-status-red text-[13px] cursor-pointer p-1.5">
               Delete Day {activeDay}
@@ -1541,6 +1352,12 @@ export default function PlanScreen() {
 
       {/* Wrap-up modal — portal to escape .page-enter transform */}
       {wrapUpOpen && createPortal(<WrapUpModal />, document.body)}
+
+      {/* Logistics footer bar — pretrip & live only */}
+      {(tripPhase === 'pretrip' || tripPhase === 'live') && totalStops > 0 && createPortal(
+        <LogisticsPanel />,
+        document.body
+      )}
 
       {/* Chat FAB — not during posttrip */}
       {tripPhase !== 'posttrip' && totalStops > 0 && createPortal(

@@ -7,7 +7,8 @@ import { formatDistance } from '../services/places';
 import { calcWalkMinutes, calcDriveMinutes, buildMapsUrl, haversineKm } from '../utils/transport';
 import { PRICE_LEVEL_ESTIMATE } from '../data/constants';
 import { hapticImpact, hapticNotification, hapticSelection } from '../utils/haptics';
-import { generateDayPlan } from '../services/autoPlan';
+import { generateDayPlan, fetchCuratedPicks } from '../services/autoPlan';
+import type { CuratedPicksResult } from '../services/autoPlan';
 import { fetchTravelAdvisory } from '../services/travelAdvisory';
 import { getPreferenceSummary, recordTripGenerated, recordAddedToTrip, recordSwapPreference } from '../utils/preferences';
 
@@ -197,9 +198,11 @@ export function useTripPlan(deps: {
     } catch { return []; }
   });
 
-  // Plan title/vibe (declared early for use in confirmClearPlan)
+  // Plan title/vibe/headline (declared early for use in confirmClearPlan)
   const [lastPlanTitle, setLastPlanTitle] = useState<string | null>(null);
   const [lastPlanVibe, setLastPlanVibe] = useState<string | null>(null);
+  const [lastPlanHeadline, setLastPlanHeadline] = useState<string | null>(null);
+  const [lastPlanDuration, setLastPlanDuration] = useState<string | null>(null);
 
   // Reset plan title/vibe when city changes — prevents stale "plan completed" state
   const prevCityLabel = useRef(cityLabel);
@@ -207,6 +210,7 @@ export function useTripPlan(deps: {
     if (prevCityLabel.current !== cityLabel) {
       setLastPlanTitle(null);
       setLastPlanVibe(null);
+      setLastPlanHeadline(null);
       prevCityLabel.current = cityLabel;
     }
   }, [cityLabel]);
@@ -572,6 +576,53 @@ export function useTripPlan(deps: {
   };
 
   // --------------------------------------------------------------------------
+  // Curated Picks (Browse mode)
+  // --------------------------------------------------------------------------
+
+  const [curatedPicks, setCuratedPicks] = useState<CuratedPicksResult | null>(null);
+  const [curatedLoading, setCuratedLoading] = useState(false);
+  const [curatedVibe, setCuratedVibe] = useState<string | null>(null);
+
+  const [curatedError, setCuratedError] = useState<string | null>(null);
+
+  const loadCuratedPicks = useCallback(async (vibe: string): Promise<boolean> => {
+    setCuratedError(null);
+    if (!lat || !lng) {
+      showToast('Location needed — pick a city or enable GPS', 'error');
+      return false;
+    }
+
+    setCuratedLoading(true);
+    setCuratedVibe(vibe);
+    setCuratedPicks(null);
+
+    try {
+      const result = await fetchCuratedPicks({
+        lat,
+        lng,
+        city: cityLabel || undefined,
+        vibe,
+        travelGroup: travelGroup || undefined,
+      });
+      setCuratedPicks(result);
+      track('curated_picks_loaded', { vibe, city: cityLabel, total: String(result.totalPlaces) });
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to load picks';
+      setCuratedError(msg);
+      showToast(msg, 'error');
+      return false;
+    } finally {
+      setCuratedLoading(false);
+    }
+  }, [lat, lng, cityLabel, travelGroup, showToast]);
+
+  const clearCuratedPicks = useCallback(() => {
+    setCuratedPicks(null);
+    setCuratedVibe(null);
+  }, []);
+
+  // --------------------------------------------------------------------------
   // Auto Day Planner
   // --------------------------------------------------------------------------
 
@@ -678,13 +729,17 @@ export function useTripPlan(deps: {
         addedAt: new Date(),
         timeSlot: s.timeSlot,
         reason: s.reason,
+        knownFor: s.knownFor || '',
         estimatedSpend: s.estimatedSpend,
+        neighborhood: s.neighborhood || '',
       }));
 
       // Populate the currently active day (preserve other days)
       setTripDays(prev => ({ ...prev, [activeDay]: stops }));
       setLastPlanTitle(result.dayTitle);
       setLastPlanVibe(vibe || null);
+      setLastPlanHeadline(result.headline || null);
+      setLastPlanDuration(duration);
 
       // Clear old trip start date so the new plan starts fresh (no stale "posttrip" state)
       setTripStartDate(null);
@@ -753,7 +808,8 @@ export function useTripPlan(deps: {
     clearPlan, movePlanStop, reorderStops, addDay, removeDay, moveStopToDay, pivotStop,
     getRouteUrl, getFullTripRouteUrl, sharePlan, shareAsLink, getTransportInfo, getDaySummary,
     estimatedSpend,
-    autoPlanLoading, autoPlanError, lastPlanTitle, lastPlanVibe, planMyDay,
+    autoPlanLoading, autoPlanError, lastPlanTitle, lastPlanVibe, lastPlanHeadline, lastPlanDuration, planMyDay,
+    curatedPicks, curatedLoading, curatedVibe, curatedError, loadCuratedPicks, clearCuratedPicks,
     tripStartDate, setTripStartDate,
     tripHistory, clearTripHistory, deleteTripHistoryEntry,
     wrapUpOpen, startWrapUp, dismissWrapUp, confirmClearPlan,

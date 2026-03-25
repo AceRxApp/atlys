@@ -235,7 +235,7 @@ export default function EventsScreen() {
   }
 
   return (
-    <div>
+    <div className="overscroll-contain">
       <ContextHint
         storageKey="events"
         title="Events Near You"
@@ -266,7 +266,7 @@ export default function EventsScreen() {
       {/* Header */}
       <div className="mb-3 flex justify-between items-start">
         <div>
-          <h1 className="text-xl font-bold mb-0.5">
+          <h1 className="font-heading text-xl font-bold mb-0.5">
             Events {cityLabel ? `in ${cityLabel}` : ''} {'\u{1F3AB}'}
           </h1>
           <p className="text-text-tertiary text-[13px]">
@@ -371,21 +371,39 @@ export default function EventsScreen() {
           </button>
         </div>
       ) : filteredEvents.length === 0 ? (
-        <div className="text-center pt-[60px]">
-          <div className="text-[64px] mb-4 opacity-60">&#x1F3AB;</div>
-          <h2 className="text-xl font-bold mb-2">No events found</h2>
-          <p className="text-text-secondary text-sm leading-[1.5]">
-            {!useGps && !selectedCity
-              ? 'Select a city or use GPS to discover events nearby'
-              : searchQuery || dateFilter !== 'all' || eventCategoryFilter !== 'all'
-                ? 'Try adjusting your filters or search.'
-                : 'No upcoming events found in this area. Check back soon!'}
-          </p>
+        <div className="text-center pt-[48px] px-6">
+          <div className="text-[56px] mb-3 opacity-60">&#x1F3AB;</div>
+          <h2 className="text-lg font-bold mb-2 text-text-primary">No events found</h2>
+          {!useGps && !selectedCity ? (
+            <p className="text-text-secondary text-sm leading-relaxed">
+              Select a city or enable GPS to discover events nearby.
+            </p>
+          ) : searchQuery ? (
+            <p className="text-text-secondary text-sm leading-relaxed">
+              No results for "<span className="font-semibold text-text-primary">{searchQuery}</span>". Try a different search term or clear your filters.
+            </p>
+          ) : dateFilter === 'today' ? (
+            <p className="text-text-secondary text-sm leading-relaxed">
+              No events happening today. Try <button onClick={() => setDateFilter('week')} className="text-events-active bg-transparent border-none cursor-pointer font-semibold p-0 text-sm underline">This Week</button> or <button onClick={() => setDateFilter('month')} className="text-events-active bg-transparent border-none cursor-pointer font-semibold p-0 text-sm underline">This Month</button> to see more.
+            </p>
+          ) : dateFilter === 'week' ? (
+            <p className="text-text-secondary text-sm leading-relaxed">
+              Nothing this week. Try expanding to <button onClick={() => setDateFilter('month')} className="text-events-active bg-transparent border-none cursor-pointer font-semibold p-0 text-sm underline">This Month</button> or <button onClick={() => setDateFilter('all')} className="text-events-active bg-transparent border-none cursor-pointer font-semibold p-0 text-sm underline">All Dates</button>.
+            </p>
+          ) : eventCategoryFilter !== 'all' ? (
+            <p className="text-text-secondary text-sm leading-relaxed">
+              No {eventCategoryFilter} events found. Try <button onClick={() => setEventCategoryFilter('all')} className="text-events-active bg-transparent border-none cursor-pointer font-semibold p-0 text-sm underline">viewing all categories</button>.
+            </p>
+          ) : (
+            <p className="text-text-secondary text-sm leading-relaxed">
+              No upcoming events in this area yet. Check back closer to your trip dates!
+            </p>
+          )}
           {(searchQuery || dateFilter !== 'all' || eventCategoryFilter !== 'all') && (
             <button
               onClick={() => { setSearchQuery(''); setDateFilter('all'); setEventCategoryFilter('all'); }}
-              className="mt-3 bg-none border border-events-active text-events-active rounded-[10px] py-2.5 px-5 text-[13px] font-semibold cursor-pointer min-h-[44px]">
-              Clear Filters
+              className="mt-4 bg-none border border-events-active text-events-active rounded-[10px] py-2.5 px-5 text-[13px] font-semibold cursor-pointer min-h-[44px]">
+              Clear All Filters
             </button>
           )}
         </div>
@@ -393,8 +411,10 @@ export default function EventsScreen() {
         <EventsMapView eventsList={filteredEvents} />
       ) : (
         <div className="md:grid md:grid-cols-2 md:gap-4">
-          {filteredEvents.map(event => (
-            <EventCard key={event.id} event={event} />
+          {filteredEvents.map((event, i) => (
+            <div key={event.id} className="animate-enter-up" style={{ animationDelay: `${Math.min(i, 10) * 60}ms` }}>
+              <EventCard event={event} />
+            </div>
           ))}
         </div>
       )}

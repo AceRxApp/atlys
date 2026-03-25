@@ -127,33 +127,49 @@ export default function LogisticsPanel() {
   };
 
   return (
-    <div className="card mt-3 p-0 overflow-hidden">
-      {/* Toggle header */}
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full py-3.5 px-4 bg-transparent border-none cursor-pointer flex items-center justify-between"
-      >
-        <div className="flex items-center gap-2">
-          <span className="text-lg">{'\u{1F9F3}'}</span>
-          <span className="text-sm font-semibold text-text-primary">Trip Info</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {itemCount > 0 && (
-            <span className="text-xs font-semibold py-0.5 px-2 rounded-[10px] bg-amber-tint-bg10 text-accent-amber">
-              {itemCount}
-            </span>
-          )}
-          <span
-            className="text-text-tertiary text-sm transition-transform duration-200"
-            style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
-          >
-            {'\u{25BC}'}
-          </span>
-        </div>
-      </button>
-
+    <>
+      {/* Backdrop when expanded */}
       {expanded && (
-        <div className="px-4 pb-4">
+        <div
+          className="fixed inset-0 bg-black/40 z-[149]"
+          onClick={() => setExpanded(false)}
+        />
+      )}
+
+      <div
+        className="fixed left-0 right-0 z-[150] max-w-[430px] mx-auto transition-all duration-300 ease-out"
+        style={{
+          bottom: 'env(safe-area-inset-bottom, 0px)',
+          maxHeight: expanded ? '70vh' : 'auto',
+        }}
+      >
+        {/* Collapsed footer bar */}
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-full py-3 px-4 border-none cursor-pointer flex items-center justify-between rounded-t-2xl"
+          style={{ background: 'var(--bg-elevated)', borderTop: '1px solid var(--border-subtle)' }}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-lg">{'\u{1F9F3}'}</span>
+            <span className="text-sm font-semibold text-text-primary">Trip Info</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {itemCount > 0 && (
+              <span className="text-xs font-semibold py-0.5 px-2 rounded-[10px] bg-amber-tint-bg10 text-accent-amber">
+                {itemCount}
+              </span>
+            )}
+            <span
+              className="text-text-tertiary text-sm transition-transform duration-200"
+              style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            >
+              {'\u{25B2}'}
+            </span>
+          </div>
+        </button>
+
+        {expanded && (
+          <div className="px-4 pb-4 overflow-auto" style={{ background: 'var(--bg-elevated)', maxHeight: 'calc(70vh - 48px)' }}>
           {/* ---- HOTEL SECTION ---- */}
           <div className="mb-4">
             <div className="text-xs text-text-tertiary font-semibold mb-2 uppercase tracking-[0.05em]">
@@ -511,6 +527,7 @@ export default function LogisticsPanel() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

@@ -37,6 +37,7 @@ export default function AdminPanel() {
   const videoThumbRef = useRef<HTMLInputElement>(null);
 
   const [adminError, setAdminError] = useState<string | null>(null);
+  const [adminGroup, setAdminGroup] = useState<'overview' | 'users' | 'content' | 'developer'>('overview');
 
   useEffect(() => {
     Promise.all([
@@ -137,16 +138,53 @@ export default function AdminPanel() {
         </button>
       </div>
 
-      {/* Admin Tabs */}
-      <div className="flex border-b border-border-subtle overflow-x-auto scroll-hidden">
-        {(['dashboard', 'signups', 'users', 'cities', 'reports', 'stops', 'dish-images', 'videos', 'health', 'api-keys'] as const).map(tab => (
-          <button key={tab}
-            onClick={() => setAdminTab(tab)}
-            className={`flex-1 p-3 text-[13px] font-medium bg-transparent border-none cursor-pointer border-b-2 whitespace-nowrap ${adminTab === tab ? 'text-accent-amber border-b-accent-amber' : 'text-text-tertiary border-b-transparent'}`}>
-            {tab === 'dish-images' ? 'Dishes' : tab === 'api-keys' ? 'API Keys' : tab === 'videos' ? 'Videos' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+      {/* Admin Group Tabs (consolidated from 10 → 4) */}
+      <div className="flex border-b border-border-subtle">
+        {([
+          { id: 'overview' as const, label: 'Overview', defaultSub: 'dashboard' as const },
+          { id: 'users' as const, label: 'Users', defaultSub: 'signups' as const },
+          { id: 'content' as const, label: 'Content', defaultSub: 'cities' as const },
+          { id: 'developer' as const, label: 'Developer', defaultSub: 'api-keys' as const },
+        ]).map(group => (
+          <button key={group.id}
+            onClick={() => { setAdminGroup(group.id); setAdminTab(group.defaultSub); }}
+            className={`flex-1 p-3 text-[13px] font-medium bg-transparent border-none cursor-pointer border-b-2 whitespace-nowrap ${adminGroup === group.id ? 'text-accent-amber border-b-accent-amber' : 'text-text-tertiary border-b-transparent'}`}>
+            {group.label}
           </button>
         ))}
       </div>
+
+      {/* Sub-tabs within group */}
+      {adminGroup === 'overview' && (
+        <div className="flex gap-1 px-5 pt-3 pb-0">
+          {([{ id: 'dashboard' as const, label: 'Dashboard' }, { id: 'health' as const, label: 'Health' }]).map(sub => (
+            <button key={sub.id} onClick={() => setAdminTab(sub.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium border-none cursor-pointer ${adminTab === sub.id ? 'bg-amber-tint-bg15 text-accent-amber' : 'bg-transparent text-text-tertiary'}`}>
+              {sub.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {adminGroup === 'users' && (
+        <div className="flex gap-1 px-5 pt-3 pb-0">
+          {([{ id: 'signups' as const, label: 'Signups' }, { id: 'users' as const, label: 'Registered' }, { id: 'reports' as const, label: 'Reports' }]).map(sub => (
+            <button key={sub.id} onClick={() => setAdminTab(sub.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium border-none cursor-pointer ${adminTab === sub.id ? 'bg-amber-tint-bg15 text-accent-amber' : 'bg-transparent text-text-tertiary'}`}>
+              {sub.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {adminGroup === 'content' && (
+        <div className="flex gap-1 px-5 pt-3 pb-0">
+          {([{ id: 'cities' as const, label: 'Cities' }, { id: 'stops' as const, label: 'Stops' }, { id: 'dish-images' as const, label: 'Dishes' }, { id: 'videos' as const, label: 'Videos' }]).map(sub => (
+            <button key={sub.id} onClick={() => setAdminTab(sub.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium border-none cursor-pointer ${adminTab === sub.id ? 'bg-amber-tint-bg15 text-accent-amber' : 'bg-transparent text-text-tertiary'}`}>
+              {sub.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="p-5">
         {adminError && (

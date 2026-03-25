@@ -24,7 +24,7 @@ export default function BrandsScreen() {
           <div className="text-xs text-accent-amber uppercase tracking-[0.15em] font-semibold mb-4">
             NxStops for Brands
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold text-text-primary leading-tight mb-4">
+          <h1 className="font-heading text-3xl md:text-4xl font-bold text-text-primary leading-tight mb-4">
             Elevate Your Next<br />Brand Trip
           </h1>
           <p className="text-[16px] text-text-secondary leading-relaxed max-w-[480px] mx-auto mb-8">
@@ -43,7 +43,7 @@ export default function BrandsScreen() {
         {/* ================================================================ */}
         <div className="mb-12">
           <div className="bg-bg-surface-alpha backdrop-blur-[20px] rounded-2xl p-6 border border-border-subtle">
-            <h2 className="text-lg font-bold text-text-primary mb-3">Brand trips deserve better tools</h2>
+            <h2 className="font-heading text-lg font-bold text-text-primary mb-3">Brand trips deserve better tools</h2>
             <p className="text-sm leading-[1.7] text-text-secondary mb-3">
               Your brand spends months planning the perfect creator trip. But the itinerary lives in a Google Doc. Logistics bounce around a WhatsApp group. Creators miss the best local spots because they don't know the city.
             </p>
@@ -57,7 +57,7 @@ export default function BrandsScreen() {
         {/* HOW IT WORKS                                                     */}
         {/* ================================================================ */}
         <div className="mb-12">
-          <h2 className="text-lg font-bold text-text-primary mb-5 text-center">How it works</h2>
+          <h2 className="font-heading text-lg font-bold text-text-primary mb-5 text-center">How it works</h2>
           <div className="grid gap-4">
             {[
               {
@@ -75,10 +75,11 @@ export default function BrandsScreen() {
                 title: 'Content flows',
                 desc: 'Every stop is a content moment. Photogenic venues, shareable routes, and curated experiences that align with your brand story.',
               },
-            ].map((item) => (
+            ].map((item, i) => (
               <div
                 key={item.step}
-                className="bg-bg-surface-alpha backdrop-blur-[20px] rounded-2xl p-5 border border-border-subtle"
+                className="bg-bg-surface-alpha backdrop-blur-[20px] rounded-2xl p-5 border border-border-subtle animate-enter-up"
+                style={{ animationDelay: `${i * 100}ms` }}
               >
                 <div className="flex items-start gap-4">
                   <div className="text-2xl font-bold text-accent-amber opacity-50 leading-none pt-0.5">
@@ -98,7 +99,7 @@ export default function BrandsScreen() {
         {/* WHAT BRANDS GET                                                  */}
         {/* ================================================================ */}
         <div className="mb-12">
-          <h2 className="text-lg font-bold text-text-primary mb-5 text-center">What your brand gets</h2>
+          <h2 className="font-heading text-lg font-bold text-text-primary mb-5 text-center">What your brand gets</h2>
           <div className="grid grid-cols-2 gap-3">
             {[
               { title: 'Custom itinerary', desc: 'Branded trip plan with your venues, your aesthetic, your story' },
@@ -107,10 +108,11 @@ export default function BrandsScreen() {
               { title: 'Real-time updates', desc: 'Change the plan on the fly. Everyone sees updates instantly' },
               { title: 'Shareable links', desc: 'One link to share the entire trip with your creator roster' },
               { title: 'Content-ready stops', desc: 'Every venue selected for visual impact and brand alignment' },
-            ].map((item) => (
+            ].map((item, i) => (
               <div
                 key={item.title}
-                className="bg-bg-surface-alpha backdrop-blur-[20px] rounded-xl p-4 border border-border-subtle"
+                className="bg-bg-surface-alpha backdrop-blur-[20px] rounded-xl p-4 border border-border-subtle animate-enter-up"
+                style={{ animationDelay: `${i * 80}ms` }}
               >
                 <h3 className="text-[13px] font-semibold text-text-primary mb-1">{item.title}</h3>
                 <p className="text-[11px] leading-relaxed text-text-tertiary">{item.desc}</p>
@@ -123,7 +125,7 @@ export default function BrandsScreen() {
         {/* PAST TRIP DESTINATIONS                                           */}
         {/* ================================================================ */}
         <div className="mb-12">
-          <h2 className="text-lg font-bold text-text-primary mb-5 text-center">Built for destinations like these</h2>
+          <h2 className="font-heading text-lg font-bold text-text-primary mb-5 text-center">Built for destinations like these</h2>
           <div className="grid grid-cols-3 gap-3">
             {[
               { city: 'Positano', country: 'Italy' },
@@ -135,10 +137,11 @@ export default function BrandsScreen() {
               { city: 'Dubai', country: 'UAE' },
               { city: 'Sydney', country: 'Australia' },
               { city: 'Tokyo', country: 'Japan' },
-            ].map((d) => (
+            ].map((d, i) => (
               <div
                 key={d.city}
-                className="bg-bg-surface-alpha backdrop-blur-[20px] rounded-xl p-3 border border-border-subtle text-center"
+                className="bg-bg-surface-alpha backdrop-blur-[20px] rounded-xl p-3 border border-border-subtle text-center animate-enter-scale"
+                style={{ animationDelay: `${i * 60}ms` }}
               >
                 <div className="text-[13px] font-semibold text-text-primary">{d.city}</div>
                 <div className="text-[10px] text-text-tertiary">{d.country}</div>
@@ -151,7 +154,7 @@ export default function BrandsScreen() {
         {/* CTA                                                              */}
         {/* ================================================================ */}
         <div className="text-center py-10 border-t border-border-subtle">
-          <h2 className="text-xl font-bold text-text-primary mb-2">
+          <h2 className="font-heading text-xl font-bold text-text-primary mb-2">
             Let's build your next brand trip
           </h2>
           <p className="text-sm text-text-secondary mb-6 max-w-[400px] mx-auto">

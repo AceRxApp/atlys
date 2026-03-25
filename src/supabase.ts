@@ -337,8 +337,14 @@ export async function authGetSession(): Promise<Session | null> {
 }
 
 export function authOnStateChange(callback: (session: Session | null) => void) {
-  return supabase.auth.onAuthStateChange((_event, session) => {
-    callback(session);
+  return supabase.auth.onAuthStateChange((event, session) => {
+    // Only react to meaningful auth events — ignore INITIAL_SESSION
+    // (we already handle that with getSession) and TOKEN_REFRESHED
+    // (which doesn't change the user). This prevents race conditions
+    // where INITIAL_SESSION fires with null after a successful login.
+    if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+      callback(session);
+    }
   });
 }
 

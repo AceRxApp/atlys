@@ -810,7 +810,7 @@ export default function PlaceDetailModal({ place }: { place: Place }) {
                 addToPlan(place);
               }
             }}
-            className={`w-full p-4 rounded-[14px] text-base font-semibold cursor-pointer ${
+            className={`w-full p-4 rounded-[14px] text-base font-semibold cursor-pointer active:scale-[0.97] transition-transform ${
               inPlan
                 ? 'bg-transparent text-accent-amber border-2 border-accent-amber shadow-none'
                 : 'bg-accent-gradient text-text-on-accent border-none shadow-[0_4px_20px_var(--amber-tint-shadow)]'

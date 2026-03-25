@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Place, formatDistance, getHoursStatus } from '../services/places';
 import { StarRating } from './ui';
@@ -143,58 +143,88 @@ export default memo(function PlaceCard({ place }: { place: Place }) {
           </div>
         )}
 
-        {/* Action Row */}
-        <div className="flex gap-2" onClick={e => e.stopPropagation()}>
-          <button
-            onClick={() => { if (inPlan) { const stop = Object.values(tripDays).flat().find(s => s.place?.placeId === place.placeId); if (stop) removeFromPlan(stop.id); } else { addToPlan(place); } }}
-            className={`flex-1 px-4 py-3 rounded-[10px] text-[13px] font-semibold cursor-pointer min-h-[44px] ${
-              inPlan
-                ? 'bg-transparent text-accent-amber border-[1.5px] border-accent-amber'
-                : 'bg-accent-gradient text-text-on-accent border-none'
-            }`}
-          >
-            {inPlan ? '\u2713 Saved' : '+ Add'}
-          </button>
-          {place.googleMapsUrl && (
-            <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
-              aria-label="Get directions"
-              className="px-4 py-3 rounded-[10px] bg-bg-subtle-strong text-text-secondary flex items-center justify-center no-underline min-h-[44px] min-w-[44px]">
-              <DirectionsIcon />
-            </a>
-          )}
-          {place.phone && (
-            <a href={`tel:${place.phone}`}
-              aria-label="Call"
-              className="px-4 py-3 rounded-[10px] bg-bg-subtle-strong text-text-secondary flex items-center justify-center no-underline min-h-[44px] min-w-[44px]">
-              <PhoneIcon />
-            </a>
-          )}
-          {(isReservable(place) || isBookable(place)) && (
-            <a href={getBookingUrl(place)} target="_blank" rel="noopener noreferrer"
-              className={`px-4 py-3 rounded-[10px] flex items-center justify-center no-underline text-xs font-semibold min-h-[44px] ${
-                isReservable(place)
-                  ? 'bg-[rgba(218,55,67,0.12)] text-[#DA3743] border border-[rgba(218,55,67,0.25)]'
-                  : 'bg-green-tint-bg text-status-green border border-green-tint-border'
-              }`}>
-              {getBookingLabel(place)}
-            </a>
-          )}
-          <button onClick={() => toggleSaved(place)}
-            aria-label={isSaved(place.placeId) ? 'Remove from saved' : 'Save place'}
-            className={`px-4 py-3 rounded-[10px] border-none cursor-pointer flex items-center justify-center text-base min-h-[44px] min-w-[44px] ${
-              isSaved(place.placeId)
-                ? 'bg-amber-tint-bg15 text-accent-amber'
-                : 'bg-bg-subtle-strong text-text-secondary'
-            }`}>
-            {isSaved(place.placeId) ? '\u2665' : '\u2661'}
-          </button>
-          <button onClick={() => sharePlace(place)}
-            aria-label="Share"
-            className="px-4 py-3 rounded-[10px] bg-bg-subtle-strong text-text-secondary border-none cursor-pointer flex items-center justify-center min-h-[44px] min-w-[44px]">
-            <ShareIcon />
-          </button>
-        </div>
+        {/* Action Row — 2 primary + overflow */}
+        <PlaceActions place={place} inPlan={inPlan} />
       </div>
     </div>
   );
 });
+
+/* Compact action bar: Add + Directions visible, rest behind "..." */
+function PlaceActions({ place, inPlan }: { place: Place; inPlan: boolean }) {
+  const [open, setOpen] = useState(false);
+  const {
+    addToPlan, removeFromPlan, tripDays,
+    toggleSaved, isSaved, sharePlace,
+    isReservable, isBookable, getBookingUrl, getBookingLabel,
+  } = useApp();
+
+  return (
+    <div className="relative flex gap-2" onClick={e => e.stopPropagation()}>
+      <button
+        onClick={() => {
+          if (inPlan) {
+            const stop = Object.values(tripDays).flat().find(s => s.place?.placeId === place.placeId);
+            if (stop) removeFromPlan(stop.id);
+          } else { addToPlan(place); }
+        }}
+        className={`flex-1 px-4 py-3 rounded-[10px] text-[13px] font-semibold cursor-pointer min-h-[44px] active:scale-[0.95] transition-transform ${
+          inPlan
+            ? 'bg-transparent text-accent-amber border-[1.5px] border-accent-amber'
+            : 'bg-accent-gradient text-text-on-accent border-none'
+        }`}
+      >
+        {inPlan ? '\u2713 Saved' : '+ Add'}
+      </button>
+
+      {place.googleMapsUrl && (
+        <a href={place.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+          aria-label="Get directions"
+          className="px-4 py-3 rounded-[10px] bg-bg-subtle-strong text-text-secondary flex items-center justify-center no-underline min-h-[44px] min-w-[44px]">
+          <DirectionsIcon />
+        </a>
+      )}
+
+      <button onClick={() => toggleSaved(place)}
+        aria-label={isSaved(place.placeId) ? 'Remove from saved' : 'Save place'}
+        className={`px-4 py-3 rounded-[10px] border-none cursor-pointer flex items-center justify-center text-base min-h-[44px] min-w-[44px] ${
+          isSaved(place.placeId)
+            ? 'bg-amber-tint-bg15 text-accent-amber'
+            : 'bg-bg-subtle-strong text-text-secondary'
+        }`}>
+        {isSaved(place.placeId) ? '\u2665' : '\u2661'}
+      </button>
+
+      {/* Overflow "..." */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        aria-label="More actions"
+        className="px-3 py-3 rounded-[10px] bg-bg-subtle-strong text-text-secondary border-none cursor-pointer flex items-center justify-center min-h-[44px] min-w-[44px] text-lg font-bold"
+      >
+        ···
+      </button>
+
+      {open && (
+        <div className="absolute right-0 bottom-full mb-1 z-50 min-w-[160px] rounded-xl bg-bg-card border border-border-medium shadow-lg overflow-hidden animate-enter-scale">
+          {place.phone && (
+            <a href={`tel:${place.phone}`}
+              className="flex items-center gap-2.5 px-3.5 py-3 text-[13px] text-text-primary no-underline hover:bg-bg-subtle">
+              <PhoneIcon /> Call
+            </a>
+          )}
+          {(isReservable(place) || isBookable(place)) && (
+            <a href={getBookingUrl(place)} target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-2.5 px-3.5 py-3 text-[13px] text-text-primary no-underline hover:bg-bg-subtle">
+              {isReservable(place) ? '🍽️' : '🎟️'} {getBookingLabel(place)}
+            </a>
+          )}
+          <button
+            onClick={() => { sharePlace(place); setOpen(false); }}
+            className="flex items-center gap-2.5 px-3.5 py-3 text-[13px] text-text-primary bg-transparent border-none cursor-pointer w-full text-left hover:bg-bg-subtle">
+            <ShareIcon /> Share
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

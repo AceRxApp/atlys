@@ -25,7 +25,7 @@ export default function WorldCupScreen() {
           <div className="text-xs text-accent-amber uppercase tracking-[0.15em] font-semibold mb-4">
             NxStops x FIFA World Cup 2026
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold text-text-primary leading-tight mb-4">
+          <h1 className="font-heading text-3xl md:text-4xl font-bold text-text-primary leading-tight mb-4">
             The Fan Guide for<br />Every Host City
           </h1>
           <p className="text-[16px] text-text-secondary leading-relaxed max-w-[480px] mx-auto mb-8">
@@ -44,7 +44,7 @@ export default function WorldCupScreen() {
         {/* ================================================================ */}
         <div className="mb-12">
           <div className="bg-bg-surface-alpha backdrop-blur-[20px] rounded-2xl p-6 border border-border-subtle">
-            <h2 className="text-lg font-bold text-text-primary mb-3">Millions of fans, zero city guides</h2>
+            <h2 className="font-heading text-lg font-bold text-text-primary mb-3">Millions of fans, zero city guides</h2>
             <p className="text-sm leading-[1.7] text-text-secondary mb-3">
               The 2026 FIFA World Cup brings 5+ million visitors to 11 US host cities. Most of them have never been there before. They don't know where to eat, what to see, or how to get from the stadium to the best local spots.
             </p>
@@ -58,7 +58,7 @@ export default function WorldCupScreen() {
         {/* HOW IT WORKS                                                     */}
         {/* ================================================================ */}
         <div className="mb-12">
-          <h2 className="text-lg font-bold text-text-primary mb-5 text-center">How it works</h2>
+          <h2 className="font-heading text-lg font-bold text-text-primary mb-5 text-center">How it works</h2>
           <div className="grid gap-4">
             {[
               {
@@ -76,10 +76,11 @@ export default function WorldCupScreen() {
                 title: 'Cities shine',
                 desc: 'Every stop is a discovery moment. The best local restaurants, cultural landmarks, and nightlife — so fans experience the real city, not just the stadium.',
               },
-            ].map((item) => (
+            ].map((item, i) => (
               <div
                 key={item.step}
-                className="bg-bg-surface-alpha backdrop-blur-[20px] rounded-2xl p-5 border border-border-subtle"
+                className="bg-bg-surface-alpha backdrop-blur-[20px] rounded-2xl p-5 border border-border-subtle animate-enter-up"
+                style={{ animationDelay: `${i * 100}ms` }}
               >
                 <div className="flex items-start gap-4">
                   <div className="text-2xl font-bold text-accent-amber opacity-50 leading-none pt-0.5">
@@ -99,7 +100,7 @@ export default function WorldCupScreen() {
         {/* WHAT PARTNERS GET                                                */}
         {/* ================================================================ */}
         <div className="mb-12">
-          <h2 className="text-lg font-bold text-text-primary mb-5 text-center">What partners get</h2>
+          <h2 className="font-heading text-lg font-bold text-text-primary mb-5 text-center">What partners get</h2>
           <div className="grid grid-cols-2 gap-3">
             {[
               { title: 'Custom city guide', desc: 'Interactive guide with stadiums, fan zones, restaurants, and local picks' },
@@ -108,10 +109,11 @@ export default function WorldCupScreen() {
               { title: 'Real-time updates', desc: 'Weather changes, venue closures, or schedule shifts — updated instantly' },
               { title: 'Shareable links', desc: 'One link to share with fans, creators, or your entire activation team' },
               { title: 'Brand integration', desc: 'Sponsored stops, branded activations, and partner venue highlights' },
-            ].map((item) => (
+            ].map((item, i) => (
               <div
                 key={item.title}
-                className="bg-bg-surface-alpha backdrop-blur-[20px] rounded-xl p-4 border border-border-subtle"
+                className="bg-bg-surface-alpha backdrop-blur-[20px] rounded-xl p-4 border border-border-subtle animate-enter-up"
+                style={{ animationDelay: `${i * 80}ms` }}
               >
                 <h3 className="text-[13px] font-semibold text-text-primary mb-1">{item.title}</h3>
                 <p className="text-[11px] leading-relaxed text-text-tertiary">{item.desc}</p>
@@ -124,12 +126,13 @@ export default function WorldCupScreen() {
         {/* HOST CITIES                                                      */}
         {/* ================================================================ */}
         <div className="mb-12">
-          <h2 className="text-lg font-bold text-text-primary mb-5 text-center">2026 US Host Cities</h2>
+          <h2 className="font-heading text-lg font-bold text-text-primary mb-5 text-center">2026 US Host Cities</h2>
           <div className="grid grid-cols-3 gap-3">
-            {HOST_CITIES.map((c) => (
+            {HOST_CITIES.map((c, i) => (
               <div
                 key={c.city}
-                className="bg-bg-surface-alpha backdrop-blur-[20px] rounded-xl p-3 border border-border-subtle text-center"
+                className="bg-bg-surface-alpha backdrop-blur-[20px] rounded-xl p-3 border border-border-subtle text-center animate-enter-scale"
+                style={{ animationDelay: `${i * 60}ms` }}
               >
                 <div className="text-[13px] font-semibold text-text-primary">{c.city}</div>
                 <div className="text-[10px] text-text-tertiary">{c.venue}</div>
@@ -142,7 +145,7 @@ export default function WorldCupScreen() {
         {/* CTA                                                              */}
         {/* ================================================================ */}
         <div className="text-center py-10 border-t border-border-subtle">
-          <h2 className="text-xl font-bold text-text-primary mb-2">
+          <h2 className="font-heading text-xl font-bold text-text-primary mb-2">
             Let's build the ultimate fan guide
           </h2>
           <p className="text-sm text-text-secondary mb-6 max-w-[400px] mx-auto">

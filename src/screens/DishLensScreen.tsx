@@ -32,11 +32,32 @@ function TasteLensIntro({ onDismiss }: { onDismiss: () => void }) {
   );
 }
 
-// ---------- Persistent "How to use" hint ----------
+// ---------- Collapsible "How to use" hint (? icon for returning users) ----------
 function HowToUseHint() {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!expanded) {
+    return (
+      <button
+        onClick={() => setExpanded(true)}
+        className="flex items-center gap-2 mb-4 px-3 py-2 rounded-xl border border-border-subtle bg-transparent cursor-pointer text-text-tertiary hover:text-accent-amber transition-colors"
+        aria-label="How to use TasteLens"
+      >
+        <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center text-xs font-bold shrink-0">?</span>
+        <span className="text-xs">How to use TasteLens</span>
+      </button>
+    );
+  }
+
   return (
     <div className="card p-3.5 mb-4 border border-border-subtle">
-      <div className="text-[11px] text-accent-amber uppercase tracking-wider font-bold mb-2.5">4 ways to use TasteLens</div>
+      <div className="flex items-center justify-between mb-2.5">
+        <div className="text-[11px] text-accent-amber uppercase tracking-wider font-bold">4 ways to use TasteLens</div>
+        <button onClick={() => setExpanded(false)}
+          className="text-text-tertiary bg-transparent border-none cursor-pointer text-xs p-1">
+          {'\u2715'}
+        </button>
+      </div>
       <div className="space-y-2">
         <div className="flex items-start gap-2.5">
           <span className="text-sm shrink-0 mt-px">{'\u{1F4F7}'}</span>

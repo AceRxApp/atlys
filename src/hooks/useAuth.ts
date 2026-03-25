@@ -46,12 +46,15 @@ export function useAuth(showToast: (msg: string) => void, onSignOut: () => void)
 
   // Check session on mount + subscribe to auth state changes
   useEffect(() => {
+    let mounted = true;
     authGetSession()
-      .then(session => { setUser(session?.user ?? null); })
+      .then(session => { if (mounted) setUser(session?.user ?? null); })
       .catch(() => { /* session check failed — continue without auth */ })
-      .finally(() => setAuthLoading(false));
-    const { data: { subscription } } = authOnStateChange(session => setUser(session?.user ?? null));
-    return () => subscription.unsubscribe();
+      .finally(() => { if (mounted) setAuthLoading(false); });
+    const { data: { subscription } } = authOnStateChange(session => {
+      if (mounted) setUser(session?.user ?? null);
+    });
+    return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
 
   const handleSignIn = async () => {

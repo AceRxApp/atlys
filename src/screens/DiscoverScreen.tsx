@@ -103,7 +103,7 @@ export default function DiscoverScreen() {
   }, [cityLabel]);
 
   return (
-    <div>
+    <div className="overscroll-contain">
       {/* Notification Permission Prompt */}
       {showNotificationPrompt && notificationPermission === 'default' && selectedCity && (
         <div className="flex items-center gap-2.5 px-3.5 py-3 mb-3 rounded-xl bg-amber-tint-bg06 border border-amber-tint-border20">
@@ -161,7 +161,7 @@ export default function DiscoverScreen() {
       {/* Header */}
       <div className="mb-3 flex justify-between items-start">
         <div>
-          <h1 className="text-xl font-bold mb-0.5">
+          <h1 className="font-heading text-xl font-bold mb-0.5">
             {cityLabel} 📍
           </h1>
           <p className="text-text-tertiary text-[13px]">{filteredPlaces.length} places near you</p>
@@ -226,6 +226,7 @@ export default function DiscoverScreen() {
       <div className="flex gap-2 mb-3">
         <input
           type="text"
+          inputMode="search"
           placeholder="Search for a place..."
           value={searchQuery}
           onChange={e => { setSearchQuery(e.target.value); if (!e.target.value.trim() && showSearch) { dismissSearch(); } }}
@@ -536,8 +537,10 @@ export default function DiscoverScreen() {
 
               {/* Place Cards */}
               <div className="md:grid md:grid-cols-2 md:gap-4">
-              {!placesLoading && filteredPlaces.map(place => (
-                <PlaceCard key={place.placeId} place={place} />
+              {!placesLoading && filteredPlaces.map((place, i) => (
+                <div key={place.placeId} className="animate-enter-up" style={{ animationDelay: `${Math.min(i, 8) * 60}ms` }}>
+                  <PlaceCard place={place} />
+                </div>
               ))}
               </div>
 

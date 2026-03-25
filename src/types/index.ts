@@ -38,7 +38,9 @@ export interface Stop {
   addedAt: Date;
   timeSlot?: string;
   reason?: string;
+  knownFor?: string;
   estimatedSpend?: number;
+  neighborhood?: string;
 }
 
 export type PlanDuration = 'full' | 'morning' | 'afternoon' | 'evening';

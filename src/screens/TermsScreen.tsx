@@ -17,7 +17,7 @@ export default function TermsScreen() {
           </button>
         </div>
 
-        <h1 className="text-[28px] font-bold mb-2">Terms of Service</h1>
+        <h1 className="font-heading text-[28px] font-bold mb-2">Terms of Service</h1>
         <p className="text-[13px] text-text-tertiary mb-8">Effective date: January 1, 2025</p>
 
         <p className="text-sm leading-[1.7] text-text-body mb-3">

@@ -6,37 +6,39 @@
       <stop offset="100%" stop-color="#D97706"/>
     </linearGradient>
     <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#131110"/>
+      <stop offset="0%" stop-color="#1A1816"/>
       <stop offset="100%" stop-color="#0C0A09"/>
     </linearGradient>
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="8" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
   </defs>
 
   <!-- Background -->
   <rect width="512" height="512" rx="112" fill="url(#bg)"/>
 
-  <!-- Subtle inner border -->
-  <rect x="2" y="2" width="508" height="508" rx="110" fill="none" stroke="rgba(251,191,36,0.06)" stroke-width="1"/>
+  <!-- Route line connecting 3 dots — sits above the wordmark -->
+  <!-- Curved route path -->
+  <path d="M140 160 C180 160 190 200 230 200 C270 200 280 150 320 150 C360 150 370 190 380 190"
+        fill="none" stroke="url(#amber)" stroke-width="3" stroke-linecap="round" opacity="0.4"/>
 
-  <!-- Subtle amber glow behind pin -->
-  <ellipse cx="256" cy="210" rx="100" ry="110" fill="rgba(245,158,11,0.04)"/>
+  <!-- Stop dots along route -->
+  <circle cx="140" cy="160" r="10" fill="#0C0A09" stroke="url(#amber)" stroke-width="2.5"/>
+  <circle cx="140" cy="160" r="4" fill="url(#amber)"/>
 
-  <!-- Pin mark -->
-  <path d="M256 428 C228 355 144 272 144 188 C144 126 194 76 256 76 C318 76 368 126 368 188 C368 272 284 355 256 428Z"
-        fill="url(#amber)" filter="url(#glow)"/>
+  <circle cx="230" cy="200" r="10" fill="#0C0A09" stroke="url(#amber)" stroke-width="2.5"/>
+  <circle cx="230" cy="200" r="4" fill="url(#amber)"/>
 
-  <!-- Inner circle cutout -->
-  <circle cx="256" cy="188" r="46" fill="#0C0A09"/>
+  <circle cx="320" cy="150" r="10" fill="#0C0A09" stroke="url(#amber)" stroke-width="2.5"/>
+  <circle cx="320" cy="150" r="4" fill="url(#amber)"/>
 
-  <!-- Inner circle subtle ring -->
-  <circle cx="256" cy="188" r="46" fill="none" stroke="rgba(251,191,36,0.15)" stroke-width="1"/>
+  <!-- Destination pin (final stop) -->
+  <path d="M380 190 C376 176 366 166 366 156 C366 148 372 142 380 142 C388 142 394 148 394 156 C394 166 384 176 380 190Z"
+        fill="url(#amber)"/>
+  <circle cx="380" cy="156" r="5" fill="#0C0A09"/>
 
-  <!-- Center dot -->
-  <circle cx="256" cy="188" r="11" fill="url(#amber)"/>
+  <!-- "NxStops" wordmark — one line, large and bold -->
+  <text x="256" y="320" text-anchor="middle" font-family="'Outfit','DM Sans',system-ui,sans-serif" font-weight="700" font-size="88" fill="#FAFAF9" letter-spacing="-2">
+    <tspan fill="url(#amber)">Nx</tspan><tspan fill="#FAFAF9">Stops</tspan>
+  </text>
+
+  <!-- Subtitle -->
+  <text x="256" y="370" text-anchor="middle" font-family="'DM Sans',system-ui,sans-serif" font-weight="500" font-size="20" fill="#78716C" letter-spacing="6">YOUR NEXT STOP</text>
 </svg>

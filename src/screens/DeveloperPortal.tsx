@@ -151,7 +151,7 @@ export default function DeveloperPortal() {
 
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2" style={{ background: 'linear-gradient(135deg, #E8940A, #F5A623)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          <h1 className="font-heading text-3xl font-bold mb-2" style={{ background: 'linear-gradient(135deg, #E8940A, #F5A623)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             NxStops API
           </h1>
           <p className="text-text-secondary text-sm">

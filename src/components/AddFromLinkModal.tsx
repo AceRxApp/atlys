@@ -225,6 +225,7 @@ export default function AddFromLinkModal({ onClose }: Props) {
               <div className="relative">
                 <input
                   type="url"
+                  inputMode="url"
                   value={link}
                   onChange={e => setLink(e.target.value)}
                   onBlur={handleLinkBlur}

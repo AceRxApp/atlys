@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { LocationIcon } from '../components/icons';
 import { formatDistance } from '../services/places';
-import type { PlanDuration, City } from '../types';
+import type { City } from '../types';
 import ContextHint from '../components/ContextHint';
 import { useSubscription } from '../hooks/useSubscription';
 import PaywallModal from '../components/PaywallModal';
@@ -20,67 +20,19 @@ interface VibeOption {
   desc: string;
 }
 
-function getVibesForDuration(duration: PlanDuration): VibeOption[] {
-  const food: VibeOption = {
-    id: 'food', emoji: '\u{1F37D}\u{FE0F}', label: 'Food Tour',
-    desc: duration === 'morning' ? 'Coffee shops, brunch spots, bakeries'
-      : duration === 'afternoon' ? 'Lunch spots, desserts, afternoon bites'
-      : duration === 'evening' ? 'Dinner spots, late-night bites, cocktails'
-      : 'The best food spots across the city',
-  };
-  const adventure: VibeOption = {
-    id: 'adventure', emoji: '\u{1F33F}', label: 'Adventure',
-    desc: duration === 'morning' ? 'Parks, museums, scenic walks + breakfast'
-      : duration === 'afternoon' ? 'Culture, landmarks, markets + lunch'
-      : duration === 'evening' ? 'Sunset spots, viewpoints, culture + dinner'
-      : 'Outdoor, museums, culture + food between',
-  };
-  const curatedCity: VibeOption = {
-    id: 'surprise', emoji: '\u{1F3D9}\u{FE0F}', label: 'Best of the City',
-    desc: duration === 'morning' ? 'Top cafés, brunch spots, parks & culture'
-      : duration === 'afternoon' ? 'Best lunch, museums, shopping & neighborhoods'
-      : duration === 'evening' ? 'Top dinner, bars, events & nightlife'
-      : 'The city\'s greatest hits — top-rated everything',
-  };
-
-  if (duration === 'morning') {
-    return [
-      { id: 'chill', emoji: '\u{2615}', label: 'Chill Vibes', desc: 'Coffee shops, bookstores, scenic walks' },
-      food, adventure, curatedCity,
-    ];
-  }
-  if (duration === 'afternoon') {
-    return [
-      { id: 'daydrinks', emoji: '\u{1F379}', label: 'Day Drinks', desc: 'Rooftop bars, happy hour, wine bars' },
-      food, adventure, curatedCity,
-    ];
-  }
-  if (duration === 'evening') {
-    return [
-      { id: 'nightout', emoji: '\u{1F319}', label: 'Night Out',
-        desc: 'Dinner, bars, lounges, late night bites' },
-      food, adventure, curatedCity,
-    ];
-  }
-  // Full day vibes
-  return [
-    { id: 'stacked', emoji: '\u{1F525}', label: 'Full Experience',
-      desc: 'Breakfast to late night — the complete itinerary' },
-    food, adventure, curatedCity,
-  ];
-}
-
-const PLAN_DURATIONS: { id: PlanDuration; emoji: string; label: string; desc: string }[] = [
-  { id: 'full', emoji: '\u{2600}\u{FE0F}', label: 'Full Day', desc: '6-8 stops' },
-  { id: 'morning', emoji: '\u{1F305}', label: 'Morning', desc: '3 stops' },
-  { id: 'afternoon', emoji: '\u{26C5}', label: 'Afternoon', desc: '3 stops' },
-  { id: 'evening', emoji: '\u{1F319}', label: 'Evening', desc: '3 stops' },
+const VIBES: VibeOption[] = [
+  { id: 'starthare', emoji: '\u{2B50}', label: 'Greatest Hits', desc: 'The must-do highlights & iconic spots' },
+  { id: 'indulge', emoji: '\u{1F37D}\u{FE0F}', label: 'Indulge', desc: 'Food & drink worth the trip' },
+  { id: 'afterdark', emoji: '\u{1F31C}', label: 'After Dark', desc: 'Where the city comes alive at night' },
+  { id: 'escape', emoji: '\u{1F33F}', label: 'Escape', desc: 'Nature, scenic views & peaceful spots' },
+  { id: 'luxe', emoji: '\u{1F451}', label: 'Luxe', desc: 'High-end, upscale experiences' },
+  { id: 'undertheradar', emoji: '\u{1F4CD}', label: 'Under the Radar', desc: 'Hidden gems & local favorites' },
 ];
 
 const LOADING_MESSAGES = [
   'Finding top spots nearby...',
   'Checking what\'s open now...',
-  'Building your itinerary...',
+  'Curating the best picks...',
   'Adding local favorites...',
   'Almost ready...',
 ];
@@ -285,6 +237,7 @@ function CitySearch({ cities, selectedCity, loading, onSelect }: CitySearchProps
           aria-expanded={open}
           aria-autocomplete="list"
           aria-controls="city-search-list"
+          inputMode="search"
           className={`input-field pr-10 transition-[border-color] duration-150 ${open ? 'border-accent-amber' : 'border-border-strong'}`}
         />
         {query && selectedCity ? (
@@ -375,8 +328,10 @@ export default function HomeScreen() {
     loc,
     cities,
     loading,
-    autoPlanLoading,
+    loadCuratedPicks,
+    curatedLoading,
     planMyDay,
+    autoPlanLoading,
     weather, formatTemp,
     forYouPlaces,
     filteredPlaces,
@@ -393,33 +348,38 @@ export default function HomeScreen() {
   } = useApp();
   const subscription = useSubscription(user);
 
-  const [selectedVibe, setSelectedVibe] = useState<string | null>(null);
-  const [planDuration, setPlanDuration] = useState<PlanDuration>('full');
+  const [selectedVibesSet, setSelectedVibesSet] = useState<Set<string>>(new Set());
+  const [selectedDuration, setSelectedDuration] = useState<'full' | 'morning' | 'afternoon' | 'evening'>('full');
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
   const [showPaywall, setShowPaywall] = useState(false);
 
   const hasLocation = useGps || !!selectedCity;
-  const currentVibes = getVibesForDuration(planDuration);
-
-  // Reset vibe when duration changes if current vibe isn't available
-  useEffect(() => {
-    if (selectedVibe && !currentVibes.some(v => v.id === selectedVibe)) {
-      setSelectedVibe(null);
-    }
-  }, [planDuration]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Rotate loading messages
   useEffect(() => {
-    if (!autoPlanLoading) { setLoadingMsgIdx(0); return; }
+    if (!curatedLoading) { setLoadingMsgIdx(0); return; }
     const interval = setInterval(() => {
       setLoadingMsgIdx(prev => (prev + 1) % LOADING_MESSAGES.length);
     }, 2500);
     return () => clearInterval(interval);
-  }, [autoPlanLoading]);
+  }, [curatedLoading]);
 
   const handleSelectVibe = (vibeId: string) => {
-    setSelectedVibe(selectedVibe === vibeId ? null : vibeId);
+    setSelectedVibesSet(prev => {
+      const next = new Set(prev);
+      if (next.has(vibeId)) {
+        next.delete(vibeId);
+      } else {
+        if (next.size >= 2) {
+          const first = next.values().next().value;
+          if (first) next.delete(first);
+        }
+        next.add(vibeId);
+      }
+      return next;
+    });
   };
+  const selectedVibe = selectedVibesSet.size > 0 ? Array.from(selectedVibesSet).join(',') : null;
 
   const handlePlanMyDay = async () => {
     // "Try before sign up" — allow 1 free plan without an account
@@ -428,23 +388,19 @@ export default function HomeScreen() {
 
     if (!user) {
       if (trialUsed) {
-        // Already used their free trial — require sign-up
         setShowProfile(true);
         setAuthScreen('signup');
         return;
       }
-      // First-time anonymous user — let them try it
     } else {
-      // Signed-in user — check subscription limits
       if (!subscription.canUseFeature('plan_my_day')) {
         setShowPaywall(true);
         return;
       }
     }
 
-    const vibe = selectedVibe || 'surprise';
-    const vibeLabel = currentVibes.find(v => v.id === vibe)?.label || 'Best of the City';
-    const success = await planMyDay(vibeLabel, planDuration, vibe);
+    const vibe = selectedVibe || 'starthare';
+    const success = await planMyDay('explore', selectedDuration, vibe);
     if (success) {
       if (user) {
         subscription.useFeature('plan_my_day');
@@ -456,8 +412,10 @@ export default function HomeScreen() {
   };
 
   // Full-page loading state — fun animated progress
-  if (autoPlanLoading) {
-    const vibeLabel = currentVibes.find(v => v.id === (selectedVibe || 'surprise'))?.label || 'Best of the City';
+  if (curatedLoading || autoPlanLoading) {
+    const vibeLabel = selectedVibesSet.size > 1
+      ? Array.from(selectedVibesSet).map(id => VIBES.find(v => v.id === id)?.label || '').join(' + ')
+      : VIBES.find(v => v.id === (Array.from(selectedVibesSet)[0] || 'starthare'))?.label || 'Explore';
     return (
       <PlanLoadingAnimation
         cityName={cityLabel || loc.city || 'your city'}
@@ -480,7 +438,7 @@ export default function HomeScreen() {
           hints={[
             { emoji: '\u{1F4CD}', title: 'Pick your destination', description: 'Search for any city or tap "Use my location" to explore where you are right now.' },
             { emoji: '\u{1F3AF}', title: 'Choose your vibe', description: 'Pick a mood like Food Tour, Adventure, or Best of the City — then choose Full Day, Morning, Afternoon, or Evening.' },
-            { emoji: '\u{1F4CB}', title: 'Auto-plan your day', description: 'Tap "Plan My Day" and our AI builds a complete itinerary with the best stops for your mood and time.' },
+            { emoji: '\u{1F4CB}', title: 'Pick your vibe', description: 'Choose a vibe and we\u2019ll show you the best spots for morning, afternoon, and evening. Add what you like.' },
             { emoji: '\u{1F30D}', title: 'Explore featured cities', description: 'Scroll through popular destinations worldwide for trip inspiration.' },
           ]}
         />
@@ -586,16 +544,6 @@ export default function HomeScreen() {
         <p className="text-text-secondary text-sm">{getTimeSuggestion()}</p>
       </div>
 
-      {/* Compact Weather Banner */}
-      {weather && (
-        <div className="flex items-center gap-2.5 mb-5 py-2.5 px-3.5 rounded-xl border border-blue-tint-border"
-          style={{ background: 'linear-gradient(135deg, var(--blue-tint-bg), var(--bg-subtle))' }}>
-          <span className="text-2xl">{weather.emoji}</span>
-          <span className="text-base font-bold text-text-primary">{formatTemp(weather.temp)}</span>
-          <span className="text-xs text-text-secondary flex-1">{weather.description} · H: {formatTemp(weather.high)} L: {formatTemp(weather.low)}</span>
-        </div>
-      )}
-
       {/* ── Selected City ── */}
       <div className="mb-5">
         <div className="flex items-center gap-2.5 py-2.5 px-3.5 rounded-xl border border-accent-amber bg-amber-tint-bg10">
@@ -614,51 +562,89 @@ export default function HomeScreen() {
         </div>
       </div>
 
-      {/* ── How long? ── */}
+      {/* ── What's your vibe? ── */}
       <div className="mb-5">
-        <label className="section-label block mb-2.5">How long?</label>
-        <div className="grid grid-cols-4 gap-2">
-          {PLAN_DURATIONS.map(d => (
-            <button key={d.id}
-              onClick={() => setPlanDuration(d.id)}
-              aria-label={`${d.label} — ${d.desc}`}
-              aria-pressed={planDuration === d.id}
-              className={`py-2.5 px-2 rounded-xl text-center cursor-pointer transition-colors duration-150 ${
-                planDuration === d.id
-                  ? 'border-2 border-accent-amber bg-amber-tint-bg15'
-                  : 'border border-border-medium bg-transparent'
+        <div className="flex items-center justify-between mb-2">
+          <label className="section-label font-heading">What's your vibe?</label>
+          <span className="text-[11px] text-text-tertiary">Pick up to 2</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {VIBES.map((v, i) => {
+            const isVibeSelected = selectedVibesSet.has(v.id);
+            return (
+            <button key={v.id}
+              onClick={() => handleSelectVibe(v.id)}
+              aria-label={`${v.label} — ${v.desc}`}
+              aria-pressed={isVibeSelected}
+              style={{ animationDelay: `${i * 50}ms` }}
+              className={`flex flex-col items-center gap-1 py-2.5 px-2 rounded-xl cursor-pointer transition-all duration-200 animate-enter-up ${
+                isVibeSelected
+                  ? 'border-[1.5px] border-accent-amber bg-amber-tint-bg15 shadow-[0_0_16px_rgba(232,148,10,0.12)]'
+                  : 'border border-border-medium bg-transparent hover:border-border-strong'
               }`}>
-              <div className="text-lg mb-0.5">{d.emoji}</div>
-              <div className={`text-xs font-semibold ${planDuration === d.id ? 'text-accent-amber' : 'text-text-primary'}`}>{d.label}</div>
-              <div className="text-[11px] text-text-tertiary">{d.desc}</div>
+              <span className="text-lg">{v.emoji}</span>
+              <span className={`text-[12px] font-semibold leading-tight ${isVibeSelected ? 'text-accent-amber' : 'text-text-primary'}`}>{v.label}</span>
+            </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Duration Picker ── */}
+      <div className="mb-4">
+        <div className="flex gap-2">
+          {([
+            { id: 'full' as const, label: 'Full Day', emoji: '\u2600\uFE0F' },
+            { id: 'morning' as const, label: 'Morning', emoji: '\u{1F305}' },
+            { id: 'afternoon' as const, label: 'Afternoon', emoji: '\u{1F31E}' },
+            { id: 'evening' as const, label: 'Tonight', emoji: '\u{1F303}' },
+          ]).map(d => (
+            <button key={d.id}
+              onClick={() => setSelectedDuration(d.id)}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-all ${
+                selectedDuration === d.id
+                  ? 'border-[1.5px] border-accent-amber bg-amber-tint-bg15 text-accent-amber'
+                  : 'border border-border-medium bg-transparent text-text-tertiary'
+              }`}>
+              <span className="block text-sm mb-0.5">{d.emoji}</span>
+              {d.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* ── I'm out for... ── */}
-      <div className="mb-5">
-        <label className="section-label block mb-2.5">What's your vibe?</label>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
-          {currentVibes.map(v => (
-            <button key={v.id}
-              onClick={() => handleSelectVibe(v.id)}
-              aria-label={`${v.label} — ${v.desc}`}
-              aria-pressed={selectedVibe === v.id}
-              className={`py-3 px-3 rounded-xl text-left cursor-pointer transition-all duration-150 ${
-                selectedVibe === v.id
-                  ? 'border-2 border-accent-amber bg-amber-tint-bg15 scale-[1.01]'
-                  : 'border border-border-medium bg-transparent'
-              }`}>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-lg">{v.emoji}</span>
-                <span className={`text-[13px] font-semibold ${selectedVibe === v.id ? 'text-accent-amber' : 'text-text-primary'}`}>{v.label}</span>
-              </div>
-              <div className="text-[11px] text-text-tertiary leading-snug">{v.desc}</div>
-            </button>
-          ))}
+      {/* ── Generate Button ── */}
+      <button
+        onClick={handlePlanMyDay}
+        disabled={autoPlanLoading}
+        className="w-full p-4 rounded-[14px] border-none text-base font-bold cursor-pointer shadow-[0_4px_20px_var(--amber-tint-shadow)] disabled:opacity-50"
+        style={{ background: 'linear-gradient(135deg, var(--accent-amber), var(--accent-amber-dark))', color: '#0C0A09' }}
+      >
+        {autoPlanLoading ? 'Building your plan...' : `Plan My ${selectedDuration === 'full' ? 'Day' : selectedDuration === 'evening' ? 'Night' : selectedDuration.charAt(0).toUpperCase() + selectedDuration.slice(1)}`}
+      </button>
+      {!user ? (
+        <div className="text-center text-xs text-text-tertiary mt-1.5">
+          {localStorage.getItem('nxstops_free_trial_used') === '1'
+            ? <>Sign up to keep planning {' '}<button onClick={() => { setShowProfile(true); setAuthScreen('signup'); }} className="text-accent-amber bg-transparent border-none cursor-pointer text-xs p-0 underline">Create free account</button></>
+            : 'No account needed — try your first plan free'
+          }
         </div>
-      </div>
+      ) : !subscription.isPro ? (
+        <div className="text-center text-xs text-text-tertiary mt-1.5">
+          {subscription.getRemainingUses('plan_my_day')} of {subscription.getLimit('plan_my_day')} free plans left this month
+          {' '}<button onClick={() => setShowPaywall(true)} className="text-accent-amber bg-transparent border-none cursor-pointer text-xs p-0 underline">Upgrade</button>
+        </div>
+      ) : null}
+
+      {/* Compact Weather Banner */}
+      {weather && (
+        <div className="flex items-center gap-2.5 mb-5 py-2.5 px-3.5 rounded-xl border border-blue-tint-border"
+          style={{ background: 'linear-gradient(135deg, var(--blue-tint-bg), var(--bg-subtle))' }}>
+          <span className="text-2xl">{weather.emoji}</span>
+          <span className="text-base font-bold text-text-primary">{formatTemp(weather.temp)}</span>
+          <span className="text-xs text-text-secondary flex-1">{weather.description} · H: {formatTemp(weather.high)} L: {formatTemp(weather.low)}</span>
+        </div>
+      )}
 
       {/* ── Nearby Picks — show what's around before committing to a plan ── */}
       {!placesLoading && (() => {
@@ -714,58 +700,15 @@ export default function HomeScreen() {
         );
       })()}
 
-      {/* ── Generate Button ── */}
-      <button
-        onClick={handlePlanMyDay}
-        className="w-full p-4 rounded-[14px] border-none text-base font-bold cursor-pointer shadow-[0_4px_20px_var(--amber-tint-shadow)]"
-        style={{ background: 'linear-gradient(135deg, var(--accent-amber), var(--accent-amber-dark))', color: '#0C0A09' }}
-      >
-        Plan My Day
-      </button>
-      {!user ? (
-        <div className="text-center text-xs text-text-tertiary mt-1.5">
-          {localStorage.getItem('nxstops_free_trial_used') === '1'
-            ? <>Sign up to keep planning {' '}<button onClick={() => { setShowProfile(true); setAuthScreen('signup'); }} className="text-accent-amber bg-transparent border-none cursor-pointer text-xs p-0 underline">Create free account</button></>
-            : 'No account needed — try your first plan free'
-          }
-        </div>
-      ) : !subscription.isPro ? (
-        <div className="text-center text-xs text-text-tertiary mt-1.5">
-          {subscription.getRemainingUses('plan_my_day')} of {subscription.getLimit('plan_my_day')} free plans left this month
-          {' '}<button onClick={() => setShowPaywall(true)} className="text-accent-amber bg-transparent border-none cursor-pointer text-xs p-0 underline">Upgrade</button>
-        </div>
-      ) : null}
+      {/* ── Discover — Community Routes + Quick Actions ── */}
+      {hasLocation && <CommunityRoutesSection citySlug={citySlug} />}
 
       {/* Social Proof */}
       <div className="mt-5">
         <SocialProof />
       </div>
 
-      {/* ── Discover — Community Routes + Quick Actions ── */}
-      {hasLocation && <CommunityRoutesSection citySlug={citySlug} />}
-
-      <div className="mt-5 flex gap-2.5">
-        <button
-          onClick={() => setScreen('tastelens')}
-          className="flex-1 card !p-3 flex items-center gap-2.5 cursor-pointer border border-amber-tint-border15"
-          style={{ background: 'linear-gradient(135deg, var(--amber-tint-bg06), var(--bg-subtle))' }}>
-          <span className="text-xl">{'\u{1F37D}\u{FE0F}'}</span>
-          <div>
-            <div className="text-[13px] font-semibold text-text-primary">TasteLens</div>
-            <div className="text-[11px] text-text-tertiary">Scan any menu</div>
-          </div>
-        </button>
-        <button
-          onClick={() => setScreen('events')}
-          className="flex-1 card !p-3 flex items-center gap-2.5 cursor-pointer border border-purple-tint-border15"
-          style={{ background: 'linear-gradient(135deg, var(--purple-tint-bg08), var(--bg-subtle))' }}>
-          <span className="text-xl">{'\u{1F3AB}'}</span>
-          <div>
-            <div className="text-[13px] font-semibold text-text-primary">Events</div>
-            <div className="text-[11px] text-text-tertiary">What's happening</div>
-          </div>
-        </button>
-      </div>
+      {/* TasteLens & Events — accessible from bottom nav, removed here to reduce clutter */}
 
       {/* Paywall Modal */}
       {showPaywall && (

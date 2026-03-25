@@ -710,9 +710,27 @@ export default function App() {
   if (location.loading && location.cities.length === 0) {
     return (
       <div className="font-['DM_Sans',system-ui,sans-serif] bg-bg-body min-h-screen text-text-primary flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl font-bold mb-1 bg-accent-text-gradient bg-clip-text text-transparent">
-            NxStops
+        <div className="text-center flex flex-col items-center">
+          <svg width="48" height="48" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="mb-3">
+            <defs>
+              <linearGradient id="ld-amber" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#FBBF24"/>
+                <stop offset="50%" stopColor="#F59E0B"/>
+                <stop offset="100%" stopColor="#D97706"/>
+              </linearGradient>
+            </defs>
+            <path d="M15 35 C25 35 30 55 45 55 C60 55 65 30 75 30" fill="none" stroke="url(#ld-amber)" strokeWidth="2.5" strokeLinecap="round" opacity="0.5"/>
+            <circle cx="15" cy="35" r="6" fill="var(--bg-body)" stroke="url(#ld-amber)" strokeWidth="2"/>
+            <circle cx="15" cy="35" r="2.5" fill="url(#ld-amber)"/>
+            <circle cx="45" cy="55" r="6" fill="var(--bg-body)" stroke="url(#ld-amber)" strokeWidth="2"/>
+            <circle cx="45" cy="55" r="2.5" fill="url(#ld-amber)"/>
+            <circle cx="75" cy="30" r="6" fill="var(--bg-body)" stroke="url(#ld-amber)" strokeWidth="2"/>
+            <circle cx="75" cy="30" r="2.5" fill="url(#ld-amber)"/>
+            <path d="M88 70 C85 60 78 53 78 46 C78 40 82 36 88 36 C94 36 98 40 98 46 C98 53 91 60 88 70Z" fill="url(#ld-amber)"/>
+            <circle cx="88" cy="46" r="3.5" fill="var(--bg-body)"/>
+          </svg>
+          <div className="text-4xl font-bold mb-1">
+            <span className="bg-accent-text-gradient bg-clip-text text-transparent">Nx</span><span className="text-text-primary">Stops</span>
           </div>
           <div className="text-[11px] text-text-tertiary tracking-[0.1em] uppercase mb-6">
             by Nav&eacute;
@@ -744,8 +762,26 @@ export default function App() {
     return (
       <div className="font-['DM_Sans',system-ui,sans-serif] bg-bg-body min-h-screen text-text-primary flex flex-col items-center justify-center max-w-[430px] md:max-w-[768px] lg:max-w-[1024px] mx-auto px-6 py-10">
         <div className="flex-1 flex flex-col items-center justify-center text-center">
-          <div className="text-4xl font-bold mb-1 bg-accent-text-gradient bg-clip-text text-transparent">
-            NxStops
+          <svg width="44" height="44" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="mb-2">
+            <defs>
+              <linearGradient id="ob-amber" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#FBBF24"/>
+                <stop offset="50%" stopColor="#F59E0B"/>
+                <stop offset="100%" stopColor="#D97706"/>
+              </linearGradient>
+            </defs>
+            <path d="M15 35 C25 35 30 55 45 55 C60 55 65 30 75 30" fill="none" stroke="url(#ob-amber)" strokeWidth="2.5" strokeLinecap="round" opacity="0.5"/>
+            <circle cx="15" cy="35" r="6" fill="var(--bg-body)" stroke="url(#ob-amber)" strokeWidth="2"/>
+            <circle cx="15" cy="35" r="2.5" fill="url(#ob-amber)"/>
+            <circle cx="45" cy="55" r="6" fill="var(--bg-body)" stroke="url(#ob-amber)" strokeWidth="2"/>
+            <circle cx="45" cy="55" r="2.5" fill="url(#ob-amber)"/>
+            <circle cx="75" cy="30" r="6" fill="var(--bg-body)" stroke="url(#ob-amber)" strokeWidth="2"/>
+            <circle cx="75" cy="30" r="2.5" fill="url(#ob-amber)"/>
+            <path d="M88 70 C85 60 78 53 78 46 C78 40 82 36 88 36 C94 36 98 40 98 46 C98 53 91 60 88 70Z" fill="url(#ob-amber)"/>
+            <circle cx="88" cy="46" r="3.5" fill="var(--bg-body)"/>
+          </svg>
+          <div className="text-4xl font-bold mb-1">
+            <span className="bg-accent-text-gradient bg-clip-text text-transparent">Nx</span><span className="text-text-primary">Stops</span>
           </div>
           <div className="text-[11px] text-text-tertiary tracking-[0.1em] uppercase mb-10">
             by Nav&eacute;
@@ -809,12 +845,33 @@ export default function App() {
           <div className="flex justify-between items-center">
             {/* Left: Logo + time */}
             <div className="flex items-center gap-3">
-              <div>
-                <div className="text-[22px] font-bold leading-tight bg-accent-text-gradient bg-clip-text text-transparent">
-                  NxStops
-                </div>
-                <div className="text-[10px] text-text-tertiary tracking-[0.12em] uppercase leading-none mt-0.5">
-                  by Nav&eacute;
+              <div className="flex items-center gap-2">
+                {/* Route-line logo mark */}
+                <svg width="28" height="28" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+                  <defs>
+                    <linearGradient id="hdr-amber" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#FBBF24"/>
+                      <stop offset="50%" stopColor="#F59E0B"/>
+                      <stop offset="100%" stopColor="#D97706"/>
+                    </linearGradient>
+                  </defs>
+                  <path d="M15 35 C25 35 30 55 45 55 C60 55 65 30 75 30" fill="none" stroke="url(#hdr-amber)" strokeWidth="2.5" strokeLinecap="round" opacity="0.5"/>
+                  <circle cx="15" cy="35" r="6" fill="var(--bg-body)" stroke="url(#hdr-amber)" strokeWidth="2"/>
+                  <circle cx="15" cy="35" r="2.5" fill="url(#hdr-amber)"/>
+                  <circle cx="45" cy="55" r="6" fill="var(--bg-body)" stroke="url(#hdr-amber)" strokeWidth="2"/>
+                  <circle cx="45" cy="55" r="2.5" fill="url(#hdr-amber)"/>
+                  <circle cx="75" cy="30" r="6" fill="var(--bg-body)" stroke="url(#hdr-amber)" strokeWidth="2"/>
+                  <circle cx="75" cy="30" r="2.5" fill="url(#hdr-amber)"/>
+                  <path d="M88 70 C85 60 78 53 78 46 C78 40 82 36 88 36 C94 36 98 40 98 46 C98 53 91 60 88 70Z" fill="url(#hdr-amber)"/>
+                  <circle cx="88" cy="46" r="3.5" fill="var(--bg-body)"/>
+                </svg>
+                <div>
+                  <div className="text-[20px] font-bold leading-tight">
+                    <span className="bg-accent-text-gradient bg-clip-text text-transparent">Nx</span><span className="text-text-primary">Stops</span>
+                  </div>
+                  <div className="text-[9px] text-text-tertiary tracking-[0.12em] uppercase leading-none mt-0.5">
+                    by Nav&eacute;
+                  </div>
                 </div>
               </div>
               <div className="h-6 w-px bg-border-subtle/60 mx-0.5" />
@@ -907,7 +964,7 @@ export default function App() {
         </main>
 
         {/* Bottom Navigation */}
-        {!isInfoPage && <nav aria-label="Main navigation" className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] md:max-w-[768px] lg:max-w-[1024px] bg-bg-nav backdrop-blur-[24px] border-t border-border-nav flex justify-around pt-2" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)' }}>
+        {!isInfoPage && <nav aria-label="Main navigation" className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] md:max-w-[768px] lg:max-w-[1024px] bg-bg-nav backdrop-blur-[32px] backdrop-saturate-[1.8] border-t border-border-nav flex justify-around pt-2" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)' }}>
           {([
             { id: 'home' as Screen, icon: HomeIcon, label: 'Home' },
             { id: 'discover' as Screen, icon: DiscoverIcon, label: 'Discover' },
@@ -925,9 +982,10 @@ export default function App() {
                 className={`flex flex-col items-center gap-1 bg-transparent border-none text-[11px] font-medium px-5 py-2 rounded-xl relative min-h-[48px] ${isActive ? 'text-text-primary' : canNavigate ? 'text-text-tertiary' : 'text-text-disabled'} ${canNavigate ? 'cursor-pointer opacity-100' : 'cursor-default opacity-40'}`}
                 onClick={() => { if (canNavigate) { hapticSelection(); setScreen(tab.id); } }}
               >
-                {isActive && (
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[44px] h-[44px] rounded-full pointer-events-none -z-1" style={{ background: 'radial-gradient(circle, rgba(232,148,10,0.2) 0%, transparent 70%)' }} />
-                )}
+                {isActive && (<>
+                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-6 h-[3px] rounded-full pointer-events-none" style={{ background: 'var(--accent-amber-gradient)' }} />
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[48px] h-[48px] rounded-full pointer-events-none -z-1" style={{ background: 'radial-gradient(circle, rgba(232,148,10,0.25) 0%, transparent 70%)' }} />
+                </>)}
                 <tab.icon active={isActive} />
                 <span style={{
                   background: isActive ? 'linear-gradient(135deg, #E8940A, #F5A623)' : 'none',

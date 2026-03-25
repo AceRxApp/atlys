@@ -49,7 +49,7 @@ export default function CityScreen() {
           <div className="text-xs text-text-tertiary uppercase tracking-[0.1em] mb-2">
             {meta.country}
           </div>
-          <h1 className="text-4xl font-bold mb-2 leading-[1.1] bg-accent-text-gradient">
+          <h1 className="font-heading text-4xl font-bold mb-2 leading-[1.1] bg-accent-text-gradient">
             {meta.name}
           </h1>
           <p className="text-lg text-text-secondary italic mb-4">

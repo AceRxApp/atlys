@@ -1,6 +1,6 @@
-const CACHE_NAME = 'nxstops-v12';
-const API_CACHE_NAME = 'nxstops-api-v8';
-const ASSETS_CACHE_NAME = 'nxstops-assets-v8';
+const CACHE_NAME = 'nxstops-v13';
+const API_CACHE_NAME = 'nxstops-api-v9';
+const ASSETS_CACHE_NAME = 'nxstops-assets-v9';
 const API_CACHE_MAX_AGE = 4 * 60 * 60 * 1000; // 4 hours in ms (reduced from 24h to prevent stale city data)
 const API_CACHE_MAX_ENTRIES = 50;
 const API_ROUTES = ['/api/places', '/api/events', '/api/weather', '/api/currency'];

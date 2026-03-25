@@ -17,7 +17,7 @@ export default function ContactScreen() {
           </button>
         </div>
 
-        <h1 className="text-[28px] font-bold mb-2">Contact Us</h1>
+        <h1 className="font-heading text-[28px] font-bold mb-2">Contact Us</h1>
         <p className="text-[15px] text-text-secondary mb-10 leading-relaxed">
           We'd love to hear from you. Whether you have a question, feedback, or want to partner with us — reach out anytime.
         </p>

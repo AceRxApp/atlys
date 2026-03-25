@@ -37,7 +37,7 @@ export default function WorldCupTripScreen() {
           <div className="text-xs text-accent-amber uppercase tracking-[0.15em] font-semibold mb-4">
             {heroLabel}
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold text-text-primary leading-tight mb-4">
+          <h1 className="font-heading text-3xl md:text-4xl font-bold text-text-primary leading-tight mb-4">
             {heroTitle}
           </h1>
           <p className="text-[16px] text-text-secondary leading-relaxed max-w-[480px] mx-auto mb-8">

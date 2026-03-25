@@ -55,7 +55,7 @@ export default function AboutScreen() {
 
         {/* What is NxStops */}
         <div className="mb-8">
-          <h2 className="text-lg font-bold text-text-primary mb-3">What is NxStops?</h2>
+          <h2 className="font-heading text-lg font-bold text-text-primary mb-3">What is NxStops?</h2>
           <p className="text-sm leading-[1.7] text-text-body">
             NxStops is a city discovery app built for explorers, friend groups, solo adventurers, and everyone in between. Whether you're visiting a new city or rediscovering your own, NxStops helps you find what's around you, plan your day, and make the most of every stop.
           </p>
@@ -66,12 +66,13 @@ export default function AboutScreen() {
 
         {/* Features */}
         <div className="mb-8">
-          <h2 className="text-lg font-bold text-text-primary mb-3">Key Features</h2>
+          <h2 className="font-heading text-lg font-bold text-text-primary mb-3">Key Features</h2>
           <div className="grid gap-3">
-            {features.map((f) => (
+            {features.map((f, i) => (
               <div
                 key={f.title}
-                className="bg-bg-surface-alpha backdrop-blur-[20px] rounded-2xl p-5 border border-border-subtle"
+                className="bg-bg-surface-alpha backdrop-blur-[20px] rounded-2xl p-5 border border-border-subtle animate-enter-up"
+                style={{ animationDelay: `${i * 100}ms` }}
               >
                 <div className="flex items-center gap-2.5 mb-2">
                   <span className="text-[22px]">{f.icon}</span>

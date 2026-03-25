@@ -4,10 +4,11 @@ import type { ReactNode } from 'react';
 
 interface Props {
   id: string;
+  className?: string;
   children: (listeners: Record<string, Function> | undefined) => ReactNode;
 }
 
-export default function SortableStopCard({ id, children }: Props) {
+export default function SortableStopCard({ id, className, children }: Props) {
   const {
     attributes,
     listeners,
@@ -25,7 +26,7 @@ export default function SortableStopCard({ id, children }: Props) {
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes}>
+    <div ref={setNodeRef} style={style} {...attributes} className={className}>
       {children(listeners)}
     </div>
   );

@@ -65,6 +65,7 @@ export default function ProfileScreen() {
   const [billingPlan, setBillingPlan] = useState<'monthly' | 'yearly'>('monthly');
   const [viewingTrip, setViewingTrip] = useState<typeof tripHistory[number] | null>(null);
   const [wrappedTrip, setWrappedTrip] = useState<typeof tripHistory[number] | null>(null);
+  const [profileTab, setProfileTab] = useState<'account' | 'trips' | 'settings'>('account');
 
   const handleAvatarChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -117,7 +118,7 @@ export default function ProfileScreen() {
         <div className="px-5 pt-6 pb-10">
           {/* Header with close button */}
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold">Profile</h2>
+            <h2 className="font-heading text-xl font-bold">Profile</h2>
             <button
               onClick={() => setShowProfile(false)}
               aria-label="Close profile"
@@ -526,10 +527,29 @@ export default function ProfileScreen() {
             </div>
           )}
 
+          {/* Tab Bar */}
+          {user && (
+            <div className="flex gap-1 mb-6 p-1 rounded-xl bg-bg-subtle border border-border-subtle">
+              {(['account', 'trips', 'settings'] as const).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setProfileTab(tab)}
+                  className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold cursor-pointer border-none capitalize ${
+                    profileTab === tab
+                      ? 'bg-amber-tint-bg15 text-accent-amber'
+                      : 'bg-transparent text-text-tertiary'
+                  }`}
+                >
+                  {tab === 'trips' ? 'My Trips' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* ================================================================ */}
           {/* SUBSCRIPTION                                                    */}
           {/* ================================================================ */}
-          {user && (
+          {user && profileTab === 'account' && (
             <div className="mb-6">
               <div className="section-label">Subscription</div>
               <div className="p-4 rounded-xl border border-border-subtle bg-bg-subtle">
@@ -621,7 +641,7 @@ export default function ProfileScreen() {
           {/* ================================================================ */}
 
           {/* Explorer Stats */}
-          {totalPlacesVisited > 0 && (
+          {profileTab === 'trips' && totalPlacesVisited > 0 && (
             <div className="mb-6">
               <div className="section-label">Your Journey</div>
               <div className="card p-4 border border-border-subtle">
@@ -654,7 +674,7 @@ export default function ProfileScreen() {
           )}
 
           {/* Taste Passport */}
-          {user && (
+          {user && profileTab === 'trips' && (
             <div className="mb-6">
               <div className="section-label">Taste Passport</div>
               <TastePassport dishes={dishHistory} />
@@ -662,7 +682,7 @@ export default function ProfileScreen() {
           )}
 
           {/* Passport Stamps */}
-          {user && (
+          {user && profileTab === 'trips' && (
             <div className="mb-6">
               <PassportStamps
                 tripHistory={tripHistory}
@@ -673,7 +693,7 @@ export default function ProfileScreen() {
           )}
 
           {/* Travel Map */}
-          {tripHistory.length > 0 && (() => {
+          {profileTab === 'trips' && tripHistory.length > 0 && (() => {
             const visitedCities = [...new Set(tripHistory.map(t => t.city.toLowerCase()))]
               .map(cityName => {
                 const coords = CITY_COORDS[cityName];
@@ -700,6 +720,7 @@ export default function ProfileScreen() {
           {/* ================================================================ */}
           {/* SETTINGS — Theme, Temperature, Security, Tools                  */}
           {/* ================================================================ */}
+          {profileTab === 'settings' && (<>
 
           {/* Theme Section */}
           <div className="mb-6">
@@ -943,9 +964,10 @@ export default function ProfileScreen() {
               </div>
             </div>
           </div>
+          </>)}
 
           {/* Saved Places Section */}
-          {savedPlaces.length > 0 && (
+          {profileTab === 'trips' && savedPlaces.length > 0 && (
             <div className="mb-6">
               <div className="section-label">
                 Saved Places
@@ -994,7 +1016,7 @@ export default function ProfileScreen() {
           )}
 
           {/* My Trips Section */}
-          {profileTotalStops > 0 && (
+          {profileTab === 'trips' && profileTotalStops > 0 && (
             <div className="mb-6">
               <div className="section-label">
                 My Trips
@@ -1044,7 +1066,7 @@ export default function ProfileScreen() {
           )}
 
           {/* Past Trips */}
-          {tripHistory.length > 0 && (
+          {profileTab === 'trips' && tripHistory.length > 0 && (
             <div className="mb-6">
               <div className="flex items-center justify-between mb-2">
                 <div className="section-label mb-0">Past Trips</div>
@@ -1158,7 +1180,7 @@ export default function ProfileScreen() {
           )}
 
           {/* Sign Out Button & Danger Zone */}
-          {user && (
+          {user && profileTab === 'account' && (
             <>
               <button
                 onClick={() => { handleSignOut(); setShowProfile(false); }}

@@ -104,7 +104,7 @@ export default function OnboardingSamplePlan({ onGetStarted }: OnboardingSampleP
           A Day in Paris, France
         </h2>
         <p className="text-sm text-text-secondary">
-          4 stops \u00B7 curated by NxStops AI
+          4 stops {'\u00B7'} curated by NxStops AI
         </p>
       </div>
 

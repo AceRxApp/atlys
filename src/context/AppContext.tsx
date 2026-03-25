@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react';
 import type { City, EventItem, Stop, AdminSignup, Vibe, QuickFilter, TravelGroup, CommunityTag, PlanDuration, TripHistoryEntry, StopCheckIn, Achievement, ItineraryAlert, Reservation } from '../types';
 import type { Place } from '../services/places';
+import type { CuratedPicksResult } from '../services/autoPlan';
 import type { Review } from '../supabase';
 import type { User } from '@supabase/supabase-js';
 
@@ -283,7 +284,15 @@ export interface AppContextType {
   autoPlanError: string | null;
   lastPlanTitle: string | null;
   lastPlanVibe: string | null;
+  lastPlanHeadline: string | null;
+  lastPlanDuration: string | null;
   planMyDay: (mood: string, duration: PlanDuration, vibe?: string, subVibe?: string) => Promise<boolean>;
+  curatedPicks: CuratedPicksResult | null;
+  curatedLoading: boolean;
+  curatedVibe: string | null;
+  curatedError: string | null;
+  loadCuratedPicks: (vibe: string) => Promise<boolean>;
+  clearCuratedPicks: () => void;
   tripStartDate: string | null;
   setTripStartDate: (date: string | null) => void;
   tripHistory: TripHistoryEntry[];
