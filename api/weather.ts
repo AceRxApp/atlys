@@ -108,6 +108,107 @@ async function handleWeather(req: VercelRequest, res: VercelResponse) {
   }
 }
 
+// ── Flights (Kiwi Tequila API) ──
+const flightsCache = new Map<string, { data: unknown; expiresAt: number }>();
+const FLIGHTS_TTL = 30 * 60 * 1000; // 30 minutes
+
+async function handleFlights(req: VercelRequest, res: VercelResponse) {
+  const { origin, destination, date } = req.query;
+  if (!origin || typeof origin !== 'string' || !destination || typeof destination !== 'string') {
+    return res.status(400).json({ error: 'origin and destination parameters required (IATA codes or city names)' });
+  }
+
+  const KIWI_KEY = process.env.KIWI_API_KEY;
+  if (!KIWI_KEY) {
+    return res.status(500).json({ error: 'Flight search not configured' });
+  }
+
+  // Use date or default to next 30-day window
+  const today = new Date();
+  const dateFrom = typeof date === 'string' && date.length === 10
+    ? date.replace(/-/g, '/')
+    : `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+  const dateTo = (() => {
+    const d = new Date(today);
+    d.setDate(d.getDate() + 30);
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  })();
+
+  const cacheKey = `${origin.toUpperCase()}_${destination.toUpperCase()}_${dateFrom}`;
+  const cached = flightsCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    res.setHeader('Cache-Control', 's-maxage=1800, stale-while-revalidate=3600');
+    return res.status(200).json(cached.data);
+  }
+
+  try {
+    const params = new URLSearchParams({
+      fly_from: origin.toUpperCase(),
+      fly_to: destination.toUpperCase(),
+      date_from: dateFrom,
+      date_to: dateTo,
+      sort: 'price',
+      limit: '5',
+      curr: 'USD',
+      max_stopovers: '2',
+      one_for_city: '0',
+      adults: '1',
+    });
+
+    const resp = await fetch(`https://api.tequila.kiwi.com/v2/search?${params}`, {
+      headers: { apikey: KIWI_KEY },
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => '');
+      console.error('Kiwi API error:', resp.status, errText);
+      return res.status(502).json({ error: 'Flight search unavailable' });
+    }
+
+    const raw = await resp.json();
+    const flights = (raw.data || []).slice(0, 3).map((f: any) => {
+      const route = f.route || [];
+      const airlines = [...new Set(route.map((r: any) => r.airline))];
+      const stops = Math.max(0, route.length - 1);
+      // Duration in hours and minutes
+      const durationSec = f.duration?.total || 0;
+      const hours = Math.floor(durationSec / 3600);
+      const minutes = Math.floor((durationSec % 3600) / 60);
+
+      return {
+        airline: airlines[0] || 'Unknown',
+        airlines,
+        price: Math.round(f.price || 0),
+        currency: f.currency || 'USD',
+        duration: `${hours}h${minutes > 0 ? ` ${minutes}m` : ''}`,
+        durationMinutes: Math.round(durationSec / 60),
+        stops,
+        stopsLabel: stops === 0 ? 'Nonstop' : `${stops} stop${stops > 1 ? 's' : ''}`,
+        departTime: f.local_departure || '',
+        arriveTime: f.local_arrival || '',
+        deepLink: f.deep_link || '',
+        bookingLink: `https://www.kiwi.com/deep?affilid=nxstopsapp&from=${origin.toUpperCase()}&to=${destination.toUpperCase()}&departure=${dateFrom}`,
+      };
+    });
+
+    const result = {
+      flights,
+      origin: origin.toUpperCase(),
+      destination: destination.toUpperCase(),
+      dateRange: `${dateFrom} - ${dateTo}`,
+      searchedAt: new Date().toISOString(),
+    };
+
+    flightsCache.set(cacheKey, { data: result, expiresAt: Date.now() + FLIGHTS_TTL });
+
+    res.setHeader('Cache-Control', 's-maxage=1800, stale-while-revalidate=3600');
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error('Flight search error:', err);
+    return res.status(500).json({ error: 'Failed to search flights' });
+  }
+}
+
 // ── Main handler — routes by ?action= ──
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const corsOk = setCorsHeaders(res, req.headers.origin as string | undefined, 'GET, OPTIONS');
@@ -124,5 +225,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const action = req.query.action as string | undefined;
   if (action === 'advisory') return handleAdvisory(req, res);
+  if (action === 'flights') return handleFlights(req, res);
   return handleWeather(req, res);
 }

@@ -34,6 +34,7 @@ import { useTripLogistics } from './hooks/useTripLogistics';
 import { useCityProgress } from './hooks/useCityProgress';
 import { useItineraryAlerts } from './hooks/useItineraryAlerts';
 import { useExploreMode } from './hooks/useExploreMode';
+import { useFlights } from './hooks/useFlights';
 
 type Screen = 'home' | 'discover' | 'events' | 'currency' | 'plan' | 'tastelens';
 
@@ -434,6 +435,14 @@ export default function App() {
     events.events,
   );
 
+  // --- Flights ---
+  const flightsData = useFlights({
+    selectedCity: location.selectedCity,
+    userLat: location.useGps ? loc.lat : null,
+    userLng: location.useGps ? loc.lng : null,
+    tripStartDate: trip.tripStartDate,
+  });
+
   // --- Trip Logistics ---
   const logistics = useTripLogistics(location.citySlug);
 
@@ -666,6 +675,12 @@ export default function App() {
     // DishLens
     dishLensContext, setDishLensContext,
     dishHistory, addDishToHistory,
+    // Flights
+    flights: flightsData.flights,
+    flightsLoading: flightsData.loading,
+    originAirport: flightsData.originAirport,
+    destinationAirport: flightsData.destinationAirport,
+    googleFlightsUrl: flightsData.googleFlightsUrl,
     // Logistics
     ...logistics,
     // City Progress & Achievements

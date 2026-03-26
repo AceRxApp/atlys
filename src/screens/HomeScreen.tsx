@@ -8,6 +8,7 @@ import { useSubscription } from '../hooks/useSubscription';
 import PaywallModal from '../components/PaywallModal';
 import { fixPhotoUrl } from '../utils/photoUrl';
 import NativeImg from '../components/NativeImg';
+import { FlightCard, FlightCardSkeleton } from '../components/FlightCard';
 import CommunityRoutesSection from '../components/CommunityRoutesSection';
 import SocialProof from '../components/SocialProof';
 import PlanLoadingAnimation from '../components/PlanLoadingAnimation';
@@ -345,6 +346,11 @@ export default function HomeScreen() {
     showToast,
     setShowProfile,
     setAuthScreen,
+    flights,
+    flightsLoading,
+    originAirport,
+    destinationAirport,
+    googleFlightsUrl,
   } = useApp();
   const subscription = useSubscription(user);
 
@@ -645,6 +651,19 @@ export default function HomeScreen() {
           <span className="text-xs text-text-secondary flex-1">{weather.description} · H: {formatTemp(weather.high)} L: {formatTemp(weather.low)}</span>
         </div>
       )}
+
+      {/* ── Flight Prices ── */}
+      {flights && flights.length > 0 && originAirport && destinationAirport && (
+        <div className="mb-5">
+          <FlightCard
+            flights={flights}
+            originAirport={originAirport}
+            destinationAirport={destinationAirport}
+            googleFlightsUrl={googleFlightsUrl}
+          />
+        </div>
+      )}
+      {flightsLoading && <div className="mb-5"><FlightCardSkeleton /></div>}
 
       {/* ── Nearby Picks — show what's around before committing to a plan ── */}
       {!placesLoading && (() => {

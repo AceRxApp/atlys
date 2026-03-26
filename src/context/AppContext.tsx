@@ -299,6 +299,13 @@ export interface AppContextType {
   clearTripHistory: () => void;
   deleteTripHistoryEntry: (entryId: string) => void;
 
+  // --- Flights ---
+  flights: import('../hooks/useFlights').FlightOffer[] | null;
+  flightsLoading: boolean;
+  originAirport: string | null;
+  destinationAirport: string | null;
+  googleFlightsUrl: string | null;
+
   // --- Wrap Up ---
   wrapUpOpen: boolean;
   startWrapUp: () => void;

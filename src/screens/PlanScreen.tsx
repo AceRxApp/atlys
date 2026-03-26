@@ -17,6 +17,7 @@ import { BOOKING_SERVICES } from '../data/bookingLinks';
 import { fixPhotoUrl } from '../utils/photoUrl';
 import NativeImg from '../components/NativeImg';
 import PlanLoadingAnimation from '../components/PlanLoadingAnimation';
+import { FlightLine } from '../components/FlightCard';
 import {
   DndContext,
   closestCenter,
@@ -193,6 +194,10 @@ export default function PlanScreen() {
     lastPlanHeadline,
     lastPlanDuration,
     autoPlanLoading,
+    flights,
+    originAirport,
+    destinationAirport,
+    googleFlightsUrl,
     shareAsLink,
     saveForOffline,
     offlineSaved,
@@ -468,6 +473,17 @@ export default function PlanScreen() {
           <p className="text-sm text-text-secondary italic mt-1.5 leading-snug">
             {lastPlanHeadline}
           </p>
+        )}
+        {/* Flight info */}
+        {flights && flights.length > 0 && originAirport && destinationAirport && (
+          <div className="mt-2">
+            <FlightLine
+              flights={flights}
+              originAirport={originAirport}
+              destinationAirport={destinationAirport}
+              googleFlightsUrl={googleFlightsUrl}
+            />
+          </div>
         )}
         {/* Trip date picker */}
         <div className="relative mt-2 inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-border-medium bg-bg-subtle text-text-secondary text-xs font-medium cursor-pointer">
