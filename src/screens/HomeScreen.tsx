@@ -49,7 +49,7 @@ const ALL_DESTINATIONS = [
   },
   {
     city: 'New York', country: 'USA', landmark: 'Statue of Liberty', continent: 'N. America',
-    image: 'https://images.unsplash.com/photo-1485738422979-f5c462d49f04?w=600&h=400&fit=crop',
+    image: 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=600&h=400&fit=crop',
   },
   {
     city: 'Rio de Janeiro', country: 'Brazil', landmark: 'Christ the Redeemer', continent: 'S. America',
@@ -57,7 +57,7 @@ const ALL_DESTINATIONS = [
   },
   {
     city: 'Accra', country: 'Ghana', landmark: 'Independence Arch', continent: 'Africa',
-    image: 'https://images.unsplash.com/photo-1642255226557-1ee114040624?w=600&h=400&fit=crop',
+    image: 'https://images.unsplash.com/photo-1611348586804-61bf6c080437?w=600&h=400&fit=crop',
   },
   {
     city: 'Sydney', country: 'Australia', landmark: 'Opera House', continent: 'Oceania',
@@ -507,10 +507,10 @@ export default function HomeScreen() {
                   className="absolute inset-0 w-full h-full object-cover"
                   loading="lazy"
                 />
-                {/* Fallback when image fails */}
+                {/* Fallback when image fails — rich gradient with city initial */}
                 <div className="absolute inset-0 -z-10 flex items-center justify-center"
-                  style={{ background: 'linear-gradient(135deg, var(--amber-tint-bg15), var(--bg-subtle))' }}>
-                  <span className="text-3xl opacity-60">{'\u{1F3D9}\u{FE0F}'}</span>
+                  style={{ background: `linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg-subtle) 50%, var(--amber-tint-bg15) 100%)` }}>
+                  <span className="text-[48px] font-bold opacity-15" style={{ color: 'var(--accent-amber)' }}>{dest.city[0]}</span>
                 </div>
                 <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.2) 50%, transparent 100%)' }} />
                 <div className="absolute bottom-0 left-0 right-0 p-2.5">
