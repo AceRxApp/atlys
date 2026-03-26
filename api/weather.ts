@@ -108,33 +108,27 @@ async function handleWeather(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-// ── Flights (Kiwi Tequila API) ──
+// ── Flights (SerpApi — Google Flights) ──
 const flightsCache = new Map<string, { data: unknown; expiresAt: number }>();
 const FLIGHTS_TTL = 30 * 60 * 1000; // 30 minutes
 
 async function handleFlights(req: VercelRequest, res: VercelResponse) {
   const { origin, destination, date } = req.query;
   if (!origin || typeof origin !== 'string' || !destination || typeof destination !== 'string') {
-    return res.status(400).json({ error: 'origin and destination parameters required (IATA codes or city names)' });
+    return res.status(400).json({ error: 'origin and destination parameters required (IATA codes)' });
   }
 
-  const KIWI_KEY = process.env.KIWI_API_KEY;
-  if (!KIWI_KEY) {
+  const SERP_KEY = process.env.SERPAPI_KEY;
+  if (!SERP_KEY) {
     return res.status(500).json({ error: 'Flight search not configured' });
   }
 
-  // Use date or default to next 30-day window
-  const today = new Date();
-  const dateFrom = typeof date === 'string' && date.length === 10
-    ? date.replace(/-/g, '/')
-    : `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
-  const dateTo = (() => {
-    const d = new Date(today);
-    d.setDate(d.getDate() + 30);
-    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-  })();
+  // Date for search — use provided date or tomorrow
+  const searchDate = typeof date === 'string' && date.length === 10
+    ? date
+    : (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); })();
 
-  const cacheKey = `${origin.toUpperCase()}_${destination.toUpperCase()}_${dateFrom}`;
+  const cacheKey = `${origin.toUpperCase()}_${destination.toUpperCase()}_${searchDate}`;
   const cached = flightsCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     res.setHeader('Cache-Control', 's-maxage=1800, stale-while-revalidate=3600');
@@ -143,51 +137,65 @@ async function handleFlights(req: VercelRequest, res: VercelResponse) {
 
   try {
     const params = new URLSearchParams({
-      fly_from: origin.toUpperCase(),
-      fly_to: destination.toUpperCase(),
-      date_from: dateFrom,
-      date_to: dateTo,
-      sort: 'price',
-      limit: '5',
-      curr: 'USD',
-      max_stopovers: '2',
-      one_for_city: '0',
-      adults: '1',
+      engine: 'google_flights',
+      departure_id: origin.toUpperCase(),
+      arrival_id: destination.toUpperCase(),
+      outbound_date: searchDate,
+      currency: 'USD',
+      hl: 'en',
+      type: '2',  // one-way
+      api_key: SERP_KEY,
     });
 
-    const resp = await fetch(`https://api.tequila.kiwi.com/v2/search?${params}`, {
-      headers: { apikey: KIWI_KEY },
-    });
+    const resp = await fetch(`https://serpapi.com/search.json?${params}`);
 
     if (!resp.ok) {
       const errText = await resp.text().catch(() => '');
-      console.error('Kiwi API error:', resp.status, errText);
+      console.error('SerpApi error:', resp.status, errText);
       return res.status(502).json({ error: 'Flight search unavailable' });
     }
 
     const raw = await resp.json();
-    const flights = (raw.data || []).slice(0, 3).map((f: any) => {
-      const route = f.route || [];
-      const airlines = [...new Set(route.map((r: any) => r.airline))];
-      const stops = Math.max(0, route.length - 1);
-      // Duration in hours and minutes
-      const durationSec = f.duration?.total || 0;
-      const hours = Math.floor(durationSec / 3600);
-      const minutes = Math.floor((durationSec % 3600) / 60);
+
+    // SerpApi returns best_flights and other_flights arrays
+    const allFlights = [...(raw.best_flights || []), ...(raw.other_flights || [])];
+
+    // Sort by price and take top 3
+    const sorted = allFlights
+      .filter((f: any) => f.price != null)
+      .sort((a: any, b: any) => (a.price || 9999) - (b.price || 9999))
+      .slice(0, 3);
+
+    const flights = sorted.map((f: any) => {
+      const legs = f.flights || [];
+      const firstLeg = legs[0] || {};
+      const lastLeg = legs[legs.length - 1] || firstLeg;
+      const airlines = [...new Set(legs.map((l: any) => l.airline || ''))].filter(Boolean) as string[];
+      const stops = Math.max(0, legs.length - 1);
+
+      // Total duration in minutes
+      const totalMin = f.total_duration || legs.reduce((sum: number, l: any) => sum + (l.duration || 0), 0);
+      const hours = Math.floor(totalMin / 60);
+      const minutes = totalMin % 60;
+
+      // Build Google Flights booking URL
+      const bookingUrl = `https://www.google.com/travel/flights?q=flights+from+${origin.toUpperCase()}+to+${destination.toUpperCase()}+on+${searchDate}`;
 
       return {
-        airline: airlines[0] || 'Unknown',
+        airline: firstLeg.airline || airlines[0] || 'Unknown',
         airlines,
         price: Math.round(f.price || 0),
-        currency: f.currency || 'USD',
+        currency: 'USD',
         duration: `${hours}h${minutes > 0 ? ` ${minutes}m` : ''}`,
-        durationMinutes: Math.round(durationSec / 60),
+        durationMinutes: totalMin,
         stops,
         stopsLabel: stops === 0 ? 'Nonstop' : `${stops} stop${stops > 1 ? 's' : ''}`,
-        departTime: f.local_departure || '',
-        arriveTime: f.local_arrival || '',
-        deepLink: f.deep_link || '',
-        bookingLink: `https://www.kiwi.com/deep?affilid=nxstopsapp&from=${origin.toUpperCase()}&to=${destination.toUpperCase()}&departure=${dateFrom}`,
+        departTime: firstLeg.departure_airport?.time || '',
+        arriveTime: lastLeg.arrival_airport?.time || '',
+        deepLink: f.booking_token
+          ? `https://www.google.com/travel/flights/booking?token=${encodeURIComponent(f.booking_token)}`
+          : bookingUrl,
+        bookingLink: bookingUrl,
       };
     });
 
@@ -195,7 +203,7 @@ async function handleFlights(req: VercelRequest, res: VercelResponse) {
       flights,
       origin: origin.toUpperCase(),
       destination: destination.toUpperCase(),
-      dateRange: `${dateFrom} - ${dateTo}`,
+      dateRange: searchDate,
       searchedAt: new Date().toISOString(),
     };
 
