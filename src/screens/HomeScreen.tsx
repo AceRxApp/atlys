@@ -58,7 +58,7 @@ const ALL_DESTINATIONS = [
   },
   {
     city: 'Accra', country: 'Ghana', landmark: 'Independence Arch', continent: 'Africa',
-    image: 'https://images.unsplash.com/photo-1611348586804-61bf6c080437?w=600&h=400&fit=crop',
+    image: 'https://images.unsplash.com/photo-1630386226447-af0a955c1009?w=600&h=400&fit=crop',
   },
   {
     city: 'Sydney', country: 'Australia', landmark: 'Opera House', continent: 'Oceania',
@@ -70,7 +70,7 @@ const ALL_DESTINATIONS = [
   },
   {
     city: 'Cartagena', country: 'Colombia', landmark: 'Castillo San Felipe', continent: 'S. America',
-    image: 'https://images.unsplash.com/photo-1583997052301-0042b33fc598?w=600&h=400&fit=crop',
+    image: 'https://images.unsplash.com/photo-1770808564556-7bc511b893a2?w=600&h=400&fit=crop',
   },
   {
     city: 'London', country: 'England', landmark: 'Tower Bridge', continent: 'Europe',
