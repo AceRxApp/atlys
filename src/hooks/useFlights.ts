@@ -49,6 +49,34 @@ const CITY_TO_IATA: Record<string, string> = {
 
 const SESSION_KEY_PREFIX = 'nxstops_flights_';
 
+// Fallback: guess a major airport from the user's timezone when GPS is unavailable
+function guessAirportFromTimezone(): string | null {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone; // e.g. "America/New_York"
+    const tzMap: Record<string, string> = {
+      'America/New_York': 'JFK', 'America/Chicago': 'ORD', 'America/Denver': 'DEN',
+      'America/Los_Angeles': 'LAX', 'America/Phoenix': 'PHX', 'America/Anchorage': 'ANC',
+      'Pacific/Honolulu': 'HNL', 'America/Detroit': 'DTW', 'America/Indiana/Indianapolis': 'IND',
+      'America/Toronto': 'YYZ', 'America/Vancouver': 'YVR', 'America/Montreal': 'YUL',
+      'Europe/London': 'LHR', 'Europe/Paris': 'CDG', 'Europe/Berlin': 'BER',
+      'Europe/Madrid': 'MAD', 'Europe/Rome': 'FCO', 'Europe/Amsterdam': 'AMS',
+      'Europe/Istanbul': 'IST', 'Europe/Lisbon': 'LIS', 'Europe/Dublin': 'DUB',
+      'Europe/Zurich': 'ZRH', 'Europe/Vienna': 'VIE', 'Europe/Prague': 'PRG',
+      'Europe/Stockholm': 'ARN', 'Europe/Copenhagen': 'CPH', 'Europe/Oslo': 'OSL',
+      'Asia/Tokyo': 'NRT', 'Asia/Seoul': 'ICN', 'Asia/Shanghai': 'PVG',
+      'Asia/Hong_Kong': 'HKG', 'Asia/Singapore': 'SIN', 'Asia/Bangkok': 'BKK',
+      'Asia/Dubai': 'DXB', 'Asia/Kolkata': 'BOM', 'Asia/Kuala_Lumpur': 'KUL',
+      'Asia/Taipei': 'TPE', 'Asia/Manila': 'MNL', 'Asia/Jakarta': 'CGK',
+      'Australia/Sydney': 'SYD', 'Australia/Melbourne': 'MEL', 'Pacific/Auckland': 'AKL',
+      'Africa/Johannesburg': 'JNB', 'Africa/Cairo': 'CAI', 'Africa/Lagos': 'LOS',
+      'Africa/Nairobi': 'NBO', 'Africa/Accra': 'ACC', 'Africa/Casablanca': 'CMN',
+      'America/Sao_Paulo': 'GRU', 'America/Argentina/Buenos_Aires': 'EZE',
+      'America/Mexico_City': 'MEX', 'America/Bogota': 'BOG', 'America/Lima': 'LIM',
+    };
+    return tzMap[tz] || null;
+  } catch { return null; }
+}
+
 export function useFlights(deps: {
   selectedCity: City | null;
   userLat: number | null;
@@ -64,28 +92,35 @@ export function useFlights(deps: {
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (!selectedCity || !userLat || !userLng) {
+    if (!selectedCity) {
       setFlights(null);
       setOriginAirport(null);
       setDestinationAirport(null);
       return;
     }
 
-    // Find origin airport from user's location
-    let originCode: string | null = null;
-    try {
-      // Dynamic import to avoid loading airport data until needed
-      import('../data/airports').then(({ findNearestAirport }) => {
-        const nearest = findNearestAirport(userLat, userLng);
-        if (nearest) {
-          originCode = nearest.iata;
-          fetchFlights(nearest.iata);
-        }
-      }).catch(() => {
-        // Fallback: skip flights if airport data fails to load
-      });
-    } catch {
-      // skip
+    // Find origin airport: GPS first, then timezone fallback
+    if (userLat && userLng) {
+      try {
+        import('../data/airports').then(({ findNearestAirport }) => {
+          const nearest = findNearestAirport(userLat, userLng);
+          if (nearest) fetchFlights(nearest.iata);
+          else {
+            const fallback = guessAirportFromTimezone();
+            if (fallback) fetchFlights(fallback);
+          }
+        }).catch(() => {
+          const fallback = guessAirportFromTimezone();
+          if (fallback) fetchFlights(fallback);
+        });
+      } catch {
+        const fallback = guessAirportFromTimezone();
+        if (fallback) fetchFlights(fallback);
+      }
+    } else {
+      // No GPS — use timezone
+      const fallback = guessAirportFromTimezone();
+      if (fallback) fetchFlights(fallback);
     }
 
     function fetchFlights(origin: string) {

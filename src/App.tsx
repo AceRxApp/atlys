@@ -438,8 +438,8 @@ export default function App() {
   // --- Flights ---
   const flightsData = useFlights({
     selectedCity: location.selectedCity,
-    userLat: location.useGps ? loc.lat : null,
-    userLng: location.useGps ? loc.lng : null,
+    userLat: loc.lat,
+    userLng: loc.lng,
     tripStartDate: trip.tripStartDate,
   });
 
