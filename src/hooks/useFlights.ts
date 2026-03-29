@@ -26,25 +26,59 @@ export interface FlightsResult {
 }
 
 // IATA codes for cities in the app — maps lowercase city name to airport code
+// Maps city name (lowercase) AND slug to IATA code — duplicates are intentional for matching
 const CITY_TO_IATA: Record<string, string> = {
-  paris: 'CDG', tokyo: 'TYO', 'new york': 'JFK', 'rio de janeiro': 'GIG',
+  // Major destinations
+  paris: 'CDG', tokyo: 'TYO', 'new york': 'JFK', 'new-york': 'JFK',
+  'rio de janeiro': 'GIG', 'rio-de-janeiro': 'GIG', rio: 'GIG',
   accra: 'ACC', sydney: 'SYD', dubai: 'DXB', cartagena: 'CTG',
   london: 'LHR', bangkok: 'BKK', rome: 'FCO', istanbul: 'IST',
-  'mexico city': 'MEX', 'cape town': 'CPT', barcelona: 'BCN', marrakech: 'RAK',
-  miami: 'MIA', 'los angeles': 'LAX', 'san francisco': 'SFO', chicago: 'ORD',
+  'mexico city': 'MEX', 'mexico-city': 'MEX', 'cape town': 'CPT', 'cape-town': 'CPT',
+  barcelona: 'BCN', marrakech: 'RAK', marrakesh: 'RAK',
+  // US cities
+  miami: 'MIA', 'los angeles': 'LAX', 'los-angeles': 'LAX',
+  'san francisco': 'SFO', 'san-francisco': 'SFO', chicago: 'ORD',
   atlanta: 'ATL', dallas: 'DFW', seattle: 'SEA', boston: 'BOS', denver: 'DEN',
-  houston: 'IAH', philadelphia: 'PHL', washington: 'IAD', minneapolis: 'MSP',
-  detroit: 'DTW', 'las vegas': 'LAS', orlando: 'MCO', nashville: 'BNA',
+  houston: 'IAH', philadelphia: 'PHL', washington: 'IAD', 'washington dc': 'IAD', 'washington-dc': 'IAD',
+  minneapolis: 'MSP', detroit: 'DTW', 'las vegas': 'LAS', 'las-vegas': 'LAS',
+  orlando: 'MCO', nashville: 'BNA', 'new orleans': 'MSY', 'new-orleans': 'MSY',
+  austin: 'AUS', portland: 'PDX', 'san diego': 'SAN', 'san-diego': 'SAN',
+  charlotte: 'CLT', tampa: 'TPA', pittsburgh: 'PIT', sacramento: 'SMF',
+  // Europe
   amsterdam: 'AMS', berlin: 'BER', madrid: 'MAD', lisbon: 'LIS', vienna: 'VIE',
   prague: 'PRG', budapest: 'BUD', athens: 'ATH', dublin: 'DUB', zurich: 'ZRH',
-  singapore: 'SIN', 'hong kong': 'HKG', seoul: 'ICN', mumbai: 'BOM',
-  delhi: 'DEL', 'kuala lumpur': 'KUL', taipei: 'TPE', manila: 'MNL',
+  copenhagen: 'CPH', stockholm: 'ARN', oslo: 'OSL', helsinki: 'HEL',
+  warsaw: 'WAW', bucharest: 'OTP', milan: 'MXP', florence: 'FLR',
+  venice: 'VCE', nice: 'NCE', edinburgh: 'EDI', munich: 'MUC',
+  brussels: 'BRU', porto: 'OPO', seville: 'SVQ', malaga: 'AGP',
+  // Asia
+  singapore: 'SIN', 'hong kong': 'HKG', 'hong-kong': 'HKG', seoul: 'ICN',
+  mumbai: 'BOM', delhi: 'DEL', 'new delhi': 'DEL', 'new-delhi': 'DEL',
+  'kuala lumpur': 'KUL', 'kuala-lumpur': 'KUL', taipei: 'TPE', manila: 'MNL',
+  hanoi: 'HAN', 'ho chi minh': 'SGN', 'ho-chi-minh': 'SGN', saigon: 'SGN',
+  osaka: 'KIX', kyoto: 'KIX', 'phnom penh': 'PNH', 'phnom-penh': 'PNH',
+  colombo: 'CMB', kathmandu: 'KTM', yangon: 'RGN',
+  // Middle East
+  doha: 'DOH', 'abu dhabi': 'AUH', 'abu-dhabi': 'AUH', jeddah: 'JED', riyadh: 'RUH',
+  muscat: 'MCT', amman: 'AMM', beirut: 'BEY', kuwait: 'KWI',
+  // Africa
   cairo: 'CAI', nairobi: 'NBO', lagos: 'LOS', johannesburg: 'JNB',
-  'buenos aires': 'EZE', 'sao paulo': 'GRU', lima: 'LIM', bogota: 'BOG',
-  doha: 'DOH', 'abu dhabi': 'AUH', jeddah: 'JED', riyadh: 'RUH',
+  'dar es salaam': 'DAR', 'dar-es-salaam': 'DAR', addis: 'ADD', 'addis ababa': 'ADD', 'addis-ababa': 'ADD',
+  casablanca: 'CMN', dakar: 'DSS', kampala: 'EBB', kigali: 'KGL',
+  zanzibar: 'ZNZ', tunis: 'TUN', algiers: 'ALG', abidjan: 'ABJ',
+  // South America
+  'buenos aires': 'EZE', 'buenos-aires': 'EZE', 'sao paulo': 'GRU', 'sao-paulo': 'GRU',
+  lima: 'LIM', bogota: 'BOG', santiago: 'SCL', medellin: 'MDE', medellín: 'MDE',
+  quito: 'UIO', montevideo: 'MVD', 'panama city': 'PTY', 'panama-city': 'PTY',
+  // Oceania / Islands
   melbourne: 'MEL', auckland: 'AKL', bali: 'DPS', phuket: 'HKT',
   cancun: 'CUN', ibiza: 'IBZ', santorini: 'JTR', mykonos: 'JMK',
-  'tel aviv': 'TLV', havana: 'HAV', 'san juan': 'SJU', reykjavik: 'KEF',
+  'tel aviv': 'TLV', 'tel-aviv': 'TLV', havana: 'HAV',
+  'san juan': 'SJU', 'san-juan': 'SJU', reykjavik: 'KEF',
+  fiji: 'NAN', honolulu: 'HNL', 'punta cana': 'PUJ', 'punta-cana': 'PUJ',
+  kingston: 'KIN', nassau: 'NAS', 'montego bay': 'MBJ', 'montego-bay': 'MBJ',
+  // Canada
+  toronto: 'YYZ', montreal: 'YUL', vancouver: 'YVR', calgary: 'YYC',
 };
 
 const SESSION_KEY_PREFIX = 'nxstops_flights_';
@@ -124,15 +158,15 @@ export function useFlights(deps: {
     }
 
     function fetchFlights(origin: string) {
-      // Find destination IATA
-      const cityName = selectedCity!.name.toLowerCase();
-      const destCode = CITY_TO_IATA[cityName];
-      if (!destCode) {
-        // Try partial match
-        const match = Object.entries(CITY_TO_IATA).find(([key]) => cityName.includes(key) || key.includes(cityName));
-        if (!match) return; // Can't map destination to airport
-      }
-      const destination = destCode || Object.entries(CITY_TO_IATA).find(([key]) => cityName.includes(key) || key.includes(cityName))?.[1];
+      // Find destination IATA — try name, slug, then partial match
+      const cityName = selectedCity!.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const citySlug = (selectedCity as any).slug?.toLowerCase() || cityName.replace(/\s+/g, '-');
+      const destination =
+        CITY_TO_IATA[cityName] ||
+        CITY_TO_IATA[citySlug] ||
+        // Partial match as fallback
+        Object.entries(CITY_TO_IATA).find(([key]) => cityName.includes(key) || key.includes(cityName))?.[1] ||
+        null;
       if (!destination) return;
 
       // Don't search flights to same city
