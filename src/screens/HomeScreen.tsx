@@ -171,9 +171,10 @@ function CitySearch({ cities, selectedCity, loading, onSelect }: CitySearchProps
         `${c.name}, ${c.country}`.toLowerCase().includes(normalizedQuery)
       );
 
-  // Group by region
+  // Group by region — merge "United States" into "North America"
   const grouped = filtered.reduce<Record<string, typeof filtered>>((acc, city) => {
-    const region = city.region || 'Other';
+    let region = city.region || 'Other';
+    if (region === 'United States') region = 'North America';
     (acc[region] ??= []).push(city);
     return acc;
   }, {});
