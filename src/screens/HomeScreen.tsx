@@ -314,6 +314,131 @@ function CitySearch({ cities, selectedCity, loading, onSelect }: CitySearchProps
 }
 
 // ============================================================================
+// Nearby Picks Carousel — one card at a time
+// ============================================================================
+
+function NearbyPicksCarousel({
+  forYouPlaces, filteredPlaces, useMiles, fixPhotoUrl, onSelectPlace, onSeeAll,
+}: {
+  forYouPlaces: import('../services/places').Place[];
+  filteredPlaces: import('../services/places').Place[];
+  useMiles: boolean;
+  fixPhotoUrl: (url: string | null | undefined) => string | null;
+  onSelectPlace: (place: import('../services/places').Place) => void;
+  onSeeAll: () => void;
+}) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const picks = forYouPlaces.length >= 3
+    ? forYouPlaces.slice(0, 8)
+    : filteredPlaces.filter(p => p.rating >= 4.0 && p.photoUrl).slice(0, 8);
+
+  if (picks.length < 2) return null;
+
+  const place = picks[currentIndex];
+  const canPrev = currentIndex > 0;
+  const canNext = currentIndex < picks.length - 1;
+
+  return (
+    <div className="mb-5">
+      <div className="flex justify-between items-center mb-2.5">
+        <h3 className="text-[15px] font-semibold">Nearby Picks</h3>
+        <button
+          onClick={onSeeAll}
+          className="text-xs text-accent-amber bg-transparent border-none cursor-pointer font-medium">
+          See all {'\u2192'}
+        </button>
+      </div>
+
+      {/* Card */}
+      <div
+        onClick={() => onSelectPlace(place)}
+        role="button"
+        tabIndex={0}
+        aria-label={`View details for ${place.name}`}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectPlace(place); } }}
+        className="rounded-2xl border border-border-subtle overflow-hidden cursor-pointer bg-bg-elevated"
+      >
+        {place.photoUrl ? (
+          <div className="h-[180px] w-full relative overflow-hidden">
+            <NativeImg src={fixPhotoUrl(place.photoUrl)!} alt={place.name} loading="lazy" decoding="async"
+              className="w-full h-full object-cover block" />
+            <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.7))' }} />
+            {/* Info overlay on image */}
+            <div className="absolute bottom-0 left-0 right-0 p-4">
+              <div className="text-[16px] font-bold text-white mb-1">{place.name}</div>
+              <div className="flex items-center gap-2 text-[13px] text-white/80">
+                <span className="flex items-center gap-1">
+                  <span className="text-accent-amber">{'\u2605'}</span> {place.rating.toFixed(1)}
+                </span>
+                <span>{'\u00B7'}</span>
+                <span>{place.categoryDisplay}</span>
+                {place.distance != null && (
+                  <>
+                    <span>{'\u00B7'}</span>
+                    <span>{formatDistance(place.distance, useMiles)}</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="p-4">
+            <div className="text-[16px] font-bold text-text-primary mb-1">{place.name}</div>
+            <div className="flex items-center gap-2 text-[13px] text-text-tertiary">
+              <span className="text-accent-amber">{'\u2605'}</span> {place.rating.toFixed(1)}
+              <span>{'\u00B7'}</span>
+              {place.categoryDisplay}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Navigation: arrows + dots */}
+      <div className="flex items-center justify-between mt-3">
+        <button
+          onClick={(e) => { e.stopPropagation(); if (canPrev) setCurrentIndex(i => i - 1); }}
+          disabled={!canPrev}
+          aria-label="Previous pick"
+          className="w-9 h-9 rounded-full border border-border-subtle bg-bg-elevated flex items-center justify-center cursor-pointer disabled:opacity-25 disabled:cursor-default"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+
+        {/* Dots */}
+        <div className="flex items-center gap-1.5">
+          {picks.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setCurrentIndex(i)}
+              aria-label={`Go to pick ${i + 1}`}
+              className={`rounded-full border-none cursor-pointer transition-all duration-200 ${
+                i === currentIndex
+                  ? 'w-5 h-2 bg-accent-amber'
+                  : 'w-2 h-2 bg-border-medium hover:bg-border-strong'
+              }`}
+            />
+          ))}
+        </div>
+
+        <button
+          onClick={(e) => { e.stopPropagation(); if (canNext) setCurrentIndex(i => i + 1); }}
+          disabled={!canNext}
+          aria-label="Next pick"
+          className="w-9 h-9 rounded-full border border-border-subtle bg-bg-elevated flex items-center justify-center cursor-pointer disabled:opacity-25 disabled:cursor-default"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // Home Screen — Planner Only
 // ============================================================================
 
@@ -665,59 +790,15 @@ export default function HomeScreen() {
       )}
       {flightsLoading && <div className="mb-5"><FlightCardSkeleton /></div>}
 
-      {/* ── Nearby Picks — show what's around before committing to a plan ── */}
-      {!placesLoading && (() => {
-        const picks = forYouPlaces.length >= 3
-          ? forYouPlaces.slice(0, 6)
-          : filteredPlaces.filter(p => p.rating >= 4.0 && p.photoUrl).slice(0, 6);
-        if (picks.length < 2) return null;
-        return (
-          <div className="mb-5">
-            <div className="flex justify-between items-center mb-2.5">
-              <h3 className="text-[15px] font-semibold flex items-center gap-1.5">
-                Nearby Picks
-              </h3>
-              <button
-                onClick={() => setScreen('discover')}
-                className="text-xs text-accent-amber bg-transparent border-none cursor-pointer font-medium">
-                See all {'\u2192'}
-              </button>
-            </div>
-            <div className="flex gap-3 overflow-x-auto pb-2 scroll-hidden">
-              {picks.map(place => (
-                <div key={place.placeId}
-                  onClick={() => setSelectedPlace(place)}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`View details for ${place.name}`}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPlace(place); } }}
-                  className="card !p-0 overflow-hidden min-w-[160px] max-w-[180px] shrink-0 cursor-pointer border border-amber-tint-border15">
-                  {place.photoUrl ? (
-                    <div className="h-[100px] w-full relative overflow-hidden">
-                      <NativeImg src={fixPhotoUrl(place.photoUrl)!} alt={place.name} loading="lazy" decoding="async"
-                        className="w-full h-full object-cover block" />
-                      <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 40%, var(--bg-image-overlay))' }} />
-                    </div>
-                  ) : (
-                    <div className="h-[100px] w-full bg-amber-tint-bg06 flex items-center justify-center text-xl text-text-tertiary">{'\u{1F4CD}'}</div>
-                  )}
-                  <div className="py-2.5 px-3">
-                    <div className="text-[13px] font-semibold text-text-primary mb-[3px] overflow-hidden text-ellipsis whitespace-nowrap">{place.name}</div>
-                    <div className="text-xs text-text-tertiary flex items-center gap-1">
-                      <span className="text-accent-amber">{'\u2605'}</span> {place.rating.toFixed(1)}
-                      <span className="mx-0.5">{'\u00B7'}</span>
-                      {place.categoryDisplay}
-                    </div>
-                    {place.distance != null && (
-                      <div className="text-[11px] text-text-muted mt-0.5">{formatDistance(place.distance, useMiles)}</div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
+      {/* ── Nearby Picks — one card at a time carousel ── */}
+      {!placesLoading && <NearbyPicksCarousel
+        forYouPlaces={forYouPlaces}
+        filteredPlaces={filteredPlaces}
+        useMiles={useMiles}
+        fixPhotoUrl={fixPhotoUrl}
+        onSelectPlace={setSelectedPlace}
+        onSeeAll={() => setScreen('discover')}
+      />}
 
       {/* ── Discover — Community Routes + Quick Actions ── */}
       {hasLocation && <CommunityRoutesSection citySlug={citySlug} />}
