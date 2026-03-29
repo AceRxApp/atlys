@@ -63,9 +63,12 @@ const CITY_TO_IATA: Record<string, string> = {
   muscat: 'MCT', amman: 'AMM', beirut: 'BEY', kuwait: 'KWI',
   // Africa
   cairo: 'CAI', nairobi: 'NBO', lagos: 'LOS', johannesburg: 'JNB',
-  'dar es salaam': 'DAR', 'dar-es-salaam': 'DAR', addis: 'ADD', 'addis ababa': 'ADD', 'addis-ababa': 'ADD',
+  abuja: 'ABV', 'dar es salaam': 'DAR', 'dar-es-salaam': 'DAR',
+  addis: 'ADD', 'addis ababa': 'ADD', 'addis-ababa': 'ADD',
   casablanca: 'CMN', dakar: 'DSS', kampala: 'EBB', kigali: 'KGL',
   zanzibar: 'ZNZ', tunis: 'TUN', algiers: 'ALG', abidjan: 'ABJ',
+  lusaka: 'LUN', harare: 'HRE', maputo: 'MPM', windhoek: 'WDH',
+  kumasi: 'KMS', lome: 'LFW', cotonou: 'COO',
   // South America
   'buenos aires': 'EZE', 'buenos-aires': 'EZE', 'sao paulo': 'GRU', 'sao-paulo': 'GRU',
   lima: 'LIM', bogota: 'BOG', santiago: 'SCL', medellin: 'MDE', medellín: 'MDE',
@@ -133,41 +136,55 @@ export function useFlights(deps: {
       return;
     }
 
-    // Find origin airport: GPS first, then timezone fallback
-    if (userLat && userLng) {
-      try {
-        import('../data/airports').then(({ findNearestAirport }) => {
-          const nearest = findNearestAirport(userLat, userLng);
-          if (nearest) fetchFlights(nearest.iata);
-          else {
-            const fallback = guessAirportFromTimezone();
-            if (fallback) fetchFlights(fallback);
-          }
-        }).catch(() => {
-          const fallback = guessAirportFromTimezone();
-          if (fallback) fetchFlights(fallback);
-        });
-      } catch {
-        const fallback = guessAirportFromTimezone();
-        if (fallback) fetchFlights(fallback);
+    // Load airport data once, then resolve origin + destination
+    import('../data/airports').then(({ findNearestAirport }) => {
+      // Resolve origin: GPS → nearest airport → timezone fallback
+      let originCode: string | null = null;
+      if (userLat && userLng) {
+        const nearest = findNearestAirport(userLat, userLng);
+        originCode = nearest?.iata || guessAirportFromTimezone();
+      } else {
+        originCode = guessAirportFromTimezone();
       }
-    } else {
-      // No GPS — use timezone
-      const fallback = guessAirportFromTimezone();
-      if (fallback) fetchFlights(fallback);
-    }
+      if (!originCode) return;
 
-    function fetchFlights(origin: string) {
-      // Find destination IATA — try name, slug, then partial match
+      // Resolve destination: map lookup → nearest airport to city's lat/lng
       const cityName = selectedCity!.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       const citySlug = (selectedCity as any).slug?.toLowerCase() || cityName.replace(/\s+/g, '-');
-      const destination =
+      let destCode =
         CITY_TO_IATA[cityName] ||
         CITY_TO_IATA[citySlug] ||
-        // Partial match as fallback
         Object.entries(CITY_TO_IATA).find(([key]) => cityName.includes(key) || key.includes(cityName))?.[1] ||
         null;
-      if (!destination) return;
+
+      // If not in the map, use the city's own coordinates to find nearest airport
+      if (!destCode) {
+        const cityLat = (selectedCity as any).lat;
+        const cityLng = (selectedCity as any).lng;
+        if (cityLat && cityLng) {
+          const nearestDest = findNearestAirport(cityLat, cityLng);
+          destCode = nearestDest?.iata || null;
+        }
+      }
+      if (!destCode) return;
+
+      fetchFlights(originCode, destCode);
+    }).catch(() => {
+      // Airport data failed to load — try with timezone + map only
+      const originCode = guessAirportFromTimezone();
+      if (!originCode) return;
+      const cityName = selectedCity!.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const citySlug = (selectedCity as any).slug?.toLowerCase() || cityName.replace(/\s+/g, '-');
+      const destCode =
+        CITY_TO_IATA[cityName] ||
+        CITY_TO_IATA[citySlug] ||
+        Object.entries(CITY_TO_IATA).find(([key]) => cityName.includes(key) || key.includes(cityName))?.[1] ||
+        null;
+      if (!destCode) return;
+      fetchFlights(originCode, destCode);
+    });
+
+    function fetchFlights(origin: string, destination: string) {
 
       // Don't search flights to same city
       if (origin === destination) return;
