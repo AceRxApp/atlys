@@ -36,6 +36,34 @@ const FOOD_CATEGORIES = new Set([
   'bistro', 'diner', 'grill', 'bbq', 'tea_house', 'dessert_shop',
 ]);
 
+/** Map categories to broader groups so swaps match "same type" */
+const SWAP_GROUP: Record<string, string> = {
+  restaurant: 'food', cafe: 'food', bakery: 'food', coffee_shop: 'food',
+  diner: 'food', bistro: 'food', fast_food: 'food', ice_cream_shop: 'food',
+  pizza_restaurant: 'food', sushi_restaurant: 'food', brunch_restaurant: 'food',
+  breakfast_restaurant: 'food', steak_house: 'food', seafood_restaurant: 'food',
+  sandwich_shop: 'food', grill: 'food', bbq: 'food', dessert_shop: 'food',
+  tea_house: 'food', meal_takeaway: 'food', meal_delivery: 'food',
+  bar: 'drink', wine_bar: 'drink', pub: 'drink', cocktail_bar: 'drink',
+  brewery: 'drink', night_club: 'nightlife', lounge: 'nightlife',
+  karaoke: 'nightlife', comedy_club: 'nightlife',
+  museum: 'culture', art_gallery: 'culture', library: 'culture',
+  performing_arts_theater: 'culture', movie_theater: 'culture',
+  historic_site: 'landmark', monument: 'landmark', landmark: 'landmark',
+  historical_landmark: 'landmark', tourist_attraction: 'landmark',
+  church: 'landmark', temple: 'landmark', mosque: 'landmark', castle: 'landmark',
+  park: 'outdoor', garden: 'outdoor', beach: 'outdoor', hiking_area: 'outdoor',
+  national_park: 'outdoor', playground: 'outdoor', zoo: 'outdoor',
+  campground: 'outdoor', marina: 'outdoor',
+  shopping_mall: 'shopping', market: 'shopping', boutique: 'shopping',
+  clothing_store: 'shopping', gift_shop: 'shopping',
+  spa: 'wellness', gym: 'wellness', yoga_studio: 'wellness',
+};
+
+function getSwapGroup(category: string): string {
+  return SWAP_GROUP[category] || category;
+}
+
 /** Categories appropriate for breakfast/brunch (morning slots) */
 const BREAKFAST_CATEGORIES = new Set([
   'cafe', 'coffee_shop', 'bakery', 'brunch_restaurant', 'breakfast_restaurant',
@@ -87,6 +115,19 @@ export function findPivotAlternatives(
       open = breakfastOnly;
     }
   }
+
+  // Strongly prefer same-category, then same-group results
+  const stopGroup = getSwapGroup(currentStop.category);
+  const sameCategory = open.filter(p => p.category === currentStop.category);
+  const sameGroup = open.filter(p => getSwapGroup(p.category) === stopGroup);
+
+  // Use narrowest matching pool that has enough results
+  if (sameCategory.length >= maxResults) {
+    open = sameCategory;
+  } else if (sameGroup.length >= maxResults) {
+    open = sameGroup;
+  }
+  // else keep all — better to show something than nothing
 
   const scored = open.map(p => {
     let score = 0;

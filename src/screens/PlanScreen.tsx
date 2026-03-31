@@ -1035,7 +1035,24 @@ export default function PlanScreen() {
                                   const isOutdoor = OUTDOOR_CATEGORIES.includes(stop.place!.category);
                                   const vibe = isFoodPlan ? 'eatsip' : isOutdoor ? 'thespot' : (TYPE_TO_VIBE[stop.place!.category] || stop.place!.tags?.[0] || 'thespot');
                                   const googlePlaces = await searchNearby(stop.place!.lat, stop.place!.lng, [vibe], 2000);
-                                  alternatives = googlePlaces.filter(p => !excludeIds.has(p.placeId) && p.placeId !== stop.place!.placeId).slice(0, 8);
+                                  let filtered = googlePlaces.filter(p => !excludeIds.has(p.placeId) && p.placeId !== stop.place!.placeId);
+                                  // Prefer same category, then same group
+                                  const SWAP_GROUP: Record<string, string> = {
+                                    restaurant:'food',cafe:'food',bakery:'food',coffee_shop:'food',diner:'food',bistro:'food',
+                                    bar:'drink',wine_bar:'drink',pub:'drink',cocktail_bar:'drink',brewery:'drink',
+                                    museum:'culture',art_gallery:'culture',library:'culture',
+                                    historic_site:'landmark',monument:'landmark',landmark:'landmark',historical_landmark:'landmark',tourist_attraction:'landmark',
+                                    park:'outdoor',garden:'outdoor',beach:'outdoor',hiking_area:'outdoor',national_park:'outdoor',
+                                    night_club:'nightlife',lounge:'nightlife',spa:'wellness',gym:'wellness',
+                                    shopping_mall:'shopping',market:'shopping',boutique:'shopping',
+                                  };
+                                  const stopCat = stop.place!.category;
+                                  const stopGrp = SWAP_GROUP[stopCat] || stopCat;
+                                  const sameCat = filtered.filter(p => p.category === stopCat);
+                                  const sameGrp = filtered.filter(p => (SWAP_GROUP[p.category] || p.category) === stopGrp);
+                                  if (sameCat.length >= 3) filtered = sameCat;
+                                  else if (sameGrp.length >= 3) filtered = sameGrp;
+                                  alternatives = filtered.slice(0, 8);
                                 } catch { /* ignore */ }
                                 setPivotLoading(false);
                               }

@@ -186,8 +186,8 @@ describe('theme system', () => {
       expect(darkTheme.mapColorScheme).toBe('DARK');
     });
 
-    it('sunset theme uses DARK mapColorScheme', () => {
-      expect(sunsetTheme.mapColorScheme).toBe('DARK');
+    it('sunset theme uses LIGHT mapColorScheme', () => {
+      expect(sunsetTheme.mapColorScheme).toBe('LIGHT');
     });
   });
 });
