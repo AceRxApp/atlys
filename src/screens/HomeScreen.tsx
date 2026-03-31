@@ -223,7 +223,7 @@ function CitySearch({ cities, selectedCity, loading, onSelect }: CitySearchProps
         <input
           ref={inputRef}
           type="text"
-          placeholder={loading && cities.length === 0 ? 'Loading cities...' : 'Type a city name...'}
+          placeholder={loading && cities.length === 0 ? 'Loading cities...' : 'Where to next?'}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -343,7 +343,10 @@ function NearbyPicksCarousel({
   return (
     <div className="mb-5">
       <div className="flex justify-between items-center mb-2.5">
-        <h3 className="text-[15px] font-semibold">Nearby Picks</h3>
+        <h3 className="text-[15px] font-semibold flex items-center gap-0">
+          <span className="inline-block w-4 h-[3px] rounded-sm mr-2 shrink-0" style={{ background: 'linear-gradient(90deg, var(--accent-amber), var(--accent-amber-dark))' }} />
+          Nearby Picks
+        </h3>
         <button
           onClick={onSeeAll}
           className="text-xs text-accent-amber bg-transparent border-none cursor-pointer font-medium">
@@ -358,7 +361,7 @@ function NearbyPicksCarousel({
         tabIndex={0}
         aria-label={`View details for ${place.name}`}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectPlace(place); } }}
-        className="rounded-2xl border border-border-subtle overflow-hidden cursor-pointer bg-bg-elevated"
+        className="rounded-2xl border border-border-subtle overflow-hidden cursor-pointer bg-bg-elevated card-edge-glow"
       >
         {place.photoUrl ? (
           <div className="h-[180px] w-full relative overflow-hidden">
@@ -631,8 +634,10 @@ export default function HomeScreen() {
                   }
                 }}
                 onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (matchedCity) { setSelectedCity(matchedCity); setUseGps(false); } } }}
-                className="relative overflow-hidden rounded-xl border border-border-subtle cursor-pointer h-[130px]"
+                className="relative overflow-hidden rounded-xl border border-border-subtle cursor-pointer h-[130px] card-edge-glow"
               >
+                {/* Signature pin dot */}
+                <div className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full z-10" style={{ background: '#F59E0B', boxShadow: '0 0 8px rgba(245,158,11,0.5)' }} />
                 <NativeImg
                   src={dest.image}
                   alt={`${dest.landmark}, ${dest.city}`}
@@ -711,7 +716,7 @@ export default function HomeScreen() {
               style={{ animationDelay: `${i * 50}ms` }}
               className={`flex flex-col items-center gap-1 py-2.5 px-2 rounded-xl cursor-pointer transition-all duration-200 animate-enter-up ${
                 isVibeSelected
-                  ? 'border-[1.5px] border-accent-amber bg-amber-tint-bg15 shadow-[0_0_16px_rgba(232,148,10,0.12)]'
+                  ? 'border-[1.5px] border-accent-amber bg-amber-tint-bg15 shadow-[0_0_16px_rgba(232,148,10,0.12)] card-edge-glow'
                   : 'border border-border-medium bg-transparent hover:border-border-strong'
               }`}>
               <span className="text-lg">{v.emoji}</span>

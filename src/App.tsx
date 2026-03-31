@@ -861,24 +861,11 @@ export default function App() {
             {/* Left: Logo + time */}
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
-                {/* Route-line logo mark */}
-                <svg width="28" height="28" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
-                  <defs>
-                    <linearGradient id="hdr-amber" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#FBBF24"/>
-                      <stop offset="50%" stopColor="#F59E0B"/>
-                      <stop offset="100%" stopColor="#D97706"/>
-                    </linearGradient>
-                  </defs>
-                  <path d="M15 35 C25 35 30 55 45 55 C60 55 65 30 75 30" fill="none" stroke="url(#hdr-amber)" strokeWidth="2.5" strokeLinecap="round" opacity="0.5"/>
-                  <circle cx="15" cy="35" r="6" fill="var(--bg-body)" stroke="url(#hdr-amber)" strokeWidth="2"/>
-                  <circle cx="15" cy="35" r="2.5" fill="url(#hdr-amber)"/>
-                  <circle cx="45" cy="55" r="6" fill="var(--bg-body)" stroke="url(#hdr-amber)" strokeWidth="2"/>
-                  <circle cx="45" cy="55" r="2.5" fill="url(#hdr-amber)"/>
-                  <circle cx="75" cy="30" r="6" fill="var(--bg-body)" stroke="url(#hdr-amber)" strokeWidth="2"/>
-                  <circle cx="75" cy="30" r="2.5" fill="url(#hdr-amber)"/>
-                  <path d="M88 70 C85 60 78 53 78 46 C78 40 82 36 88 36 C94 36 98 40 98 46 C98 53 91 60 88 70Z" fill="url(#hdr-amber)"/>
-                  <circle cx="88" cy="46" r="3.5" fill="var(--bg-body)"/>
+                {/* Orbit pin logo mark */}
+                <svg width="28" height="28" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+                  <ellipse cx="13" cy="13" rx="10" ry="5.5" fill="none" stroke="var(--accent-amber)" strokeWidth="1.2" strokeDasharray="3 2.5" opacity="0.45" transform="rotate(-12,13,13)"/>
+                  <path d="M10,18 C8.5,15 5,13 5,10 C5,6.5 8.5,4 13,4 C17.5,4 21,6.5 21,10 C21,13 17.5,15 16,18 L13,22 Z" fill="var(--accent-amber)"/>
+                  <circle cx="13" cy="10" r="3" fill="var(--bg-body)"/>
                 </svg>
                 <div>
                   <div className="text-[20px] font-bold leading-tight">

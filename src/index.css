@@ -2,7 +2,7 @@
    NxStops by Navé - Tailwind CSS v4 Entry Point
    ============================================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
@@ -11,7 +11,7 @@
 
 @theme {
   --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
-  --font-heading: 'Outfit', 'DM Sans', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Space Grotesk', 'DM Sans', system-ui, -apple-system, sans-serif;
 
   /* Background */
   --color-bg-body: var(--bg-body);
@@ -262,6 +262,65 @@
   font-family: var(--font-heading);
 }
 
+/* Signature NxStops section dash — amber gradient bar before section headers */
+@utility section-dash {
+  &::before {
+    content: '';
+    display: inline-block;
+    width: 16px;
+    height: 3px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--accent-amber), var(--accent-amber-dark));
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+}
+
+/* Signature amber glow dot — used on active states and markers */
+@utility glow-dot {
+  &::before {
+    content: '';
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent-amber);
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+    display: inline-block;
+    margin-right: 6px;
+  }
+}
+
+/* Signature card bottom edge — amber gradient line */
+@utility card-edge-glow {
+  position: relative;
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent-amber), transparent 80%);
+    border-radius: 0 0 inherit inherit;
+    pointer-events: none;
+  }
+}
+
+/* Route connector line between stop cards */
+@utility route-connector {
+  position: relative;
+  &::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 34px;
+    width: 2px;
+    height: 8px;
+    background: rgba(245, 158, 11, 0.15);
+    pointer-events: none;
+  }
+}
+
 @utility animate-enter-up {
   animation: enterUp 0.4s ease-out both;
 }
@@ -322,7 +381,7 @@
     color: var(--text-secondary);
   }
 
-  /* Heading typography — Outfit for visual hierarchy */
+  /* Heading typography — Space Grotesk for distinctive visual hierarchy */
   h1, h2, h3, .section-label {
     font-family: var(--font-heading);
   }
@@ -379,6 +438,20 @@
     margin-bottom: 12px;
     font-weight: 600;
     color: var(--text-tertiary);
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+  /* Signature amber dash before every section label */
+  .section-label::before {
+    content: '';
+    display: inline-block;
+    width: 14px;
+    height: 2.5px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--accent-amber), var(--accent-amber-dark));
+    margin-right: 8px;
+    flex-shrink: 0;
   }
 
   .badge {

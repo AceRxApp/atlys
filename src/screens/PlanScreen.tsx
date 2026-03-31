@@ -898,13 +898,17 @@ export default function PlanScreen() {
               <Fragment key={stop.id}>
                 <SortableStopCard id={stop.id}>
                 {(listeners) => (
-                  <div className={`rounded-2xl overflow-hidden border ${
+                  <div className={`rounded-2xl overflow-hidden border card-edge-glow ${
                     stop.type === 'event' ? 'border-purple-tint-border15' : 'border-border-subtle'
-                  } bg-bg-elevated`}>
+                  } bg-bg-elevated ${index > 0 ? 'route-connector' : ''}`}>
                     {/* Photo */}
                     <div className="relative h-[100px] w-full cursor-pointer"
                       onClick={() => { if (stop.type === 'place' && stop.place) setSelectedPlace(stop.place); }}
                       role="button" tabIndex={0}>
+                      {/* Signature stop number badge */}
+                      <div className="absolute top-1.5 left-1.5 w-5 h-5 rounded-md flex items-center justify-center z-10 text-[10px] font-bold font-heading" style={{ background: '#F59E0B', color: '#0A0A0A' }}>
+                        {index + 1}
+                      </div>
                       {photoUrl ? (
                         <>
                           <NativeImg src={fixPhotoUrl(photoUrl)!} alt={stopName} loading="lazy" decoding="async"
