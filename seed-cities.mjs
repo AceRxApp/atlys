@@ -1,8 +1,12 @@
 // seed-cities.mjs - Insert 100 new cities into Supabase via REST API
 // Usage: node seed-cities.mjs
 
-const SUPABASE_URL = 'https://hwtsyigwsucpefadznnp.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3dHN5aWd3c3VjcGVmYWR6bm5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwODcwOTgsImV4cCI6MjA4NTY2MzA5OH0.EnqHcTqoPN1pfSEUggwm_mMUNWME8kNcih5EvB4JlD4';
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error('Set SUPABASE_URL and SUPABASE_ANON_KEY environment variables');
+  process.exit(1);
+}
 const HEADERS = {
   apikey: SUPABASE_ANON_KEY,
   Authorization: `Bearer ${SUPABASE_ANON_KEY}`,

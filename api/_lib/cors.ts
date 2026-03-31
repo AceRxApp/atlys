@@ -8,8 +8,6 @@ interface ServerResponse {
 export const ALLOWED_ORIGINS = [
   'https://nxstops.com',
   'https://www.nxstops.com',
-  'https://vynbynave.vercel.app',
-  'https://nxstops-new.vercel.app',
   'http://localhost:5173',
   'http://localhost:4173',
 ];
