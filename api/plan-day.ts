@@ -147,6 +147,14 @@ const DIVERSE_TEXT_SEARCHES: Record<string, string[]> = {
     'bakery pastry shop local', 'scenic walking trail park', 'art gallery exhibition',
     'vintage shop boutique', 'beach seaside relaxing waterfront',
   ],
+  wander: [
+    'historic neighborhood walking tour', 'street art mural district',
+    'local market bazaar neighborhood', 'pedestrian street shopping district',
+    'waterfront boardwalk promenade', 'cultural district heritage quarter',
+    'charming neighborhood cafe local', 'vintage shop thrift store district',
+    'food market street food stalls', 'scenic neighborhood architecture walk',
+    'park plaza public square landmark', 'artisan shops craft neighborhood',
+  ],
   daydrinks: [
     'rooftop bar views', 'happy hour cocktail bar', 'wine bar wine tasting',
     'craft brewery taproom', 'boozy brunch mimosa', 'cocktail lounge afternoon',
@@ -1543,6 +1551,19 @@ const VIBE_CONFIG: Record<string, {
       full: 'Morning coffee → park or bookstore → brunch → afternoon cafe → gallery or market → cozy dinner',
     },
   },
+  wander: {
+    foodTypes: ['cafe', 'restaurant', 'bakery', 'coffee_shop', 'ice_cream_shop', 'brunch_restaurant'],
+    activityTypes: ['market', 'park', 'art_gallery', 'historical_landmark', 'cultural_landmark', 'tourist_attraction', 'book_store', 'clothing_store', 'gift_shop'],
+    textSearchKey: 'wander',
+    textSearchCount: 5,
+    aiHint: 'This is a WANDER afternoon — exploring neighborhoods on foot. Think charming streets, local markets, street art, pedestrian districts, and stumbling upon great spots. Mix walkable food stops (cafes, street food, bakeries) with interesting places to browse (vintage shops, bookstores, markets). Each stop should feel like a natural discovery while walking. The route should flow geographically — no backtracking.',
+    structureHint: {
+      morning: 'Neighborhood cafe → local market or park → bakery or brunch spot',
+      afternoon: 'Lunch in a walkable district → market or street art area → cafe or gelato → vintage shop or bookstore',
+      evening: 'Neighborhood dinner → evening walk through historic area → cocktail or dessert spot',
+      full: 'Morning coffee in a neighborhood → market browse → lunch spot → afternoon wander through district → cafe stop → neighborhood dinner → evening stroll',
+    },
+  },
   daydrinks: {
     foodTypes: ['restaurant', 'bar', 'wine_bar', 'brunch_restaurant', 'cafe', 'seafood_restaurant'],
     activityTypes: ['bar', 'wine_bar'],
@@ -2430,7 +2451,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Legacy vibes
       nightout: 'Night Out', food: 'Foodie Tour',
       adventure: 'Outdoor Adventure', surprise: 'Under the Radar',
-      chill: 'Chill Vibes', daydrinks: 'Day Drinks',
+      chill: 'Chill Vibes', wander: 'Wander', daydrinks: 'Day Drinks',
       stacked: 'Stacked', cultural: 'Art & Culture',
       datenight: 'Date Night', hiddengems: 'Hidden Gems',
     };
@@ -2864,6 +2885,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         eveningPicks = markUsed([...dinner.slice(0, 4), ...eveningBars.slice(0, 3)].slice(0, 8));
         eveningLabel = 'Cozy Evenings';
         eveningEmoji = '\u{1F56F}\u{FE0F}';
+
+      } else if (vibeKey === 'wander') {
+        // ── WANDER — walkable neighborhood exploration ────────────────
+        const cafes = foodPlaces.filter(p => cm(p, /cafe|coffee|bakery|brunch/i));
+        const wanderActs = activityPlaces.filter(p => cm(p, /market|art|gallery|book|shop|boutique|vintage|historic|landmark|park/i));
+        morningPicks = markUsed([...cafes.slice(0, 3), ...wanderActs.slice(0, 3)].slice(0, 6));
+        morningLabel = 'Morning Stroll';
+        morningEmoji = '\u2615';
+
+        const lunchSpots = foodPlaces.filter(p => notUsed(p));
+        const browseSpots = activityPlaces.filter(p => notUsed(p));
+        afternoonPicks = markUsed([...lunchSpots.slice(0, 3), ...browseSpots.slice(0, 5)].slice(0, 8));
+        afternoonLabel = 'Afternoon Wander';
+        afternoonEmoji = '\u{1F6B6}';
+
+        const dinner = foodPlaces.filter(p => notUsed(p) && cm(p, /restaurant|dinner|bistro/i));
+        const eveningWalk = activityPlaces.filter(p => notUsed(p));
+        eveningPicks = markUsed([...dinner.slice(0, 4), ...eveningWalk.slice(0, 3)].slice(0, 8));
+        eveningLabel = 'Evening Discovery';
+        eveningEmoji = '\u{1F307}';
 
       } else if (vibeKey === 'daydrinks') {
         // ── DAY DRINKS ──────────────────────────────────────────────────

@@ -21,7 +21,7 @@ interface VibeOption {
   desc: string;
 }
 
-const VIBES: VibeOption[] = [
+const BASE_VIBES: VibeOption[] = [
   { id: 'starthare', emoji: '\u{2B50}', label: 'Greatest Hits', desc: 'The must-do highlights & iconic spots' },
   { id: 'indulge', emoji: '\u{1F37D}\u{FE0F}', label: 'Indulge', desc: 'Food & drink worth the trip' },
   { id: 'afterdark', emoji: '\u{1F31C}', label: 'After Dark', desc: 'Where the city comes alive at night' },
@@ -29,6 +29,21 @@ const VIBES: VibeOption[] = [
   { id: 'luxe', emoji: '\u{1F451}', label: 'Luxe', desc: 'High-end, upscale experiences' },
   { id: 'undertheradar', emoji: '\u{1F4CD}', label: 'Under the Radar', desc: 'Hidden gems & local favorites' },
 ];
+
+// Time-specific vibes that replace "After Dark" for morning/afternoon
+const CHILL_VIBE: VibeOption = { id: 'chill', emoji: '\u2615', label: 'Chill', desc: 'Cafés, parks, bookshops & slow vibes' };
+const WANDER_VIBE: VibeOption = { id: 'wander', emoji: '\u{1F6B6}', label: 'Wander', desc: 'Neighborhoods, street life & walkable gems' };
+
+function getVibesForDuration(duration: 'full' | 'morning' | 'afternoon' | 'evening'): VibeOption[] {
+  if (duration === 'morning') {
+    return BASE_VIBES.map(v => v.id === 'afterdark' ? CHILL_VIBE : v);
+  }
+  if (duration === 'afternoon') {
+    return BASE_VIBES.map(v => v.id === 'afterdark' ? WANDER_VIBE : v);
+  }
+  // full day and evening keep After Dark
+  return BASE_VIBES;
+}
 
 const LOADING_MESSAGES = [
   'Finding top spots nearby...',
@@ -548,9 +563,10 @@ export default function HomeScreen() {
 
   // Full-page loading state — fun animated progress
   if (curatedLoading || autoPlanLoading) {
+    const currentVibes = getVibesForDuration(selectedDuration);
     const vibeLabel = selectedVibesSet.size > 1
-      ? Array.from(selectedVibesSet).map(id => VIBES.find(v => v.id === id)?.label || '').join(' + ')
-      : VIBES.find(v => v.id === (Array.from(selectedVibesSet)[0] || 'starthare'))?.label || 'Explore';
+      ? Array.from(selectedVibesSet).map(id => currentVibes.find(v => v.id === id)?.label || '').join(' + ')
+      : currentVibes.find(v => v.id === (Array.from(selectedVibesSet)[0] || 'starthare'))?.label || 'Explore';
     return (
       <PlanLoadingAnimation
         cityName={cityLabel || loc.city || 'your city'}
@@ -706,7 +722,7 @@ export default function HomeScreen() {
           <span className="text-[11px] text-text-tertiary">Pick up to 2</span>
         </div>
         <div className="grid grid-cols-3 gap-2">
-          {VIBES.map((v, i) => {
+          {getVibesForDuration(selectedDuration).map((v, i) => {
             const isVibeSelected = selectedVibesSet.has(v.id);
             return (
             <button key={v.id}
@@ -737,7 +753,16 @@ export default function HomeScreen() {
             { id: 'evening' as const, label: 'Tonight', emoji: '\u{1F303}' },
           ]).map(d => (
             <button key={d.id}
-              onClick={() => setSelectedDuration(d.id)}
+              onClick={() => {
+                setSelectedDuration(d.id);
+                // Clear vibes that aren't available in the new duration
+                const newVibes = getVibesForDuration(d.id);
+                const newVibeIds = new Set(newVibes.map(v => v.id));
+                setSelectedVibesSet(prev => {
+                  const filtered = new Set([...prev].filter(id => newVibeIds.has(id)));
+                  return filtered.size !== prev.size ? filtered : prev;
+                });
+              }}
               className={`flex-1 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-all ${
                 selectedDuration === d.id
                   ? 'border-[1.5px] border-accent-amber bg-amber-tint-bg15 text-accent-amber'
