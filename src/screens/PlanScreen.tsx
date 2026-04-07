@@ -922,12 +922,12 @@ export default function PlanScreen() {
                         </div>
                       )}
                       {stop.timeSlot && !(isLiveDay && isCheckedIn(stop.id)) && (
-                        <div className="absolute top-1.5 left-1.5 text-[9px] font-bold text-white/90 uppercase tracking-wider bg-black/40 px-1.5 py-0.5 rounded backdrop-blur-sm">
+                        <div className="absolute top-1.5 left-8 text-[9px] font-bold text-white/90 uppercase tracking-wider bg-black/40 px-1.5 py-0.5 rounded backdrop-blur-sm">
                           {stop.timeSlot}
                         </div>
                       )}
                       {isLiveDay && isCheckedIn(stop.id) && (
-                        <div className="absolute top-1.5 left-1.5 bg-status-green text-white text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                        <div className="absolute top-1.5 left-8 bg-status-green text-white text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
                           {'\u2713'} Visited
                         </div>
                       )}
@@ -954,6 +954,30 @@ export default function PlanScreen() {
                           <span className="text-[11px] text-accent-amber shrink-0">{'\u2605'} {stopRating.toFixed(1)}</span>
                         )}
                       </div>
+                      {stop.bestTime && stop.bestTime !== 'any' && (() => {
+                        const bestLabel: Record<string, string> = {
+                          morning: 'Best in the morning',
+                          midday: 'Best at midday',
+                          afternoon: 'Best in the afternoon',
+                          sunset: 'Best at sunset',
+                          evening: 'Best in the evening',
+                          night: 'Best at night',
+                        };
+                        const bestIcon: Record<string, string> = {
+                          morning: '\u2615',
+                          midday: '\u{1F31E}',
+                          afternoon: '\u{1F33F}',
+                          sunset: '\u{1F305}',
+                          evening: '\u{1F377}',
+                          night: '\u{1F31C}',
+                        };
+                        return (
+                          <div className="inline-flex items-center gap-1 mb-1 text-[9px] font-semibold text-accent-amber bg-amber-tint-bg10 border border-amber-tint-border px-1.5 py-[2px] rounded">
+                            <span>{bestIcon[stop.bestTime]}</span>
+                            <span>{bestLabel[stop.bestTime]}</span>
+                          </div>
+                        );
+                      })()}
                       {stop.type === 'place' && stop.place && (() => {
                         const hs = getHoursStatus(stop.place.hours, stop.place.openNow);
                         return (

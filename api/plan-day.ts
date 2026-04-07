@@ -1764,6 +1764,76 @@ function transformPlace(raw: Record<string, unknown>, userLat: number, userLng: 
 }
 
 // --------------------------------------------------------------------------
+// Best time-of-day heuristic — when is this place at its best?
+// Returns one of: 'morning' | 'midday' | 'afternoon' | 'sunset' | 'evening' | 'night' | 'any'
+// Used to (1) hint to the AI which slot a place belongs in and (2) reorder
+// stops so each lands in its sweet spot.
+// --------------------------------------------------------------------------
+type BestTime = 'morning' | 'midday' | 'afternoon' | 'sunset' | 'evening' | 'night' | 'any';
+
+// Map best-time → an "ideal hour" used for sorting
+const BEST_TIME_HOUR: Record<BestTime, number> = {
+  morning: 9,
+  midday: 13,
+  afternoon: 15,
+  sunset: 18,
+  evening: 20,
+  night: 22,
+  any: 14,
+};
+
+function getBestTime(place: PlanPlace): BestTime {
+  const cat = (place.category || '').toLowerCase();
+  const display = (place.categoryDisplay || '').toLowerCase();
+  const name = (place.name || '').toLowerCase();
+  const editorial = (place.editorialSummary || '').toLowerCase();
+  const haystack = `${cat} ${display} ${name} ${editorial}`;
+
+  // Night-only — clubs, late-night venues
+  if (/night_club|nightclub|disco|dance_club/.test(cat)) return 'night';
+  if (/\b(club|nightclub|after.?hours|late.?night)\b/.test(haystack)) return 'night';
+
+  // Sunset spots — rooftops, sky bars, sunset viewpoints
+  if (/\b(rooftop|sky.?bar|sunset|skyline|observation deck|panoramic)\b/.test(haystack)) return 'sunset';
+
+  // Evening — bars, lounges, dinner-focused, live music, theaters
+  if (/\b(bar|lounge|speakeasy|cocktail|wine_bar|pub|brewery|izakaya|live music|jazz|comedy)\b/.test(haystack)) return 'evening';
+  if (/performing_arts_theater|movie_theater|theater/.test(cat)) return 'evening';
+  if (/fine_dining|steak_house|sushi|ramen/.test(cat)) return 'evening';
+
+  // Morning — cafés, bakeries, breakfast, brunch, parks (cool hours), beaches (cool hours)
+  if (/cafe|coffee_shop|bakery|breakfast_restaurant|brunch_restaurant/.test(cat)) return 'morning';
+  if (/\b(cafe|coffee|bakery|breakfast|brunch|patisserie|donut|bagel)\b/.test(haystack)) return 'morning';
+  if (/\b(beach|park|garden|botanic|hike|trail|farmers.?market)\b/.test(haystack) && !/night/.test(haystack)) return 'morning';
+  if (/park|hiking_area|beach|botanical_garden/.test(cat)) return 'morning';
+
+  // Midday — museums, galleries, indoor cultural (beat the heat), shopping
+  if (/museum|art_gallery|aquarium|library|historical_landmark/.test(cat)) return 'midday';
+  if (/\b(museum|gallery|exhibition|aquarium|planetarium)\b/.test(haystack)) return 'midday';
+
+  // Afternoon — markets, shopping, neighborhoods, casual lunch
+  if (/market|shopping_mall|department_store|book_store|boutique/.test(cat)) return 'afternoon';
+  if (/\b(market|bazaar|souk|boutique|vintage|shopping)\b/.test(haystack)) return 'afternoon';
+
+  // Default: restaurants are flexible (lean afternoon), everything else any
+  if (/restaurant/.test(cat)) return 'afternoon';
+  return 'any';
+}
+
+// Parse a "7:30 PM" / "19:30" timeSlot string into a fractional hour (0–24)
+function parseTimeSlot(slot: string): number {
+  if (!slot) return -1;
+  const m = slot.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM|am|pm)?/);
+  if (!m) return -1;
+  let h = parseInt(m[1], 10);
+  const min = m[2] ? parseInt(m[2], 10) : 0;
+  const ampm = m[3]?.toUpperCase();
+  if (ampm === 'PM' && h < 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  return h + min / 60;
+}
+
+// --------------------------------------------------------------------------
 // OpenAI GPT-4o-mini call
 // --------------------------------------------------------------------------
 
@@ -3070,18 +3140,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    const condensed = topPlaces.map((p, i) => ({
-      idx: i,
-      name: p.name,
-      cat: p.categoryDisplay,
-      rating: p.rating,
-      price: p.priceLevel,
-      open: p.openNow,
-      dist: p.distance ? `${p.distance.toFixed(1)}km` : '?',
-      lat: Math.round(p.lat * 10000) / 10000,
-      lng: Math.round(p.lng * 10000) / 10000,
-      ...(isHiddenGem(p) ? { gem: true } : {}),
-    }));
+    const condensed = topPlaces.map((p, i) => {
+      const bestTime = getBestTime(p);
+      return {
+        idx: i,
+        name: p.name,
+        cat: p.categoryDisplay,
+        rating: p.rating,
+        price: p.priceLevel,
+        open: p.openNow,
+        dist: p.distance ? `${p.distance.toFixed(1)}km` : '?',
+        lat: Math.round(p.lat * 10000) / 10000,
+        lng: Math.round(p.lng * 10000) / 10000,
+        best: bestTime,
+        ...(isHiddenGem(p) ? { gem: true } : {}),
+      };
+    });
 
     // 3. Build events section if available
     let eventsSection = '';
@@ -3228,6 +3302,16 @@ The plan should feel like ONE continuous adventure through connected neighborhoo
    - DINNER (6 PM – 10 PM): sit-down, elevated dining.
    - LATE-NIGHT (after 10 PM): casual — tacos, pizza, diners.
 
+7b. BEST-TIME MATCHING (CRITICAL): Each place has a "best" field signaling when it shines: morning, midday, afternoon, sunset, evening, night, or any. RESPECT IT.
+   - "best":"morning" → schedule before 11 AM (cafés, bakeries, parks, beaches when cool, farmers' markets)
+   - "best":"midday" → schedule 11 AM – 3 PM (museums, galleries, indoor cultural — beat the sun)
+   - "best":"afternoon" → schedule 2 PM – 5 PM (markets, shopping, neighborhood walks, casual lunch)
+   - "best":"sunset" → schedule 5:30 PM – 7 PM (rooftops, sky bars, viewpoints — the golden hour magic happens here, never schedule them at noon)
+   - "best":"evening" → schedule 6 PM – 10 PM (bars, lounges, dinner, live music)
+   - "best":"night" → schedule 10 PM onward (clubs, late-night)
+   - "best":"any" → flexible
+   A rooftop bar at 11 AM is a FAILURE. A nightclub at 3 PM is a FAILURE. A café at 8 PM is a FAILURE. Match each pick to its window. Within the chosen duration, arrange stops in chronological order so each lands in its sweet spot.
+
 8. REALISTIC TIMING: Each timeSlot = specific time (e.g., "7:30 PM") accounting for:
    - Coffee/cafe: 30-45 min | Quick bite: 45 min | Sit-down dinner: 1.5h | Bar: 1-1.5h
    - Museum/gallery: 2-3h | Park/market: 1.5-2h | Beach: 1.5-2.5h
@@ -3306,6 +3390,7 @@ Return ONLY this JSON:
         knownFor: s.knownFor || '',
         estimatedSpend: s.spend || 0,
         neighborhood: s.neighborhood || '',
+        bestTime: getBestTime(topPlaces[s.idx]),
       }));
 
     // Backfill if dedup removed stops — pick unused places to reach the target count
@@ -3325,9 +3410,21 @@ Return ONLY this JSON:
           knownFor: '',
           estimatedSpend: 0,
           neighborhood: '',
+          bestTime: getBestTime(topPlaces[i]),
         });
       }
     }
+
+    // Reorder stops chronologically by their AI-assigned timeSlot. If a slot
+    // is missing or unparseable, fall back to the place's bestTime ideal hour
+    // so even backfilled bonus stops land in a sensible position.
+    planStops.sort((a, b) => {
+      const ah = parseTimeSlot(a.timeSlot);
+      const bh = parseTimeSlot(b.timeSlot);
+      const aHour = ah >= 0 ? ah : BEST_TIME_HOUR[a.bestTime];
+      const bHour = bh >= 0 ? bh : BEST_TIME_HOUR[b.bestTime];
+      return aHour - bHour;
+    });
 
     return res.status(200).json({
       plan: planStops,

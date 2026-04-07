@@ -11,6 +11,7 @@ export interface AutoPlanStop {
   knownFor?: string;
   estimatedSpend: number;
   neighborhood?: string;
+  bestTime?: 'morning' | 'midday' | 'afternoon' | 'sunset' | 'evening' | 'night' | 'any';
 }
 
 export interface AutoPlanResult {

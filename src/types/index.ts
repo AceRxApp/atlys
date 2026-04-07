@@ -41,6 +41,7 @@ export interface Stop {
   knownFor?: string;
   estimatedSpend?: number;
   neighborhood?: string;
+  bestTime?: 'morning' | 'midday' | 'afternoon' | 'sunset' | 'evening' | 'night' | 'any';
 }
 
 export type PlanDuration = 'full' | 'morning' | 'afternoon' | 'evening';

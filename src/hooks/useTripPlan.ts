@@ -732,6 +732,7 @@ export function useTripPlan(deps: {
         knownFor: s.knownFor || '',
         estimatedSpend: s.estimatedSpend,
         neighborhood: s.neighborhood || '',
+        bestTime: s.bestTime,
       }));
 
       // Populate the currently active day (preserve other days)
