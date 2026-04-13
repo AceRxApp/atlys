@@ -12,6 +12,7 @@ import { FlightCard, FlightCardSkeleton } from '../components/FlightCard';
 import CommunityRoutesSection from '../components/CommunityRoutesSection';
 import SocialProof from '../components/SocialProof';
 import PlanLoadingAnimation from '../components/PlanLoadingAnimation';
+import { API_URL } from '../utils/api';
 
 // ── Vibe Cards ──
 interface VibeOption {
@@ -147,15 +148,19 @@ interface CitySearchProps {
   selectedCity: City | null;
   loading: boolean;
   onSelect: (city: City | null) => void;
+  onUseGps: () => void;
 }
 
-function CitySearch({ cities, selectedCity, loading, onSelect }: CitySearchProps) {
+function CitySearch({ cities, selectedCity, loading, onSelect, onUseGps }: CitySearchProps) {
   const [query, setQuery] = useState(selectedCity ? `${selectedCity.name}, ${selectedCity.country}` : '');
   const [open, setOpen] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(-1);
+  const [remoteCities, setRemoteCities] = useState<City[]>([]);
+  const [remoteLoading, setRemoteLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const autocompleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sync display text when selectedCity changes externally
   useEffect(() => {
@@ -175,16 +180,69 @@ function CitySearch({ cities, selectedCity, loading, onSelect }: CitySearchProps
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Filter cities
+  // Filter cities from seeded list
   const normalizedQuery = query.toLowerCase().trim();
   const isExactMatch = selectedCity && query === `${selectedCity.name}, ${selectedCity.country}`;
-  const filtered = (normalizedQuery.length === 0 || isExactMatch)
+  const localFiltered = (normalizedQuery.length === 0 || isExactMatch)
     ? cities
     : cities.filter(c =>
         c.name.toLowerCase().includes(normalizedQuery) ||
         c.country.toLowerCase().includes(normalizedQuery) ||
         `${c.name}, ${c.country}`.toLowerCase().includes(normalizedQuery)
       );
+
+  // Google Places autocomplete fallback — fires when local results are empty
+  useEffect(() => {
+    if (autocompleteTimer.current) clearTimeout(autocompleteTimer.current);
+    setRemoteCities([]);
+
+    // Only search remotely if we have a query with no local matches
+    if (normalizedQuery.length < 2 || isExactMatch || localFiltered.length > 0) {
+      setRemoteLoading(false);
+      return;
+    }
+
+    setRemoteLoading(true);
+    autocompleteTimer.current = setTimeout(async () => {
+      try {
+        const resp = await fetch(`${API_URL}/api/places?action=autocomplete&input=${encodeURIComponent(normalizedQuery)}`);
+        if (!resp.ok) { setRemoteLoading(false); return; }
+        const data = await resp.json();
+        const suggestions: City[] = (data.suggestions || [])
+          .filter((s: Record<string, unknown>) => s.placePrediction)
+          .slice(0, 6)
+          .map((s: Record<string, unknown>) => {
+            const pred = s.placePrediction as Record<string, unknown>;
+            const structured = pred.structuredFormat as { mainText?: { text?: string }; secondaryText?: { text?: string } } | undefined;
+            const cityName = structured?.mainText?.text || (pred.text as { text?: string })?.text || '';
+            const secondary = structured?.secondaryText?.text || '';
+            // Extract country from secondary text (e.g. "Ghana" from "Accra, Ghana")
+            const parts = secondary.split(',').map((p: string) => p.trim());
+            const country = parts[parts.length - 1] || '';
+            return {
+              id: (pred.placeId as string) || cityName.toLowerCase().replace(/\s+/g, '-'),
+              name: cityName,
+              slug: cityName.toLowerCase().replace(/\s+/g, '-'),
+              country,
+              region: 'Search Results',
+              banner_url: '',
+              timezone: '',
+              is_active: true,
+              // lat/lng intentionally omitted — selectCity will geocode via placeId
+            } as City;
+          });
+        setRemoteCities(suggestions);
+      } catch { /* silently fail */ }
+      setRemoteLoading(false);
+    }, 300); // 300ms debounce
+
+    return () => { if (autocompleteTimer.current) clearTimeout(autocompleteTimer.current); };
+  }, [normalizedQuery, isExactMatch, localFiltered.length]);
+
+  // Merge: seeded cities first, then remote results (deduplicated)
+  const seededNames = new Set(localFiltered.map(c => c.name.toLowerCase()));
+  const dedupedRemote = remoteCities.filter(c => !seededNames.has(c.name.toLowerCase()));
+  const filtered = localFiltered.length > 0 ? localFiltered : dedupedRemote;
 
   // Group by region — merge "United States" into "North America"
   const grouped = filtered.reduce<Record<string, typeof filtered>>((acc, city) => {
@@ -196,12 +254,29 @@ function CitySearch({ cities, selectedCity, loading, onSelect }: CitySearchProps
   const regionOrder = Object.keys(grouped).sort();
   const flatList = regionOrder.flatMap(r => grouped[r]);
 
-  const selectCity = useCallback((city: typeof cities[number]) => {
-    onSelect(city);
+  const selectCity = useCallback(async (city: City) => {
     setQuery(`${city.name}, ${city.country}`);
     setOpen(false);
     setHighlightIndex(-1);
     inputRef.current?.blur();
+
+    // Remote city (no lat/lng) — geocode via Places details to get coordinates
+    if (!city.lat || !city.lng) {
+      try {
+        const detailResp = await fetch(
+          `${API_URL}/api/places?action=details&placeId=${encodeURIComponent(city.id)}`
+        );
+        if (detailResp.ok) {
+          const detail = await detailResp.json();
+          const loc = detail.location;
+          if (loc) {
+            city = { ...city, lat: loc.latitude, lng: loc.longitude };
+          }
+        }
+      } catch { /* proceed — plan-day can still work with city name */ }
+    }
+
+    onSelect(city);
   }, [onSelect]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -283,8 +358,30 @@ function CitySearch({ cities, selectedCity, loading, onSelect }: CitySearchProps
           className="absolute left-0 right-0 top-full mt-1 max-h-[280px] overflow-y-auto rounded-xl border border-border-strong bg-bg-surface z-50 shadow-[0_8px_32px_rgba(0,0,0,0.2)]"
         >
           {flatList.length === 0 ? (
-            <div className="p-4 text-center text-text-tertiary text-[13px]">
-              No cities found for &ldquo;{query}&rdquo;
+            <div className="p-4 text-center">
+              {remoteLoading ? (
+                <p className="text-text-tertiary text-[13px]">Searching cities...</p>
+              ) : (
+                <>
+                  <p className="text-text-tertiary text-[13px] mb-2">
+                    No cities found for &ldquo;{query}&rdquo;
+                  </p>
+                  <button
+                    onClick={() => {
+                      onUseGps();
+                      setQuery('');
+                      setOpen(false);
+                    }}
+                    className="inline-flex items-center gap-1.5 text-[13px] text-accent-amber font-semibold bg-amber-tint-bg10 border border-amber-tint-border20 rounded-full px-4 py-2 cursor-pointer"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                      <circle cx="12" cy="10" r="3" />
+                    </svg>
+                    Use my current location instead
+                  </button>
+                </>
+              )}
             </div>
           ) : (
             regionOrder.map(region => (
@@ -609,6 +706,7 @@ export default function HomeScreen() {
             selectedCity={selectedCity}
             loading={loading}
             onSelect={(city) => { setSelectedCity(city); setUseGps(false); }}
+            onUseGps={() => { setUseGps(true); setSelectedCity(null); }}
           />
         </div>
 

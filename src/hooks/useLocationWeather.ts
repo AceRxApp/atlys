@@ -87,18 +87,22 @@ export function useLocationWeather(loc: LocState) {
 
       // Restore last city/GPS from localStorage
       const savedGps = localStorage.getItem('nxstops_use_gps');
+      const savedCity = localStorage.getItem('nxstops_selected_city');
       if (savedGps === 'true') {
         setUseGpsRaw(true);
-      } else {
+      } else if (savedCity) {
         try {
-          const saved = localStorage.getItem('nxstops_selected_city');
-          if (saved) {
-            const parsed = JSON.parse(saved) as City;
-            // Match against freshly loaded cities to ensure it's still valid
-            const match = data.find(c => c.slug === parsed.slug) || parsed;
-            setSelectedCityRaw(match);
-          }
+          const parsed = JSON.parse(savedCity) as City;
+          // Match against freshly loaded cities to ensure it's still valid
+          const match = data.find(c => c.slug === parsed.slug) || parsed;
+          setSelectedCityRaw(match);
         } catch { /* ignore corrupt data */ }
+      } else {
+        // First visit — auto-detect location so users aren't staring at an empty search bar
+        setUseGpsRaw(true);
+        localStorage.setItem('nxstops_use_gps', 'true');
+        // Trigger location request if available
+        if (loc.requestLocation) loc.requestLocation();
       }
 
       setLoading(false);
