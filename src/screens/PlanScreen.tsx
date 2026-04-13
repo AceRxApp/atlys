@@ -33,14 +33,11 @@ import {
 } from '@dnd-kit/sortable';
 import SortableStopCard from '../components/SortableStopCard';
 import AddFromLinkModal from '../components/AddFromLinkModal';
-import WrapUpModal from '../components/WrapUpModal';
 import QuickReviewPrompt from '../components/QuickReviewPrompt';
 import NearbyDiscoveries from '../components/NearbyDiscoveries';
 import LogisticsPanel from '../components/LogisticsPanel';
 import ItineraryAlertBanner from '../components/ItineraryAlertBanner';
-import ExploreModeBanner from '../components/ExploreModeBanner';
 import ChatBot from '../components/ChatBot';
-import CheckInCelebration from '../components/CheckInCelebration';
 import GoldenHourCard from '../components/GoldenHourCard';
 // LocalRhythm removed — collection view uses compact cards
 import VibePicker from '../components/VibePicker';
@@ -207,8 +204,6 @@ export default function PlanScreen() {
     tripStartDate,
     setTripStartDate,
     selectedCity,
-    startWrapUp,
-    wrapUpOpen,
     isLiveDay,
     liveDayNumber,
     checkIn,
@@ -221,17 +216,6 @@ export default function PlanScreen() {
     // New features
     itineraryAlerts,
     dismissAlert,
-    exploreActive,
-    currentStopIndex,
-    startExplore,
-    stopExplore,
-    currentExploreStop,
-    nextExploreStop,
-    nextStopDistance,
-    nextStopWalkMin,
-    nextStopDriveMin,
-    shouldLeaveNow,
-    leaveByMessage,
     addToPlan,
     checkIns,
     currentStreak,
@@ -316,21 +300,9 @@ export default function PlanScreen() {
   // Logistics panel
   const [showLogistics, setShowLogistics] = useState(false);
 
-  // Check-in celebration
-  const [celebrationMsg, setCelebrationMsg] = useState<string | null>(null);
-  const [celebrationStreak, setCelebrationStreak] = useState(0);
-  const handleCheckInWithCelebration = useCallback((stopId: string) => {
+  const handleCheckIn = useCallback((stopId: string) => {
     checkIn(stopId);
-    const newCount = checkedInCount + 1;
-    if (newCount >= totalStopsToday) {
-      setCelebrationMsg('All stops visited! Amazing day!');
-    } else if (newCount >= 3) {
-      setCelebrationMsg(`${newCount} stops down! Keep going!`);
-    } else {
-      setCelebrationMsg('Checked in!');
-    }
-    setCelebrationStreak(currentStreak + 1);
-  }, [checkIn, checkedInCount, totalStopsToday, currentStreak]);
+  }, [checkIn]);
 
   // Travel advisory state
   const [advisory, setAdvisory] = useState<TravelAdvisory | null>(null);
@@ -620,83 +592,6 @@ export default function PlanScreen() {
       {/* Logistics Panel moved to fixed footer — see portal below */}
 
       {/* Post-trip summary card — only show if user actually checked in to stops */}
-      {tripPhase === 'posttrip' && Object.keys(checkIns).length > 0 && (
-        <div className="mb-4 p-5 rounded-2xl border border-green-tint-border animate-enter-up"
-          style={{ background: 'linear-gradient(135deg, var(--green-tint-bg), var(--bg-subtle))' }}>
-          <div className="text-center mb-3">
-            <div className="text-3xl mb-2">{'\u2705'}</div>
-            <h2 className="font-heading text-lg font-bold text-text-primary">Trip Complete!</h2>
-            <p className="text-sm text-text-secondary mt-1">
-              {totalStops} stop{totalStops !== 1 ? 's' : ''} across {dayCount} day{dayCount !== 1 ? 's' : ''} in {cityLabel}
-            </p>
-          </div>
-          {/* Stats row */}
-          <div className="flex justify-around py-3 mb-3 rounded-xl bg-bg-subtle/50">
-            <div className="text-center">
-              <div className="text-lg font-bold text-text-primary">{Object.keys(checkIns).length}</div>
-              <div className="text-[11px] text-text-tertiary">Visited</div>
-            </div>
-            <div className="w-px bg-border-subtle" />
-            <div className="text-center">
-              <div className="text-lg font-bold text-text-primary">
-                {Object.values(checkIns).filter(c => c.photos && c.photos.length > 0).length}
-              </div>
-              <div className="text-[11px] text-text-tertiary">Photos</div>
-            </div>
-            <div className="w-px bg-border-subtle" />
-            <div className="text-center">
-              <div className="text-lg font-bold text-text-primary">
-                {Object.values(checkIns).filter(c => c.rating && c.rating > 0).length}
-              </div>
-              <div className="text-[11px] text-text-tertiary">Reviews</div>
-            </div>
-          </div>
-          {/* Actions */}
-          <div className="flex flex-col gap-2">
-            <button
-              onClick={() => { if (!requireAuth()) return; shareAsLink(); }}
-              className="w-full py-3 rounded-xl bg-accent-gradient text-text-on-accent border-none text-sm font-semibold cursor-pointer active:scale-[0.97] transition-transform"
-            >
-              {'\u{1F4E4}'} Share Your Trip
-            </button>
-            <button
-              onClick={startWrapUp}
-              className="w-full py-3 rounded-xl bg-bg-subtle-strong text-text-primary border border-border-medium text-sm font-semibold cursor-pointer active:scale-[0.97] transition-transform"
-            >
-              {'\u{2728}'} Start a New Trip
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Explore Mode — Start Trip button or active banner */}
-      {isLiveDay && !exploreActive && dayPlan.length > 0 && (
-        <button
-          onClick={startExplore}
-          className="w-full mb-3 py-3.5 rounded-xl border-none text-sm font-bold cursor-pointer active:scale-[0.97] transition-transform"
-          style={{ background: 'linear-gradient(135deg, #22C55E, #16A34A)', color: '#fff' }}
-        >
-          {'\u{1F680}'} Start Trip
-        </button>
-      )}
-
-      {exploreActive && currentExploreStop && (
-        <ExploreModeBanner
-          currentStop={currentExploreStop}
-          nextStop={nextExploreStop}
-          currentStopIndex={currentStopIndex}
-          totalStops={dayPlan.length}
-          nextStopDistance={nextStopDistance}
-          nextStopWalkMin={nextStopWalkMin}
-          nextStopDriveMin={nextStopDriveMin}
-          shouldLeaveNow={shouldLeaveNow}
-          leaveByMessage={leaveByMessage}
-          tripComplete={false}
-          onCheckIn={(stopId) => handleCheckInWithCelebration(stopId)}
-          onEndTrip={stopExplore}
-        />
-      )}
-
       {/* Day Tabs */}
       <div className="flex gap-2 overflow-x-auto pb-3 mb-3 scroll-hidden">
         {sortedDays.map(day => {
@@ -1006,7 +901,7 @@ export default function PlanScreen() {
                       {/* Actions */}
                       <div className="flex gap-1 mt-1.5 flex-wrap">
                         {isLiveDay && !isCheckedIn(stop.id) && (
-                          <button onClick={() => handleCheckInWithCelebration(stop.id)}
+                          <button onClick={() => handleCheckIn(stop.id)}
                             className="py-[3px] px-1.5 rounded text-[10px] bg-green-tint-bg text-status-green border border-green-tint-border cursor-pointer font-semibold active:scale-[0.93] transition-transform">
                             {'\u{1F4CD}'} Check In
                           </button>
@@ -1343,7 +1238,7 @@ export default function PlanScreen() {
           {showClearConfirm ? (
             <span className="flex items-center gap-2">
               <span className="text-[13px] text-status-red font-medium">Clear all stops?</span>
-              <button onClick={() => { startWrapUp(); setShowClearConfirm(false); }}
+              <button onClick={() => { clearPlan(); setShowClearConfirm(false); }}
                 className="bg-status-red text-white border-none text-[12px] font-semibold cursor-pointer py-1 px-2.5 rounded-lg">
                 Yes, clear
               </button>
@@ -1400,19 +1295,6 @@ export default function PlanScreen() {
         if (!stop) return null;
         return createPortal(<QuickReviewPrompt stop={stop} />, document.body);
       })()}
-
-      {/* Check-in celebration — portal */}
-      {celebrationMsg && createPortal(
-        <CheckInCelebration
-          message={celebrationMsg}
-          streak={celebrationStreak}
-          onDone={() => setCelebrationMsg(null)}
-        />,
-        document.body
-      )}
-
-      {/* Wrap-up modal — portal to escape .page-enter transform */}
-      {wrapUpOpen && createPortal(<WrapUpModal />, document.body)}
 
       {/* Logistics footer bar — pretrip & live only */}
       {(tripPhase === 'pretrip' || tripPhase === 'live') && totalStops > 0 && createPortal(

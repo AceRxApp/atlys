@@ -592,6 +592,7 @@ export default function HomeScreen() {
     originAirport,
     destinationAirport,
     googleFlightsUrl,
+    totalStops,
   } = useApp();
   const subscription = useSubscription(user);
 
@@ -601,6 +602,27 @@ export default function HomeScreen() {
   const [showPaywall, setShowPaywall] = useState(false);
 
   const hasLocation = useGps || !!selectedCity;
+  const autoPlannedRef = useRef(false);
+
+  // Auto-generate a "Greatest Hits" plan when location is first available and no plan exists
+  useEffect(() => {
+    if (!hasLocation || totalStops > 0 || autoPlanLoading || autoPlannedRef.current) return;
+    // Don't auto-plan if user has used free trial and isn't signed in
+    const trialUsed = localStorage.getItem('nxstops_free_trial_used') === '1';
+    if (!user && trialUsed) return;
+    // Wait a tick for coords to settle
+    const timer = setTimeout(async () => {
+      if (autoPlannedRef.current) return;
+      autoPlannedRef.current = true;
+      const success = await planMyDay('explore', 'full', 'starthare');
+      if (success) {
+        // Mark free trial as used for non-logged-in users
+        if (!user) localStorage.setItem('nxstops_free_trial_used', '1');
+        setScreen('plan');
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [hasLocation, totalStops, autoPlanLoading, planMyDay, setScreen, user]);
 
   // Rotate loading messages
   useEffect(() => {

@@ -125,14 +125,19 @@ export function useTripPlan(deps: {
     } catch { setTripDays({ 1: [] }); }
   }, [getPlanKey]);
 
-  // Save plan
+  // Save plan (debounced to avoid blocking UI on rapid stop adds)
+  const savePlanTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    const key = getPlanKey();
-    if (totalStops > 0) {
-      localStorage.setItem(key, JSON.stringify({ tripDays, tripStartDate, expires: Date.now() + 7 * 24 * 60 * 60 * 1000 }));
-    } else {
-      localStorage.removeItem(key);
-    }
+    if (savePlanTimer.current) clearTimeout(savePlanTimer.current);
+    savePlanTimer.current = setTimeout(() => {
+      const key = getPlanKey();
+      if (totalStops > 0) {
+        localStorage.setItem(key, JSON.stringify({ tripDays, tripStartDate, expires: Date.now() + 7 * 24 * 60 * 60 * 1000 }));
+      } else {
+        localStorage.removeItem(key);
+      }
+    }, 500);
+    return () => { if (savePlanTimer.current) clearTimeout(savePlanTimer.current); };
   }, [tripDays, totalStops, getPlanKey, tripStartDate]);
 
   // --------------------------------------------------------------------------
@@ -198,7 +203,7 @@ export function useTripPlan(deps: {
     } catch { return []; }
   });
 
-  // Plan title/vibe/headline (declared early for use in confirmClearPlan)
+  // Plan title/vibe/headline
   const [lastPlanTitle, setLastPlanTitle] = useState<string | null>(null);
   const [lastPlanVibe, setLastPlanVibe] = useState<string | null>(null);
   const [lastPlanHeadline, setLastPlanHeadline] = useState<string | null>(null);
@@ -214,79 +219,6 @@ export function useTripPlan(deps: {
       prevCityLabel.current = cityLabel;
     }
   }, [cityLabel]);
-
-  // Wrap-up flow state
-  const [wrapUpOpen, setWrapUpOpen] = useState(false);
-
-  const startWrapUp = useCallback(() => {
-    if (totalStops === 0) {
-      setTripDays({ 1: [] });
-      setActiveDay(1);
-      showToast('Plan cleared');
-      return;
-    }
-    hapticImpact('Medium');
-    setWrapUpOpen(true);
-  }, [totalStops, showToast]);
-
-  const dismissWrapUp = useCallback(() => {
-    setWrapUpOpen(false);
-  }, []);
-
-  const confirmClearPlan = useCallback((pendingRatings: Record<string, 'up' | 'down'>) => {
-    hapticNotification('Success');
-    const allStops = Object.values(tripDays).flat();
-
-    // Compute total spend
-    const totalSpend = allStops.reduce((sum, s) => {
-      if (s.estimatedSpend && s.estimatedSpend > 0) return sum + s.estimatedSpend;
-      if (s.type === 'event') return sum + 20;
-      const pl = s.place?.priceLevel ?? -1;
-      return sum + (PRICE_LEVEL_ESTIMATE[pl] ?? 15);
-    }, 0);
-
-    // Category breakdown
-    const categories: Record<string, number> = {};
-    allStops.forEach(s => {
-      const cat = s.type === 'event' ? 'event' : (s.place?.categoryDisplay || 'other');
-      categories[cat] = (categories[cat] || 0) + 1;
-    });
-
-    const entry: TripHistoryEntry = {
-      id: Date.now().toString(36),
-      city: cityLabel,
-      title: lastPlanTitle,
-      totalStops,
-      dayCount,
-      savedAt: new Date().toISOString(),
-      tripStartDate,
-      totalEstimatedSpend: totalSpend,
-      categoryBreakdown: categories,
-      ratings: pendingRatings,
-      stops: allStops.map(s => ({
-        name: s.place?.name || s.event?.name || 'Stop',
-        photoUrl: s.place?.photoUrl || null,
-        category: s.type === 'event' ? (s.event?.category || 'Event') : (s.place?.categoryDisplay || ''),
-        placeId: s.place?.placeId,
-        rating: pendingRatings[s.id],
-        estimatedSpend: s.estimatedSpend,
-      })),
-    };
-
-    const updated = [entry, ...tripHistory].slice(0, 10);
-    setTripHistory(updated);
-    localStorage.setItem('nxstops_trip_history', JSON.stringify(updated));
-
-    // Reset
-    setTripDays({ 1: [] });
-    setActiveDay(1);
-    setLastPlanTitle(null);
-    setLastPlanVibe(null);
-    setTripStartDate(null);
-    setWrapUpOpen(false);
-    showToast('Trip saved to history!');
-    track('trip_wrap_up', { city: cityLabel, stops: String(totalStops), rated: String(Object.keys(pendingRatings).length) });
-  }, [tripDays, dayCount, cityLabel, lastPlanTitle, totalStops, tripStartDate, tripHistory, showToast]);
 
   const clearPlan = () => {
     hapticNotification('Warning');
@@ -628,11 +560,17 @@ export function useTripPlan(deps: {
 
   const [autoPlanLoading, setAutoPlanLoading] = useState(false);
   const [autoPlanError, setAutoPlanError] = useState<string | null>(null);
+  const planAbortRef = useRef<AbortController | null>(null);
   const planMyDay = useCallback(async (mood: string, duration: PlanDuration, vibe?: string, subVibe?: string): Promise<boolean> => {
     if (!lat || !lng) {
       showToast('Location needed — pick a city or enable GPS');
       return false;
     }
+
+    // Cancel any in-flight plan request
+    planAbortRef.current?.abort();
+    planAbortRef.current = new AbortController();
+    const signal = planAbortRef.current.signal;
 
     setAutoPlanLoading(true);
     setAutoPlanError(null);
@@ -719,7 +657,7 @@ export function useTripPlan(deps: {
         advisory: advisoryStr,
         jetLagContext: jetLagStr,
         localTime: localTimeStr,
-      });
+      }, signal);
 
       // Convert plan stops to Stop objects
       const stops: Stop[] = result.plan.map(s => ({
@@ -792,6 +730,8 @@ export function useTripPlan(deps: {
       });
       return true;
     } catch (err) {
+      // Silently ignore aborted requests (user navigated away or started new plan)
+      if (err instanceof DOMException && err.name === 'AbortError') return false;
       const msg = err instanceof Error ? err.message : 'Failed to generate plan';
       setAutoPlanError(msg);
       hapticNotification('Error');
@@ -813,6 +753,5 @@ export function useTripPlan(deps: {
     curatedPicks, curatedLoading, curatedVibe, curatedError, loadCuratedPicks, clearCuratedPicks,
     tripStartDate, setTripStartDate,
     tripHistory, clearTripHistory, deleteTripHistoryEntry,
-    wrapUpOpen, startWrapUp, dismissWrapUp, confirmClearPlan,
   };
 }

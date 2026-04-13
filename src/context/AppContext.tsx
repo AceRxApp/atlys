@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { City, EventItem, Stop, AdminSignup, Vibe, QuickFilter, TravelGroup, CommunityTag, PlanDuration, TripHistoryEntry, StopCheckIn, Achievement, ItineraryAlert, Reservation } from '../types';
+import type { City, EventItem, Stop, AdminSignup, Vibe, QuickFilter, TravelGroup, CommunityTag, PlanDuration, TripHistoryEntry, StopCheckIn, ItineraryAlert, Reservation } from '../types';
 import type { Place } from '../services/places';
 import type { CuratedPicksResult } from '../services/autoPlan';
 import type { Review } from '../supabase';
@@ -306,12 +306,6 @@ export interface AppContextType {
   destinationAirport: string | null;
   googleFlightsUrl: string | null;
 
-  // --- Wrap Up ---
-  wrapUpOpen: boolean;
-  startWrapUp: () => void;
-  dismissWrapUp: () => void;
-  confirmClearPlan: (ratings: Record<string, 'up' | 'down'>) => void;
-
   // --- Live Day ---
   isLiveDay: boolean;
   liveDayNumber: number | null;
@@ -341,29 +335,9 @@ export interface AppContextType {
   setTransitPass: (transitPass: { type: string; reference: string } | null) => void;
   clearLogistics: () => void;
 
-  // --- City Progress & Achievements ---
-  categoryProgress: Record<string, number>;
-  achievements: Achievement[];
-  totalCitiesExplored: number;
-  totalPlacesVisited: number;
-
   // --- Itinerary Alerts ---
   itineraryAlerts: ItineraryAlert[];
   dismissAlert: (id: string) => void;
-
-  // --- Explore Mode ---
-  exploreActive: boolean;
-  currentStopIndex: number;
-  currentExploreStop: Stop | null;
-  nextExploreStop: Stop | null;
-  nextStopDistance: string | null;
-  nextStopWalkMin: number | null;
-  nextStopDriveMin: number | null;
-  shouldLeaveNow: boolean;
-  leaveByMessage: string | null;
-  tripComplete: boolean;
-  startExplore: () => void;
-  stopExplore: () => void;
 
   // --- City slug setter ---
   setCitySlug: (slug: string) => void;

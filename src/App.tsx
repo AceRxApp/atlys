@@ -31,9 +31,7 @@ import { useStopRatings } from './hooks/useStopRatings';
 import { useOfflineSave } from './hooks/useOfflineSave';
 import { useLiveDay } from './hooks/useLiveDay';
 import { useTripLogistics } from './hooks/useTripLogistics';
-import { useCityProgress } from './hooks/useCityProgress';
 import { useItineraryAlerts } from './hooks/useItineraryAlerts';
-import { useExploreMode } from './hooks/useExploreMode';
 import { useFlights } from './hooks/useFlights';
 
 type Screen = 'home' | 'discover' | 'events' | 'currency' | 'plan' | 'tastelens';
@@ -161,10 +159,6 @@ const CityScreen = lazy(() => import('./screens/CityScreen'));
 const ChatBot = lazy(() => import('./components/ChatBot'));
 const SharedPlanScreen = lazy(() => import('./screens/SharedPlanScreen'));
 const DishLensScreen = lazy(() => import('./screens/DishLensScreen'));
-const BrandsScreen = lazy(() => import('./screens/BrandsScreen'));
-const BrandTripScreen = lazy(() => import('./screens/BrandTripScreen'));
-const WorldCupScreen = lazy(() => import('./screens/WorldCupScreen'));
-const WorldCupTripScreen = lazy(() => import('./screens/WorldCupTripScreen'));
 const DeveloperPortal = lazy(() => import('./screens/DeveloperPortal'));
 
 // ============================================================================
@@ -232,7 +226,7 @@ export default function App() {
     return (['home', 'discover', 'events', 'currency', 'plan', 'tastelens'].includes(path) ? path : 'home') as Screen;
   })();
 
-  const isInfoPage = ['/about', '/privacy', '/terms', '/contact', '/brands', '/worldcup', '/developers'].includes(routerLocation.pathname) || routerLocation.pathname.startsWith('/cities/') || routerLocation.pathname.startsWith('/brands/') || routerLocation.pathname.startsWith('/worldcup/');
+  const isInfoPage = ['/about', '/privacy', '/terms', '/contact', '/developers'].includes(routerLocation.pathname) || routerLocation.pathname.startsWith('/cities/');
 
   const setScreen = useCallback((s: string) => {
     navigate(s === 'home' ? '/' : `/${s}`);
@@ -446,18 +440,8 @@ export default function App() {
   // --- Trip Logistics ---
   const logistics = useTripLogistics(location.citySlug);
 
-  // --- City Progress & Achievements ---
-  const cityProgress = useCityProgress(trip.tripHistory, liveDay.checkIns);
-
   // --- Itinerary Alerts ---
   const itineraryAlerts = useItineraryAlerts({
-    dayPlan: trip.tripDays[trip.activeDay] || [],
-    isLiveDay: liveDay.isLiveDay,
-    checkIns: liveDay.checkIns,
-  });
-
-  // --- Explore Mode ---
-  const exploreMode = useExploreMode({
     dayPlan: trip.tripDays[trip.activeDay] || [],
     isLiveDay: liveDay.isLiveDay,
     checkIns: liveDay.checkIns,
@@ -683,24 +667,9 @@ export default function App() {
     googleFlightsUrl: flightsData.googleFlightsUrl,
     // Logistics
     ...logistics,
-    // City Progress & Achievements
-    ...cityProgress,
     // Itinerary Alerts
     itineraryAlerts: itineraryAlerts.alerts,
     dismissAlert: itineraryAlerts.dismissAlert,
-    // Explore Mode
-    exploreActive: exploreMode.exploreActive,
-    currentStopIndex: exploreMode.currentStopIndex,
-    currentExploreStop: exploreMode.currentStop,
-    nextExploreStop: exploreMode.nextStop,
-    nextStopDistance: exploreMode.nextStopDistance,
-    nextStopWalkMin: exploreMode.nextStopWalkMin,
-    nextStopDriveMin: exploreMode.nextStopDriveMin,
-    shouldLeaveNow: exploreMode.shouldLeaveNow,
-    leaveByMessage: exploreMode.leaveByMessage,
-    tripComplete: exploreMode.tripComplete,
-    startExplore: exploreMode.startExplore,
-    stopExplore: exploreMode.stopExplore,
     // City slug setter
     setCitySlug: (slug: string) => {
       const city = location.cities.find(c => c.slug === slug);
@@ -708,7 +677,7 @@ export default function App() {
     },
   }), [
     screen, setScreen, location, auth, places, events, trip, liveDay, stopRatings, offlineSave,
-    logistics, cityProgress, itineraryAlerts, exploreMode,
+    logistics, itineraryAlerts,
     selectedPlace, activePhotoIndex,
     showSafety, showProfile, showAdmin, showCulture, avatarUrl,
     showToast, getGreeting, getTimeSuggestion, getDistanceReference, currentTime, requireAuth,
@@ -938,10 +907,6 @@ export default function App() {
                 <Route path="/privacy" element={<PrivacyScreen />} />
                 <Route path="/terms" element={<TermsScreen />} />
                 <Route path="/contact" element={<ContactScreen />} />
-                <Route path="/brands" element={<BrandsScreen />} />
-                <Route path="/brands/:slug" element={<BrandTripScreen />} />
-                <Route path="/worldcup" element={<WorldCupScreen />} />
-                <Route path="/worldcup/:slug" element={<WorldCupTripScreen />} />
                 <Route path="/cities/:slug" element={<CityScreen />} />
                 <Route path="/place/:placeId" element={<PlaceDeepLink />} />
                 <Route path="/trip/:slug" element={<SharedPlanScreen />} />

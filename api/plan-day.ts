@@ -3,6 +3,13 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { setCorsHeaders, checkRateLimit, getClientIp, validateApiKey } from './_lib/cors.js';
+
+// Fetch with 5-second timeout to prevent hanging on slow external APIs
+function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 5000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
 import { CURATED_SEEDS } from './_lib/curated-seeds.js';
 
 const OPENAI_API_KEY = (process.env.OPENAI_API_KEY || '').trim();
@@ -1597,7 +1604,7 @@ async function fetchNearbyPlaces(
     },
   };
 
-  const response = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
+  const response = await fetchWithTimeout('https://places.googleapis.com/v1/places:searchNearby', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -1639,7 +1646,7 @@ async function textSearchPlaces(
       },
     },
   };
-  const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
+  const response = await fetchWithTimeout('https://places.googleapis.com/v1/places:searchText', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -1840,7 +1847,7 @@ function parseTimeSlot(slot: string): number {
 async function callOpenAI(messages: { role: string; content: string }[]): Promise<string | null> {
   if (!OPENAI_API_KEY) return null;
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1853,7 +1860,7 @@ async function callOpenAI(messages: { role: string; content: string }[]): Promis
         max_tokens: 1200,
         response_format: { type: 'json_object' },
       }),
-    });
+    }, 8000);
     if (!response.ok) {
       console.error('[NxStops Plan] OpenAI error:', response.status);
       return null;
@@ -1873,7 +1880,7 @@ async function callOpenAI(messages: { role: string; content: string }[]): Promis
 async function callGemini(systemPrompt: string, userPrompt: string): Promise<string | null> {
   if (!GEMINI_API_KEY) return null;
   try {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
@@ -1887,6 +1894,7 @@ async function callGemini(systemPrompt: string, userPrompt: string): Promise<str
           },
         }),
       },
+      8000,
     );
     if (!response.ok) {
       console.error('[NxStops Plan] Gemini error:', response.status);
@@ -1991,7 +1999,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       fetchLabels.push('activity');
     }
 
-    const rawResults = await Promise.all(fetches);
+    const settled = await Promise.allSettled(fetches);
+    const rawResults = settled.map(r => r.status === 'fulfilled' ? r.value : []);
     let allRaw = rawResults.flat();
     console.log(`[NxStops Plan] Initial nearby: ${rawResults.map((r, i) => `${fetchLabels[i]}=${r.length}`).join(', ')} total=${allRaw.length}`);
 
@@ -2005,7 +2014,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (config.activityTypes.length > 0) {
         expandedFetches.push(fetchNearbyPlaces(lat, lng, config.activityTypes, 25000));
       }
-      const expandedResults = await Promise.all(expandedFetches);
+      const expandedSettled = await Promise.allSettled(expandedFetches);
+      const expandedResults = expandedSettled.map(r => r.status === 'fulfilled' ? r.value : []);
       allRaw = [...allRaw, ...expandedResults.flat()];
     }
 
@@ -2199,7 +2209,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const regularSearches = shuffledSearches.map(q => textSearchPlaces(q, lat, lng, textRadius).catch(() => []));
       const curatedSearches = seedSearches.map(q => textSearchPlaces(q, lat, lng, seedRadius).catch(() => []));
       const allSearches = [...regularSearches, ...curatedSearches];
-      const textResults = await Promise.all(allSearches);
+      const textSettled = await Promise.allSettled(allSearches);
+      const textResults = textSettled.map(r => r.status === 'fulfilled' ? r.value : []);
       for (let i = regularSearches.length; i < textResults.length; i++) {
         for (const p of textResults[i]) {
           const id = p.id as string;

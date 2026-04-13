@@ -11,9 +11,6 @@ import { CITY_COORDS } from '../data/cityCoords';
 
 const TravelMap = lazy(() => import('../components/TravelMap'));
 import TripMomentsModal from '../components/TripMomentsModal';
-import TastePassport from '../components/TastePassport';
-import PassportStamps from '../components/PassportStamps';
-import TripWrapped from '../components/TripWrapped';
 
 export default function ProfileScreen() {
   const {
@@ -36,9 +33,6 @@ export default function ProfileScreen() {
     acceptedTerms, setAcceptedTerms,
     handleSignIn, handleSignUp, handleSignOut, handleResetPassword, handleResendVerification,
     avatarUrl, setAvatarUrl,
-    // City Progress & Achievements
-    categoryProgress, achievements, totalCitiesExplored, totalPlacesVisited,
-    // Taste Passport & Stamps
     dishHistory, checkIns,
   } = useApp();
   const { theme, themePreference, setThemePreference } = useTheme();
@@ -64,7 +58,6 @@ export default function ProfileScreen() {
   const [billingError, setBillingError] = useState<string | null>(null);
   const [billingPlan, setBillingPlan] = useState<'monthly' | 'yearly'>('monthly');
   const [viewingTrip, setViewingTrip] = useState<typeof tripHistory[number] | null>(null);
-  const [wrappedTrip, setWrappedTrip] = useState<typeof tripHistory[number] | null>(null);
   const [profileTab, setProfileTab] = useState<'account' | 'trips' | 'settings'>('account');
 
   const handleAvatarChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -641,57 +634,6 @@ export default function ProfileScreen() {
           {/* ================================================================ */}
 
           {/* Explorer Stats */}
-          {profileTab === 'trips' && totalPlacesVisited > 0 && (
-            <div className="mb-6">
-              <div className="section-label">Your Journey</div>
-              <div className="card p-4 border border-border-subtle">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="text-center flex-1">
-                    <div className="text-2xl font-bold text-accent-amber">{totalPlacesVisited}</div>
-                    <div className="text-[11px] text-text-tertiary">Places</div>
-                  </div>
-                  <div className="w-px h-8 bg-border-subtle" />
-                  <div className="text-center flex-1">
-                    <div className="text-2xl font-bold text-text-primary">{totalCitiesExplored}</div>
-                    <div className="text-[11px] text-text-tertiary">Cities</div>
-                  </div>
-                </div>
-                {/* Category progress bars */}
-                {Object.entries(categoryProgress).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([cat, count]) => (
-                  <div key={cat} className="flex items-center gap-2.5 mb-2">
-                    <span className="text-xs text-text-secondary w-20 capitalize truncate">{cat}</span>
-                    <div className="flex-1 h-2 rounded-full bg-bg-subtle-strong overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-accent-amber transition-all duration-500"
-                        style={{ width: `${Math.min(100, (count / 10) * 100)}%` }}
-                      />
-                    </div>
-                    <span className="text-[11px] text-text-tertiary w-6 text-right">{count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Taste Passport */}
-          {user && profileTab === 'trips' && (
-            <div className="mb-6">
-              <div className="section-label">Taste Passport</div>
-              <TastePassport dishes={dishHistory} />
-            </div>
-          )}
-
-          {/* Passport Stamps */}
-          {user && profileTab === 'trips' && (
-            <div className="mb-6">
-              <PassportStamps
-                tripHistory={tripHistory}
-                checkIns={checkIns}
-                totalDishes={dishHistory.length}
-              />
-            </div>
-          )}
-
           {/* Travel Map */}
           {profileTab === 'trips' && tripHistory.length > 0 && (() => {
             const visitedCities = [...new Set(tripHistory.map(t => t.city.toLowerCase()))]
@@ -1159,13 +1101,6 @@ export default function ProfileScreen() {
                           Timeline
                         </button>
                         <button
-                          onClick={() => setWrappedTrip(trip)}
-                          className="flex-1 py-2 rounded-xl border text-xs font-semibold cursor-pointer"
-                          style={{ background: 'linear-gradient(135deg, rgba(232,148,10,0.12), rgba(216,90,24,0.12))', borderColor: 'rgba(232,148,10,0.25)', color: 'var(--accent-amber)' }}
-                        >
-                          Trip Wrapped
-                        </button>
-                        <button
                           onClick={() => deleteTripHistoryEntry(trip.id)}
                           className="py-2 px-3 rounded-xl bg-red-tint-bg border border-red-tint-border text-status-red text-xs font-semibold cursor-pointer"
                         >
@@ -1246,13 +1181,6 @@ export default function ProfileScreen() {
         />
       )}
 
-      {/* Trip Wrapped Modal */}
-      {wrappedTrip && (
-        <TripWrapped
-          trip={wrappedTrip}
-          onClose={() => setWrappedTrip(null)}
-        />
-      )}
     </div>
   );
 }

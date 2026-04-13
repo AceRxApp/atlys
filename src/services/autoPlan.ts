@@ -95,11 +95,12 @@ export async function fetchCuratedPicks(
 
 // ─── AI Itinerary (Original mode) ────────────────────────────────────────
 
-export async function generateDayPlan(request: AutoPlanRequest): Promise<AutoPlanResult> {
+export async function generateDayPlan(request: AutoPlanRequest, signal?: AbortSignal): Promise<AutoPlanResult> {
   const response = await fetchRetry(`${API_URL}/api/plan-day`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
+    signal,
   });
 
   if (!response.ok) {
