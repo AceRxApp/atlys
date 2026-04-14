@@ -16,6 +16,11 @@ const OPENAI_API_KEY = (process.env.OPENAI_API_KEY || '').trim();
 const GOOGLE_API_KEY = (process.env.GOOGLE_PLACES_API_KEY || '').trim();
 const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || '').trim();
 
+// In-memory place cache — reuse Google results for same city within 10 minutes
+// Dramatically speeds up repeat plans (e.g. switching vibes in same city)
+const placeCache = new Map<string, { places: Record<string, unknown>[]; timestamp: number }>();
+const PLACE_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
 const FIELD_MASK = [
   'places.id', 'places.displayName', 'places.formattedAddress',
   'places.location', 'places.types', 'places.primaryType',
@@ -1857,7 +1862,7 @@ async function callOpenAI(messages: { role: string; content: string }[]): Promis
         model: 'gpt-4o-mini',
         messages,
         temperature: 0.8,
-        max_tokens: 1200,
+        max_tokens: 800,
         response_format: { type: 'json_object' },
       }),
     }, 8000);
@@ -1889,7 +1894,7 @@ async function callGemini(systemPrompt: string, userPrompt: string): Promise<str
           contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
           generationConfig: {
             temperature: 0.8,
-            maxOutputTokens: 1200,
+            maxOutputTokens: 800,
             responseMimeType: 'application/json',
           },
         }),
@@ -1981,48 +1986,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       : VIBE_CONFIG[vibeKey];
 
-    // 1. ALWAYS fetch food places (food is woven into every itinerary)
-    const fetches: Promise<Record<string, unknown>[]>[] = [];
-    const fetchLabels: string[] = [];
+    // These are used in AI prompt regardless of cache — declare early
+    const localRegion = detectLocalRegion(city || '');
+    const partyDest = detectPartyDestination(city || '');
+    const cityLower = (city || '').toLowerCase().trim();
+    const citySeeds = CURATED_SEEDS[cityLower];
+    const seedSearches: string[] = [];
+    if (citySeeds) {
+      for (const vk of vibeKeys) {
+        const vibeSeeds = citySeeds[vk] || [];
+        if (vibeSeeds.length > 0) seedSearches.push(...vibeSeeds);
+      }
+    }
 
-    // Food types — always fetched (start with 5km, expand if too few results)
-    fetches.push(fetchNearbyPlaces(lat, lng, config.foodTypes, 5000));
-    fetchLabels.push('food');
+    // Check place cache — reuse Google results if same city was fetched recently
+    const cacheKey = `${Math.round(lat * 100)}_${Math.round(lng * 100)}_${vibeKey}`;
+    const cached = placeCache.get(cacheKey);
+    let allRaw: Record<string, unknown>[];
+    const seedPlaceIds = new Set<string>();
 
-    // Activity types — fetched if the vibe has them
-    // Activities get a WIDER radius than food — people will travel further for landmarks/museums/parks
+    if (cached && Date.now() - cached.timestamp < PLACE_CACHE_TTL) {
+      allRaw = cached.places;
+      console.log(`[NxStops Plan] Cache hit: ${allRaw.length} places for ${cacheKey}`);
+    } else {
+
+    // 1. Fire ALL searches in parallel — nearby + wide-radius fallback + text searches
+    //    This is the critical speed optimization: instead of sequential steps, run everything at once
+    const nearbyFetches: Promise<Record<string, unknown>[]>[] = [];
+
+    // Food nearby (5km tight + 25km wide for coverage)
+    nearbyFetches.push(fetchNearbyPlaces(lat, lng, config.foodTypes, 5000).catch(() => []));
+    nearbyFetches.push(fetchNearbyPlaces(lat, lng, config.foodTypes, 25000).catch(() => []));
+
+    // Activity nearby (if vibe needs them)
     if (config.activityTypes.length > 0) {
       const wideRadiusVibes = ['stacked', 'adventure', 'starthare', 'escape'];
       const needsWideRadius = isBlended ? vibeKeys.some(k => wideRadiusVibes.includes(k)) : wideRadiusVibes.includes(vibeKey);
       const activityRadius = needsWideRadius ? 15000 : 6000;
-      fetches.push(fetchNearbyPlaces(lat, lng, config.activityTypes, activityRadius));
-      fetchLabels.push('activity');
-    }
-
-    const settled = await Promise.allSettled(fetches);
-    const rawResults = settled.map(r => r.status === 'fulfilled' ? r.value : []);
-    let allRaw = rawResults.flat();
-    console.log(`[NxStops Plan] Initial nearby: ${rawResults.map((r, i) => `${fetchLabels[i]}=${r.length}`).join(', ')} total=${allRaw.length}`);
-
-    // Fallback for small/island/remote cities: if nearby search returned too few,
-    // retry with much larger radius (25km covers most islands and small cities)
-    if (allRaw.length < 10) {
-      console.log(`[NxStops Plan] Only ${allRaw.length} nearby results — expanding search radius to 25km`);
-      const expandedFetches: Promise<Record<string, unknown>[]>[] = [
-        fetchNearbyPlaces(lat, lng, config.foodTypes, 25000),
-      ];
-      if (config.activityTypes.length > 0) {
-        expandedFetches.push(fetchNearbyPlaces(lat, lng, config.activityTypes, 25000));
-      }
-      const expandedSettled = await Promise.allSettled(expandedFetches);
-      const expandedResults = expandedSettled.map(r => r.status === 'fulfilled' ? r.value : []);
-      allRaw = [...allRaw, ...expandedResults.flat()];
+      nearbyFetches.push(fetchNearbyPlaces(lat, lng, config.activityTypes, activityRadius).catch(() => []));
+      nearbyFetches.push(fetchNearbyPlaces(lat, lng, config.activityTypes, 25000).catch(() => []));
     }
 
     // 1b. Region-aware text searches
-    // Non-Western cities → HEAVY local cuisine + sprinkle of international
-    // Western cities → diverse multicultural mix
-    const localRegion = detectLocalRegion(city || '');
     const shuffledSearches: string[] = [];
 
     if (localRegion) {
@@ -2174,54 +2179,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // ── PARTY DESTINATION: add venue-specific searches for famous nightlife/beach cities ──
-    const partyDest = detectPartyDestination(city || '');
     if (partyDest) {
       const partySearches = [...partyDest.searches].sort(() => Math.random() - 0.5).slice(0, 8);
       shuffledSearches.push(...partySearches);
       console.log(`[NxStops Plan] Party destination detected: adding ${partySearches.length} venue searches`);
     }
 
-    // ── CURATED SEEDS: hand-picked places that MUST be searched for ──────────
-    // Match city name (lowercase) against seed keys
-    const cityLower = (city || '').toLowerCase().trim();
-    const citySeeds = CURATED_SEEDS[cityLower];
-    const seedSearches: string[] = [];
-    if (citySeeds) {
-      // Pull seeds from ALL selected vibes (supports blended multi-vibe)
-      for (const vk of vibeKeys) {
-        const vibeSeeds = citySeeds[vk] || [];
-        if (vibeSeeds.length > 0) {
-          seedSearches.push(...vibeSeeds);
-          console.log(`[NxStops Plan] Adding ${vibeSeeds.length} curated seeds for ${cityLower}/${vk}`);
-        }
+    // Cap text searches at 4 for speed — each is a Google API call (~500ms)
+    const cappedSearches = shuffledSearches.slice(0, 4);
+    const textRadius = 15000; // 15km default for text searches
+    const seedRadius = 100000;
+    const textFetches = cappedSearches.map(q => textSearchPlaces(q, lat, lng, textRadius).catch(() => []));
+    const curatedFetches = seedSearches.map(q => textSearchPlaces(q, lat, lng, seedRadius).catch(() => []));
+
+    // FIRE EVERYTHING AT ONCE — nearby + text + curated seeds in one parallel batch
+    const allFetches = [...nearbyFetches, ...textFetches, ...curatedFetches];
+    const allSettled = await Promise.allSettled(allFetches);
+    const allResults = allSettled.map(r => r.status === 'fulfilled' ? r.value : []);
+
+    // Split results back out
+    const nearbyCount = nearbyFetches.length;
+    const textCount = textFetches.length;
+    const nearbyResults = allResults.slice(0, nearbyCount);
+    const textResults = allResults.slice(nearbyCount, nearbyCount + textCount);
+    const curatedResults = allResults.slice(nearbyCount + textCount);
+
+    allRaw = nearbyResults.flat();
+    console.log(`[NxStops Plan] Parallel fetch: ${nearbyCount} nearby (${allRaw.length} places), ${textCount} text, ${curatedFetches.length} seeds — all in one batch`);
+
+    // Mark curated seed placeIds
+    for (const results of curatedResults) {
+      for (const p of results) {
+        const id = p.id as string;
+        if (id) seedPlaceIds.add(id);
       }
+    }
+    if (seedPlaceIds.size > 0) {
+      console.log(`[NxStops Plan] ${seedPlaceIds.size} curated seed places found`);
+    }
+    allRaw = [...allRaw, ...textResults.flat(), ...curatedResults.flat()];
+
+    // Store in cache for subsequent requests
+    placeCache.set(cacheKey, { places: [...allRaw], timestamp: Date.now() });
+    // Clean stale entries
+    for (const [k, v] of placeCache) {
+      if (Date.now() - v.timestamp > PLACE_CACHE_TTL) placeCache.delete(k);
     }
 
-    // Track placeIds from curated seeds — these bypass min-review filters
-    const seedPlaceIds = new Set<string>();
-    if (shuffledSearches.length > 0 || seedSearches.length > 0) {
-      // Use larger text search radius (10km default, 25km for small/island cities)
-      const textRadius = allRaw.length < 15 ? 25000 : 10000;
-      // Curated seeds get a much larger radius (100km) since they're hand-picked
-      // and may be spread across a large region/island (e.g. Corsica is 180km long)
-      const seedRadius = 100000;
-      // Run regular text searches and seed searches in parallel
-      const regularSearches = shuffledSearches.map(q => textSearchPlaces(q, lat, lng, textRadius).catch(() => []));
-      const curatedSearches = seedSearches.map(q => textSearchPlaces(q, lat, lng, seedRadius).catch(() => []));
-      const allSearches = [...regularSearches, ...curatedSearches];
-      const textSettled = await Promise.allSettled(allSearches);
-      const textResults = textSettled.map(r => r.status === 'fulfilled' ? r.value : []);
-      for (let i = regularSearches.length; i < textResults.length; i++) {
-        for (const p of textResults[i]) {
-          const id = p.id as string;
-          if (id) seedPlaceIds.add(id);
-        }
-      }
-      if (seedPlaceIds.size > 0) {
-        console.log(`[NxStops Plan] ${seedPlaceIds.size} curated seed places found via Google`);
-      }
-      allRaw = [...allRaw, ...textResults.flat()];
-    }
+    } // end cache miss block
 
     // 1c. Filter out closed, not-yet-open, ghost listings, and out-of-city places
     const NOT_OPEN_RE = /\b(coming soon|opening soon|under construction|not yet open|grand opening|pre-opening|opening \d{4}|opens? in|currently closed|permanently closed|temporarily closed|reopening|closed for renovation|under renovation)\b/i;
@@ -2522,7 +2527,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const gemCount = topPlaces.filter(p => isHiddenGem(p)).length;
-    console.log(`[NxStops Plan] vibe="${vibeKey}" duration="${duration || 'full'}" region="${localRegion?.label || 'diverse'}" fetched=[${fetchLabels}] totalPlaces=${topPlaces.length} hiddenGems=${gemCount}`);
+    console.log(`[NxStops Plan] vibe="${vibeKey}" duration="${duration || 'full'}" region="${localRegion?.label || 'diverse'}" totalPlaces=${topPlaces.length} hiddenGems=${gemCount}`);
 
     // Vibe labels — defined early so curated mode can use them
     const vibeLabels: Record<string, string> = {
@@ -3338,8 +3343,8 @@ ${vibeKey === 'food' || vibeKey === 'indulge' ? `\n   FOOD TOUR SPACING: AT LEAS
 
 12. GROUP: family=kid-friendly no nightlife; couple=romantic; solo=flexible; friends=social.${eventsSection ? `\n\n13. Include at most 1 event if it fits.` : ''}${advisory ? `\n\n${eventsSection ? '14' : '13'}. TRAVEL ADVISORY: ${advisory}. Prefer well-lit, busy venues.` : ''}${jetLagContext ? `\n\n${eventsSection ? (advisory ? '15' : '14') : (advisory ? '14' : '13')}. JET LAG: Plan lighter — start later (10-11 AM), include relaxing stops, no late-night past 10 PM.` : ''}
 
-Return ONLY this JSON:
-{"stops":[{"idx":0,"timeSlot":"7:30 PM","reason":"Vivid narrative transition connecting to journey","knownFor":"What this place is famous for in 5-10 words — e.g. 'World-famous sunset DJ sets on the terrace' or 'Family-run since 1985, best paella on the island'","spend":25,"neighborhood":"District Name"}],"dayTitle":"Catchy 3-5 word title","headline":"One evocative sentence summarizing the journey through neighborhoods, e.g. From the spice markets of Kadıköy to sunset over the Bosphorus"}`;
+Return ONLY this JSON (keep reason + knownFor SHORT — max 8 words each):
+{"stops":[{"idx":0,"timeSlot":"7:30 PM","reason":"Short transition","knownFor":"Famous for X","spend":25,"neighborhood":"Area"}],"dayTitle":"3-5 word title","headline":"One sentence journey summary"}`;
 
     const systemMsg = 'You are NxStops, a curated itinerary planner that feels like a local friend who knows all the best spots. You prioritize culturally diverse, locally-owned businesses and create itineraries with a narrative arc — not just a list of places. Every plan should make someone excited to go out. Return ONLY valid JSON.';
     const messages = [
