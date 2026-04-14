@@ -17,9 +17,13 @@ const GOOGLE_API_KEY = (process.env.GOOGLE_PLACES_API_KEY || '').trim();
 const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || '').trim();
 
 // In-memory place cache — reuse Google results for same city within 10 minutes
-// Dramatically speeds up repeat plans (e.g. switching vibes in same city)
 const placeCache = new Map<string, { places: Record<string, unknown>[]; timestamp: number }>();
 const PLACE_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+// Final plan cache — cache complete AI-generated plans for 5 minutes
+// Same city + vibe + duration returns instantly on second request
+const planCache = new Map<string, { result: unknown; timestamp: number }>();
+const PLAN_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 const FIELD_MASK = [
   'places.id', 'places.displayName', 'places.formattedAddress',
@@ -1958,6 +1962,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Location is required' });
     }
 
+    // Check final plan cache — instant response for repeat city+vibe+duration requests
+    if (mode !== 'curated') {
+      const planCacheKey = `plan_${Math.round(lat * 100)}_${Math.round(lng * 100)}_${vibe || 'starthare'}_${duration || 'full'}_${travelGroup || 'solo'}`;
+      const cachedPlan = planCache.get(planCacheKey);
+      if (cachedPlan && Date.now() - cachedPlan.timestamp < PLAN_CACHE_TTL) {
+        console.log(`[NxStops Plan] Plan cache hit: ${planCacheKey}`);
+        return res.status(200).json(cachedPlan.result);
+      }
+      // Store key for later caching
+      (req as unknown as Record<string, unknown>)._planCacheKey = planCacheKey;
+    }
+
     // Determine vibe config — supports comma-separated multi-vibe (e.g. "luxe,escape")
     const vibeKeys = (vibe || 'starthare').split(',').map((v: string) => v.trim()).filter((v: string) => VIBE_CONFIG[v]);
     if (vibeKeys.length === 0) vibeKeys.push('starthare');
@@ -2324,7 +2340,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Chain restaurants / non-venue names to always exclude
     const BLOCKED_NAMES = /\b(little caesars|domino'?s|papa john|subway|mcdonald|burger king|wendy'?s|kfc|popeyes|taco bell|pizza hut|chick-fil-a|five guys|chipotle|panda express|dunkin|starbucks|7.eleven|circle k|wawa|sheetz|jumbo|walmart|costco|target|club deportivo|trampoline|masaje|solomasajes|entertainment center)\b/i;
     // Minimum review count — filter out garbage/new/unverified places
-    const MIN_REVIEWS = vibeKey === 'undertheradar' || vibeKey === 'surprise' ? 10 : 25;
+    // Lower threshold for hidden-gem vibes and European/island cities where local spots have fewer reviews
+    const isSmallCityRegion = !!localRegion || filtered.length < 80;
+    const MIN_REVIEWS = vibeKey === 'undertheradar' || vibeKey === 'surprise' ? 5
+      : isSmallCityRegion ? 10
+      : 25;
 
     const allPlaces: PlanPlace[] = [];
     for (const p of filtered) {
@@ -3442,12 +3462,24 @@ Return ONLY this JSON (keep reason + knownFor SHORT — max 8 words each):
       return aHour - bHour;
     });
 
-    return res.status(200).json({
+    const finalResult = {
       plan: planStops,
       dayTitle: aiPlan.dayTitle || 'Your Day Plan',
       headline: aiPlan.headline || '',
       totalPlaces: topPlaces.length,
-    });
+    };
+
+    // Cache the final plan for instant repeat requests
+    const planCacheKey = (req as unknown as Record<string, unknown>)._planCacheKey as string | undefined;
+    if (planCacheKey) {
+      planCache.set(planCacheKey, { result: finalResult, timestamp: Date.now() });
+      // Clean stale entries
+      for (const [k, v] of planCache) {
+        if (Date.now() - v.timestamp > PLAN_CACHE_TTL) planCache.delete(k);
+      }
+    }
+
+    return res.status(200).json(finalResult);
   } catch (err: unknown) {
     console.error('[NxStops Plan] Error:', err);
     return res.status(500).json({ error: 'Something went wrong generating your plan. Please try again.' });
