@@ -3385,6 +3385,13 @@ Return ONLY this JSON (keep reason + knownFor SHORT — max 8 words each):
     }
 
     if (!aiContent) {
+      // 3. Both failed — wait 2s and retry Gemini once (rate limit may have cleared)
+      console.log('[NxStops Plan] Both AI providers failed, retrying Gemini after 2s...');
+      await new Promise(r => setTimeout(r, 2000));
+      aiContent = await callGemini(systemMsg, prompt);
+    }
+
+    if (!aiContent) {
       return res.status(502).json({ error: 'AI service is busy. Please try again in a few minutes.' });
     }
 
