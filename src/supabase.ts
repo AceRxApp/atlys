@@ -840,12 +840,29 @@ export async function createSharedPlan(
   tripDays: Record<number, unknown[]>, dayTitle?: string,
 ): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser();
+  // Strip heavy fields (photos array, hours, etc.) to keep payload under Supabase limits
+  const leanDays: Record<number, unknown[]> = {};
+  for (const [day, stops] of Object.entries(tripDays)) {
+    leanDays[Number(day)] = (stops as Record<string, unknown>[]).map(s => {
+      const place = s.place as Record<string, unknown> | undefined;
+      return {
+        ...s,
+        addedAt: s.addedAt instanceof Date ? s.addedAt.toISOString() : s.addedAt,
+        place: place ? {
+          ...place,
+          photoNames: undefined,
+          hours: undefined,
+          reviews: undefined,
+        } : undefined,
+      };
+    });
+  }
   const { error } = await supabase.from('shared_plans').insert({
     slug, city_slug: citySlug, city_label: cityLabel,
-    trip_days: tripDays, day_title: dayTitle || null,
+    trip_days: leanDays, day_title: dayTitle || null,
     shared_by: user?.id || null,
   });
-  if (error) { console.error('Error creating shared plan:', error); return false; }
+  if (error) { console.error('Error creating shared plan:', error.message, error.details, error.hint); return false; }
   return true;
 }
 
