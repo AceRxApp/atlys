@@ -1869,7 +1869,7 @@ async function callOpenAI(messages: { role: string; content: string }[]): Promis
         max_tokens: 800,
         response_format: { type: 'json_object' },
       }),
-    }, 8000);
+    }, 15000);
     if (!response.ok) {
       console.error('[NxStops Plan] OpenAI error:', response.status);
       return null;
@@ -1903,7 +1903,7 @@ async function callGemini(systemPrompt: string, userPrompt: string): Promise<str
           },
         }),
       },
-      8000,
+      15000,
     );
     if (!response.ok) {
       console.error('[NxStops Plan] Gemini error:', response.status);
