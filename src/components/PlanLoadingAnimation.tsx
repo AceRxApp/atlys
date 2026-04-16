@@ -5,31 +5,83 @@ interface PlanLoadingAnimationProps {
   vibe: string;
 }
 
-const STEPS = [
-  { label: 'Scanning top-rated spots...', icon: '\u{1F4CD}' },
-  { label: 'Checking what\u2019s open now...', icon: '\u{1F552}' },
-  { label: 'Weaving in local events...', icon: '\u{1F3AB}' },
-  { label: 'Optimizing your route...', icon: '\u{1F5FA}\u{FE0F}' },
-  { label: 'Adding hidden gems...', icon: '\u{1F48E}' },
-  { label: 'Finalizing your perfect day...', icon: '\u{2728}' },
+// Real backend phases with approximate timing (ms since start):
+//   0-2000ms:  Finding spots nearby (Google Places parallel fetch ~2-5s)
+//   2000-4500ms: Picking the best picks (server-side filtering ~0.5s, buffer)
+//   4500ms+:   Crafting your itinerary (OpenAI/Gemini generating JSON ~3-10s)
+//   When complete: done (handled by parent unmount)
+interface Phase {
+  label: (city: string, vibe: string) => string;
+  icon: string;
+  enterAt: number; // ms since start when this phase becomes active
+}
+
+const PHASES: Phase[] = [
+  {
+    label: (city) => `Scouting top spots in ${city}`,
+    icon: '\u{1F50D}',
+    enterAt: 0,
+  },
+  {
+    label: (_city, vibe) => `Picking the best ${vibe.toLowerCase()} picks`,
+    icon: '\u{2728}',
+    enterAt: 2200,
+  },
+  {
+    label: () => `Crafting your itinerary`,
+    icon: '\u{1F4DD}',
+    enterAt: 4500,
+  },
 ];
 
-const STEP_INTERVAL_MS = 2500;
+// Rotating city facts / tips shown during the slowest phase (AI generation)
+// Keeps the user engaged while the model is writing their plan
+const CITY_TIPS = [
+  'Good plans take seconds. Great ones take a few more.',
+  'Matching stops to the best time of day...',
+  'Weaving in neighborhood transitions...',
+  'Checking opening hours for every stop...',
+  'Almost there — finalizing your day.',
+];
 
 export default function PlanLoadingAnimation({ cityName, vibe }: PlanLoadingAnimationProps) {
-  const [currentStep, setCurrentStep] = useState(0);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [tipIdx, setTipIdx] = useState(0);
 
+  // Tick elapsed time every 100ms for smooth phase transitions
   useEffect(() => {
-    if (currentStep >= STEPS.length - 1) return;
+    const start = Date.now();
+    const interval = setInterval(() => {
+      setElapsedMs(Date.now() - start);
+    }, 100);
+    return () => clearInterval(interval);
+  }, []);
 
-    const timer = setTimeout(() => {
-      setCurrentStep((prev) => Math.min(prev + 1, STEPS.length - 1));
-    }, STEP_INTERVAL_MS);
+  // Rotate through tips during the slow AI phase
+  useEffect(() => {
+    if (elapsedMs < 4500) return;
+    const interval = setInterval(() => {
+      setTipIdx((prev) => (prev + 1) % CITY_TIPS.length);
+    }, 2600);
+    return () => clearInterval(interval);
+  }, [elapsedMs >= 4500]);
 
-    return () => clearTimeout(timer);
-  }, [currentStep]);
+  // Determine the current active phase based on elapsed time
+  const currentPhaseIdx = PHASES.reduce(
+    (acc, phase, idx) => (elapsedMs >= phase.enterAt ? idx : acc),
+    0,
+  );
 
-  const progressPercent = ((currentStep + 1) / STEPS.length) * 100;
+  // Progress bar fills smoothly — slower in the final phase because AI is the bottleneck
+  // 0-2.2s: 0% → 35%
+  // 2.2-4.5s: 35% → 65%
+  // 4.5s+: 65% → 95% (caps at 95% to avoid false "done" feel; parent unmounts on real done)
+  const progressPercent =
+    elapsedMs < 2200
+      ? (elapsedMs / 2200) * 35
+      : elapsedMs < 4500
+        ? 35 + ((elapsedMs - 2200) / 2300) * 30
+        : Math.min(95, 65 + ((elapsedMs - 4500) / 8000) * 30);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
@@ -47,9 +99,10 @@ export default function PlanLoadingAnimation({ cityName, vibe }: PlanLoadingAnim
       <div className="w-full max-w-xs mb-8">
         <div className="h-1.5 w-full rounded-full bg-bg-subtle-medium overflow-hidden">
           <div
-            className="h-full rounded-full transition-all duration-700 ease-out relative overflow-hidden"
+            className="h-full rounded-full relative overflow-hidden"
             style={{
               width: `${progressPercent}%`,
+              transition: 'width 300ms ease-out',
               background: 'linear-gradient(90deg, var(--accent-amber-dark), var(--accent-amber))',
             }}
           >
@@ -66,20 +119,20 @@ export default function PlanLoadingAnimation({ cityName, vibe }: PlanLoadingAnim
         </div>
         <div className="flex justify-between mt-1.5">
           <span className="text-[11px] text-text-muted">
-            Step {currentStep + 1} of {STEPS.length}
+            {Math.round(progressPercent)}%
           </span>
           <span className="text-[11px] text-text-muted">
-            {Math.round(progressPercent)}%
+            {Math.floor(elapsedMs / 1000)}s
           </span>
         </div>
       </div>
 
-      {/* Step list */}
+      {/* Phase list */}
       <div className="w-full max-w-xs space-y-3">
-        {STEPS.map((step, index) => {
-          const isCompleted = index < currentStep;
-          const isCurrent = index === currentStep;
-          const isFuture = index > currentStep;
+        {PHASES.map((phase, index) => {
+          const isCompleted = index < currentPhaseIdx;
+          const isCurrent = index === currentPhaseIdx;
+          const isFuture = index > currentPhaseIdx;
 
           return (
             <div
@@ -88,7 +141,7 @@ export default function PlanLoadingAnimation({ cityName, vibe }: PlanLoadingAnim
                 isFuture ? 'opacity-30' : 'opacity-100'
               }`}
               style={{
-                animation: index <= currentStep ? `fadeInUp 0.4s ease-out ${index * 0.08}s both` : 'none',
+                animation: index <= currentPhaseIdx ? `fadeInUp 0.4s ease-out ${index * 0.08}s both` : 'none',
               }}
             >
               {/* Status indicator */}
@@ -136,7 +189,7 @@ export default function PlanLoadingAnimation({ cityName, vibe }: PlanLoadingAnim
 
               {/* Icon and label */}
               <div className="flex items-center gap-2 min-w-0">
-                <span className="text-base shrink-0">{step.icon}</span>
+                <span className="text-base shrink-0">{phase.icon}</span>
                 <span
                   className={`text-sm leading-snug ${
                     isCompleted
@@ -146,7 +199,7 @@ export default function PlanLoadingAnimation({ cityName, vibe }: PlanLoadingAnim
                         : 'text-text-disabled'
                   }`}
                 >
-                  {step.label}
+                  {phase.label(cityName, vibe)}
                 </span>
               </div>
             </div>
@@ -154,8 +207,21 @@ export default function PlanLoadingAnimation({ cityName, vibe }: PlanLoadingAnim
         })}
       </div>
 
+      {/* Rotating tip during the slow AI phase — so the user sees activity */}
+      {elapsedMs >= 4500 && (
+        <div className="mt-8 max-w-xs text-center">
+          <p
+            className="text-xs text-text-tertiary italic transition-opacity duration-500"
+            key={tipIdx}
+            style={{ animation: 'fadeInUp 0.5s ease-out' }}
+          >
+            {CITY_TIPS[tipIdx]}
+          </p>
+        </div>
+      )}
+
       {/* Bottom shimmer decoration */}
-      <div className="mt-10 w-full max-w-xs">
+      <div className="mt-6 w-full max-w-xs">
         <div
           className="h-px w-full animate-shimmer rounded-full"
           style={{
