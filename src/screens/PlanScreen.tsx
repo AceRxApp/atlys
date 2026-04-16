@@ -1157,11 +1157,12 @@ export default function PlanScreen() {
             <button
               onClick={async () => {
                 if (!requireAuth()) return;
+                if (!confirm(`Publish this ${cityLabel} plan to the Community Routes feed?\n\nOther travelers will be able to see and use your itinerary on the Home screen.`)) return;
                 const result = await shareAsLink();
                 if (result?.slug) {
                   const { publishRoute } = await import('../supabase');
                   const ok = await publishRoute(result.slug, 'adventure', user.user_metadata?.name || 'Traveler');
-                  showToast(ok ? 'Route published to community!' : 'Could not publish route');
+                  showToast(ok ? `Published! Find it under Community Routes on Home.` : 'Could not publish route', ok ? 'info' : 'error');
                 }
               }}
               className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl cursor-pointer border border-amber-tint-border20 bg-amber-tint-bg10 text-accent-amber text-[13px] font-semibold"

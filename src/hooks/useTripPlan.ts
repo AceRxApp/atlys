@@ -450,11 +450,42 @@ export function useTripPlan(deps: {
     const url = `${window.location.origin}/trip/${slug}`;
     track('share_plan_link', { city: cityLabel, slug });
     hapticImpact('Light');
+
+    // Try Capacitor native share first (iOS/Android apps)
+    try {
+      const { Capacitor } = await import('@capacitor/core');
+      if (Capacitor.isNativePlatform()) {
+        const { Share } = await import('@capacitor/share');
+        await Share.share({
+          title: `${cityLabel} Trip Plan`,
+          text: `Check out my ${cityLabel} trip plan:`,
+          url,
+          dialogTitle: 'Share your trip',
+        });
+        showToast('Link ready to share!');
+        return { slug, url };
+      }
+    } catch { /* fall through to web share / clipboard */ }
+
+    // Web: native share sheet if available, otherwise copy to clipboard
     if (navigator.share) {
-      try { await navigator.share({ title: `${cityLabel} Trip Plan`, url }); } catch { /* cancelled */ }
+      try {
+        await navigator.share({ title: `${cityLabel} Trip Plan`, url });
+        showToast('Link shared!');
+      } catch {
+        // User cancelled — also copy as fallback so they still have it
+        try {
+          await navigator.clipboard.writeText(url);
+          showToast('Link copied to clipboard');
+        } catch { /* clipboard blocked */ }
+      }
     } else {
-      await navigator.clipboard.writeText(url);
-      showToast('Link copied!');
+      try {
+        await navigator.clipboard.writeText(url);
+        showToast('Link copied to clipboard');
+      } catch {
+        showToast(`Share link: ${url}`);
+      }
     }
     return { slug, url };
   };
