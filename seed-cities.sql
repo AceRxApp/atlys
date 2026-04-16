@@ -141,6 +141,7 @@ FROM (VALUES
   ('San Francisco', 'USA', 'North America', 'san-francisco', 'America/Los_Angeles'),
   ('San Jose', 'Costa Rica', 'Central America', 'san-jose-cr', 'America/Costa_Rica'),
   ('San Juan', 'Puerto Rico', 'Caribbean', 'san-juan', 'America/Puerto_Rico'),
+  ('Sarasota', 'USA', 'North America', 'sarasota', 'America/New_York'),
   ('Santiago', 'Chile', 'South America', 'santiago', 'America/Santiago'),
   ('Santorini', 'Greece', 'Europe', 'santorini', 'Europe/Athens'),
   ('Santo Domingo', 'Dominican Republic', 'Caribbean', 'santo-domingo', 'America/Santo_Domingo'),

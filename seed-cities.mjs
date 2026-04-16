@@ -145,6 +145,7 @@ const ALL_CITIES = [
   { name: 'San Francisco', country: 'USA', region: 'North America', slug: 'san-francisco', timezone: 'America/Los_Angeles' },
   { name: 'San Jose', country: 'Costa Rica', region: 'Central America', slug: 'san-jose-cr', timezone: 'America/Costa_Rica' },
   { name: 'San Juan', country: 'Puerto Rico', region: 'Caribbean', slug: 'san-juan', timezone: 'America/Puerto_Rico' },
+  { name: 'Sarasota', country: 'USA', region: 'North America', slug: 'sarasota', timezone: 'America/New_York' },
   { name: 'Santiago', country: 'Chile', region: 'South America', slug: 'santiago', timezone: 'America/Santiago' },
   { name: 'Santorini', country: 'Greece', region: 'Europe', slug: 'santorini', timezone: 'Europe/Athens' },
   { name: 'Santo Domingo', country: 'Dominican Republic', region: 'Caribbean', slug: 'santo-domingo', timezone: 'America/Santo_Domingo' },
