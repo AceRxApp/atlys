@@ -3,5 +3,7 @@
 -- Run in Supabase SQL Editor.
 
 INSERT INTO cities (name, country, region, slug, timezone, is_active)
-VALUES ('Sarasota', 'USA', 'North America', 'sarasota', 'America/New_York', true)
-ON CONFLICT (name) DO NOTHING;
+SELECT 'Sarasota', 'USA', 'North America', 'sarasota', 'America/New_York', true
+WHERE NOT EXISTS (
+  SELECT 1 FROM cities WHERE name = 'Sarasota'
+);
