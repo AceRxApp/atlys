@@ -1157,10 +1157,10 @@ export default function PlanScreen() {
             <button
               onClick={async () => {
                 if (!requireAuth()) return;
-                const slug = await shareAsLink();
-                if (slug) {
+                const result = await shareAsLink();
+                if (result?.slug) {
                   const { publishRoute } = await import('../supabase');
-                  const ok = await publishRoute(slug, 'adventure', user.user_metadata?.name || 'Traveler');
+                  const ok = await publishRoute(result.slug, 'adventure', user.user_metadata?.name || 'Traveler');
                   showToast(ok ? 'Route published to community!' : 'Could not publish route');
                 }
               }}

@@ -66,7 +66,7 @@ export interface AppContextType {
   addEventToPlanOnDay: (event: EventItem, day: number) => void;
   isEventInPlan: (eventId: string) => boolean;
   pivotStop: (oldStopId: string, newPlace: Place) => void;
-  shareAsLink: () => Promise<string | null>;
+  shareAsLink: () => Promise<{ slug: string; url: string } | null>;
 
   // --- Stop Ratings ---
   rateStop: (stopId: string, placeId: string, rating: 'up' | 'down') => void;

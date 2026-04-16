@@ -885,11 +885,13 @@ export async function fetchSharedPlan(slug: string) {
 export async function publishRoute(
   slug: string, category: string, creatorName: string,
 ): Promise<boolean> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('shared_plans')
     .update({ is_published: true, category, creator_name: creatorName })
-    .eq('slug', slug);
-  if (error) { console.error('Error publishing route:', error); return false; }
+    .eq('slug', slug)
+    .select();
+  if (error) { console.error('Error publishing route:', error.message, error.details); return false; }
+  if (!data || data.length === 0) { console.error('Publish failed: no row matched slug', slug); return false; }
   return true;
 }
 

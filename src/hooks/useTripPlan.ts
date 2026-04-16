@@ -396,27 +396,50 @@ export function useTripPlan(deps: {
       const stopList = stops.map((s, i) => `  ${i + 1}. ${getStopName(s)} (${getStopCategory(s)})`).join('\n');
       return `Day ${day}:\n${stopList}`;
     }).filter(Boolean).join('\n\n');
-    const summary = `My ${cityLabel} Trip Plan:\n\n${lines}\n\nPlanned with NxStops`;
     const allStops = Object.values(tripDays).flat().length;
+
+    // Generate a shareable link so the recipient can open the plan in the app
+    let shareUrl: string | null = null;
+    try {
+      const slug = generateShareCode();
+      const success = await createSharedPlan(slug, citySlug, cityLabel, tripDays, lastPlanTitle || undefined);
+      if (success) shareUrl = `${window.location.origin}/trip/${slug}`;
+    } catch { /* fall through — will share text only */ }
+
+    const summary = shareUrl
+      ? `My ${cityLabel} Trip Plan:\n\n${lines}\n\nSee the full plan: ${shareUrl}`
+      : `My ${cityLabel} Trip Plan:\n\n${lines}\n\nPlanned with NxStops`;
+
     track('share_plan', { city: cityLabel, days: String(Object.keys(tripDays).length), stops: String(allStops) });
     hapticImpact('Light');
     try {
       const { Capacitor } = await import('@capacitor/core');
       if (Capacitor.isNativePlatform()) {
         const { Share } = await import('@capacitor/share');
-        await Share.share({ title: `${cityLabel} Trip Plan`, text: summary, dialogTitle: 'Share your trip' });
+        await Share.share({
+          title: `${cityLabel} Trip Plan`,
+          text: summary,
+          ...(shareUrl ? { url: shareUrl } : {}),
+          dialogTitle: 'Share your trip',
+        });
         return;
       }
     } catch { /* fall through */ }
     if (navigator.share) {
-      await navigator.share({ title: `${cityLabel} Trip Plan`, text: summary });
+      try {
+        await navigator.share({
+          title: `${cityLabel} Trip Plan`,
+          text: summary,
+          ...(shareUrl ? { url: shareUrl } : {}),
+        });
+      } catch { /* user cancelled */ }
     } else {
       await navigator.clipboard.writeText(summary);
       showToast('Plan copied to clipboard');
     }
   };
 
-  const shareAsLink = async (): Promise<string | null> => {
+  const shareAsLink = async (): Promise<{ slug: string; url: string } | null> => {
     const slug = generateShareCode();
     const success = await createSharedPlan(slug, citySlug, cityLabel, tripDays, lastPlanTitle || undefined);
     if (!success) { showToast('Failed to create share link', 'error'); return null; }
@@ -429,7 +452,7 @@ export function useTripPlan(deps: {
       await navigator.clipboard.writeText(url);
       showToast('Link copied!');
     }
-    return url;
+    return { slug, url };
   };
 
   const getStopCoords = (stop: Stop): { lat: number; lng: number } | null => {
