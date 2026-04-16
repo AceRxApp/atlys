@@ -402,8 +402,8 @@ export function useTripPlan(deps: {
     let shareUrl: string | null = null;
     try {
       const slug = generateShareCode();
-      const success = await createSharedPlan(slug, citySlug, cityLabel, tripDays, lastPlanTitle || undefined);
-      if (success) shareUrl = `${window.location.origin}/trip/${slug}`;
+      const result = await createSharedPlan(slug, citySlug, cityLabel, tripDays, lastPlanTitle || undefined);
+      if (result.ok) shareUrl = `${window.location.origin}/trip/${slug}`;
     } catch { /* fall through — will share text only */ }
 
     const summary = shareUrl
@@ -441,8 +441,12 @@ export function useTripPlan(deps: {
 
   const shareAsLink = async (): Promise<{ slug: string; url: string } | null> => {
     const slug = generateShareCode();
-    const success = await createSharedPlan(slug, citySlug, cityLabel, tripDays, lastPlanTitle || undefined);
-    if (!success) { showToast('Failed to create share link', 'error'); return null; }
+    const result = await createSharedPlan(slug, citySlug, cityLabel, tripDays, lastPlanTitle || undefined);
+    if (!result.ok) {
+      const errMsg = result.error ? `Share failed: ${result.error}` : 'Failed to create share link';
+      showToast(errMsg, 'error');
+      return null;
+    }
     const url = `${window.location.origin}/trip/${slug}`;
     track('share_plan_link', { city: cityLabel, slug });
     hapticImpact('Light');

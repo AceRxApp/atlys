@@ -838,7 +838,7 @@ export async function saveStopRating(placeId: string, citySlug: string, rating: 
 export async function createSharedPlan(
   slug: string, citySlug: string, cityLabel: string,
   tripDays: Record<number, unknown[]>, dayTitle?: string,
-): Promise<boolean> {
+): Promise<{ ok: boolean; error?: string }> {
   const { data: { user } } = await supabase.auth.getUser();
   // Strip heavy fields (photos array, hours, etc.) to keep payload under Supabase limits
   const leanDays: Record<number, unknown[]> = {};
@@ -862,8 +862,11 @@ export async function createSharedPlan(
     trip_days: leanDays, day_title: dayTitle || null,
     shared_by: user?.id || null,
   });
-  if (error) { console.error('Error creating shared plan:', error.message, error.details, error.hint); return false; }
-  return true;
+  if (error) {
+    console.error('Error creating shared plan:', error.message, error.details, error.hint, error.code);
+    return { ok: false, error: error.message || 'Unknown error' };
+  }
+  return { ok: true };
 }
 
 export async function fetchSharedPlan(slug: string) {
