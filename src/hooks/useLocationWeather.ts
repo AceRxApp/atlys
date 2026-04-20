@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { track } from '@vercel/analytics';
 import { fetchCities } from '../supabase';
 import type { City } from '../types';
@@ -154,12 +154,19 @@ export function useLocationWeather(loc: LocState) {
     fetchWeather();
   }, [useGps, loc.lat, loc.lng, selectedCity]);
 
-  return {
+  return useMemo(() => ({
     cities, selectedCity, setSelectedCity,
     useGps, setUseGps, searchRadius, setSearchRadius,
     loading, weather, loc,
     cityLabel, citySlug, useMiles,
     useCelsius, setUseCelsius, formatTemp,
     getMapCenter, MAPS_API_KEY,
-  };
+  }), [
+    cities, selectedCity, setSelectedCity,
+    useGps, setUseGps, searchRadius,
+    loading, weather, loc,
+    cityLabel, citySlug, useMiles,
+    useCelsius, setUseCelsius, formatTemp,
+    getMapCenter,
+  ]);
 }

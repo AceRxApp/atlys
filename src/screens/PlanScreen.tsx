@@ -34,6 +34,7 @@ import {
 import SortableStopCard from '../components/SortableStopCard';
 import AddFromLinkModal from '../components/AddFromLinkModal';
 import QuickReviewPrompt from '../components/QuickReviewPrompt';
+import { confirmDialog } from '../components/ConfirmDialog';
 import NearbyDiscoveries from '../components/NearbyDiscoveries';
 import LogisticsPanel from '../components/LogisticsPanel';
 import ItineraryAlertBanner from '../components/ItineraryAlertBanner';
@@ -1157,7 +1158,12 @@ export default function PlanScreen() {
             <button
               onClick={async () => {
                 if (!requireAuth()) return;
-                if (!confirm(`Publish this ${cityLabel} plan to the Community Routes feed?\n\nOther travelers will be able to see and use your itinerary on the Home screen.`)) return;
+                const ok = await confirmDialog({
+                  title: `Publish to Community Routes?`,
+                  message: `Other travelers will be able to see and use your ${cityLabel} itinerary on the Home screen.`,
+                  confirmLabel: 'Publish',
+                });
+                if (!ok) return;
                 const result = await shareAsLink();
                 if (result?.slug) {
                   const { publishRoute } = await import('../supabase');
@@ -1225,10 +1231,14 @@ export default function PlanScreen() {
       {(tripPhase === 'planning' || tripPhase === 'pretrip') && <div className="mt-6">
         <div className="flex items-center justify-center gap-4 pt-1">
           {dayCount > 1 && (
-            <button onClick={() => {
-                if (window.confirm(`Delete Day ${activeDay}? This will remove all stops for this day.`)) {
-                  removeDay(activeDay);
-                }
+            <button onClick={async () => {
+                const ok = await confirmDialog({
+                  title: `Delete Day ${activeDay}?`,
+                  message: `This will remove all stops for this day. You can't undo this.`,
+                  confirmLabel: 'Delete',
+                  destructive: true,
+                });
+                if (ok) removeDay(activeDay);
               }}
               aria-label={`Delete day ${activeDay} from trip`}
               className="bg-transparent border-none text-status-red text-[13px] cursor-pointer p-1.5">

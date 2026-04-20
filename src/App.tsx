@@ -20,6 +20,7 @@ import { HomeIcon, DiscoverIcon, EventsIcon, TasteLensIcon, PlanIcon, ShieldIcon
 import { SkeletonCard } from './components/ui';
 import Footer from './components/Footer';
 import NativeImg from './components/NativeImg';
+import { ConfirmDialogProvider } from './components/ConfirmDialog';
 
 // Custom hooks (extracted logic)
 import { useAuth } from './hooks/useAuth';
@@ -929,6 +930,8 @@ export default function App() {
           </Suspense>
           {!isInfoPage && <Footer />}
         </main>
+
+        <ConfirmDialogProvider />
 
         {/* Bottom Navigation */}
         {!isInfoPage && <nav aria-label="Main navigation" className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] md:max-w-[768px] lg:max-w-[1024px] bg-bg-nav backdrop-blur-[32px] backdrop-saturate-[1.8] border-t border-border-nav flex justify-around pt-2" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)' }}>

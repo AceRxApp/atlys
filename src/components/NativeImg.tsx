@@ -1,30 +1,59 @@
-import { useState, useEffect, memo } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { Capacitor } from '@capacitor/core';
 
 const isNative = Capacitor.isNativePlatform();
 const blobCache = new Map<string, string>();
+
+interface NativeImgProps extends React.ImgHTMLAttributes<HTMLImageElement> {
+  /** Defer loading until the image scrolls near the viewport. Default true for native, false for web. */
+  lazy?: boolean;
+}
 
 /**
  * Drop-in <img> replacement that works on Capacitor iOS.
  * WKWebView blocks cross-origin <img src> requests, but fetch() works.
  * This component fetches the image via JS and renders a blob URL.
  * On web, it renders a normal <img> tag.
+ *
+ * Lazy loading:
+ *   - Web: respects `loading="lazy"` attribute natively (passed through via ...rest)
+ *   - Native: uses IntersectionObserver to defer fetch() until image is near viewport
  */
-const NativeImg = memo(function NativeImg(
-  props: React.ImgHTMLAttributes<HTMLImageElement>
-) {
-  const { src, ...rest } = props;
+const NativeImg = memo(function NativeImg(props: NativeImgProps) {
+  const { src, lazy = isNative, ...rest } = props;
   const [blobSrc, setBlobSrc] = useState<string | undefined>(() => {
     if (!isNative || !src) return src;
     return blobCache.get(src) || undefined;
   });
   const [failed, setFailed] = useState(false);
+  const [inView, setInView] = useState(!lazy || !!blobCache.get(src || ''));
+  const containerRef = useRef<HTMLDivElement | HTMLImageElement | null>(null);
+
+  // IntersectionObserver — defer loading until image is near viewport
+  useEffect(() => {
+    if (!lazy || inView || !containerRef.current) return;
+    const el = containerRef.current;
+    // Observer with a 200px rootMargin so images start loading just before they enter the screen
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setInView(true);
+            observer.disconnect();
+            break;
+          }
+        }
+      },
+      { rootMargin: '200px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [lazy, inView]);
 
   useEffect(() => {
     if (!src || !isNative) { setBlobSrc(src); return; }
+    if (!inView) return; // Wait until in view
     if (blobCache.has(src)) { setBlobSrc(blobCache.get(src)); return; }
-
-    // Already a blob/data URL — use directly
     if (src.startsWith('blob:') || src.startsWith('data:')) { setBlobSrc(src); return; }
 
     let cancelled = false;
@@ -42,15 +71,13 @@ const NativeImg = memo(function NativeImg(
       .catch(() => {
         if (cancelled) return;
         setFailed(true);
-        // Fire onError so parent components can react (e.g. show fallback)
         if (rest.onError) rest.onError({} as React.SyntheticEvent<HTMLImageElement>);
       });
 
     return () => { cancelled = true; };
-  }, [src]);
+  }, [src, inView]);
 
-  // When the image fails, render a subtle fallback placeholder instead of null
-  // so parent layout doesn't collapse to a blank space
+  // When the image fails, render a subtle fallback placeholder
   if (failed) {
     return (
       <div
@@ -62,11 +89,26 @@ const NativeImg = memo(function NativeImg(
     );
   }
   if (!blobSrc && isNative) {
-    // Loading placeholder
-    return <div className={rest.className as string} style={{ ...rest.style as object, background: 'var(--bg-elevated)' }} />;
+    // Loading placeholder (also serves as the IntersectionObserver target when lazy)
+    return (
+      <div
+        ref={containerRef as React.RefObject<HTMLDivElement>}
+        className={rest.className as string}
+        style={{ ...rest.style as object, background: 'var(--bg-elevated)' }}
+      />
+    );
   }
 
-  return <img {...rest} src={blobSrc} onError={(e) => { setFailed(true); if (rest.onError) rest.onError(e); }} />;
+  return (
+    <img
+      {...rest}
+      ref={containerRef as React.RefObject<HTMLImageElement>}
+      loading={rest.loading ?? (lazy ? 'lazy' : undefined)}
+      decoding={rest.decoding ?? 'async'}
+      src={blobSrc}
+      onError={(e) => { setFailed(true); if (rest.onError) rest.onError(e); }}
+    />
+  );
 });
 
 export default NativeImg;
