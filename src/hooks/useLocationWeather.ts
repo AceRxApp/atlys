@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { track } from '@vercel/analytics';
 import { fetchCities } from '../supabase';
 import type { City } from '../types';
-import { CITY_COORDS, WEATHER_CODES } from '../data';
+import { CITY_COORDS, WEATHER_CODES, lookupCityCoords } from '../data';
 import { API_URL } from '../utils/api';
 
 export const MAPS_API_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || '';
@@ -72,7 +72,7 @@ export function useLocationWeather(loc: LocState) {
   const getMapCenter = useCallback(() => {
     if (useGps && loc.lat && loc.lng) return { lat: loc.lat, lng: loc.lng };
     if (selectedCity) {
-      const c = CITY_COORDS[selectedCity.name.toLowerCase()];
+      const c = lookupCityCoords(selectedCity.name);
       if (c) return c;
       if (selectedCity.lat && selectedCity.lng) return { lat: selectedCity.lat, lng: selectedCity.lng };
     }
@@ -114,7 +114,7 @@ export function useLocationWeather(loc: LocState) {
     let lat: number | undefined, lng: number | undefined;
     if (useGps && loc.lat && loc.lng) { lat = loc.lat; lng = loc.lng; }
     else if (selectedCity) {
-      const c = CITY_COORDS[selectedCity.name.toLowerCase()];
+      const c = lookupCityCoords(selectedCity.name);
       if (c) { lat = c.lat; lng = c.lng; }
       else if (selectedCity.lat && selectedCity.lng) { lat = selectedCity.lat; lng = selectedCity.lng; }
     }

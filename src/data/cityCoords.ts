@@ -1,3 +1,16 @@
+/**
+ * Look up city coordinates with tolerance for state/region suffixes.
+ * Handles both "Greenville" and "Greenville, SC" → both find the same coords.
+ */
+export function lookupCityCoords(name: string | null | undefined): { lat: number; lng: number } | undefined {
+  if (!name) return undefined;
+  const lower = name.toLowerCase().trim();
+  if (CITY_COORDS[lower]) return CITY_COORDS[lower];
+  // Strip ", XX" or ", state" suffix and retry — supports "Greenville, SC" → "greenville"
+  const stripped = lower.split(',')[0].trim();
+  return CITY_COORDS[stripped];
+}
+
 export const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
   'abu dhabi': { lat: 24.4539, lng: 54.3773 },
   'abuja': { lat: 9.0579, lng: 7.4951 },
@@ -317,4 +330,29 @@ export const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
   'yerevan': { lat: 40.1792, lng: 44.4991 },
   'zanzibar': { lat: -6.1659, lng: 39.2026 },
   'zurich': { lat: 47.3769, lng: 8.5417 },
+
+  // Mid-sized US cities (added 2026 — strategic tourism partnership targets)
+  'albuquerque': { lat: 35.0844, lng: -106.6504 },
+  'asheville': { lat: 35.5951, lng: -82.5515 },
+  'birmingham': { lat: 33.5186, lng: -86.8104 },
+  'boise': { lat: 43.6150, lng: -116.2023 },
+  'boulder': { lat: 40.0150, lng: -105.2705 },
+  'buffalo': { lat: 42.8864, lng: -78.8784 },
+  'burlington': { lat: 44.4759, lng: -73.2121 },
+  'chattanooga': { lat: 35.0456, lng: -85.3097 },
+  'des moines': { lat: 41.5868, lng: -93.6250 },
+  'greenville': { lat: 34.8526, lng: -82.3940 },
+  'hartford': { lat: 41.7658, lng: -72.6734 },
+  'key west': { lat: 24.5551, lng: -81.7800 },
+  'knoxville': { lat: 35.9606, lng: -83.9207 },
+  'madison': { lat: 43.0731, lng: -89.4012 },
+  'naples': { lat: 26.1420, lng: -81.7948 },
+  'providence': { lat: 41.8240, lng: -71.4128 },
+  'richmond': { lat: 37.5407, lng: -77.4360 },
+  'sedona': { lat: 34.8697, lng: -111.7610 },
+  'spokane': { lat: 47.6588, lng: -117.4260 },
+  'st. augustine': { lat: 29.9012, lng: -81.3124 },
+  'st. petersburg': { lat: 27.7676, lng: -82.6403 },
+  'tulsa': { lat: 36.1539, lng: -95.9928 },
+  'wilmington': { lat: 39.7391, lng: -75.5398 },
 };

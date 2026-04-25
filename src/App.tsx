@@ -12,7 +12,7 @@ import { hapticSelection } from './utils/haptics';
 import type { Place } from './services/places';
 import { useLocation as useGeoLocation } from './hooks/useLocation';
 import type { AdminSignup } from './types';
-import { CITY_COORDS, EMERGENCY_BY_COUNTRY } from './data';
+import { CITY_COORDS, EMERGENCY_BY_COUNTRY, lookupCityCoords } from './data';
 import { setBookingCountry } from './data/bookingLinks';
 
 import { AppContext } from './context/AppContext';
@@ -402,8 +402,8 @@ export default function App() {
     useGps: location.useGps, locCity: loc.city, selectedCity: location.selectedCity,
     cityLabel: location.cityLabel, citySlug: location.citySlug, useMiles: location.useMiles,
     showToast, requireAuth,
-    lat: location.useGps ? loc.lat : (location.selectedCity ? (location.selectedCity.lat ?? CITY_COORDS[location.selectedCity.name.toLowerCase()]?.lat ?? null) : null),
-    lng: location.useGps ? loc.lng : (location.selectedCity ? (location.selectedCity.lng ?? CITY_COORDS[location.selectedCity.name.toLowerCase()]?.lng ?? null) : null),
+    lat: location.useGps ? loc.lat : (location.selectedCity ? (location.selectedCity.lat ?? lookupCityCoords(location.selectedCity.name)?.lat ?? null) : null),
+    lng: location.useGps ? loc.lng : (location.selectedCity ? (location.selectedCity.lng ?? lookupCityCoords(location.selectedCity.name)?.lng ?? null) : null),
     weather: location.weather,
     travelGroup: places.travelGroup,
     events: events.events,
@@ -424,8 +424,8 @@ export default function App() {
   // --- Offline Save ---
   const offlineSave = useOfflineSave(
     trip.tripDays, location.citySlug,
-    location.useGps ? loc.lat : (location.selectedCity ? (location.selectedCity.lat ?? CITY_COORDS[location.selectedCity.name.toLowerCase()]?.lat ?? null) : null),
-    location.useGps ? loc.lng : (location.selectedCity ? (location.selectedCity.lng ?? CITY_COORDS[location.selectedCity.name.toLowerCase()]?.lng ?? null) : null),
+    location.useGps ? loc.lat : (location.selectedCity ? (location.selectedCity.lat ?? lookupCityCoords(location.selectedCity.name)?.lat ?? null) : null),
+    location.useGps ? loc.lng : (location.selectedCity ? (location.selectedCity.lng ?? lookupCityCoords(location.selectedCity.name)?.lng ?? null) : null),
     places.places,
     events.events,
   );

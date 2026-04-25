@@ -216,14 +216,13 @@ function CitySearch({ cities, selectedCity, loading, onSelect, onUseGps }: CityS
             const structured = pred.structuredFormat as { mainText?: { text?: string }; secondaryText?: { text?: string } } | undefined;
             const cityName = structured?.mainText?.text || (pred.text as { text?: string })?.text || '';
             const secondary = structured?.secondaryText?.text || '';
-            // Extract country from secondary text (e.g. "Ghana" from "Accra, Ghana")
-            const parts = secondary.split(',').map((p: string) => p.trim());
-            const country = parts[parts.length - 1] || '';
+            // Show full secondary as country to distinguish "Greenville, SC" from "Greenville, NC"
+            // e.g. "SC, USA" or "Ghana" — gives users enough info to pick the right one
             return {
               id: (pred.placeId as string) || cityName.toLowerCase().replace(/\s+/g, '-'),
               name: cityName,
-              slug: cityName.toLowerCase().replace(/\s+/g, '-'),
-              country,
+              slug: ((pred.placeId as string) || cityName).toLowerCase().replace(/[^a-z0-9]/g, '-'),
+              country: secondary || '',
               region: 'Search Results',
               banner_url: '',
               timezone: '',

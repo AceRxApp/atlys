@@ -1,5 +1,5 @@
 import { useParams, Link, Navigate } from 'react-router-dom';
-import { CITY_COORDS } from '../data/cityCoords';
+import { lookupCityCoords } from '../data/cityCoords';
 import Footer from '../components/Footer';
 
 // Top cities for SEO landing pages — slug -> display name + tagline
@@ -33,8 +33,7 @@ export default function CityScreen() {
   const meta = slug ? CITY_META[slug] : null;
   if (!meta) return <Navigate to="/" replace />;
 
-  const coordKey = meta.name.toLowerCase();
-  const coords = CITY_COORDS[coordKey];
+  const coords = lookupCityCoords(meta.name);
 
   return (
     <div className="font-sans bg-bg-body min-h-screen text-text-primary">

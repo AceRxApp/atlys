@@ -7,8 +7,8 @@ import type { Review, UserStop } from '../supabase';
 import type { User } from '@supabase/supabase-js';
 import type { City, Vibe, QuickFilter, TravelGroup, CommunityTag } from '../types';
 import {
-  CITY_COORDS, NIGHTLIFE_TYPES, GIRLY_TYPES, GIRLY_KEYWORDS, BOYS_EXCLUDE_TYPES,
-  RESERVABLE_TYPES, BOOKABLE_TYPES,
+  NIGHTLIFE_TYPES, GIRLY_TYPES, GIRLY_KEYWORDS, BOYS_EXCLUDE_TYPES,
+  RESERVABLE_TYPES, BOOKABLE_TYPES, lookupCityCoords,
 } from '../data';
 import { hapticImpact, hapticNotification } from '../utils/haptics';
 import { scorePlaceByPreference, getPreferences } from '../utils/preferences';
@@ -103,7 +103,7 @@ export function usePlaces(deps: {
     let lat: number | undefined, lng: number | undefined;
     if (useGps && loc.lat && loc.lng) { lat = loc.lat; lng = loc.lng; }
     else if (selectedCity) {
-      const c = CITY_COORDS[selectedCity.name.toLowerCase()];
+      const c = lookupCityCoords(selectedCity.name);
       if (c) { lat = c.lat; lng = c.lng; }
       else if (selectedCity.lat && selectedCity.lng) { lat = selectedCity.lat; lng = selectedCity.lng; }
     }
@@ -396,7 +396,7 @@ export function usePlaces(deps: {
     let lat: number | undefined, lng: number | undefined;
     if (useGps && loc.lat && loc.lng) { lat = loc.lat; lng = loc.lng; }
     else if (selectedCity) {
-      const c = CITY_COORDS[selectedCity.name.toLowerCase()];
+      const c = lookupCityCoords(selectedCity.name);
       if (c) { lat = c.lat; lng = c.lng; }
       else if (selectedCity.lat && selectedCity.lng) { lat = selectedCity.lat; lng = selectedCity.lng; }
     }

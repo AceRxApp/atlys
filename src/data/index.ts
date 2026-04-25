@@ -1,4 +1,4 @@
-export { CITY_COORDS } from './cityCoords';
+export { CITY_COORDS, lookupCityCoords } from './cityCoords';
 export { CITY_CULTURE } from './cityCulture';
 export type { CityContext } from './cityCulture';
 export { EMERGENCY_BY_COUNTRY } from './emergencyNumbers';

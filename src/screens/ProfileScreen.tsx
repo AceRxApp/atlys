@@ -7,7 +7,7 @@ import { uploadAvatar, deleteAccount, authSignInWithGoogle } from '../supabase';
 import { useSubscription } from '../hooks/useSubscription';
 import { fixPhotoUrl } from '../utils/photoUrl';
 import NativeImg from '../components/NativeImg';
-import { CITY_COORDS } from '../data/cityCoords';
+import { lookupCityCoords } from '../data/cityCoords';
 
 const TravelMap = lazy(() => import('../components/TravelMap'));
 import TripMomentsModal from '../components/TripMomentsModal';
@@ -638,7 +638,7 @@ export default function ProfileScreen() {
           {profileTab === 'trips' && tripHistory.length > 0 && (() => {
             const visitedCities = [...new Set(tripHistory.map(t => t.city.toLowerCase()))]
               .map(cityName => {
-                const coords = CITY_COORDS[cityName];
+                const coords = lookupCityCoords(cityName);
                 if (!coords) return null;
                 return { name: cityName, lat: coords.lat, lng: coords.lng };
               })
