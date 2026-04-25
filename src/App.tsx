@@ -161,6 +161,7 @@ const ChatBot = lazy(() => import('./components/ChatBot'));
 const SharedPlanScreen = lazy(() => import('./screens/SharedPlanScreen'));
 const DishLensScreen = lazy(() => import('./screens/DishLensScreen'));
 const DeveloperPortal = lazy(() => import('./screens/DeveloperPortal'));
+const ChicagoConcertScreen = lazy(() => import('./screens/ChicagoConcertScreen'));
 
 // ============================================================================
 // DEEP LINK — /place/:placeId
@@ -227,7 +228,7 @@ export default function App() {
     return (['home', 'discover', 'events', 'currency', 'plan', 'tastelens'].includes(path) ? path : 'home') as Screen;
   })();
 
-  const isInfoPage = ['/about', '/privacy', '/terms', '/contact', '/developers'].includes(routerLocation.pathname) || routerLocation.pathname.startsWith('/cities/');
+  const isInfoPage = ['/about', '/privacy', '/terms', '/contact', '/developers'].includes(routerLocation.pathname) || routerLocation.pathname.startsWith('/cities/') || routerLocation.pathname.startsWith('/chicago/');
 
   const setScreen = useCallback((s: string) => {
     navigate(s === 'home' ? '/' : `/${s}`);
@@ -912,6 +913,7 @@ export default function App() {
                 <Route path="/place/:placeId" element={<PlaceDeepLink />} />
                 <Route path="/trip/:slug" element={<SharedPlanScreen />} />
                 <Route path="/developers" element={<DeveloperPortal />} />
+                <Route path="/chicago/concert-weekend" element={<ChicagoConcertScreen />} />
                 <Route path="*" element={
                   <div className="text-center px-5 py-[60px]">
                     <div className="text-5xl mb-3">🗺️</div>
