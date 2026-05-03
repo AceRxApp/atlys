@@ -145,4 +145,41 @@
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
+  <url>
+    <loc>https://nxstops.com/cities/sarasota</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <!-- Mid-sized US cities -->
+  <url><loc>https://nxstops.com/cities/albuquerque-nm</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/asheville-nc</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/birmingham-al</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/boise-id</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/boulder-co</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/buffalo-ny</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/burlington-vt</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/chattanooga-tn</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/cincinnati-oh</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/cleveland-oh</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/des-moines-ia</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/greenville-sc</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://nxstops.com/cities/hartford-ct</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/indianapolis-in</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/key-west-fl</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/knoxville-tn</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/louisville-ky</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/madison-wi</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/milwaukee-wi</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/naples-fl</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/providence-ri</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/raleigh-nc</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/richmond-va</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/salt-lake-city-ut</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/sedona-az</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/spokane-wa</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/st-augustine-fl</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/st-petersburg-fl</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/tucson-az</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/tulsa-ok</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://nxstops.com/cities/wilmington-de</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
 </urlset>
