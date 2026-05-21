@@ -2,7 +2,7 @@
 // Proxies chat requests to Groq API (server-side, keeps keys safe)
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors.js';
+import { setCorsHeaders, checkRateLimit, getClientIp, verifySupabaseToken } from './_lib/cors.js';
 
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
@@ -71,8 +71,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!corsOk) return res.status(403).json({ error: 'Origin not allowed' });
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const ip = getClientIp(req.headers);
-  if (!(await checkRateLimit(ip, 10, 60_000))) {
+  // Per-user (signed-in) or per-IP (anonymous) rate limit, backed by Upstash.
+  const authUser = await verifySupabaseToken(req.headers as Record<string, string | string[] | undefined>);
+  const rlId = authUser ? `chat:user:${authUser.id}` : `chat:ip:${getClientIp(req.headers)}`;
+  const rlMax = authUser ? 60 : 20;           // per 5 minutes
+  if (!(await checkRateLimit(rlId, rlMax, 5 * 60 * 1000))) {
     return res.status(429).json({ error: 'Too many requests. Please wait a moment.' });
   }
 

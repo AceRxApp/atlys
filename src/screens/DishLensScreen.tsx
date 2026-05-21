@@ -5,6 +5,7 @@ import { API_URL } from '../utils/api';
 import { useSubscription } from '../hooks/useSubscription';
 import PaywallModal from '../components/PaywallModal';
 import NativeImg from '../components/NativeImg';
+import { supabase } from '../supabase';
 
 // ---------- Intro Guide (first-time users) ----------
 function TasteLensIntro({ onDismiss }: { onDismiss: () => void }) {
@@ -514,9 +515,12 @@ export default function DishLensScreen() {
     setMenuDishes([]);
     try {
       const base64 = await resizeImage(file);
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
       const res = await fetch(`${API_URL}/api/dishlens`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ image: base64 }),
       });
       if (!res.ok) {

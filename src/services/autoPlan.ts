@@ -3,6 +3,17 @@
 import type { Place } from './places';
 import { fetchRetry } from '../utils/fetchRetry';
 import { API_URL } from '../utils/api';
+import { supabase } from '../supabase';
+
+// Attach the Supabase access token when available so signed-in users get the
+// higher per-user rate limit on the backend (vs the tighter anonymous IP limit).
+async function authHeaders(): Promise<Record<string, string>> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) return { Authorization: `Bearer ${session.access_token}` };
+  } catch {}
+  return {};
+}
 
 export interface AutoPlanStop {
   place: Place;
@@ -57,7 +68,7 @@ export async function fetchCuratedPicks(
 ): Promise<CuratedPicksResult> {
   const response = await fetchRetry(`${API_URL}/api/plan-day`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify({ ...request, mode: 'curated' }),
   });
 
@@ -98,7 +109,7 @@ export async function fetchCuratedPicks(
 export async function generateDayPlan(request: AutoPlanRequest, signal?: AbortSignal): Promise<AutoPlanResult> {
   const response = await fetchRetry(`${API_URL}/api/plan-day`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify(request),
     signal,
   });

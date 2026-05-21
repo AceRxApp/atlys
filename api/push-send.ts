@@ -48,9 +48,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Verify cron secret to prevent unauthorized triggers
+  // Verify cron secret to prevent unauthorized triggers.
+  // Fail closed: if CRON_SECRET is not set, reject all requests rather than allow them.
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && req.headers.authorization !== `Bearer ${cronSecret}`) {
+  if (!cronSecret || req.headers.authorization !== `Bearer ${cronSecret}`) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

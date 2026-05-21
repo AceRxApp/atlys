@@ -183,6 +183,37 @@ interface ExtractedData {
 
 const BROWSER_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
+// SSRF guard — reject URLs that target internal/private network ranges or
+// non-http(s) schemes. Used before any fetch() of a user-supplied URL.
+function isUnsafeUrl(url: URL): boolean {
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return true;
+  const host = url.hostname.toLowerCase();
+  if (!host) return true;
+  // Block localhost and loopback aliases
+  if (host === 'localhost' || host === 'ip6-localhost' || host === 'ip6-loopback') return true;
+  // Block raw IPv4 addresses in private/reserved/link-local ranges
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const [a, b] = [parseInt(ipv4[1], 10), parseInt(ipv4[2], 10)];
+    if (a === 10) return true;                                // 10.0.0.0/8
+    if (a === 127) return true;                               // 127.0.0.0/8
+    if (a === 0) return true;                                 // 0.0.0.0/8
+    if (a === 169 && b === 254) return true;                  // 169.254.0.0/16 (AWS IMDS, link-local)
+    if (a === 172 && b >= 16 && b <= 31) return true;         // 172.16.0.0/12
+    if (a === 192 && b === 168) return true;                  // 192.168.0.0/16
+    if (a >= 224) return true;                                // multicast + reserved
+  }
+  // Block IPv6 loopback, link-local, ULA, and bracketed forms
+  if (host.includes(':') || host.startsWith('[')) {
+    const v6 = host.replace(/^\[|\]$/g, '');
+    if (v6 === '::1' || v6 === '::') return true;
+    if (v6.startsWith('fe80:') || v6.startsWith('fc') || v6.startsWith('fd')) return true;
+  }
+  // Block AWS/GCP/Azure metadata endpoints by hostname
+  if (host === 'metadata.google.internal' || host === 'metadata.goog') return true;
+  return false;
+}
+
 async function handleExtractLink(req: VercelRequest, res: VercelResponse) {
   const rawUrl = req.query.url as string | undefined;
   if (!rawUrl) return res.status(400).json({ error: 'url parameter is required' });
@@ -192,6 +223,10 @@ async function handleExtractLink(req: VercelRequest, res: VercelResponse) {
     url = new URL(rawUrl);
   } catch {
     return res.status(400).json({ error: 'Invalid URL' });
+  }
+
+  if (isUnsafeUrl(url)) {
+    return res.status(400).json({ error: 'URL not allowed' });
   }
 
   try {
@@ -392,6 +427,9 @@ function detectSourceLink(html: string, hostname: string): string | null {
 
 async function fetchSourceLink(sourceUrl: string): Promise<Partial<ExtractedData>> {
   try {
+    let parsed: URL;
+    try { parsed = new URL(sourceUrl); } catch { return {}; }
+    if (isUnsafeUrl(parsed)) return {};
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5_000);
     const resp = await fetch(sourceUrl, {
@@ -532,8 +570,6 @@ async function aiExtract(html: string, url: string): Promise<{
 // Video Clips — place-level video management
 // =========================================================================
 
-const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
-
 async function handleGetVideo(req: VercelRequest, res: VercelResponse) {
   const placeId = req.query.placeId as string;
   if (!placeId) return res.status(400).json({ error: 'placeId required' });
@@ -567,7 +603,8 @@ async function handleGetCityVideos(req: VercelRequest, res: VercelResponse) {
 
 async function handleUpsertVideo(req: VercelRequest, res: VercelResponse) {
   const authHeader = req.headers.authorization;
-  if (!ADMIN_SECRET || authHeader !== `Bearer ${ADMIN_SECRET}`) {
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (!token || !(await verifyAdmin(token))) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {

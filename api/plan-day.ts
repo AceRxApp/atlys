@@ -2,7 +2,7 @@
 // Uses GPT-4o-mini + Google Places to generate personalized day itineraries
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { setCorsHeaders, checkRateLimit, getClientIp, validateApiKey } from './_lib/cors.js';
+import { setCorsHeaders, checkRateLimit, getClientIp, validateApiKey, verifySupabaseToken } from './_lib/cors.js';
 
 // Fetch with 5-second timeout to prevent hanging on slow external APIs
 function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 5000): Promise<Response> {
@@ -1932,8 +1932,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const ip = getClientIp(req.headers);
-  if (!(await checkRateLimit(ip, 15, 60_000))) {
+  // Rate limit by user_id (signed-in) or IP (anonymous). Signed-in callers
+  // get a higher cap; anonymous callers are capped tightly to bound the
+  // OpenAI/Gemini/Places spend from abuse. The limiter uses Upstash Redis
+  // when configured so cold starts and region rotation don't reset it.
+  const authUser = await verifySupabaseToken(req.headers as Record<string, string | string[] | undefined>);
+  const rlId = authUser ? `plan:user:${authUser.id}` : `plan:ip:${getClientIp(req.headers)}`;
+  const rlMax = authUser ? 30 : 8;            // per hour
+  if (!(await checkRateLimit(rlId, rlMax, 60 * 60 * 1000))) {
     return res.status(429).json({ error: 'Too many plan requests. Please wait a moment.' });
   }
 

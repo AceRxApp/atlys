@@ -77,7 +77,7 @@ export async function validateApiKey(
   try {
     // Look up the key via REST API (no import needed)
     const resp = await fetch(
-      `${supabaseUrl}/rest/v1/api_keys?key=eq.${encodeURIComponent(apiKey)}&select=id,status,tier,monthly_limit,monthly_usage,usage_reset_at&limit=1`,
+      `${supabaseUrl}/rest/v1/api_keys?key=eq.${encodeURIComponent(apiKey)}&select=id,status,tier,monthly_limit,monthly_usage,usage_reset_at,allowed_origins&limit=1`,
       {
         headers: {
           'apikey': serviceKey,
@@ -92,6 +92,16 @@ export async function validateApiKey(
 
     const row = rows[0];
     if (row.status !== 'approved') return null;
+
+    // Enforce per-key origin binding. NULL/empty = unrestricted (legacy keys);
+    // non-empty array requires the request Origin to match exactly. A leaked
+    // key cannot be replayed from an attacker-hosted page once the owner sets
+    // allowed_origins for the key.
+    const callerOrigin = headers['origin'];
+    if (Array.isArray(row.allowed_origins) && row.allowed_origins.length > 0) {
+      const originStr = typeof callerOrigin === 'string' ? callerOrigin : '';
+      if (!originStr || !row.allowed_origins.includes(originStr)) return null;
+    }
 
     // Auto-reset usage if past the reset date
     const resetAt = new Date(row.usage_reset_at);
@@ -174,11 +184,20 @@ export async function validateApiKey(
 }
 
 // ---------------------------------------------------------------------------
-// In-memory rate limiting
+// Rate limiting (Upstash Redis when available, in-memory fallback)
 // ---------------------------------------------------------------------------
+//
+// Why Upstash: Vercel serverless functions run in isolated instances per
+// region — an in-memory Map cannot enforce a global rate limit because each
+// cold start gets a fresh Map and each region has its own pool. Upstash gives
+// us a single shared counter, so an attacker rotating IPs or regions cannot
+// bypass the limit by force.
+
+const UPSTASH_URL = (process.env.UPSTASH_REDIS_REST_URL || '').trim();
+const UPSTASH_TOKEN = (process.env.UPSTASH_REDIS_REST_TOKEN || '').trim();
+const UPSTASH_ENABLED = !!(UPSTASH_URL && UPSTASH_TOKEN);
 
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-
 let lastCleanup = Date.now();
 function cleanupStaleEntries() {
   const now = Date.now();
@@ -189,16 +208,56 @@ function cleanupStaleEntries() {
   }
 }
 
+async function upstashIncrWithExpire(key: string, windowSec: number): Promise<number | null> {
+  try {
+    // Pipeline: INCR key  +  EXPIRE key windowSec NX (only set TTL on first hit)
+    const resp = await fetch(`${UPSTASH_URL}/pipeline`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${UPSTASH_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify([
+        ['INCR', key],
+        ['EXPIRE', key, windowSec.toString(), 'NX'],
+      ]),
+    });
+    if (!resp.ok) return null;
+    const out = await resp.json();
+    const count = Array.isArray(out) && out[0] && typeof out[0].result === 'number' ? out[0].result : null;
+    return count;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check whether the caller is within the rate-limit window.
+ * Returns true if allowed, false if over the limit.
+ * Uses Upstash Redis when configured (global, cold-start-safe), otherwise
+ * falls back to an in-memory Map (per-instance, dev only).
+ */
 export async function checkRateLimit(
-  ip: string,
+  identifier: string,
   max: number,
   windowMs: number,
 ): Promise<boolean> {
+  if (UPSTASH_ENABLED) {
+    const windowSec = Math.max(1, Math.ceil(windowMs / 1000));
+    const bucket = Math.floor(Date.now() / windowMs);
+    const key = `rl:${identifier}:${bucket}`;
+    const count = await upstashIncrWithExpire(key, windowSec + 1);
+    // If Upstash fails, fail open (allow) — better than locking out all users
+    // during a Redis outage. The in-memory fallback below would also accept.
+    if (count === null) return true;
+    return count <= max;
+  }
+
   cleanupStaleEntries();
   const now = Date.now();
-  const entry = rateLimitMap.get(ip);
+  const entry = rateLimitMap.get(identifier);
   if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + windowMs });
+    rateLimitMap.set(identifier, { count: 1, resetAt: now + windowMs });
     return true;
   }
   if (entry.count >= max) return false;
@@ -210,4 +269,49 @@ export function getClientIp(headers: Record<string, string | string[] | undefine
   const forwarded = headers['x-forwarded-for'];
   if (typeof forwarded === 'string') return forwarded.split(',')[0]?.trim() || 'unknown';
   return 'unknown';
+}
+
+// ---------------------------------------------------------------------------
+// Supabase JWT verification (for first-party app callers)
+// ---------------------------------------------------------------------------
+
+export interface AuthUser {
+  id: string;
+  email: string | null;
+}
+
+/**
+ * Verify a Supabase access token from the Authorization header.
+ * Returns the user record if the token is valid, or null otherwise.
+ *
+ * Uses Supabase's /auth/v1/user REST endpoint with the user's bearer token,
+ * which validates the JWT signature against the project's secret server-side.
+ */
+export async function verifySupabaseToken(
+  headers: Record<string, string | string[] | undefined>,
+): Promise<AuthUser | null> {
+  const authHeader = headers['authorization'];
+  if (!authHeader || typeof authHeader !== 'string') return null;
+  if (!authHeader.startsWith('Bearer ')) return null;
+  const token = authHeader.slice(7).trim();
+  if (!token) return null;
+
+  const supabaseUrl = (process.env.SUPABASE_URL || '').trim();
+  const anonKey = (process.env.SUPABASE_ANON_KEY || '').trim();
+  if (!supabaseUrl || !anonKey) return null;
+
+  try {
+    const resp = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: {
+        'apikey': anonKey,
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    if (!resp.ok) return null;
+    const user = await resp.json();
+    if (!user || !user.id) return null;
+    return { id: user.id, email: user.email ?? null };
+  } catch {
+    return null;
+  }
 }

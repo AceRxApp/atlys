@@ -272,7 +272,7 @@
     </div>
 
     <div class="ctas">
-      <button id="install-btn" class="btn btn-primary" onclick="handleInstall()">
+      <button id="install-btn" class="btn btn-primary">
         Install App
       </button>
 
@@ -327,6 +327,8 @@
     const iosInstructions = document.getElementById('ios-instructions');
     const installedBadge = document.getElementById('installed-badge');
     const exploreBtn = document.getElementById('explore-btn');
+
+    installBtn.addEventListener('click', handleInstall);
 
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||

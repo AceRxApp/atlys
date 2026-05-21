@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { CloseIcon } from '../components/icons';
 import { fetchReports, updateReportStatus, deleteReviewById, fetchPendingStops, updateStopStatus, deleteUserStop, uploadDishImage, fetchDishImages, deleteDishImage, uploadCityVideo, fetchCityVideos, deleteCityVideo, authGetSession } from '../supabase';
 import type { UserStop, DishImageRecord, CityVideoRecord } from '../supabase';
+import { API_URL } from '../utils/api';
 
 export default function AdminPanel() {
   const {
@@ -773,7 +774,7 @@ function ApiKeysTab() {
     try {
       const session = await authGetSession();
       if (!session) return;
-      const resp = await fetch('/api/user-actions?action=approve-api-key', {
+      const resp = await fetch(`${API_URL}/api/user-actions?action=approve-api-key`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -796,7 +797,7 @@ function ApiKeysTab() {
     try {
       const session = await authGetSession();
       if (!session) return;
-      const resp = await fetch('/api/user-actions?action=revoke-api-key', {
+      const resp = await fetch(`${API_URL}/api/user-actions?action=revoke-api-key`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

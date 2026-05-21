@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { API_URL } from '../utils/api';
+import { supabase } from '../supabase';
 
 export interface TasteLensResult {
   name: string;
@@ -41,10 +42,13 @@ export function useTasteLens() {
     try {
       // Fetch AI analysis + dish-specific images in parallel
       // Use just the dish name for image search — we want photos of THE DISH, not the restaurant
+      const { data: { session } } = await supabase.auth.getSession();
+      const dishHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) dishHeaders.Authorization = `Bearer ${session.access_token}`;
       const [dishRes, imageRes] = await Promise.all([
         fetch(`${API_URL}/api/dishlens`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: dishHeaders,
           body: JSON.stringify({ dishName, restaurant, city }),
         }),
         fetch(`${API_URL}/api/dish-image?q=${encodeURIComponent(dishName)}${restaurant ? `&restaurant=${encodeURIComponent(restaurant)}` : ''}`).catch(() => null),

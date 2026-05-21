@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { CloseIcon } from './icons';
 import { API_URL } from '../utils/api';
+import { supabase } from '../supabase';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -134,9 +135,12 @@ export default function ChatBot({ city, onClose, planContext, onModification }: 
       const apiMessages = [...messages.filter(m => m.role !== 'assistant' || messages.indexOf(m) > 0), userMsg]
         .map(m => ({ role: m.role, content: m.content }));
 
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
       const res = await fetch(`${API_URL}/api/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ messages: apiMessages, city, planContext }),
       });
 

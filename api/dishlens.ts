@@ -4,7 +4,7 @@
 //   2. Menu scan:     POST { image: base64 }
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { setCorsHeaders, checkRateLimit, getClientIp } from './_lib/cors.js';
+import { setCorsHeaders, checkRateLimit, getClientIp, verifySupabaseToken } from './_lib/cors.js';
 
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
@@ -17,8 +17,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
-  const clientIp = getClientIp(req.headers);
-  if (!(await checkRateLimit(clientIp, 10, 60_000))) {
+  // Per-user (signed-in) or per-IP (anonymous) rate limit, backed by Upstash.
+  const authUser = await verifySupabaseToken(req.headers as Record<string, string | string[] | undefined>);
+  const rlId = authUser ? `dishlens:user:${authUser.id}` : `dishlens:ip:${getClientIp(req.headers)}`;
+  const rlMax = authUser ? 40 : 10;           // per 5 minutes
+  if (!(await checkRateLimit(rlId, rlMax, 5 * 60 * 1000))) {
     return res.status(429).json({ error: 'Too many requests. Please try again later.' });
   }
 
