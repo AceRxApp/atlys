@@ -1101,12 +1101,12 @@ export default function App() {
 
         {/* Floating AI Chat Button — hidden on Plan screen which has its own plan-aware chat */}
         {!isInfoPage && !selectedPlace && !showChat && screen !== 'plan' && (
-          <div className="fixed bottom-[90px] right-2 z-50">
+          <div className="fixed bottom-[90px] right-0 z-50">
             <button
               onClick={() => setShowChat(true)}
               aria-label="Open AI travel assistant"
-              className="w-10 h-10 rounded-2xl border-none cursor-pointer flex items-center justify-center opacity-60 hover:opacity-100 transition-opacity"
-              style={{ background: 'linear-gradient(135deg, #E8940A, #D85A18)', boxShadow: '0 2px 8px rgba(232,148,10,0.3)' }}
+              className="w-9 h-11 rounded-l-2xl border-none cursor-pointer flex items-center justify-center opacity-60 hover:opacity-100 transition-opacity"
+              style={{ background: 'linear-gradient(135deg, #E8940A, #D85A18)', boxShadow: '-2px 2px 8px rgba(232,148,10,0.3)' }}
               title="AI Travel Assistant"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="white" opacity="0.95" /></svg>
