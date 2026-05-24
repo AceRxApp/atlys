@@ -4,6 +4,15 @@ import type { User } from '@supabase/supabase-js';
 import { API_URL } from '../utils/api';
 
 // ---------------------------------------------------------------------------
+// Owner/admin emails get unlimited Pro access without a subscription
+// ---------------------------------------------------------------------------
+const ADMIN_EMAILS = new Set(['elevecreativehaus@gmail.com']);
+
+function isAdminEmail(email: string | undefined | null): boolean {
+  return !!email && ADMIN_EMAILS.has(email.toLowerCase());
+}
+
+// ---------------------------------------------------------------------------
 // Free tier limits (per calendar month)
 // ---------------------------------------------------------------------------
 const FREE_LIMITS = {
@@ -64,6 +73,12 @@ export function useSubscription(user: User | null) {
   const fetchSubscription = useCallback(async () => {
     if (!user) {
       setSub({ plan: 'free', status: 'inactive', isPro: false, cancelAtPeriodEnd: false, currentPeriodEnd: null, loading: false });
+      return;
+    }
+
+    // Owner gets unlimited Pro — no payment, no Supabase lookup
+    if (isAdminEmail(user.email)) {
+      setSub({ plan: 'pro_yearly', status: 'active', isPro: true, cancelAtPeriodEnd: false, currentPeriodEnd: null, loading: false });
       return;
     }
 
