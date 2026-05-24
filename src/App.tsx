@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { API_URL } from './utils/api';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -287,10 +288,7 @@ export default function App() {
   const APP_STORE_URL = 'https://apps.apple.com/app/nxstops/id6759206723';
   const [showAppBanner, setShowAppBanner] = useState(() => {
     if (localStorage.getItem('nxstops_app_banner_dismissed')) return false;
-    try {
-      const { Capacitor } = require('@capacitor/core');
-      if (Capacitor.isNativePlatform()) return false; // Already in the app
-    } catch { /* fine */ }
+    if (Capacitor.isNativePlatform()) return false; // Already in the app
     return true;
   });
 
@@ -319,14 +317,11 @@ export default function App() {
   // GDPR consent — skip on native iOS/Android (no browser cookies in native apps)
   const [showConsent, setShowConsent] = useState(() => {
     if (localStorage.getItem('nxstops_consent')) return false;
-    try {
-      const { Capacitor } = require('@capacitor/core');
-      if (Capacitor.isNativePlatform()) {
-        // Auto-accept on native — no cookie banner needed
-        localStorage.setItem('nxstops_consent', 'true');
-        return false;
-      }
-    } catch { /* not in Capacitor */ }
+    if (Capacitor.isNativePlatform()) {
+      // Auto-accept on native — no cookie banner needed
+      localStorage.setItem('nxstops_consent', 'true');
+      return false;
+    }
     return true;
   });
 
