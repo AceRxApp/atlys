@@ -406,8 +406,13 @@ export function useTripPlan(deps: {
       if (result.ok) shareUrl = `${window.location.origin}/trip/${slug}`;
     } catch { /* fall through — will share text only */ }
 
+    // When we have a share link, keep the text to a short label and let the
+    // share sheet attach the URL via the dedicated `url` field — messaging apps
+    // (iMessage, WhatsApp) then render a rich preview card instead of a wall of
+    // text. Putting the URL in both `text` and `url` would duplicate it. Fall
+    // back to the full text list only when the link couldn't be created.
     const summary = shareUrl
-      ? `My ${cityLabel} Trip Plan:\n\n${lines}\n\nSee the full plan: ${shareUrl}`
+      ? `My ${cityLabel} trip plan${allStops ? ` — ${allStops} ${allStops === 1 ? 'stop' : 'stops'}` : ''}`
       : `My ${cityLabel} Trip Plan:\n\n${lines}\n\nPlanned with NxStops`;
 
     track('share_plan', { city: cityLabel, days: String(Object.keys(tripDays).length), stops: String(allStops) });
@@ -434,7 +439,9 @@ export function useTripPlan(deps: {
         });
       } catch { /* user cancelled */ }
     } else {
-      await navigator.clipboard.writeText(summary);
+      // No share sheet (desktop web): copy text + link together so the
+      // recipient actually gets a usable, openable plan.
+      await navigator.clipboard.writeText(shareUrl ? `${summary}\n${shareUrl}` : summary);
       showToast('Plan copied to clipboard');
     }
   };

@@ -1719,6 +1719,20 @@ interface PlanPlace {
   editorialSummary: string;
 }
 
+// Casual / street-food venues that should never qualify as "luxe" regardless of
+// rating or review count. Google Places usually returns a food truck with a
+// generic primaryType ("restaurant" / "meal_takeaway"), so the truck/cart/stand
+// signal only shows up in the place NAME or the human-readable category label —
+// we check all three.
+const CASUAL_FOOD_NAME_RE = /food[\s-]?truck|\btruck\b|\bcart\b|\bstand\b|\bstall\b|\bkiosk\b|hole[\s-]?in[\s-]?the[\s-]?wall|street food|drive[\s-]?thr|\bdeli\b|hot dog|concession|snack bar/i;
+const CASUAL_FOOD_CAT_RE = /food_truck|fast_food|meal_takeaway|hamburger|hot_dog|sandwich_shop/i;
+function isCasualFoodVenue(p: PlanPlace): boolean {
+  if (CASUAL_FOOD_CAT_RE.test(p.category)) return true;
+  if (p.categoryDisplay && CASUAL_FOOD_NAME_RE.test(p.categoryDisplay)) return true;
+  if (p.name && CASUAL_FOOD_NAME_RE.test(p.name)) return true;
+  return false;
+}
+
 function transformPlace(raw: Record<string, unknown>, userLat: number, userLng: number): PlanPlace {
   const location = raw.location as { latitude: number; longitude: number } | undefined;
   const displayName = raw.displayName as { text: string } | undefined;
@@ -2425,10 +2439,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           p.priceLevel >= 3 || (LUXE_CATEGORIES.has(p.category) && p.rating >= 4.3) ||
           LUXE_NAME_RE.test(p.name) || (p.editorialSummary && LUXE_SUMMARY_RE.test(p.editorialSummary)) || false;
         const luxePool = allPlaces.filter(p =>
-          (isLuxeSignal(p) && p.rating >= 4.0 && p.reviewCount >= 30) ||
-          (p.rating >= 4.5 && p.reviewCount >= 200)
+          !isCasualFoodVenue(p) && (
+            (isLuxeSignal(p) && p.rating >= 4.0 && p.reviewCount >= 30) ||
+            (p.rating >= 4.5 && p.reviewCount >= 200)
+          )
         );
-        const fallback = allPlaces.filter(p => p.rating >= 4.3 && p.reviewCount >= 50 && !luxePool.includes(p));
+        const fallback = allPlaces.filter(p => !isCasualFoodVenue(p) && p.rating >= 4.3 && p.reviewCount >= 50 && !luxePool.includes(p));
         pool = luxePool.length >= 15 ? [...luxePool, ...fallback] : allPlaces;
       }
 
@@ -2508,10 +2524,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       };
 
       const luxePool = allPlaces.filter(p =>
-        (isLuxeSignal(p) && p.rating >= 4.0 && p.reviewCount >= 30) ||
-        (p.rating >= 4.5 && p.reviewCount >= 200)
+        !isCasualFoodVenue(p) && (
+          (isLuxeSignal(p) && p.rating >= 4.0 && p.reviewCount >= 30) ||
+          (p.rating >= 4.5 && p.reviewCount >= 200)
+        )
       );
-      const fallback = allPlaces.filter(p => p.rating >= 4.3 && p.reviewCount >= 50 && !luxePool.includes(p));
+      const fallback = allPlaces.filter(p => !isCasualFoodVenue(p) && p.rating >= 4.3 && p.reviewCount >= 50 && !luxePool.includes(p));
       const pool = [...luxePool, ...fallback].sort((a, b) => luxeScore(b) - luxeScore(a));
       const foodCandidates = pool.filter(p => isPlaceFood(p));
       const activityCandidates = pool.filter(p => !isPlaceFood(p));
@@ -2541,8 +2559,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       topPlaces = allPlaces.slice(0, 30);
     }
 
-    // Ensure at least ~20% of candidates are hidden gems (swap out lowest-scored popular places)
-    const gems = allPlaces.filter(p => isHiddenGem(p) && !topPlaces.includes(p));
+    // Ensure at least ~20% of candidates are hidden gems (swap out lowest-scored popular places).
+    // For luxe, never inject casual/street-food venues as "gems" — they'd undercut the vibe.
+    const isLuxeVibe = vibeKey === 'luxe' || (isBlended && vibeKeys.includes('luxe'));
+    const gems = allPlaces.filter(p => isHiddenGem(p) && !topPlaces.includes(p) && !(isLuxeVibe && isCasualFoodVenue(p)));
     const gemTarget = Math.max(Math.floor(topPlaces.length * 0.2), 3);
     const currentGems = topPlaces.filter(p => isHiddenGem(p)).length;
     if (currentGems < gemTarget && gems.length > 0) {
@@ -2738,8 +2758,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Categories that are NEVER luxe no matter the price
         const NEVER_LUXE = /ramen|noodle|pizza|burger|fast_food|sandwich|deli|food_court|taco|hot_dog|kebab|falafel|halal_restaurant|food_truck/i;
         const isLuxePlace = (p: PlanPlace) => {
-          // Hard exclude: casual food categories are never luxe
-          if (NEVER_LUXE.test(p.category)) return false;
+          // Hard exclude: casual food categories are never luxe. Check category,
+          // display label, and name — food trucks come back as generic
+          // "restaurant"/"meal_takeaway" so category alone misses them.
+          if (NEVER_LUXE.test(p.category) || isCasualFoodVenue(p)) return false;
           if (p.priceLevel >= 3 && p.rating >= 4.2) return true;
           // Fine dining categories count as luxe at price 3+ OR unknown price with high rating
           if (LUXE_CATS.has(p.category) && p.rating >= 4.3 && (p.priceLevel >= 3 || p.priceLevel === -1)) return true;
