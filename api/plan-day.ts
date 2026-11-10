@@ -52,6 +52,70 @@ const ADVENTURE_TYPES = [
   'book_store', 'spa', 'bowling_alley',
 ];
 
+// ── NON-FOOD DISCOVERY TYPES ─────────────────────────────────────────────
+// Google Places API (New) Table A values only — used as `includedTypes` in
+// fetchNearbyPlaces(). WARNING: a SINGLE invalid value makes the whole
+// searchNearby request return 400 INVALID_ARGUMENT, and every call site wraps
+// it in `.catch(() => [])`, so one typo silently removes an entire category of
+// candidates with no visible error. The CORE arrays below use values already
+// proven in this file or in src/services/places.ts. The _EXTENDED arrays are
+// plausible Table A values that MUST be smoke-tested against the live API
+// (one type per request) before being merged into any vibe config.
+
+const OUTDOOR_TYPES = [
+  'park', 'garden', 'botanical_garden', 'national_park',
+  'hiking_area', 'beach', 'marina', 'plaza',
+];
+
+const OUTDOOR_TYPES_EXTENDED = [
+  'state_park', 'dog_park', 'picnic_ground', 'observation_deck',
+  'wildlife_park', 'wildlife_refuge',
+];
+
+const ARCHITECTURE_TYPES = [
+  'historical_landmark', 'cultural_landmark', 'monument',
+  'plaza', 'library', 'church',
+];
+
+const ARCHITECTURE_TYPES_EXTENDED = [
+  'historical_place', 'observation_deck', 'opera_house',
+  'sculpture', 'mosque', 'synagogue', 'hindu_temple',
+];
+
+const CULTURE_TYPES = [
+  'museum', 'art_gallery', 'performing_arts_theater',
+  'library', 'book_store', 'cultural_landmark', 'historical_landmark',
+];
+
+const CULTURE_TYPES_EXTENDED = [
+  'art_studio', 'concert_hall', 'auditorium', 'planetarium',
+];
+
+const NEIGHBORHOOD_TYPES = [
+  'plaza', 'market', 'book_store', 'art_gallery',
+  'gift_shop', 'clothing_store', 'park', 'historical_landmark',
+];
+
+// Dilution set for vibes that currently ship `activityTypes: []` (indulge, food).
+// Deduped and deliberately held to 14 types or fewer: fetchNearbyPlaces sends
+// maxResultCount: 20 for the WHOLE includedTypes list, so a 25-type array does
+// not return more places — it just returns a thinner slice of each type.
+const DISCOVERY_TYPES = [
+  'park', 'garden', 'plaza', 'market',
+  'historical_landmark', 'cultural_landmark', 'monument',
+  'museum', 'art_gallery', 'performing_arts_theater',
+  'book_store', 'botanical_garden', 'tourist_attraction', 'library',
+];
+
+// Categories that count as "non-food" when enforcing the food cap in code.
+// Mirror of FOOD_CAT_SET (below) for the opposite direction — use this for
+// post-AI validation and for pool quotas rather than re-deriving it inline.
+const NON_FOOD_DISCOVERY_CAT_SET = new Set([
+  ...OUTDOOR_TYPES, ...ARCHITECTURE_TYPES, ...CULTURE_TYPES, ...NEIGHBORHOOD_TYPES,
+  'tourist_attraction', 'zoo', 'aquarium', 'amusement_park', 'spa',
+  'flea_market', 'shopping_mall', 'bowling_alley',
+]);
+
 // Diverse text searches per vibe — we pick random subsets to keep API usage reasonable
 const DIVERSE_TEXT_SEARCHES: Record<string, string[]> = {
   // ── NEW 6 VIBES ──────────────────────────────────────────────────────────
@@ -63,6 +127,9 @@ const DIVERSE_TEXT_SEARCHES: Record<string, string[]> = {
     'cultural center heritage museum', 'iconic landmark must see attraction',
     'temple shrine palace historic visit', 'famous architecture landmark',
     'best brunch restaurant popular', 'famous brunch spot acclaimed',
+    'famous plaza public square landmark', 'historic district architecture walk',
+    'iconic bridge skyline view', 'famous street pedestrian boulevard',
+    'city viewpoint observation deck', 'grand civic building architecture',
   ],
   indulge: [
     'Mexican taqueria restaurant', 'Ethiopian Eritrean restaurant',
@@ -74,6 +141,11 @@ const DIVERSE_TEXT_SEARCHES: Record<string, string[]> = {
     'best brunch spot mimosas bottomless', 'brunch restaurant eggs benedict avocado toast',
     'dessert bakery pastry', 'ramen noodle bar',
     'cocktail bar craft drinks', 'wine bar tasting',
+    // Non-food — the neighborhood the food lives in, between the meals
+    'food market hall local vendors', 'historic market square neighborhood',
+    'culinary neighborhood walkable restaurant district', 'plaza public square cafe terrace',
+    'historic architecture street district walk', 'park garden scenic walk',
+    'spice market grocery specialty food shops', 'waterfront promenade walk',
   ],
   afterdark: [
     'speakeasy cocktail bar', 'rooftop bar lounge', 'jazz club live music',
@@ -82,6 +154,9 @@ const DIVERSE_TEXT_SEARCHES: Record<string, string[]> = {
     'hip hop club lounge', 'comedy club open mic', 'underground bar hidden',
     'bowling alley arcade entertainment', 'escape room activity',
     'late night food restaurant open late', 'nightclub dance floor DJ',
+    'night market street food stalls', 'illuminated landmark night view',
+    'city viewpoint at night skyline', 'plaza nightlife square people watching',
+    'theater show evening performance',
   ],
   escape: [
     'scenic hiking trail nature walk', 'beach oceanfront seaside',
@@ -91,6 +166,10 @@ const DIVERSE_TEXT_SEARCHES: Record<string, string[]> = {
     'hot springs thermal bath spa', 'scenic viewpoint overlook panoramic',
     'lake river kayak outdoor', 'sunset spot scenic photography',
     'brunch restaurant scenic outdoor patio', 'waterfront brunch cafe',
+    'state park nature reserve trail', 'arboretum garden walk',
+    'cliff walk coastal path', 'river walk greenway trail',
+    'wildlife refuge bird watching', 'picnic spot shaded park',
+    'observation deck panoramic viewpoint', 'quiet garden courtyard hidden',
   ],
   luxe: [
     'Michelin star restaurant tasting menu fine dining', 'award winning chef restaurant upscale',
@@ -105,6 +184,11 @@ const DIVERSE_TEXT_SEARCHES: Record<string, string[]> = {
     'supper club brunch elegant live performance', 'rooftop brunch bottomless champagne views',
     'gospel brunch soul food upscale', 'celebrity chef brunch acclaimed restaurant',
     'hotel dining room brunch prix fixe elegant', 'bottomless brunch cocktails upscale trendy',
+    // Non-food — luxury is architectural too, not just spas and shopping
+    'grand historic architecture landmark building', 'opera house concert hall prestigious',
+    'private gallery exhibition by appointment', 'designer boutique district flagship',
+    'historic district architecture tour', 'manicured garden estate grounds',
+    'observation deck penthouse city view', 'luxury marina yacht harbour',
   ],
   undertheradar: [
     'neighborhood restaurant locals favorite authentic', 'hole in the wall restaurant hidden gem',
@@ -117,6 +201,11 @@ const DIVERSE_TEXT_SEARCHES: Record<string, string[]> = {
     'local fish market seafood fresh catch', 'neighborhood taco shop authentic street food',
     'locals only bar dive bar neighborhood', 'hidden courtyard cafe tucked away',
     'old school deli sandwich shop local', 'neighborhood ramen noodle shop authentic',
+    'residential neighborhood walk local streets', 'street art alley mural hidden',
+    'old quarter back streets architecture', 'neighborhood park locals pocket park',
+    'community garden neighborhood green space', 'staircase alley hidden passage',
+    'local bookshop record shop neighborhood', 'small neighborhood museum house museum',
+    'overlooked monument local landmark', 'tucked away courtyard plaza',
   ],
   // ── LEGACY VIBES (still used by backend fallback + existing plans) ──────
   nightout: [
@@ -133,6 +222,8 @@ const DIVERSE_TEXT_SEARCHES: Record<string, string[]> = {
     'African restaurant', 'Halal restaurant', 'dim sum Chinese restaurant',
     'street food food truck', 'hole in the wall restaurant local favorite',
     'brunch spot breakfast', 'dessert bakery pastry', 'ramen noodle bar',
+    'food market hall vendors', 'farmers market outdoor market',
+    'historic market square', 'walkable restaurant district neighborhood',
   ],
   adventure: [
     'cultural district historic neighborhood', 'scenic viewpoint lookout',
@@ -144,6 +235,9 @@ const DIVERSE_TEXT_SEARCHES: Record<string, string[]> = {
     'temple shrine palace historic visit', 'wildlife sanctuary nature park',
     'adventure outdoor activity zipline kayak',
     'national park nature reserve hiking',
+    'state park trail hiking', 'coastal path cliff walk',
+    'river walk greenway bike path', 'arboretum botanical garden',
+    'lookout tower observation point', 'nature center wildlife refuge',
   ],
   surprise: [
     'neighborhood restaurant locals favorite authentic', 'hole in the wall restaurant hidden gem',
@@ -156,12 +250,19 @@ const DIVERSE_TEXT_SEARCHES: Record<string, string[]> = {
     'local fish market seafood fresh catch', 'neighborhood taco shop authentic street food',
     'locals only bar dive bar neighborhood', 'hidden courtyard cafe tucked away',
     'old school deli sandwich shop local', 'neighborhood ramen noodle shop authentic',
+    'residential neighborhood walk local streets', 'street art alley mural hidden',
+    'old quarter back streets architecture', 'neighborhood park locals pocket park',
+    'community garden neighborhood green space', 'staircase alley hidden passage',
+    'local bookshop record shop neighborhood', 'small neighborhood museum house museum',
+    'overlooked monument local landmark', 'tucked away courtyard plaza',
   ],
   chill: [
     'cozy coffee shop cafe', 'indie bookstore cafe', 'botanical garden park scenic',
     'farmers market local', 'quiet brunch spot', 'tea house matcha cafe',
     'bakery pastry shop local', 'scenic walking trail park', 'art gallery exhibition',
     'vintage shop boutique', 'beach seaside relaxing waterfront',
+    'quiet plaza bench people watching', 'botanical garden conservatory calm',
+    'neighborhood library reading room', 'arboretum garden slow walk',
   ],
   wander: [
     'historic neighborhood walking tour', 'street art mural district',
@@ -170,6 +271,11 @@ const DIVERSE_TEXT_SEARCHES: Record<string, string[]> = {
     'charming neighborhood cafe local', 'vintage shop thrift store district',
     'food market street food stalls', 'scenic neighborhood architecture walk',
     'park plaza public square landmark', 'artisan shops craft neighborhood',
+    'historic architecture buildings district', 'residential neighborhood tree lined streets',
+    'public staircase alley stairway walk', 'arcade passage covered walkway',
+    'plaza public square fountain', 'riverside canal walk path',
+    'neighborhood bookshop record shop', 'small gallery artist studio neighborhood',
+    'local landmark clock tower building', 'viewpoint over the neighborhood',
   ],
   daydrinks: [
     'rooftop bar views', 'happy hour cocktail bar', 'wine bar wine tasting',
@@ -186,6 +292,9 @@ const DIVERSE_TEXT_SEARCHES: Record<string, string[]> = {
     'modern art museum contemporary gallery', 'cultural heritage landmark historic',
     'planetarium space science center', 'maritime museum naval history',
     'national monument memorial landmark', 'historic architecture district landmark',
+    'architecture landmark building tour', 'brutalist modernist building notable',
+    'art deco district buildings', 'historic quarter old town architecture',
+    'civic hall courthouse notable building', 'public art installation sculpture square',
   ],
   stacked: [
     'iconic landmark must visit attraction', 'world class museum gallery exhibition',
@@ -207,6 +316,8 @@ const DIVERSE_TEXT_SEARCHES: Record<string, string[]> = {
     'waterfront restaurant scenic dining', 'fine dining tasting menu date',
     'jazz bar live music intimate venue', 'scenic viewpoint sunset overlook',
     'dessert bar patisserie late night sweets', 'champagne bar lounge upscale',
+    'sunset viewpoint overlook', 'botanical garden evening walk',
+    'historic plaza evening stroll', 'waterfront promenade night walk',
   ],
   // Hidden gems — dedicated searches for off-the-beaten-path discoveries
   hiddengems: [
@@ -218,6 +329,9 @@ const DIVERSE_TEXT_SEARCHES: Record<string, string[]> = {
     'neighborhood bakery local favorite', 'authentic ethnic food hole in wall',
     'hidden courtyard garden park', 'secret viewpoint scenic overlook',
     'unknown museum gallery quirky', 'neighborhood street art mural alley',
+    'residential neighborhood walk local streets', 'old quarter back streets architecture',
+    'community garden neighborhood green space', 'small neighborhood museum house museum',
+    'overlooked monument local landmark',
   ],
 };
 
@@ -1386,12 +1500,12 @@ const VIBE_CONFIG: Record<string, {
   // ── NEW 6 VIBES ──────────────────────────────────────────────────────────
   starthare: {
     foodTypes: FOOD_TYPES,
-    activityTypes: ['museum', 'art_gallery', 'tourist_attraction', 'historical_landmark', 'performing_arts_theater', 'park', 'library', 'market'],
+    activityTypes: ['museum', 'art_gallery', 'tourist_attraction', 'historical_landmark', 'performing_arts_theater', 'park', 'library', 'market', 'plaza', 'monument', 'cultural_landmark', 'observation_deck'],
     textSearchKey: 'starthare',
     textSearchCount: 10,
-    aiHint: 'GREATEST HITS — the legendary, iconic, can\'t-miss spots that DEFINE this city. These are the places people FLY here for. The landmarks on every postcard. The restaurants with 2-hour waits. The viewpoints that make people cry. 60-70% MUST be world-famous EXPERIENCES (the #1 landmark, the museum everyone talks about, the viewpoint that goes viral, the street that defines the city) and 30-40% must be the city\'s most CELEBRATED food & drink (the restaurant with the line around the block, the cafe in every guidebook). If someone says "I went to [city]" and didn\'t hit these spots, they didn\'t really go. EVERY stop should make someone say "oh you HAVE to go there." No hidden gems, no under-the-radar — this is THE list.',
+    aiHint: 'GREATEST HITS — the legendary, iconic, can\'t-miss spots that DEFINE this city. These are the places people FLY here for. The landmarks on every postcard. The restaurants with 2-hour waits. The viewpoints that make people cry. 60-70% MUST be world-famous EXPERIENCES (the #1 landmark, the museum everyone talks about, the viewpoint that goes viral, the street that defines the city) and 30-40% must be the city\'s most CELEBRATED food & drink (the restaurant with the line around the block, the cafe in every guidebook). If someone says "I went to [city]" and didn\'t hit these spots, they didn\'t really go. EVERY stop should make someone say "oh you HAVE to go there." No hidden gems, no under-the-radar — this is THE list. The city\'s greatest hits include its STREETS and BUILDINGS, not just its ticketed sites — the square everyone photographs, the bridge, the skyline street, the block of architecture that is the city\'s face.',
     structureHint: {
-      morning: 'Iconic breakfast spot → famous landmark → scenic viewpoint → celebrated brunch → must-see museum → neighborhood walk',
+      morning: 'Iconic breakfast spot → famous landmark → scenic viewpoint → iconic plaza or architecture walk → must-see museum → neighborhood walk',
       afternoon: 'Acclaimed lunch spot → world-class museum → iconic landmark → scenic walk → famous cafe → cultural site',
       evening: 'Famous dinner spot → iconic sunset viewpoint → celebrated bar → cultural venue → legendary late-night spot → nightcap',
       full: 'Iconic breakfast cafe → must-see landmark → famous museum → acclaimed lunch → iconic neighborhood walk → scenic viewpoint → celebrated dinner → famous bar or cultural venue',
@@ -1399,64 +1513,64 @@ const VIBE_CONFIG: Record<string, {
   },
   indulge: {
     foodTypes: FOOD_TYPES,
-    activityTypes: [],
+    activityTypes: DISCOVERY_TYPES,
     textSearchKey: 'indulge',
     textSearchCount: 10,
-    aiHint: 'INDULGE — food so good it makes you close your eyes. This is a culinary EXPERIENCE that should IMPRESS — not just fill your stomach. Every stop is a restaurant, cafe, bar, dessert shop, or food market that would make a food critic stop in their tracks. Think: the chef who trained in Paris, the omakase counter with 8 seats, the hole-in-the-wall where the mole recipe is 4 generations old, the cocktail bar where every drink is a work of art. Each stop MUST be a different cuisine/culture — NEVER two from the same. Mix jaw-dropping fine dining with legendary street food, innovative cocktail bars with beloved neighborhood institutions. These should be places people POST about, TALK about, DREAM about going back to. The food should be so good it becomes a core memory.',
+    aiHint: 'INDULGE — food so good it makes you close your eyes. This is a culinary EXPERIENCE that should IMPRESS — not just fill your stomach. Every stop is a restaurant, cafe, bar, dessert shop, or food market that would make a food critic stop in their tracks. Think: the chef who trained in Paris, the omakase counter with 8 seats, the hole-in-the-wall where the mole recipe is 4 generations old, the cocktail bar where every drink is a work of art. Each stop MUST be a different cuisine/culture — NEVER two from the same. Mix jaw-dropping fine dining with legendary street food, innovative cocktail bars with beloved neighborhood institutions. These should be places people POST about, TALK about, DREAM about going back to. The food should be so good it becomes a core memory. Indulge is still food-led — but a food day is not a conveyor belt of tables. Between the meals, walk somewhere worth walking: the market the chefs shop at, the plaza where the neighborhood eats outdoors, the block of architecture you pass on the way, the bakery-lined street, the park where you digest. At least 2-3 stops MUST be non-food — the neighborhood the food lives in is part of the meal.',
     structureHint: {
-      morning: 'Celebrated cafe → acclaimed brunch #1 → stroll → brunch #2 (different cuisine) → dessert spot → coffee at iconic spot',
-      afternoon: 'Impressive lunch → coffee break → food market or street food → happy hour cocktails + bites → dessert → evening appetizer',
-      evening: 'Pre-dinner cocktails → elevated dinner → stroll → dessert spot → cocktail bar → nightcap',
-      full: 'Iconic breakfast cafe → acclaimed brunch → food market or street food → impressive lunch → cocktail bar → celebrated dinner → dessert destination → nightcap',
+      morning: 'Celebrated cafe → market or bakery-lined street walk → acclaimed brunch → plaza or park stroll → dessert spot',
+      afternoon: 'Impressive lunch → food market → neighborhood architecture walk → coffee break → happy hour bites',
+      evening: 'Pre-dinner walk through the dining district → elevated dinner → plaza or waterfront stroll → dessert spot → cocktail bar',
+      full: 'Iconic breakfast cafe → food market → acclaimed brunch → neighborhood walk (architecture / plaza) → impressive lunch → park or gallery → celebrated dinner → dessert destination',
     },
   },
   afterdark: {
     foodTypes: ['restaurant', 'fine_dining_restaurant', 'steak_house', 'seafood_restaurant', 'wine_bar', 'bar', 'pizza_restaurant'],
-    activityTypes: NIGHTLIFE_TYPES.concat(['bowling_alley', 'amusement_park', 'karaoke']),
+    activityTypes: NIGHTLIFE_TYPES.concat(['bowling_alley', 'amusement_park', 'karaoke', 'performing_arts_theater', 'concert_hall', 'plaza', 'observation_deck']),
     textSearchKey: 'afterdark',
     textSearchCount: 8,
-    aiHint: 'AFTER DARK — nightlife so good you don\'t want to go home. This isn\'t a quiet evening out — this is THE night. The kind of night you tell stories about for years. Start with dinner at a place with ENERGY, then escalate through the city\'s BEST bars, the speakeasy everyone whispers about, the rooftop with the insane view, the live music venue where the crowd goes wild, the dance floor where you lose track of time. Mix in FUN — karaoke, bowling alleys, comedy clubs, arcade bars, late-night boat cruises. The arc MUST escalate: pre-game food → cocktails → entertainment → PEAK energy (the best club/venue/bar in the city) → wind-down late-night food. Every stop should have more energy than the last. By the end, they should be saying "one more spot" at 2 AM.',
+    aiHint: 'AFTER DARK — nightlife so good you don\'t want to go home. This isn\'t a quiet evening out — this is THE night. The kind of night you tell stories about for years. Start with dinner at a place with ENERGY, then escalate through the city\'s BEST bars, the speakeasy everyone whispers about, the rooftop with the insane view, the live music venue where the crowd goes wild, the dance floor where you lose track of time. Mix in FUN — karaoke, bowling alleys, comedy clubs, arcade bars, late-night boat cruises. The arc MUST escalate: pre-game food → cocktails → entertainment → PEAK energy (the best club/venue/bar in the city) → wind-down late-night food. Every stop should have more energy than the last. By the end, they should be saying "one more spot" at 2 AM. Not every night stop is a drink — the lit-up plaza, the night market, the viewpoint over the city, the theater or music hall all count as nightlife.',
     structureHint: {
       morning: 'Boozy brunch → rooftop day bar → fun activity → chill cocktails → second bar → lunch with drinks',
       afternoon: 'Late lunch → happy hour rooftop → bowling/arcade/activity → pre-game cocktails → second happy hour → sunset drinks',
-      evening: 'Dinner with energy → cocktail bar → live music or comedy → rooftop bar → dance spot or club → late-night eats',
-      full: 'Dinner at energetic spot → cocktail lounge → live entertainment → rooftop bar → THE club/venue of the city → late-night food → one more spot → after-hours',
+      evening: 'Dinner with energy → cocktail bar → live music or comedy → rooftop bar → night viewpoint or lit-up plaza → dance spot or club → late-night eats',
+      full: 'Dinner at energetic spot → cocktail lounge → live entertainment → rooftop bar → night viewpoint or lit-up plaza → THE club/venue of the city → late-night food → one more spot → after-hours',
     },
   },
   escape: {
     foodTypes: ['restaurant', 'cafe', 'coffee_shop', 'seafood_restaurant', 'brunch_restaurant'],
-    activityTypes: ['park', 'hiking_area', 'tourist_attraction', 'zoo', 'aquarium', 'botanical_garden', 'spa', 'market'],
+    activityTypes: [...new Set(['park', 'hiking_area', 'tourist_attraction', 'zoo', 'aquarium', 'botanical_garden', 'spa', 'market', ...OUTDOOR_TYPES])],
     textSearchKey: 'escape',
     textSearchCount: 8,
-    aiHint: 'ESCAPE — get completely LOST in another world. This is about being so immersed in beauty, nature, and serenity that you forget what day it is. 70%+ of stops MUST be OUTDOORS or deeply IMMERSIVE: the beach where the water is crystal clear, the hike where the view makes you gasp, the botanical garden that feels like another planet, the waterfront where time stops, the spa where you melt into the table. Food is scenic — beachside cafes, cliffside restaurants, garden terraces where you eat surrounded by nature. If the city has beaches, include THE best one. If it has mountains, go to the viewpoint that takes your breath away. The pace is slow, intentional, and restorative. By the end of this day, they should feel like they\'ve been on a spiritual retreat — recharged, in awe, completely removed from the stress of real life.',
+    aiHint: 'ESCAPE — get completely LOST in another world. This is about being so immersed in beauty, nature, and serenity that you forget what day it is. 70%+ of stops MUST be OUTDOORS or deeply IMMERSIVE: the beach where the water is crystal clear, the hike where the view makes you gasp, the botanical garden that feels like another planet, the waterfront where time stops, the spa where you melt into the table. Food is scenic — beachside cafes, cliffside restaurants, garden terraces where you eat surrounded by nature. If the city has beaches, include THE best one. If it has mountains, go to the viewpoint that takes your breath away. The pace is slow, intentional, and restorative. By the end of this day, they should feel like they\'ve been on a spiritual retreat — recharged, in awe, completely removed from the stress of real life. Food here is a pause inside the landscape, never the destination — at most 2 food stops on a full day, and each must be somewhere the view is the reason you sat down.',
     structureHint: {
-      morning: 'Scenic breakfast → park or garden → nature trail → beachside brunch → botanical garden → scenic viewpoint',
+      morning: 'Scenic breakfast or coffee → park or garden → nature trail → scenic viewpoint → botanical garden → waterfront walk',
       afternoon: 'Waterfront lunch → beach or nature walk → spa or garden → scenic viewpoint → waterfront cafe → sunset spot',
       evening: 'Sunset viewpoint → waterfront dinner → evening beach walk → scenic restaurant → garden stroll → stargazing spot',
-      full: 'Scenic breakfast → morning park or hike → beachside brunch → afternoon beach or spa → botanical garden → scenic viewpoint for sunset → waterfront dinner → evening walk under the stars',
+      full: 'Scenic breakfast → morning park or hike → scenic overlook or garden → afternoon beach or spa → botanical garden → scenic viewpoint for sunset → waterfront dinner → evening walk under the stars',
     },
   },
   luxe: {
     foodTypes: ['fine_dining_restaurant', 'steak_house', 'seafood_restaurant', 'restaurant', 'sushi_restaurant', 'wine_bar', 'brunch_restaurant'],
-    activityTypes: ADVENTURE_TYPES.concat(NIGHTLIFE_TYPES).concat(['shopping_mall', 'clothing_store', 'spa']),
+    activityTypes: ADVENTURE_TYPES.concat(NIGHTLIFE_TYPES).concat(['shopping_mall', 'clothing_store', 'spa']).concat(ARCHITECTURE_TYPES),
     textSearchKey: 'luxe',
     textSearchCount: 10,
-    aiHint: 'LUXE — I want to feel like a billionaire\'s daughter. Take my money and make me feel like royalty. ONLY pick places rated 4.8+ stars. Every single stop should make you feel like you\'ve ARRIVED — Michelin-starred restaurants where the chef comes to your table, the rooftop champagne bar where the city glitters below you, the spa where they remember your name, the boutique where they bring you espresso while you shop, the private gallery viewing, the scenic viewpoint from the penthouse level. NO chains, no casual, no budget spots — if it doesn\'t feel EXCLUSIVE, it doesn\'t belong. At least HALF the stops must be premium NON-FOOD experiences (world-class museums, luxury shopping, five-star spas, iconic landmarks, private tours). Food is the city\'s FINEST — the reservation you wait 3 months for. Drinks at the bar where celebrities sit. Every stop should feel like "I can\'t believe this is my life right now."',
+    aiHint: 'LUXE — I want to feel like a billionaire\'s daughter. Take my money and make me feel like royalty. ONLY pick places rated 4.8+ stars. Every single stop should make you feel like you\'ve ARRIVED — Michelin-starred restaurants where the chef comes to your table, the rooftop champagne bar where the city glitters below you, the spa where they remember your name, the boutique where they bring you espresso while you shop, the private gallery viewing, the scenic viewpoint from the penthouse level. NO chains, no casual, no budget spots — if it doesn\'t feel EXCLUSIVE, it doesn\'t belong. At least HALF the stops must be premium NON-FOOD experiences (world-class museums, luxury shopping, five-star spas, iconic landmarks, private tours). Food is the city\'s FINEST — the reservation you wait 3 months for. Drinks at the bar where celebrities sit. Every stop should feel like "I can\'t believe this is my life right now." Luxury is also architectural: the landmark building, the grand plaza, the opera house, the designer district, the private garden. Do not spend the non-food half entirely on spas and shopping.',
     structureHint: {
       morning: 'Luxury brunch → iconic landmark → world-class gallery → premium patisserie → five-star spa → upscale cafe',
       afternoon: 'Fine dining lunch → world-class museum → luxury shopping → scenic viewpoint → premium spa → champagne bar',
       evening: 'Award-winning fine dining → exclusive rooftop lounge → champagne bar → premium nightclub → VIP experience → late-night luxury',
-      full: 'Luxury brunch → iconic landmark → world-class gallery → finest lunch → premier museum or luxury shopping → scenic viewpoint → fine dining dinner → exclusive rooftop bar',
+      full: 'Iconic landmark or grand architecture → luxury brunch → world-class gallery → premier museum or designer district → scenic viewpoint → fine dining dinner → exclusive rooftop bar',
     },
   },
   undertheradar: {
-    foodTypes: [...FOOD_TYPES, 'bakery', 'sandwich_shop', 'pizza_restaurant', 'ramen_restaurant', 'noodle_restaurant'],
-    activityTypes: ['market', 'park', 'flea_market', 'farmers_market', 'cultural_landmark', 'historical_landmark'],
+    foodTypes: [...FOOD_TYPES, 'bakery', 'sandwich_shop', 'pizza_restaurant', 'ramen_restaurant'],
+    activityTypes: ['market', 'park', 'flea_market', 'cultural_landmark', 'historical_landmark', 'plaza', 'garden', 'book_store', 'art_gallery', 'monument'],
     textSearchKey: 'undertheradar',
     textSearchCount: 8,
     aiHint: 'UNDER THE RADAR — the places people don\'t always hear about but will absolutely LOVE. These are the spots that make someone say "how did you even FIND this place?!" Think: the hole-in-the-wall where the owner has been making the same recipe for 40 years, the cafe with no sign but a line of locals every morning, the tiny bakery that makes the best croissant in the city, the bar behind an unmarked door, the park bench with the best view nobody knows about, the market stall where the grandmother makes everything by hand. EVERY stop should feel like a SECRET being shared — authentic, undiscovered, and genuinely surprising. NO chains, no tourist traps, no places in guidebooks. PRIORITIZE places with fewer reviews but 4.5+ ratings — the hidden gems. The $8 plate that destroys the $80 one. Mix food discoveries with non-food surprises: street art alleys, neighborhood markets, hidden rooftops, local community spots. By the end, they should feel like they discovered a city nobody else knows.',
     structureHint: {
-      morning: 'Local bakery with a line → hidden breakfast spot → neighborhood market → second brunch spot (different style) → tucked-away park → street art alley',
+      morning: 'Local bakery with a line → neighborhood market → back-street architecture walk → tucked-away park → street art alley → hidden courtyard cafe',
       afternoon: 'Hole-in-the-wall lunch (family-run) → local market → neighborhood walk → hidden cafe → street food stall → community gathering spot',
       evening: 'Neighborhood restaurant locals guard jealously → hidden bar behind unmarked door → local pub → street food → locals-only late-night spot → secret after-hours',
       full: 'Local bakery → neighborhood market → authentic lunch (family-run, generations old) → hidden park or street art → neighborhood cafe → secret dinner spot → locals-only bar → late-night street food',
@@ -1465,7 +1579,7 @@ const VIBE_CONFIG: Record<string, {
   // ── LEGACY VIBES (backend fallback for existing plans) ──────────────────
   nightout: {
     foodTypes: ['restaurant', 'fine_dining_restaurant', 'steak_house', 'seafood_restaurant', 'wine_bar', 'bar'],
-    activityTypes: NIGHTLIFE_TYPES,
+    activityTypes: NIGHTLIFE_TYPES.concat(['performing_arts_theater', 'concert_hall', 'plaza']),
     textSearchKey: 'nightout',
     textSearchCount: 4,
     aiHint: 'This is a NIGHT OUT. Start with dinner or a pre-game food spot, then build through bars, lounges, speakeasies, jazz clubs, or live music, and END with a late-night food spot (tacos, pizza, diner, etc). The arc should feel like a real night out with friends — not just a list of bars.',
@@ -1478,7 +1592,7 @@ const VIBE_CONFIG: Record<string, {
   },
   stacked: {
     foodTypes: FOOD_TYPES.concat(['fine_dining_restaurant', 'steak_house', 'seafood_restaurant']),
-    activityTypes: ADVENTURE_TYPES.concat(NIGHTLIFE_TYPES),
+    activityTypes: ADVENTURE_TYPES.concat(NIGHTLIFE_TYPES).concat(ARCHITECTURE_TYPES),
     textSearchKey: 'stacked',
     textSearchCount: 6,
     aiHint: 'This is the FULL EXPERIENCE — a premium day-to-night concierge itinerary covering EVERYTHING the city offers. CRITICAL: This is NOT a food tour. Think of it as: breakfast → EXPLORE (museum, temple, landmark) → lunch → ADVENTURE (park, viewpoint, cultural site) → dinner → NIGHTLIFE (rooftop bar, speakeasy, live music). The plan must feel like a COMPLETE day — eating, exploring, discovering, AND going out. Food is just the fuel between experiences. If the plan reads like a restaurant crawl with one museum, YOU HAVE FAILED. A great Full Experience plan has 3 meals woven between 2-3 iconic activities and 2 nightlife stops.',
@@ -1491,23 +1605,23 @@ const VIBE_CONFIG: Record<string, {
   },
   food: {
     foodTypes: FOOD_TYPES,
-    activityTypes: [],
+    activityTypes: NEIGHBORHOOD_TYPES,
     textSearchKey: 'food',
     textSearchCount: 5,
-    aiHint: 'This is a FOOD TOUR — a global culinary journey through the city. Every stop is food or drink. ABSOLUTE RULE: Each stop MUST be a DIFFERENT cuisine/culture. If stop 1 is Mexican, stop 2 must be a completely different culture (Chinese, Ethiopian, Korean, Indian, Caribbean, Italian, Middle Eastern, Japanese, African, Vietnamese, Thai, etc.). NEVER two stops from the same cuisine, culture, or restaurant brand. Rotate through as many different cultures as possible. Create a NARRATIVE ARC: start light (coffee, pastries, brunch), build to heavier dishes (entrees, BBQ, curry), end sweet or boozy (dessert, cocktails, nightcap). Include a mix of sit-down, casual, and grab-and-go. This food tour should feel like eating around the WORLD in one day.',
+    aiHint: 'This is a FOOD TOUR — a global culinary journey through the city. Every stop is food or drink. ABSOLUTE RULE: Each stop MUST be a DIFFERENT cuisine/culture. If stop 1 is Mexican, stop 2 must be a completely different culture (Chinese, Ethiopian, Korean, Indian, Caribbean, Italian, Middle Eastern, Japanese, African, Vietnamese, Thai, etc.). NEVER two stops from the same cuisine, culture, or restaurant brand. Rotate through as many different cultures as possible. Create a NARRATIVE ARC: start light (coffee, pastries, brunch), build to heavier dishes (entrees, BBQ, curry), end sweet or boozy (dessert, cocktails, nightcap). Include a mix of sit-down, casual, and grab-and-go. This food tour should feel like eating around the WORLD in one day. Between bites, the walk matters: markets, plazas, a park to digest in, the neighborhood the cuisine comes from. 1-2 stops should be non-food palate cleansers.',
     structureHint: {
       morning: 'Coffee/pastry → stroll neighborhood → brunch spot (2.5-3 hrs after first stop)',
       afternoon: 'Lunch entree → scenic walk or coffee break → happy hour drinks + bites (2.5-3 hrs after lunch)',
       evening: 'Dinner entree → walk and digest → dessert or cocktail spot (2.5-3 hrs after dinner)',
-      full: 'Coffee/pastry (10 AM) → walk/explore → brunch (12:30-1 PM) → stroll/digest → afternoon bite (3:30-4 PM) → walk → dinner (7 PM) → dessert or nightcap (9:30-10 PM)',
+      full: 'Coffee/pastry (10 AM) → market or neighborhood walk → brunch (12:30 PM) → plaza or park → afternoon bite (3:30 PM) → architecture walk → dinner (7 PM) → dessert or nightcap',
     },
   },
   adventure: {
     foodTypes: ['restaurant', 'cafe', 'coffee_shop', 'seafood_restaurant', 'brunch_restaurant'],
-    activityTypes: ['park', 'hiking_area', 'tourist_attraction', 'zoo', 'aquarium', 'amusement_park', 'market', 'botanical_garden'],
+    activityTypes: [...new Set(['park', 'hiking_area', 'tourist_attraction', 'zoo', 'aquarium', 'amusement_park', 'market', 'botanical_garden', ...OUTDOOR_TYPES])],
     textSearchKey: 'adventure',
     textSearchCount: 5,
-    aiHint: 'This is an OUTDOOR ADVENTURE day — parks, beaches, hikes, scenic viewpoints, nature, and outdoor activities. 70%+ of stops must be OUTDOORS: parks, trails, beaches, gardens, waterfront boardwalks, scenic lookouts, farmers markets. Food stops are quick fuel between adventures — local cafes, beachside restaurants, food trucks. If the city has beaches, MUST include at least one. If it has mountains/hills, include a viewpoint. This is about fresh air and exploration, not sitting indoors.',
+    aiHint: 'This is an OUTDOOR ADVENTURE day — parks, beaches, hikes, scenic viewpoints, nature, and outdoor activities. 70%+ of stops must be OUTDOORS: parks, trails, beaches, gardens, waterfront boardwalks, scenic lookouts, farmers markets. Food stops are quick fuel between adventures — local cafes, beachside restaurants, food trucks. If the city has beaches, MUST include at least one. If it has mountains/hills, include a viewpoint. This is about fresh air and exploration, not sitting indoors. Cap food at 2 stops on a full day — the rest is outdoors.',
     structureHint: {
       morning: 'Quick breakfast/coffee → park, garden or beach → scenic viewpoint or nature trail',
       afternoon: 'Lunch at local spot → beach, waterfront or hike → outdoor market or garden',
@@ -1517,7 +1631,7 @@ const VIBE_CONFIG: Record<string, {
   },
   datenight: {
     foodTypes: ['fine_dining_restaurant', 'restaurant', 'seafood_restaurant', 'steak_house', 'sushi_restaurant', 'wine_bar', 'bar'],
-    activityTypes: ['tourist_attraction', 'art_gallery', 'performing_arts_theater', 'park'],
+    activityTypes: ['tourist_attraction', 'art_gallery', 'performing_arts_theater', 'park', 'plaza', 'botanical_garden', 'observation_deck', 'historical_landmark'],
     textSearchKey: 'datenight',
     textSearchCount: 4,
     aiHint: 'This is a ROMANTIC DATE NIGHT. Every stop should feel intimate, beautiful, and special. Think candlelit restaurants, rooftop bars with views, scenic sunset spots, wine bars, cocktail lounges, and waterfront walks. The arc should build: start with a scenic/romantic appetizer spot or drinks → move to a memorable dinner → end with a cocktail lounge, dessert spot, or scenic walk. No loud clubs, no casual chains, no fast food. Price level 3-4 preferred. Atmosphere matters more than anything.',
@@ -1530,10 +1644,10 @@ const VIBE_CONFIG: Record<string, {
   },
   cultural: {
     foodTypes: FOOD_TYPES,
-    activityTypes: ['museum', 'art_gallery', 'tourist_attraction', 'historical_landmark', 'performing_arts_theater', 'library'],
+    activityTypes: ['museum', 'art_gallery', 'tourist_attraction', 'historical_landmark', 'performing_arts_theater', 'library', 'cultural_landmark', 'monument', 'concert_hall', 'book_store', 'plaza', 'art_studio'],
     textSearchKey: 'cultural',
     textSearchCount: 5,
-    aiHint: 'This is an ART & CULTURE day — museums, galleries, historic landmarks, street art, architecture, and cultural neighborhoods. 60-70% of stops must be CULTURAL: museums, art galleries, historic landmarks, cultural centers, street art districts, famous architecture. Weave in 2-3 food stops at neighborhood restaurants near the cultural sites — the food should reflect the cultural neighborhood. Include a mix of major institutions AND smaller local galleries/cultural spaces.',
+    aiHint: 'This is an ART & CULTURE day — museums, galleries, historic landmarks, street art, architecture, and cultural neighborhoods. 60-70% of stops must be CULTURAL: museums, art galleries, historic landmarks, cultural centers, street art districts, famous architecture. Weave in 2-3 food stops at neighborhood restaurants near the cultural sites — the food should reflect the cultural neighborhood. Include a mix of major institutions AND smaller local galleries/cultural spaces. Architecture counts as culture: a block of buildings, a civic square, a historic quarter is a stop in its own right, not a transition.',
     structureHint: {
       morning: 'Cafe near cultural district → world-class museum or gallery → street art or architecture walk',
       afternoon: 'Lunch in cultural neighborhood → historic landmark or smaller gallery → cultural center or theater',
@@ -1542,8 +1656,8 @@ const VIBE_CONFIG: Record<string, {
     },
   },
   surprise: {
-    foodTypes: [...FOOD_TYPES, 'bakery', 'sandwich_shop', 'pizza_restaurant', 'ramen_restaurant', 'noodle_restaurant'],
-    activityTypes: ['market', 'park', 'flea_market', 'farmers_market', 'cultural_landmark', 'historical_landmark', 'neighborhood'],
+    foodTypes: [...FOOD_TYPES, 'bakery', 'sandwich_shop', 'pizza_restaurant', 'ramen_restaurant'],
+    activityTypes: ['market', 'park', 'flea_market', 'cultural_landmark', 'historical_landmark', 'plaza', 'garden', 'book_store', 'art_gallery', 'monument'],
     textSearchKey: 'surprise',
     textSearchCount: 8,
     aiHint: 'LOCAL SECRETS — the hidden spots only neighborhood residents know about. Think hole-in-the-wall eateries, family-run restaurants passed down for generations, neighborhood cafes where regulars know each other by name, tiny bakeries with lines out the door, street food stalls, local markets, and cozy bars where tourists never go. EVERY stop should feel AUTHENTIC and UNDISCOVERED — the kind of place a local friend would take you. NO chains, no tourist traps, no places that appear in guidebooks. PRIORITIZE places with fewer reviews but excellent ratings — these are the hidden gems. Food should be traditional, authentic, neighborhood-level — the $8 plate that beats the $80 one. Mix in non-food local experiences: neighborhood markets, scenic local parks, street art alleys, community gathering spots. This is the REAL city, not the postcard version.',
@@ -1556,7 +1670,7 @@ const VIBE_CONFIG: Record<string, {
   },
   chill: {
     foodTypes: ['cafe', 'coffee_shop', 'bakery', 'breakfast_restaurant', 'brunch_restaurant', 'ice_cream_shop'],
-    activityTypes: ['book_store', 'park', 'art_gallery', 'market', 'spa', 'library'],
+    activityTypes: ['book_store', 'park', 'art_gallery', 'market', 'spa', 'library', 'plaza', 'garden', 'botanical_garden', 'historical_landmark'],
     textSearchKey: 'chill',
     textSearchCount: 3,
     aiHint: 'This is a CHILL morning/day. Think cozy coffee shops, indie bookstores, scenic parks, farmers markets, and relaxed brunch spots. The pace should be slow and leisurely — not rushed. Every stop should feel like a warm exhale.',
@@ -1569,10 +1683,10 @@ const VIBE_CONFIG: Record<string, {
   },
   wander: {
     foodTypes: ['cafe', 'restaurant', 'bakery', 'coffee_shop', 'ice_cream_shop', 'brunch_restaurant'],
-    activityTypes: ['market', 'park', 'art_gallery', 'historical_landmark', 'cultural_landmark', 'tourist_attraction', 'book_store', 'clothing_store', 'gift_shop'],
+    activityTypes: [...new Set(['market', 'park', 'art_gallery', 'historical_landmark', 'cultural_landmark', 'tourist_attraction', 'book_store', 'clothing_store', 'gift_shop', ...ARCHITECTURE_TYPES, 'garden', 'observation_deck'])],
     textSearchKey: 'wander',
-    textSearchCount: 5,
-    aiHint: 'This is a WANDER afternoon — exploring neighborhoods on foot. Think charming streets, local markets, street art, pedestrian districts, and stumbling upon great spots. Mix walkable food stops (cafes, street food, bakeries) with interesting places to browse (vintage shops, bookstores, markets). Each stop should feel like a natural discovery while walking. The route should flow geographically — no backtracking.',
+    textSearchCount: 8,
+    aiHint: 'This is a WANDER afternoon — exploring neighborhoods on foot. Think charming streets, local markets, street art, pedestrian districts, and stumbling upon great spots. Mix walkable food stops (cafes, street food, bakeries) with interesting places to browse (vintage shops, bookstores, markets). Each stop should feel like a natural discovery while walking. The route should flow geographically — no backtracking. The buildings and the streets are the attraction here, not a backdrop — call out the architecture, the stairways, the arcades, the squares, the residential blocks worth seeing. Food is a stop on the walk, capped at 2 on a full day.',
     structureHint: {
       morning: 'Neighborhood cafe → local market or park → bakery or brunch spot',
       afternoon: 'Lunch in a walkable district → market or street art area → cafe or gelato → vintage shop or bookstore',
@@ -2112,10 +2226,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const localNight = localRegion.nightlifeSearches.sort(() => Math.random() - 0.5).slice(0, 2);
         shuffledSearches.push(...vibeSearches, ...localFood, ...localNight);
       } else if (vibeKey === 'indulge') {
-        // Indulge: HEAVY local cuisine + diverse food exploration
-        const localFood = localRegion.foodSearches.sort(() => Math.random() - 0.5).slice(0, 5);
-        const vibeSearches = DIVERSE_TEXT_SEARCHES.indulge.sort(() => Math.random() - 0.5).slice(0, 3);
-        shuffledSearches.push(...localFood, ...vibeSearches);
+        // Indulge: diverse food + neighborhood exploration leads (the indulge bank now
+        // carries non-food market/plaza/architecture terms too), local cuisine close behind.
+        // vibeSearches MUST be pushed first — only the first 4 entries of shuffledSearches
+        // survive the cap below, and local cuisine already arrives via fetchNearbyPlaces.
+        const vibeSearches = DIVERSE_TEXT_SEARCHES.indulge.sort(() => Math.random() - 0.5).slice(0, 4);
+        const localFood = localRegion.foodSearches.sort(() => Math.random() - 0.5).slice(0, 3);
+        shuffledSearches.push(...vibeSearches, ...localFood);
       } else if (vibeKey === 'afterdark') {
         // After Dark: local nightlife + global nightlife searches + dinner
         const localNight = localRegion.nightlifeSearches.sort(() => Math.random() - 0.5).slice(0, 3);
@@ -2204,13 +2321,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     }
 
-    // Luxe vibe: ALWAYS add brunch searches for ALL cities — brunch is critical for morning section
-    if (vibeKey === 'luxe' || (isBlended && vibeKeys.includes('luxe'))) {
+    // Luxe vibe: add brunch searches only for morning/full-day plans, capped at 2 terms —
+    // afternoon/evening plans don't need brunch queries competing for the capped search budget.
+    const luxeWantsBrunch = !duration || duration === 'full' || duration === 'full day' || duration === 'morning';
+    if (luxeWantsBrunch && (vibeKey === 'luxe' || (isBlended && vibeKeys.includes('luxe')))) {
       shuffledSearches.push(
         'best upscale brunch restaurant popular acclaimed',
         'luxury hotel brunch five star restaurant elegant',
-        'jazz brunch supper club live music upscale',
-        'rooftop brunch bottomless mimosa champagne',
       );
     }
 
@@ -2414,7 +2531,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Balance candidate pool: activity-focused vibes need plenty of non-food options
     const FOOD_CAT_SET = new Set([...FOOD_TYPES, 'bar', 'wine_bar']);
-    const isPlaceFood = (p: PlanPlace) => FOOD_CAT_SET.has(p.category);
+    // Google Places (New) has dozens of cuisine-specific `_restaurant` types
+    // (mexican_restaurant, soul_food_restaurant, south_american_restaurant,
+    // persian_restaurant, barbecue_restaurant, …) that aren't all enumerated
+    // in FOOD_TYPES — confirmed live: diverse-cuisine search results routinely
+    // return types the whitelist above misses, which silently undercounts food
+    // stops everywhere this function is used, including the food-cap
+    // enforcement below. Catch any `*_restaurant` type by suffix instead of
+    // relying on an exhaustive list. `farmers_market` is deliberately NOT
+    // matched here — it belongs with neighborhood/market discovery, not the
+    // food-tour cap.
+    const isPlaceFood = (p: PlanPlace) => {
+      const cat = p.category || '';
+      return FOOD_CAT_SET.has(cat) || /_restaurant$|^food_court$|^sandwich_shop$/.test(cat);
+    };
 
     // Identify hidden gems: high-rated (4.0+) but under 300 reviews — the sweet spot
     const isHiddenGem = (p: PlanPlace) => p.rating >= 4.0 && p.reviewCount > 0 && p.reviewCount < 300;
@@ -2481,7 +2611,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .sort((a, b) => (hasUnderRadar ? gemScore(b) + (isHiddenGem(b) ? 50 : 0) : popularityScore(b)) - (hasUnderRadar ? gemScore(a) + (isHiddenGem(a) ? 50 : 0) : popularityScore(a)))
         .slice(0, 30);
       console.log(`[NxStops Plan] Blended pool: ${activityCount} activities + ${nightlifeCount} nightlife + ${foodCount} food${hasUnderRadar ? ' (hidden-gem weighted)' : ''}`);
-    } else if (vibeKey === 'adventure' || vibeKey === 'cultural' || vibeKey === 'starthare' || vibeKey === 'escape') {
+    } else if (vibeKey === 'adventure' || vibeKey === 'cultural' || vibeKey === 'starthare' || vibeKey === 'escape' || vibeKey === 'wander' || vibeKey === 'chill') {
       // Activity-heavy vibes: prioritize non-food places
       const foodCandidates = allPlaces.filter(p => isPlaceFood(p));
       const activityCandidates = allPlaces.filter(p => !isPlaceFood(p));
@@ -2489,6 +2619,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const foodCount = Math.min(foodCandidates.length, 30 - activityCount);
       topPlaces = [...activityCandidates.slice(0, activityCount), ...foodCandidates.slice(0, foodCount)]
         .sort((a, b) => gemScore(b) - gemScore(a))
+        .slice(0, 30);
+    } else if (vibeKey === 'indulge' || vibeKey === 'food') {
+      // Food-forward vibes now fetch real non-food candidates too (see activityTypes
+      // above) — reserve a ceiling of slots for them so they survive the popularity
+      // sort instead of being buried under higher-review-count restaurants.
+      const foodCandidates = allPlaces.filter(p => isPlaceFood(p));
+      const activityCandidates = allPlaces.filter(p => !isPlaceFood(p));
+      const activityCount = Math.min(activityCandidates.length, vibeKey === 'indulge' ? 10 : 8);
+      const foodCount = Math.min(foodCandidates.length, 30 - activityCount);
+      topPlaces = [...activityCandidates.slice(0, activityCount), ...foodCandidates.slice(0, foodCount)]
+        .sort((a, b) => popularityScore(b) - popularityScore(a))
         .slice(0, 30);
     } else if (vibeKey === 'surprise' || vibeKey === 'undertheradar') {
       // Under the Radar / Local Secrets: heavily favor hidden gems
@@ -3320,7 +3461,7 @@ ${isBlended
     return `Split roughly 50/50 between vibes. ${isFullDay ? '4' : '3'} food/drink stops and ${isFullDay ? '4' : '3'} non-food stops. Pull the best of each vibe equally and weave them into one cohesive day.`;
   })()}`
   : (vibeKey === 'food' || vibeKey === 'indulge')
-  ? `Every stop is food/drink. Create a CULINARY JOURNEY with EXACTLY ${stopCount} stops — each MUST be a different cuisine/culture (e.g., Mexican → Chinese → Ethiopian → Korean). NEVER two from the same cuisine. For full day: include breakfast/brunch, lunch, AND dinner options. For morning: 2 breakfast/brunch spots + cafe + dessert. Vary price points. Mix jaw-dropping fine dining with legendary casual spots. Every stop should IMPRESS.`
+  ? `Food leads this day, but it does not fill it. ${isFullDay ? '4-5' : '3-4'} stops are food/drink — each a DIFFERENT cuisine/culture, never two from the same — and the remaining ${isFullDay ? '3-4' : '2-3'} stops MUST be non-food: the market the chefs shop at, the neighborhood the cuisine comes from, a plaza or park between courses, a block of architecture on the walk. Vary price points. Mix jaw-dropping fine dining with legendary casual spots. Every stop should IMPRESS.`
   : vibeKey === 'adventure' || vibeKey === 'escape'
     ? `ESCAPE/ADVENTURE RATIO FOR ${stopCount} STOPS: ${isFullDay ? '3' : '2'} stops MUST be food/drink (breakfast + lunch + dinner for full day, or breakfast + lunch for partial). The rest (${isFullDay ? '5' : '4'}) MUST be immersive outdoor/peaceful experiences — parks, beaches, hikes, viewpoints, gardens, spas, nature, waterfronts. Food goes between escapes as scenic fuel (beachside cafes, garden restaurants). NEVER skip food entirely.`
     : vibeKey === 'surprise' || vibeKey === 'undertheradar'
@@ -3355,11 +3496,11 @@ The plan should feel like ONE continuous adventure through connected neighborhoo
 
 6. VIBE NOTE: Each "reason" must be a vivid 1-sentence description making someone EXCITED to go AND connecting it to the story as a narrative transition.${vibeKey === 'surprise' || vibeKey === 'undertheradar' ? ' For Under the Radar, use INSIDER language — "neighborhood favorite", "locals-only", "hidden", "family-run since", "off the beaten path". Good: "A tiny family-run kebab shop that\'s been here for 40 years — no sign out front, but there\'s always a line of locals." Bad: "highly rated restaurant."' : vibeKey === 'luxe' ? ' For Luxe, use PREMIUM language — "world-renowned", "award-winning", "exclusive", "stunning", "premier". Good: "A Michelin-starred tasting menu where the chef\'s omakase rivals Tokyo\'s finest." Bad: "highly rated restaurant."' : ' Good: "Duck down a side street in the old quarter to find this tucked-away speakeasy — the mezcal cocktails are unreal." Bad: "highly rated restaurant" or "popular bar."'}
 
-7. MEAL STRUCTURE IS MANDATORY:
-   - FULL DAY plans MUST include breakfast/brunch + lunch + dinner. These are NON-NEGOTIABLE meals woven between adventures.
-   - MORNING plans MUST include 2 breakfast/brunch options (give variety — e.g., a cafe AND a brunch spot) plus adventures.
-   - AFTERNOON plans MUST include lunch + an afternoon snack/drink stop.
-   - EVENING plans MUST include dinner + a late-night food option.
+7. FOOD IS WOVEN IN — IT IS NOT THE SPINE OF THE DAY:
+   - FOOD CAP: at most ${isStackedVibe ? '3' : isFullDay ? '3' : '2'} of the ${stopCount} stops may be a food or drink venue (restaurant, cafe, bakery, dessert shop, bar, lounge)${vibeKey === 'food' || vibeKey === 'indulge' ? `. This vibe is food-forward, so you may go up to ${isFullDay ? '5' : '4'} food stops — but the remaining ${isFullDay ? '3' : '2'} stops MUST still be non-food` : ''}. Every other stop must be a neighborhood walk, park, garden, landmark, notable building or architecture district, museum, gallery, market, plaza, viewpoint, waterfront or local-culture stop. Count your food stops before you answer. If you exceed the cap, YOU HAVE FAILED.
+   - ONE MEAL PER DAYPART, and only for the dayparts the window actually covers: FULL DAY = one morning coffee-or-breakfast, one midday meal, one dinner. MORNING = one breakfast or brunch (ONE — never a cafe AND a brunch spot to pad the plan). AFTERNOON = one lunch, plus an optional coffee or drink stop. EVENING = one dinner, plus an optional late-night bite. Never two breakfasts, two lunches or two dinners.
+   - A food stop must earn its slot. If you cannot defend a restaurant as the single best meal for that hour, replace it with a non-food discovery stop. Filling gaps with "another highly rated restaurant" is the exact failure mode this rule exists to prevent.
+   - The walk between meals is itself content: name the market, the square, the street of buildings, the park you pass through. Do not describe non-food stops as transitions — they are stops.
    Match food to the time:
    - BREAKFAST (before 11 AM): cafés, bakeries, brunch spots, coffee shops. NEVER pizza, BBQ, steakhouse.
    - LUNCH (11 AM – 3 PM): any restaurant.
@@ -3381,7 +3522,7 @@ The plan should feel like ONE continuous adventure through connected neighborhoo
    - Museum/gallery: 2-3h | Park/market: 1.5-2h | Beach: 1.5-2.5h
    - Travel between stops: 20-30 min buffer
    NEVER schedule next stop sooner than activity duration + travel buffer.
-${vibeKey === 'food' || vibeKey === 'indulge' ? `\n   FOOD TOUR SPACING: AT LEAST 2.5-3 HOURS between food stops. Fill gaps with walks, window shopping, coffee.` : ''}
+${vibeKey === 'food' || vibeKey === 'indulge' ? `\n   FOOD TOUR SPACING: AT LEAST 2.5-3 HOURS between food stops. Fill the gaps with REAL STOPS — a market, a park, a plaza, an architecture walk — not with "and then you walk around."` : ''}
 
 9. NO DUPLICATES: Never same name, brand, or cuisine twice. Each food stop = different cultural cuisine.
 
@@ -3391,10 +3532,12 @@ ${vibeKey === 'food' || vibeKey === 'indulge' ? `\n   FOOD TOUR SPACING: AT LEAS
 
 12. GROUP: family=kid-friendly no nightlife; couple=romantic; solo=flexible; friends=social.${eventsSection ? `\n\n13. Include at most 1 event if it fits.` : ''}${advisory ? `\n\n${eventsSection ? '14' : '13'}. TRAVEL ADVISORY: ${advisory}. Prefer well-lit, busy venues.` : ''}${jetLagContext ? `\n\n${eventsSection ? (advisory ? '15' : '14') : (advisory ? '14' : '13')}. JET LAG: Plan lighter — start later (10-11 AM), include relaxing stops, no late-night past 10 PM.` : ''}
 
+TITLE & HEADLINE: dayTitle and headline must describe the ACTUAL stops in THIS plan, not a generic food-forward default. If the plan leans parks, architecture, markets, or hidden gems, say so ("A Walk Through Old Fourth Ward's Murals", not "A Day of Culinary Delights"). Only title it around food if food stops are genuinely the majority of the day.
+
 Return ONLY this JSON (keep reason + knownFor SHORT — max 8 words each):
 {"stops":[{"idx":0,"timeSlot":"7:30 PM","reason":"Short transition","knownFor":"Famous for X","spend":25,"neighborhood":"Area"}],"dayTitle":"3-5 word title","headline":"One sentence journey summary"}`;
 
-    const systemMsg = 'You are NxStops, a curated itinerary planner that feels like a local friend who knows all the best spots. You prioritize culturally diverse, locally-owned businesses and create itineraries with a narrative arc — not just a list of places. Every plan should make someone excited to go out. Return ONLY valid JSON.';
+    const systemMsg = 'You are NxStops, a curated city-discovery planner that feels like a local friend who actually knows their city. You plan days around PLACES — neighborhoods, streets, architecture, parks, viewpoints, markets, galleries and local culture — and you weave great food and drink through them. Food is part of the story, never the whole story: one memorable meal per daypart, not a crawl from table to table. You prioritise culturally diverse, locally-owned businesses and build itineraries with a narrative arc through real areas of the city. Every plan should make someone excited to go SEE something. Return ONLY valid JSON.';
     const messages = [
       { role: 'system', content: systemMsg },
       { role: 'user', content: prompt },
@@ -3472,17 +3615,65 @@ Return ONLY this JSON (keep reason + knownFor SHORT — max 8 words each):
         if (baseName.length >= 5 && [...usedNames].some(n => n.startsWith(baseName) || baseName.startsWith(n))) continue;
         usedIdx.add(i);
         usedNames.add(baseName);
-        // Insert at the end with a reasonable time slot
-        const lastTime = planStops.length > 0 ? planStops[planStops.length - 1].timeSlot : '';
+        // Insert with a real time slot derived from the place's own ideal
+        // hour — the previous version always wrote '' here (a no-op ternary
+        // that discarded `lastTime` either way), so backfilled stops showed
+        // up with a blank time in the UI.
+        const bt = getBestTime(topPlaces[i]);
+        const btHour = BEST_TIME_HOUR[bt];
+        const h12 = Math.floor(btHour) % 12 === 0 ? 12 : Math.floor(btHour) % 12;
+        const ampm = btHour < 12 ? 'AM' : 'PM';
         planStops.push({
           place: topPlaces[i],
-          timeSlot: lastTime ? '' : '',
+          timeSlot: `${h12}:00 ${ampm}`,
           reason: 'Bonus stop to round out your day',
           knownFor: '',
           estimatedSpend: 0,
           neighborhood: '',
-          bestTime: getBestTime(topPlaces[i]),
+          bestTime: bt,
         });
+      }
+    }
+
+    // Deterministic food-cap enforcement. Rule 7 above asks the model to cap
+    // food stops, but live testing confirmed GPT-4o-mini and the Gemini
+    // fallback don't reliably obey it — a prompt-only cap is advisory. Swap
+    // the lowest-ranked surplus food stop(s) for the best unused non-food
+    // candidate, preserving the slot, so the cap holds regardless of what
+    // the model actually returned.
+    {
+      const foodForward = vibeKey === 'food' || vibeKey === 'indulge';
+      const foodCap = isStackedVibe ? 3 : foodForward ? (isFullDay ? 5 : 4) : (isFullDay ? 3 : 2);
+      const foodStops = planStops
+        .map((s, i) => ({ i, place: s.place }))
+        .filter(x => isPlaceFood(x.place))
+        .sort((a, b) => popularityScore(a.place) - popularityScore(b.place)); // weakest first
+
+      if (foodStops.length > foodCap) {
+        const surplus = foodStops.length - foodCap;
+        const swapTargets = foodStops.slice(0, surplus).map(x => x.i);
+        const unusedNonFood = topPlaces
+          .filter((p, idx) => !usedIdx.has(idx) && NON_FOOD_DISCOVERY_CAT_SET.has(p.category))
+          .sort((a, b) => popularityScore(b) - popularityScore(a));
+
+        const swapReasonTemplates = [
+          (name: string) => `A detour from the food trail — ${name} is worth the stop.`,
+          (name: string) => `Worth pausing the food tour for ${name}.`,
+          (name: string) => `${name} earns a stop in its own right.`,
+        ];
+        for (let swapI = 0; swapI < swapTargets.length; swapI++) {
+          const idx = swapTargets[swapI];
+          const replacement = unusedNonFood.shift();
+          if (!replacement) break; // not enough non-food candidates in this city — never force a stop that doesn't exist
+          usedIdx.add(topPlaces.indexOf(replacement));
+          planStops[idx] = {
+            ...planStops[idx],
+            place: replacement,
+            reason: swapReasonTemplates[swapI % swapReasonTemplates.length](replacement.name),
+            knownFor: (replacement.editorialSummary || '').slice(0, 60),
+            bestTime: getBestTime(replacement),
+          };
+        }
       }
     }
 

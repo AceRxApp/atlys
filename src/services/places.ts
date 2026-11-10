@@ -387,13 +387,18 @@ function diversityScore(place: Place): number {
     else if (place.distance > 5) score -= 5;
   }
 
-  // Bonus for food/drink/cultural categories (the soul of NxStops)
+  // Bonus for discovery categories — neighborhoods, architecture, parks, culture,
+  // and the food that sits inside them. The soul of NxStops is the PLACE; food is
+  // part of how you experience it.
   const culturalTypes = new Set([
     'restaurant', 'cafe', 'bakery', 'coffee_shop', 'bar', 'wine_bar',
     'brunch_restaurant', 'seafood_restaurant', 'sushi_restaurant',
     'steak_house', 'ice_cream_shop', 'market', 'art_gallery',
     'museum', 'performing_arts_theater', 'historical_landmark',
     'book_store', 'community_center', 'night_club',
+    'park', 'garden', 'botanical_garden', 'national_park', 'hiking_area',
+    'beach', 'plaza', 'marina', 'cultural_landmark', 'monument',
+    'historical_place', 'observation_deck', 'library', 'flea_market',
   ]);
   if (culturalTypes.has(place.category)) score += 5;
 
@@ -407,7 +412,11 @@ function diversityScore(place: Place): number {
 // API FUNCTIONS
 // ============================================================================
 
-// Diverse cuisine searches — the soul of NxStops
+// Diverse cuisine searches — one of several discovery banks, not the whole app.
+// Food stays rich and global here; it is no longer the only lens. See
+// DIVERSE_NEIGHBORHOOD_SEARCHES / DIVERSE_ARCHITECTURE_SEARCHES /
+// DIVERSE_OUTDOOR_SEARCHES / DIVERSE_CULTURE_SEARCHES for the place-feel banks,
+// which are kept at comparable volume on purpose.
 const DIVERSE_CUISINE_SEARCHES = [
   'Mexican restaurant taqueria',
   'Ethiopian restaurant Eritrean',
@@ -486,22 +495,19 @@ const DIVERSE_SHOP_SEARCHES = [
   'ethnic grocery specialty market',
 ];
 
-const DIVERSE_CULTURE_SEARCHES = [
-  'art gallery contemporary art',
-  'mural street art graffiti tour',
-  'cultural center community center',
-  'history museum heritage site',
-  'African American museum cultural center',
-  'Hispanic cultural center Latin art',
-  'Asian cultural center gallery',
-  'performing arts theater dance',
-  'independent cinema art house film',
-  'sculpture garden public art',
-  'luxury boutique gallery exhibition',
-  'iconic landmark must visit attraction',
-];
+// ── DISCOVERY SEARCH BANKS ───────────────────────────────────────────────
+// Neighborhoods, architecture, parks and local culture: the terms that make
+// NxStops a discovery app rather than a restaurant list. Volume here is
+// deliberately at or above the food/drink banks (DIVERSE_CUISINE_SEARCHES 25 +
+// DIVERSE_DRINKS_SEARCHES 17 + DIVERSE_LIVE_MUSIC_SEARCHES 13 = 55 terms), so
+// the random slice in diverseTextSearch pulls as much place-feel as plate-feel.
+// NOTE: adding terms to a bank does NOT add Google API calls — diverseTextSearch
+// shuffles and takes only `maxQueries`. More terms = more variety, same cost.
+// To give these banks more WEIGHT per request, raise the `maxQueries` argument
+// at the call sites (each +1 is one extra Google text search).
 
 const DIVERSE_NEIGHBORHOOD_SEARCHES = [
+  // ── existing 12, unchanged ──
   'ethnic enclave neighborhood walk',
   'night market food market street food',
   'walkable district main street shops',
@@ -514,6 +520,98 @@ const DIVERSE_NEIGHBORHOOD_SEARCHES = [
   'food hall food court diverse',
   'beach boardwalk promenade coastal walk',
   'park garden scenic trail nature',
+  // ── added: street life, residential texture, local errands ──
+  'residential neighborhood tree lined streets',
+  'pedestrian street car free shopping street',
+  'old town quarter historic streets',
+  'plaza public square fountain people watching',
+  'neighborhood bookshop record shop local',
+  'artisan workshop craft studio neighborhood',
+  'community garden neighborhood green space',
+  'independent storefronts local shops street',
+  'covered arcade passage shopping gallery',
+  'canal riverside neighborhood walk',
+  'hillside neighborhood stairs viewpoint streets',
+  'bazaar souk local market quarter',
+  'university quarter student neighborhood streets',
+  'waterfront fishing village harbour neighborhood',
+];
+
+const DIVERSE_ARCHITECTURE_SEARCHES = [
+  'notable architecture building landmark',
+  'historic architecture district buildings',
+  'art deco buildings district',
+  'modernist brutalist notable building',
+  'cathedral basilica notable architecture',
+  'mosque temple synagogue notable architecture',
+  'grand civic building city hall courthouse',
+  'historic theatre opera house building',
+  'public library notable building architecture',
+  'clock tower bell tower landmark',
+  'historic bridge viaduct landmark',
+  'observation deck skyline viewpoint building',
+  'palace mansion historic house museum',
+  'train station historic terminal architecture',
+  'market hall historic iron glass building',
+  'monument memorial column landmark square',
+  'courtyard cloister historic interior',
+  'lighthouse fort castle historic structure',
+  'mural painted building facade art',
+  'rooftop terrace public building view',
+];
+
+const DIVERSE_OUTDOOR_SEARCHES = [
+  'city park large green space',
+  'botanical garden conservatory glasshouse',
+  'arboretum tree collection garden',
+  'hiking trail nature walk scenic',
+  'state park national park nature reserve',
+  'coastal path cliff walk ocean trail',
+  'river walk greenway bike path',
+  'lake waterfront walk shoreline',
+  'beach shoreline swimming cove',
+  'scenic overlook lookout panoramic viewpoint',
+  'sunset spot scenic photography viewpoint',
+  'marina harbour waterfront promenade',
+  'wildlife refuge bird watching nature center',
+  'public garden rose garden japanese garden',
+  'waterfall creek swimming hole nature',
+  'hilltop park city view climb',
+  'picnic area shaded lawn park',
+  'pier boardwalk seaside walk',
+  'nature preserve wetland boardwalk trail',
+  'urban forest woodland walking path',
+  'sculpture garden outdoor art park',
+  'island ferry day trip nature',
+];
+
+const DIVERSE_CULTURE_SEARCHES = [
+  // ── existing 12, unchanged ──
+  'art gallery contemporary art',
+  'mural street art graffiti tour',
+  'cultural center community center',
+  'history museum heritage site',
+  'African American museum cultural center',
+  'Hispanic cultural center Latin art',
+  'Asian cultural center gallery',
+  'performing arts theater dance',
+  'independent cinema art house film',
+  'sculpture garden public art',
+  'luxury boutique gallery exhibition',
+  'iconic landmark must visit attraction',
+  // ── added: smaller institutions, living culture, craft ──
+  'artist studio open studio workshop',
+  'small neighborhood museum house museum',
+  'design museum architecture center',
+  'photography museum gallery exhibition',
+  'folk art craft museum traditional',
+  'music heritage museum instrument collection',
+  'indigenous heritage center cultural site',
+  'maritime museum harbour heritage',
+  'science museum planetarium exhibits',
+  'public library exhibition reading room',
+  'artist collective gallery district',
+  'historic site preserved building tour',
 ];
 
 /** Run multiple text searches in parallel, dedupe, filter chains+excluded+out-of-city */
