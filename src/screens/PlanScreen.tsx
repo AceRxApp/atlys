@@ -381,7 +381,7 @@ export default function PlanScreen() {
             {cityLabel ? `Plan your ${cityLabel} trip` : 'Start your adventure'}
           </h2>
           <p className="text-[13px] text-text-tertiary">
-            Pick a vibe and we'll curate the perfect day for you
+            Pick how you want to explore and we'll curate the day
           </p>
         </div>
 

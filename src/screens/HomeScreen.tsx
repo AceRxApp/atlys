@@ -22,27 +22,20 @@ interface VibeOption {
   desc: string;
 }
 
+// Exploration modes — retired the old mood/vibe grid (Greatest Hits, Indulge,
+// After Dark, Escape, Luxe, Under the Radar) in favor of modes that answer
+// "what would it feel like to experience this city," not "what mood are you
+// in." Each still runs on an already-rebalanced backend vibe internally —
+// only the framing shown to the user changed.
 const BASE_VIBES: VibeOption[] = [
-  { id: 'starthare', emoji: '\u{2B50}', label: 'Greatest Hits', desc: 'The must-do highlights & iconic spots' },
-  { id: 'indulge', emoji: '\u{1F37D}\u{FE0F}', label: 'Indulge', desc: 'Food & drink worth the trip' },
-  { id: 'afterdark', emoji: '\u{1F31C}', label: 'After Dark', desc: 'Where the city comes alive at night' },
-  { id: 'escape', emoji: '\u{1F33F}', label: 'Escape', desc: 'Nature, scenic views & peaceful spots' },
-  { id: 'luxe', emoji: '\u{1F451}', label: 'Luxe', desc: 'High-end, upscale experiences' },
-  { id: 'undertheradar', emoji: '\u{1F4CD}', label: 'Under the Radar', desc: 'Hidden gems & local favorites' },
+  { id: 'wander', emoji: '\u{1F6B6}', label: 'Discover This City', desc: 'Neighborhoods, streets & local life' },
+  { id: 'starthare', emoji: '\u{1F5FA}\u{FE0F}', label: 'A Weekend Here', desc: 'A well-rounded day of highlights' },
+  { id: 'undertheradar', emoji: '\u{1F4CD}', label: 'Interesting Neighborhoods', desc: 'Hidden gems & local favorites' },
 ];
 
-// Time-specific vibes that replace "After Dark" for morning/afternoon
-const CHILL_VIBE: VibeOption = { id: 'chill', emoji: '\u2615', label: 'Chill', desc: 'Cafés, parks, bookshops & slow vibes' };
-const WANDER_VIBE: VibeOption = { id: 'wander', emoji: '\u{1F6B6}', label: 'Wander', desc: 'Neighborhoods, street life & walkable gems' };
-
-function getVibesForDuration(duration: 'full' | 'morning' | 'afternoon' | 'evening'): VibeOption[] {
-  if (duration === 'morning') {
-    return BASE_VIBES.map(v => v.id === 'afterdark' ? CHILL_VIBE : v);
-  }
-  if (duration === 'afternoon') {
-    return BASE_VIBES.map(v => v.id === 'afterdark' ? WANDER_VIBE : v);
-  }
-  // full day and evening keep After Dark
+function getVibesForDuration(_duration: 'full' | 'morning' | 'afternoon' | 'evening'): VibeOption[] {
+  // All three modes work for any duration now — no more swapping a vibe
+  // out for mornings/afternoons.
   return BASE_VIBES;
 }
 
@@ -684,8 +677,8 @@ export default function HomeScreen() {
           subtitle="Your AI-powered city discovery app. Here's how to get started:"
           hints={[
             { emoji: '\u{1F4CD}', title: 'Pick your destination', description: 'Search for any city or tap "Use my location" to explore where you are right now.' },
-            { emoji: '\u{1F3AF}', title: 'Choose your vibe', description: 'Pick a mood like Food Tour, Adventure, or Best of the City — then choose Full Day, Morning, Afternoon, or Evening.' },
-            { emoji: '\u{1F4CB}', title: 'Pick your vibe', description: 'Choose a vibe and we\u2019ll show you the best spots for morning, afternoon, and evening. Add what you like.' },
+            { emoji: '\u{1F3AF}', title: 'Choose how to explore', description: 'Discover the city, plan a weekend, or dig into its neighborhoods — then pick Full Day, Morning, Afternoon, or Evening.' },
+            { emoji: '\u{1F4CB}', title: 'Get real places, not just a list', description: 'Streets, parks, architecture, and local life — not just restaurants. Add what you like to your Journal.' },
             { emoji: '\u{1F30D}', title: 'Explore featured cities', description: 'Scroll through popular destinations worldwide for trip inspiration.' },
           ]}
         />
@@ -812,10 +805,10 @@ export default function HomeScreen() {
         </div>
       </div>
 
-      {/* ── What's your vibe? ── */}
+      {/* ── How do you want to explore? ── */}
       <div className="mb-5">
         <div className="flex items-center justify-between mb-2">
-          <label className="section-label font-heading">What's your vibe?</label>
+          <label className="section-label font-heading">How do you want to explore?</label>
           <span className="text-[11px] text-text-tertiary">Pick up to 2</span>
         </div>
         <div className="grid grid-cols-3 gap-2">

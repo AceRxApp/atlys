@@ -148,12 +148,12 @@ export default function DiscoverScreen() {
       {/* First-visit hint */}
       <ContextHint
         storageKey="discover"
-        title="Discover places"
-        subtitle="Browse restaurants, attractions, and hidden gems in your city."
+        title="Explore"
+        subtitle="Neighborhoods, streets, architecture, and hidden gems — not just restaurants."
         hints={[
-          { emoji: '\u{1F50D}', title: 'Search & filter', description: 'Search by name or use vibe filters like Coffee, Brunch, Romantic, or Late Night to find the perfect spot.' },
+          { emoji: '\u{1F50D}', title: 'Search & filter', description: 'Search by name, or filter by The Neighborhood, Culture & Art, The Spot, and more to find what you’re after.' },
           { emoji: '\u{1F5FA}\u{FE0F}', title: 'List or Map view', description: 'Switch between a scrollable list and an interactive map to see places around you.' },
-          { emoji: '\u2B50', title: 'Tap for details', description: 'Tap any place to see hours, reviews, directions, phone, and website — then add it to your plan.' },
+          { emoji: '\u2B50', title: 'Tap for details', description: 'Tap any place to see hours, reviews, directions, phone, and website — then add it to your Journal.' },
           { emoji: '\u2764\u{FE0F}', title: 'Save favorites', description: 'Heart a place to save it for later. Find your saved places in your Profile.' },
         ]}
       />

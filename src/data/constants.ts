@@ -39,12 +39,17 @@ export const COMMUNITY_TAGS: { id: CommunityTag; emoji: string; label: string }[
   { id: 'solo-friendly', emoji: '🧭', label: 'Solo-friendly' },
 ];
 
+// Order matters — this drives the chip row on the Explore screen, and the
+// repositioning explicitly wants neighborhoods/culture/outdoors leading over
+// food/nightlife, not the reverse. IDs and the Vibe type are unchanged
+// (src/services/places.ts keys its VIBE_TYPE_MAP off these exact values) —
+// only the lineup order and framing moved.
 export const VIBES: { id: Vibe; emoji: string; label: string; desc: string }[] = [
+  { id: 'neighborhood', emoji: '🏘️', label: 'The Neighborhood', desc: 'Walkable areas, shops, boutiques, markets, cafes, parks' },
+  { id: 'cultureart', emoji: '🎨', label: 'Culture & Art', desc: 'Museums, galleries, landmarks, theaters, cultural sites' },
   { id: 'thespot', emoji: '📍', label: 'The Spot', desc: 'Parks, beaches, scenic spots, attractions, hangout places' },
   { id: 'eatsip', emoji: '🍽️', label: 'Eat & Sip', desc: 'Restaurants, cafes, bakeries, local eats, brunch spots' },
   { id: 'nightlife', emoji: '🍸', label: 'Nightlife', desc: 'Bars, clubs, live music, speakeasies, karaoke' },
-  { id: 'cultureart', emoji: '🎨', label: 'Culture & Art', desc: 'Museums, galleries, landmarks, theaters, cultural sites' },
-  { id: 'neighborhood', emoji: '🏘️', label: 'The Neighborhood', desc: 'Walkable areas, shops, boutiques, markets, cafes, parks' },
 ];
 
 export const QUICK_FILTERS: { id: QuickFilter; label: string }[] = [

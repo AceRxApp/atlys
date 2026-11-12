@@ -17,7 +17,7 @@ import { CITY_COORDS, EMERGENCY_BY_COUNTRY, lookupCityCoords } from './data';
 import { setBookingCountry } from './data/bookingLinks';
 
 import { AppContext } from './context/AppContext';
-import { HomeIcon, DiscoverIcon, EventsIcon, TasteLensIcon, PlanIcon, ShieldIcon, GearIcon, CloseIcon, SearchIcon } from './components/icons';
+import { HomeIcon, DiscoverIcon, PlanIcon, ProfileIcon, ShieldIcon, GearIcon, CloseIcon, SearchIcon } from './components/icons';
 import { SkeletonCard } from './components/ui';
 import Footer from './components/Footer';
 import NativeImg from './components/NativeImg';
@@ -162,7 +162,6 @@ const ChatBot = lazy(() => import('./components/ChatBot'));
 const SharedPlanScreen = lazy(() => import('./screens/SharedPlanScreen'));
 const DishLensScreen = lazy(() => import('./screens/DishLensScreen'));
 const DeveloperPortal = lazy(() => import('./screens/DeveloperPortal'));
-const ChicagoConcertScreen = lazy(() => import('./screens/ChicagoConcertScreen'));
 
 // ============================================================================
 // DEEP LINK — /place/:placeId
@@ -731,11 +730,11 @@ export default function App() {
 
   if (showOnboarding) {
     const onboardingSteps = [
-      { emoji: '\u{1F30D}', title: 'Discover Any City', desc: 'Find restaurants, attractions, and hidden gems \u{2014} wherever you are in the world.' },
-      { emoji: '\u{1F4CB}', title: 'Plan Your Day', desc: 'AI builds a personalized itinerary based on your vibe \u{2014} sightseeing, foodie, nightlife, and more.' },
-      { emoji: '\u{1F37D}\u{FE0F}', title: 'TasteLens', desc: 'Scan any menu or type a dish name \u{2014} get instant info, dietary tags, allergens, and cultural context.' },
+      { emoji: '\u{1F30D}', title: 'Discover Any City', desc: 'Neighborhoods, streets, architecture, and parks \u{2014} the feel of a place, not just a checklist.' },
+      { emoji: '\u{1F4CB}', title: 'Explore Your Way', desc: 'Discover a city, plan a weekend, or dig into its neighborhoods \u{2014} your call.' },
+      { emoji: '\u{1F37D}\u{FE0F}', title: 'TasteLens, when you want it', desc: 'Scan a menu or type a dish from any place’s detail view \u{2014} get allergens, spice level, and cultural context.' },
       { emoji: '\u{1F4B1}', title: 'Currency Converter', desc: 'Check live exchange rates and convert currencies on the go. Perfect for travel budgeting.' },
-      { emoji: '\u{1F3AB}', title: 'Local Events', desc: 'Concerts, sports, festivals, and more \u{2014} happening near you or wherever you\u{2019}re headed.' },
+      { emoji: '\u{1F3AB}', title: 'Festivals & Local Happenings', desc: 'Markets, festivals, and community events \u{2014} folded right into what you’re exploring.' },
     ];
     const step = onboardingSteps[onboardingStep] || onboardingSteps[0];
     const isLast = onboardingStep >= onboardingSteps.length - 1;
@@ -908,7 +907,6 @@ export default function App() {
                 <Route path="/place/:placeId" element={<PlaceDeepLink />} />
                 <Route path="/trip/:slug" element={<SharedPlanScreen />} />
                 <Route path="/developers" element={<DeveloperPortal />} />
-                <Route path="/chicago/concert-weekend" element={<ChicagoConcertScreen />} />
                 <Route path="*" element={
                   <div className="text-center px-5 py-[60px]">
                     <div className="text-5xl mb-3">🗺️</div>
@@ -933,21 +931,24 @@ export default function App() {
         {/* Bottom Navigation */}
         {!isInfoPage && <nav aria-label="Main navigation" className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] md:max-w-[768px] lg:max-w-[1024px] bg-bg-nav backdrop-blur-[32px] backdrop-saturate-[1.8] border-t border-border-nav flex justify-around pt-2" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)' }}>
           {([
-            { id: 'home' as Screen, icon: HomeIcon, label: 'Home' },
-            { id: 'discover' as Screen, icon: DiscoverIcon, label: 'Discover' },
-            { id: 'tastelens' as Screen, icon: TasteLensIcon, label: 'TasteLens' },
-            { id: 'events' as Screen, icon: EventsIcon, label: 'Events' },
-            { id: 'plan' as Screen, icon: PlanIcon, label: 'Plan' },
-          ]).map(tab => {
-            const isActive = screen === tab.id;
-            const canNavigate = tab.id === 'home' || location.useGps || location.selectedCity;
+            { id: 'home', icon: HomeIcon, label: 'Cities' },
+            { id: 'discover', icon: DiscoverIcon, label: 'Explore' },
+            { id: 'plan', icon: PlanIcon, label: 'Journal' },
+            { id: 'profile', icon: ProfileIcon, label: 'Profile' },
+          ] as { id: Screen | 'profile'; icon: typeof HomeIcon; label: string }[]).map(tab => {
+            // 'profile' isn't a routed Screen — it opens the Profile overlay
+            // instead of switching screens, so its active/nav logic branches
+            // slightly from the rest of the bar.
+            const isProfileTab = tab.id === 'profile';
+            const isActive = isProfileTab ? showProfile : (screen === tab.id && !showProfile);
+            const canNavigate = isProfileTab || tab.id === 'home' || location.useGps || location.selectedCity;
             return (
               <button
                 key={tab.id}
                 aria-label={tab.label}
                 aria-current={isActive ? 'page' : undefined}
                 className={`flex flex-col items-center gap-1 bg-transparent border-none text-[11px] font-medium px-5 py-2 rounded-xl relative min-h-[48px] ${isActive ? 'text-text-primary' : canNavigate ? 'text-text-tertiary' : 'text-text-disabled'} ${canNavigate ? 'cursor-pointer opacity-100' : 'cursor-default opacity-40'}`}
-                onClick={() => { if (canNavigate) { hapticSelection(); setScreen(tab.id); } }}
+                onClick={() => { if (canNavigate) { hapticSelection(); if (isProfileTab) { setShowProfile(true); } else { setScreen(tab.id as Screen); } } }}
               >
                 {isActive && (<>
                   <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-6 h-[3px] rounded-full pointer-events-none" style={{ background: 'var(--accent-amber-gradient)' }} />

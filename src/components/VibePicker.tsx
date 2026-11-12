@@ -16,13 +16,14 @@ interface Vibe {
   gradient: string;
 }
 
+// Retired the old mood grid (Greatest Hits, Indulge, After Dark, Escape,
+// Luxe, Under the Radar) for modes that answer "what would it feel like to
+// experience this city," not "what mood are you in." Each still runs on an
+// already-rebalanced backend vibe internally.
 const VIBES: Vibe[] = [
-  { id: 'starthare', emoji: '\u{2B50}', label: 'Greatest Hits', tagline: 'The must-do highlights & iconic spots', gradient: 'from-amber-900/40 to-orange-900/20' },
-  { id: 'indulge', emoji: '\u{1F37D}\u{FE0F}', label: 'Indulge', tagline: 'Food & drink worth the trip', gradient: 'from-rose-900/40 to-pink-900/20' },
-  { id: 'afterdark', emoji: '\u{1F31C}', label: 'After Dark', tagline: 'Where the city comes alive at night', gradient: 'from-violet-900/40 to-purple-900/20' },
-  { id: 'escape', emoji: '\u{1F33F}', label: 'Escape', tagline: 'Nature, scenic views & peaceful spots', gradient: 'from-emerald-900/40 to-teal-900/20' },
-  { id: 'luxe', emoji: '\u{1F451}', label: 'Luxe', tagline: 'High-end, upscale experiences', gradient: 'from-yellow-900/40 to-amber-900/20' },
-  { id: 'undertheradar', emoji: '\u{1F4CD}', label: 'Under the Radar', tagline: 'Hidden gems & local favorites', gradient: 'from-stone-700/40 to-stone-900/20' },
+  { id: 'wander', emoji: '\u{1F6B6}', label: 'Discover This City', tagline: 'Neighborhoods, streets & local life', gradient: 'from-stone-700/40 to-stone-900/20' },
+  { id: 'starthare', emoji: '\u{1F5FA}\u{FE0F}', label: 'A Weekend Here', tagline: 'A well-rounded day of highlights', gradient: 'from-amber-900/40 to-orange-900/20' },
+  { id: 'undertheradar', emoji: '\u{1F4CD}', label: 'Interesting Neighborhoods', tagline: 'Hidden gems & local favorites', gradient: 'from-emerald-900/40 to-teal-900/20' },
 ];
 
 export default function VibePicker({ onPickVibe, loading = false, cityName, onManual, compact = false }: VibePickerProps) {
@@ -114,10 +115,10 @@ export default function VibePicker({ onPickVibe, loading = false, cityName, onMa
       {/* Header */}
       <div className="text-center mb-6">
         <h2 className="text-[22px] font-bold text-text-primary mb-1.5">
-          What's your vibe?
+          How do you want to explore?
         </h2>
         <p className="text-[12px] text-text-tertiary">
-          Pick up to 2 vibes to blend
+          Pick up to 2 to blend
         </p>
         {cityName && (
           <p className="text-sm text-text-secondary mt-1">
@@ -127,7 +128,7 @@ export default function VibePicker({ onPickVibe, loading = false, cityName, onMa
       </div>
 
       {/* Vibe grid */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-3 gap-2.5">
         {VIBES.map((vibe) => {
           const isSelected = selected.has(vibe.id);
           const isLoadingThis = loading && isSelected;
@@ -139,7 +140,7 @@ export default function VibePicker({ onPickVibe, loading = false, cityName, onMa
               onClick={() => handleToggle(vibe.id)}
               disabled={loading}
               className={`
-                relative min-h-[100px] rounded-2xl border text-left p-4
+                relative min-h-[112px] rounded-2xl border text-left p-3
                 flex flex-col justify-between
                 transition-all duration-200 ease-out
                 cursor-pointer
@@ -162,12 +163,12 @@ export default function VibePicker({ onPickVibe, loading = false, cityName, onMa
               />
 
               {/* Content */}
-              <div className="relative z-10 flex flex-col gap-1.5">
-                <span className="text-[28px] leading-none">{vibe.emoji}</span>
-                <span className="text-[15px] font-semibold text-text-primary leading-tight">
+              <div className="relative z-10 flex flex-col gap-1">
+                <span className="text-[22px] leading-none">{vibe.emoji}</span>
+                <span className="text-[13px] font-semibold text-text-primary leading-tight">
                   {vibe.label}
                 </span>
-                <span className="text-[12px] text-text-tertiary leading-snug">
+                <span className="text-[11px] text-text-tertiary leading-snug">
                   {vibe.tagline}
                 </span>
               </div>

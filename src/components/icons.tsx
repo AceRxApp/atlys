@@ -35,6 +35,14 @@ export const PlanIcon = ({ active, inactiveColor = '#78716C' }: { active: boolea
   </svg>
 );
 
+export const ProfileIcon = ({ active, inactiveColor = '#78716C' }: { active: boolean; inactiveColor?: string }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <defs><linearGradient id="prg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#E8940A" /><stop offset="100%" stopColor="#F5A623" /></linearGradient></defs>
+    <circle cx="12" cy="7" r="4" stroke={active ? "url(#prg)" : inactiveColor} strokeWidth="1.75" fill={active ? "rgba(232,148,10,0.15)" : "none"} />
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke={active ? "url(#prg)" : inactiveColor} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" fill={active ? "rgba(232,148,10,0.15)" : "none"} />
+  </svg>
+);
+
 export const DragHandleIcon = ({ color = '#78716C' }: { color?: string }) => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill={color}>
     <circle cx="9" cy="6" r="1.5" />
