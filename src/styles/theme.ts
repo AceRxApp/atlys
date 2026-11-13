@@ -134,11 +134,11 @@ export interface ThemeTokens {
 
 const sharedTokens = {
   accent: {
-    amber: '#C8714A',
-    amberDark: '#9C5530',
-    amberLight: '#E8A179',
-    amberGradient: 'linear-gradient(135deg, #C8714A, #9C5530)',
-    amberTextGradient: 'linear-gradient(135deg, #E8A179, #C8714A)',
+    amber: '#FF6F5E',
+    amberDark: '#D9394A',
+    amberLight: '#FF9B7A',
+    amberGradient: 'linear-gradient(135deg, #FF9B5E, #E8375F)',
+    amberTextGradient: 'linear-gradient(135deg, #FF9B7A, #FF6F5E)',
   },
   status: {
     green: '#34D399',
@@ -155,7 +155,7 @@ const sharedTokens = {
     text: '#5FC9B4',
   },
   selection: {
-    bg: 'rgba(200,113,74,0.3)',
+    bg: 'rgba(255,111,94,0.3)',
   },
 };
 
@@ -189,7 +189,7 @@ export const darkTheme: ThemeTokens = {
     disabled: '#38302A',
     body: '#E3D4C5',
     light: '#D3C2B1',
-    onAccent: '#1F1209',
+    onAccent: '#2A0E0C',
   },
   ...sharedTokens,
   border: {
@@ -200,14 +200,14 @@ export const darkTheme: ThemeTokens = {
     nav: 'rgba(241,222,206,0.08)',
   },
   amberTint: {
-    bg06: 'rgba(200,113,74,0.06)',
-    bg10: 'rgba(200,113,74,0.1)',
-    bg15: 'rgba(200,113,74,0.15)',
-    border15: 'rgba(200,113,74,0.15)',
-    border20: 'rgba(200,113,74,0.2)',
-    border30: 'rgba(200,113,74,0.3)',
-    border40: 'rgba(200,113,74,0.4)',
-    shadow: 'rgba(200,113,74,0.3)',
+    bg06: 'rgba(255,111,94,0.06)',
+    bg10: 'rgba(255,111,94,0.1)',
+    bg15: 'rgba(255,111,94,0.15)',
+    border15: 'rgba(255,111,94,0.15)',
+    border20: 'rgba(255,111,94,0.2)',
+    border30: 'rgba(255,111,94,0.3)',
+    border40: 'rgba(255,111,94,0.4)',
+    shadow: 'rgba(255,111,94,0.3)',
   },
   greenTint: {
     bg: 'rgba(34,197,94,0.08)',
@@ -281,7 +281,7 @@ export const lightTheme: ThemeTokens = {
     disabled: '#D6D3D1',
     body: '#44403C',
     light: '#78716C',
-    onAccent: '#07131E',
+    onAccent: '#2A0E0C',
   },
   ...sharedTokens,
   border: {
@@ -292,14 +292,14 @@ export const lightTheme: ThemeTokens = {
     nav: 'rgba(0,0,0,0.09)',
   },
   amberTint: {
-    bg06: 'rgba(200,113,74,0.06)',
-    bg10: 'rgba(200,113,74,0.08)',
-    bg15: 'rgba(200,113,74,0.12)',
-    border15: 'rgba(200,113,74,0.2)',
-    border20: 'rgba(200,113,74,0.25)',
-    border30: 'rgba(200,113,74,0.35)',
-    border40: 'rgba(200,113,74,0.45)',
-    shadow: 'rgba(200,113,74,0.15)',
+    bg06: 'rgba(255,111,94,0.06)',
+    bg10: 'rgba(255,111,94,0.08)',
+    bg15: 'rgba(255,111,94,0.12)',
+    border15: 'rgba(255,111,94,0.2)',
+    border20: 'rgba(255,111,94,0.25)',
+    border30: 'rgba(255,111,94,0.35)',
+    border40: 'rgba(255,111,94,0.45)',
+    shadow: 'rgba(255,111,94,0.15)',
   },
   greenTint: {
     bg: 'rgba(34,197,94,0.08)',

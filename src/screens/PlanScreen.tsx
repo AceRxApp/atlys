@@ -74,13 +74,13 @@ function exportDayAsImage(stops: Stop[], dayNum: number, cityName: string) {
 
   // Amber accent line
   const accent = ctx.createLinearGradient(0, 0, W, 0);
-  accent.addColorStop(0, '#C8714A');
-  accent.addColorStop(1, '#9C5530');
+  accent.addColorStop(0, '#FF6F5E');
+  accent.addColorStop(1, '#D9394A');
   ctx.fillStyle = accent;
   ctx.fillRect(0, 0, W, 4);
 
   // Header
-  ctx.fillStyle = '#C8714A';
+  ctx.fillStyle = '#FF6F5E';
   ctx.font = 'bold 14px system-ui, sans-serif';
   ctx.fillText('NXSTOPS', pad, 44);
 
@@ -98,7 +98,7 @@ function exportDayAsImage(stops: Stop[], dayNum: number, cityName: string) {
     // Number circle
     ctx.beginPath();
     ctx.arc(pad + 14, y + 22, 14, 0, Math.PI * 2);
-    ctx.fillStyle = '#C8714A';
+    ctx.fillStyle = '#FF6F5E';
     ctx.fill();
     ctx.fillStyle = '#07131E';
     ctx.font = 'bold 13px system-ui, sans-serif';

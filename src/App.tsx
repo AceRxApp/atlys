@@ -204,7 +204,7 @@ function PlaceDeepLink() {
   if (loading) {
     return (
       <div className="text-center px-5 py-20">
-        <div className="w-10 h-[3px] rounded-sm mx-auto animate-shimmer" style={{ background: 'linear-gradient(90deg, rgba(200,113,74,0.3) 25%, #C8714A 50%, rgba(200,113,74,0.3) 75%)', backgroundSize: '200% 100%' }} />
+        <div className="w-10 h-[3px] rounded-sm mx-auto animate-shimmer" style={{ background: 'linear-gradient(90deg, rgba(255,111,94,0.3) 25%, #FF6F5E 50%, rgba(255,111,94,0.3) 75%)', backgroundSize: '200% 100%' }} />
         <p className="text-[13px] text-[#A8A29E] mt-4">Loading place...</p>
       </div>
     );
@@ -948,11 +948,11 @@ export default function App() {
               >
                 {isActive && (<>
                   <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-6 h-[3px] rounded-full pointer-events-none" style={{ background: 'var(--accent-amber-gradient)' }} />
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[48px] h-[48px] rounded-full pointer-events-none -z-1" style={{ background: 'radial-gradient(circle, rgba(200,113,74,0.25) 0%, transparent 70%)' }} />
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[48px] h-[48px] rounded-full pointer-events-none -z-1" style={{ background: 'radial-gradient(circle, rgba(255,111,94,0.25) 0%, transparent 70%)' }} />
                 </>)}
                 <tab.icon active={isActive} />
                 <span style={{
-                  background: isActive ? 'linear-gradient(135deg, #C8714A, #E8A179)' : 'none',
+                  background: isActive ? 'linear-gradient(135deg, #FF6F5E, #FF9B7A)' : 'none',
                   WebkitBackgroundClip: isActive ? 'text' : 'unset',
                   WebkitTextFillColor: isActive ? 'transparent' : undefined,
                 }}>

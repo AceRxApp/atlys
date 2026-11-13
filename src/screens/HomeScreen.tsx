@@ -10,7 +10,6 @@ import { fixPhotoUrl } from '../utils/photoUrl';
 import NativeImg from '../components/NativeImg';
 import { FlightCard, FlightCardSkeleton } from '../components/FlightCard';
 import CommunityRoutesSection from '../components/CommunityRoutesSection';
-import SocialProof from '../components/SocialProof';
 import PlanLoadingAnimation from '../components/PlanLoadingAnimation';
 import { API_URL } from '../utils/api';
 
@@ -740,7 +739,7 @@ export default function HomeScreen() {
                 className="relative overflow-hidden rounded-xl border border-border-subtle cursor-pointer h-[130px] card-edge-glow"
               >
                 {/* Signature pin dot */}
-                <div className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full z-10" style={{ background: '#C8714A', boxShadow: '0 0 8px rgba(200,113,74,0.5)' }} />
+                <div className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full z-10" style={{ background: '#FF6F5E', boxShadow: '0 0 8px rgba(255,111,94,0.5)' }} />
                 <NativeImg
                   src={dest.image}
                   alt={`${dest.landmark}, ${dest.city}`}
@@ -819,7 +818,7 @@ export default function HomeScreen() {
               style={{ animationDelay: `${i * 50}ms` }}
               className={`flex flex-col items-center gap-1 py-2.5 px-2 rounded-xl cursor-pointer transition-all duration-200 animate-enter-up ${
                 isVibeSelected
-                  ? 'border-[1.5px] border-accent-amber bg-amber-tint-bg15 shadow-[0_0_16px_rgba(200,113,74,0.12)] card-edge-glow'
+                  ? 'border-[1.5px] border-accent-amber bg-amber-tint-bg15 shadow-[0_0_16px_rgba(255,111,94,0.12)] card-edge-glow'
                   : 'border border-border-medium bg-transparent hover:border-border-strong'
               }`}>
               <span className="text-lg">{v.emoji}</span>
@@ -888,11 +887,6 @@ export default function HomeScreen() {
 
       {/* ── Discover — Community Routes + Quick Actions ── */}
       {hasLocation && <CommunityRoutesSection citySlug={citySlug} />}
-
-      {/* Social Proof */}
-      <div className="mt-5">
-        <SocialProof />
-      </div>
 
       {/* TasteLens & Events — accessible from bottom nav, removed here to reduce clutter */}
 

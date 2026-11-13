@@ -81,7 +81,7 @@ function classifyPlace(category: string): LumeZone['dominantCategory'] {
 const ZONE_COLORS: Record<LumeZone['dominantCategory'], {
   core: string; glow: string; ring: string; label: string; emoji: string;
 }> = {
-  food:      { core: 'rgba(200,113,74,0.9)',  glow: 'rgba(200,113,74,0.35)', ring: 'rgba(200,113,74,0.12)', label: '#C8714A', emoji: '🍽️' },
+  food:      { core: 'rgba(255,111,94,0.9)',  glow: 'rgba(255,111,94,0.35)', ring: 'rgba(255,111,94,0.12)', label: '#FF6F5E', emoji: '🍽️' },
   nightlife: { core: 'rgba(168,85,247,0.9)',   glow: 'rgba(168,85,247,0.35)', ring: 'rgba(168,85,247,0.12)', label: '#A855F7', emoji: '🌙' },
   culture:   { core: 'rgba(59,130,246,0.9)',   glow: 'rgba(59,130,246,0.35)', ring: 'rgba(59,130,246,0.12)', label: '#3B82F6', emoji: '🏛️' },
   outdoors:  { core: 'rgba(34,197,94,0.9)',    glow: 'rgba(34,197,94,0.35)',  ring: 'rgba(34,197,94,0.12)',  label: '#22C55E', emoji: '🌿' },
