@@ -579,9 +579,7 @@ export default function ProfileScreen() {
                       <span className="text-sm font-semibold text-text-primary">Free Plan</span>
                     </div>
                     <div className="text-xs text-text-tertiary mb-3">
-                      {subscription.getRemainingUses('plan_my_day')}/{subscription.getLimit('plan_my_day')} AI plans
-                      {' \u00B7 '}
-                      {subscription.getRemainingUses('tastelens')}/{subscription.getLimit('tastelens')} TasteLens scans left this month
+                      {subscription.getRemainingUses('plan_my_day')}/{subscription.getLimit('plan_my_day')} AI plans left this month
                     </div>
                     {billingError && (
                       <div className="px-3 py-2 rounded-lg bg-red-tint-bg border border-red-tint-border text-status-red text-xs mb-2">

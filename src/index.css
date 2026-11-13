@@ -284,7 +284,7 @@
     height: 5px;
     border-radius: 50%;
     background: var(--accent-amber);
-    box-shadow: 0 0 6px rgba(56, 163, 232, 0.6);
+    box-shadow: 0 0 6px rgba(200, 113, 74, 0.6);
     display: inline-block;
     margin-right: 6px;
   }
@@ -316,7 +316,7 @@
     left: 34px;
     width: 2px;
     height: 8px;
-    background: rgba(56, 163, 232, 0.15);
+    background: rgba(200, 113, 74, 0.15);
     pointer-events: none;
   }
 }
@@ -334,7 +334,7 @@
 }
 
 @utility aurora-bg {
-  background: linear-gradient(-45deg, var(--accent-amber), rgba(56,163,232,0.3), var(--bg-elevated), rgba(56,163,232,0.15));
+  background: linear-gradient(-45deg, var(--accent-amber), rgba(200,113,74,0.3), var(--bg-elevated), rgba(200,113,74,0.15));
   background-size: 300% 300%;
   animation: auroraFlow 8s ease infinite;
 }
@@ -503,11 +503,11 @@
   ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb, #44586B); border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover, #6B7E90); }
 
-  ::selection { background: var(--selection-bg, rgba(56, 163, 232, 0.3)); }
+  ::selection { background: var(--selection-bg, rgba(200, 113, 74, 0.3)); }
 
   :focus { outline: none; }
   :focus-visible {
-    outline: 2px solid var(--accent-amber, #38A3E8);
+    outline: 2px solid var(--accent-amber, #C8714A);
     outline-offset: 2px;
     border-radius: 4px;
   }
@@ -530,7 +530,7 @@
   }
 
   button, a, select {
-    -webkit-tap-highlight-color: rgba(56, 163, 232, 0.2);
+    -webkit-tap-highlight-color: rgba(200, 113, 74, 0.2);
   }
 }
 
@@ -553,7 +553,7 @@
   font-size: 14px;
   border-radius: 0 0 12px 12px;
   text-decoration: none;
-  background: #38A3E8;
+  background: #C8714A;
   color: #07131E;
   transition: top 0.2s;
 }

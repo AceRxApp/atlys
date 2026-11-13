@@ -72,7 +72,7 @@ export default function CityVideoPlayer({ cityName, videos }: Props) {
               />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg, rgba(56,163,232,0.15), rgba(111,195,247,0.08))' }}>
+                style={{ background: 'linear-gradient(135deg, rgba(200,113,74,0.15), rgba(111,195,247,0.08))' }}>
                 <span className="text-3xl opacity-40">🎬</span>
               </div>
             )}
@@ -83,7 +83,7 @@ export default function CityVideoPlayer({ cityName, videos }: Props) {
             {/* Play button center */}
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-sm"
-                style={{ background: 'rgba(56,163,232,0.85)' }}>
+                style={{ background: 'rgba(200,113,74,0.85)' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="#000" stroke="none">
                   <polygon points="6 3 20 12 6 21 6 3"/>
                 </svg>

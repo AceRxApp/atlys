@@ -6,7 +6,7 @@ import { API_URL } from '../utils/api';
 // ---------------------------------------------------------------------------
 // Owner/admin emails get unlimited Pro access without a subscription
 // ---------------------------------------------------------------------------
-const ADMIN_EMAILS = new Set(['elevecreativehaus@gmail.com']);
+const ADMIN_EMAILS = new Set(['elevecreativehaus@gmail.com', 'reviewer@nxstops.com']);
 
 function isAdminEmail(email: string | undefined | null): boolean {
   return !!email && ADMIN_EMAILS.has(email.toLowerCase());

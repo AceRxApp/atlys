@@ -413,7 +413,7 @@ export default function DiscoverScreen() {
                 const activeVibe = VIBES.find(v => selectedVibes.includes(v.id));
                 if (!activeVibe) return null;
                 return (
-                  <div className="card mb-3 px-[18px] py-4" style={{ background: `linear-gradient(135deg, var(--amber-tint-bg10), rgba(56,163,232,0.04))`, border: `1px solid var(--amber-tint-border15)` }}>
+                  <div className="card mb-3 px-[18px] py-4" style={{ background: `linear-gradient(135deg, var(--amber-tint-bg10), rgba(200,113,74,0.04))`, border: `1px solid var(--amber-tint-border15)` }}>
                     <div className="flex items-center gap-2.5 mb-1.5">
                       <span className="text-xl">{activeVibe.emoji}</span>
                       <span className="font-semibold text-[15px] text-text-primary">{activeVibe.label}</span>

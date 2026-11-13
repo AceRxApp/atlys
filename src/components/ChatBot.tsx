@@ -197,14 +197,14 @@ export default function ChatBot({ city, onClose, planContext, onModification }: 
               <div
                 className="w-10 h-10 rounded-2xl flex items-center justify-center"
                 style={{
-                  background: 'linear-gradient(135deg, #38A3E8 0%, #1C6FA8 50%, #15577F 100%)',
-                  boxShadow: '0 2px 12px rgba(56, 163, 232, 0.35)',
+                  background: 'linear-gradient(135deg, #C8714A 0%, #7A4022 50%, #5C301A 100%)',
+                  boxShadow: '0 2px 12px rgba(200, 113, 74, 0.35)',
                 }}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                   {/* Sparkle / compass star */}
                   <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="white" opacity="0.95" />
-                  <circle cx="12" cy="12" r="2.5" fill="rgba(56,163,232,0.9)" />
+                  <circle cx="12" cy="12" r="2.5" fill="rgba(200,113,74,0.9)" />
                 </svg>
               </div>
               {/* Online pulse dot */}
@@ -216,7 +216,7 @@ export default function ChatBot({ city, onClose, planContext, onModification }: 
                 <span
                   className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-[1px] rounded"
                   style={{
-                    background: 'linear-gradient(135deg, rgba(56,163,232,0.15), rgba(28,111,168,0.15))',
+                    background: 'linear-gradient(135deg, rgba(200,113,74,0.15), rgba(28,111,168,0.15))',
                     color: 'var(--accent-amber)',
                   }}
                 >
@@ -248,7 +248,7 @@ export default function ChatBot({ city, onClose, planContext, onModification }: 
                 <div
                   className="w-6 h-6 rounded-lg shrink-0 mt-1 flex items-center justify-center"
                   style={{
-                    background: 'linear-gradient(135deg, #38A3E8, #1C6FA8)',
+                    background: 'linear-gradient(135deg, #C8714A, #7A4022)',
                   }}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
@@ -282,7 +282,7 @@ export default function ChatBot({ city, onClose, planContext, onModification }: 
             <div className="flex justify-start gap-2">
               <div
                 className="w-6 h-6 rounded-lg shrink-0 mt-1 flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg, #38A3E8, #1C6FA8)' }}
+                style={{ background: 'linear-gradient(135deg, #C8714A, #7A4022)' }}
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
                   <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="white" opacity="0.95" />

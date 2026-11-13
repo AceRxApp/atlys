@@ -158,7 +158,6 @@ const PrivacyScreen = lazy(() => import('./screens/PrivacyScreen'));
 const TermsScreen = lazy(() => import('./screens/TermsScreen'));
 const ContactScreen = lazy(() => import('./screens/ContactScreen'));
 const CityScreen = lazy(() => import('./screens/CityScreen'));
-const ChatBot = lazy(() => import('./components/ChatBot'));
 const SharedPlanScreen = lazy(() => import('./screens/SharedPlanScreen'));
 const DishLensScreen = lazy(() => import('./screens/DishLensScreen'));
 const DeveloperPortal = lazy(() => import('./screens/DeveloperPortal'));
@@ -205,7 +204,7 @@ function PlaceDeepLink() {
   if (loading) {
     return (
       <div className="text-center px-5 py-20">
-        <div className="w-10 h-[3px] rounded-sm mx-auto animate-shimmer" style={{ background: 'linear-gradient(90deg, rgba(56,163,232,0.3) 25%, #38A3E8 50%, rgba(56,163,232,0.3) 75%)', backgroundSize: '200% 100%' }} />
+        <div className="w-10 h-[3px] rounded-sm mx-auto animate-shimmer" style={{ background: 'linear-gradient(90deg, rgba(200,113,74,0.3) 25%, #C8714A 50%, rgba(200,113,74,0.3) 75%)', backgroundSize: '200% 100%' }} />
         <p className="text-[13px] text-[#A8A29E] mt-4">Loading place...</p>
       </div>
     );
@@ -290,9 +289,6 @@ export default function App() {
     if (Capacitor.isNativePlatform()) return false; // Already in the app
     return true;
   });
-
-  // AI Chatbox
-  const [showChat, setShowChat] = useState(false);
 
   // TasteLens context (for navigating to TasteLens tab with restaurant context)
   const [dishLensContext, setDishLensContext] = useState<{ dish?: string; city?: string; restaurant?: string }>({});
@@ -952,11 +948,11 @@ export default function App() {
               >
                 {isActive && (<>
                   <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-6 h-[3px] rounded-full pointer-events-none" style={{ background: 'var(--accent-amber-gradient)' }} />
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[48px] h-[48px] rounded-full pointer-events-none -z-1" style={{ background: 'radial-gradient(circle, rgba(56,163,232,0.25) 0%, transparent 70%)' }} />
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[48px] h-[48px] rounded-full pointer-events-none -z-1" style={{ background: 'radial-gradient(circle, rgba(200,113,74,0.25) 0%, transparent 70%)' }} />
                 </>)}
                 <tab.icon active={isActive} />
                 <span style={{
-                  background: isActive ? 'linear-gradient(135deg, #38A3E8, #6FC3F7)' : 'none',
+                  background: isActive ? 'linear-gradient(135deg, #C8714A, #E8A179)' : 'none',
                   WebkitBackgroundClip: isActive ? 'text' : 'unset',
                   WebkitTextFillColor: isActive ? 'transparent' : undefined,
                 }}>
@@ -1095,21 +1091,6 @@ export default function App() {
           );
         })()}
 
-        {/* Floating AI Chat Button — hidden on Plan screen which has its own plan-aware chat */}
-        {!isInfoPage && !selectedPlace && !showChat && screen !== 'plan' && (
-          <div className="fixed bottom-[90px] right-0 z-50">
-            <button
-              onClick={() => setShowChat(true)}
-              aria-label="Open AI travel assistant"
-              className="w-9 h-11 rounded-l-2xl border-none cursor-pointer flex items-center justify-center opacity-60 hover:opacity-100 transition-opacity"
-              style={{ background: 'linear-gradient(135deg, #38A3E8, #1C6FA8)', boxShadow: '-2px 2px 8px rgba(56,163,232,0.3)' }}
-              title="AI Travel Assistant"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="white" opacity="0.95" /></svg>
-            </button>
-          </div>
-        )}
-
         {/* Place Detail Modal */}
         {selectedPlace && (
           <Suspense fallback={null}>
@@ -1230,16 +1211,6 @@ export default function App() {
         {showAdmin && (
           <Suspense fallback={null}>
             <AdminPanel />
-          </Suspense>
-        )}
-
-        {/* AI Chatbox */}
-        {showChat && (
-          <Suspense fallback={null}>
-            <ChatBot
-              city={location.cityLabel || null}
-              onClose={() => setShowChat(false)}
-            />
           </Suspense>
         )}
 

@@ -740,7 +740,7 @@ export default function HomeScreen() {
                 className="relative overflow-hidden rounded-xl border border-border-subtle cursor-pointer h-[130px] card-edge-glow"
               >
                 {/* Signature pin dot */}
-                <div className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full z-10" style={{ background: '#38A3E8', boxShadow: '0 0 8px rgba(56,163,232,0.5)' }} />
+                <div className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full z-10" style={{ background: '#C8714A', boxShadow: '0 0 8px rgba(200,113,74,0.5)' }} />
                 <NativeImg
                   src={dest.image}
                   alt={`${dest.landmark}, ${dest.city}`}
@@ -819,7 +819,7 @@ export default function HomeScreen() {
               style={{ animationDelay: `${i * 50}ms` }}
               className={`flex flex-col items-center gap-1 py-2.5 px-2 rounded-xl cursor-pointer transition-all duration-200 animate-enter-up ${
                 isVibeSelected
-                  ? 'border-[1.5px] border-accent-amber bg-amber-tint-bg15 shadow-[0_0_16px_rgba(56,163,232,0.12)] card-edge-glow'
+                  ? 'border-[1.5px] border-accent-amber bg-amber-tint-bg15 shadow-[0_0_16px_rgba(200,113,74,0.12)] card-edge-glow'
                   : 'border border-border-medium bg-transparent hover:border-border-strong'
               }`}>
               <span className="text-lg">{v.emoji}</span>

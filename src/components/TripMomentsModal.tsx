@@ -75,13 +75,13 @@ function generateMomentsCard(
 
   // Amber accent line at top
   const accent = ctx.createLinearGradient(0, 0, W, 0);
-  accent.addColorStop(0, '#38A3E8');
-  accent.addColorStop(1, '#1F7FBF');
+  accent.addColorStop(0, '#C8714A');
+  accent.addColorStop(1, '#9C5530');
   ctx.fillStyle = accent;
   ctx.fillRect(0, 0, W, 6);
 
   // NXSTOPS branding
-  ctx.fillStyle = '#38A3E8';
+  ctx.fillStyle = '#C8714A';
   ctx.font = 'bold 16px system-ui, sans-serif';
   ctx.fillText('NXSTOPS', pad, 60);
 
@@ -116,7 +116,7 @@ function generateMomentsCard(
   const colW = (W - pad * 2) / 3;
 
   // Stops visited
-  ctx.fillStyle = '#38A3E8';
+  ctx.fillStyle = '#C8714A';
   ctx.font = 'bold 48px system-ui, sans-serif';
   ctx.fillText(`${stopsVisited}`, pad, statsY);
   ctx.fillStyle = '#78716C';
@@ -124,7 +124,7 @@ function generateMomentsCard(
   ctx.fillText('STOPS VISITED', pad, statsY + 24);
 
   // Categories
-  ctx.fillStyle = '#38A3E8';
+  ctx.fillStyle = '#C8714A';
   ctx.font = 'bold 48px system-ui, sans-serif';
   ctx.fillText(`${categoriesExplored}`, pad + colW, statsY);
   ctx.fillStyle = '#78716C';
@@ -149,7 +149,7 @@ function generateMomentsCard(
     const y = listY + i * 48;
 
     // Number
-    ctx.fillStyle = '#38A3E8';
+    ctx.fillStyle = '#C8714A';
     ctx.font = 'bold 18px system-ui, sans-serif';
     ctx.fillText(`${i + 1}.`, pad, y + 6);
 

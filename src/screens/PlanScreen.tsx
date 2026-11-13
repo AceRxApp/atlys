@@ -38,7 +38,6 @@ import { confirmDialog } from '../components/ConfirmDialog';
 import NearbyDiscoveries from '../components/NearbyDiscoveries';
 import LogisticsPanel from '../components/LogisticsPanel';
 import ItineraryAlertBanner from '../components/ItineraryAlertBanner';
-import ChatBot from '../components/ChatBot';
 import GoldenHourCard from '../components/GoldenHourCard';
 // LocalRhythm removed — collection view uses compact cards
 import VibePicker from '../components/VibePicker';
@@ -75,13 +74,13 @@ function exportDayAsImage(stops: Stop[], dayNum: number, cityName: string) {
 
   // Amber accent line
   const accent = ctx.createLinearGradient(0, 0, W, 0);
-  accent.addColorStop(0, '#38A3E8');
-  accent.addColorStop(1, '#1F7FBF');
+  accent.addColorStop(0, '#C8714A');
+  accent.addColorStop(1, '#9C5530');
   ctx.fillStyle = accent;
   ctx.fillRect(0, 0, W, 4);
 
   // Header
-  ctx.fillStyle = '#38A3E8';
+  ctx.fillStyle = '#C8714A';
   ctx.font = 'bold 14px system-ui, sans-serif';
   ctx.fillText('NXSTOPS', pad, 44);
 
@@ -99,7 +98,7 @@ function exportDayAsImage(stops: Stop[], dayNum: number, cityName: string) {
     // Number circle
     ctx.beginPath();
     ctx.arc(pad + 14, y + 22, 14, 0, Math.PI * 2);
-    ctx.fillStyle = '#38A3E8';
+    ctx.fillStyle = '#C8714A';
     ctx.fill();
     ctx.fillStyle = '#07131E';
     ctx.font = 'bold 13px system-ui, sans-serif';
@@ -296,8 +295,6 @@ export default function PlanScreen() {
   // Nearby discoveries toggle
   const [expandedNearby, setExpandedNearby] = useState<string | null>(null);
   const [expandedStopActions, setExpandedStopActions] = useState<string | null>(null);
-  // Chat FAB
-  const [showChat, setShowChat] = useState(false);
   // Logistics panel
   const [showLogistics, setShowLogistics] = useState(false);
 
@@ -1313,39 +1310,6 @@ export default function PlanScreen() {
         document.body
       )}
 
-      {/* Chat FAB — not during posttrip */}
-      {tripPhase !== 'posttrip' && totalStops > 0 && createPortal(
-        <button
-          onClick={() => setShowChat(true)}
-          className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+80px)] right-0 w-9 h-11 rounded-l-2xl border-none cursor-pointer flex items-center justify-center z-40 opacity-60 hover:opacity-100 transition-opacity"
-          aria-label="Open AI assistant"
-          style={{ background: 'linear-gradient(135deg, #38A3E8, #1C6FA8)', boxShadow: '-2px 2px 8px rgba(56,163,232,0.3)' }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="white" opacity="0.95" /></svg>
-        </button>,
-        document.body
-      )}
-
-      {/* ChatBot modal with plan context */}
-      {showChat && createPortal(
-        <ChatBot
-          city={cityLabel}
-          onClose={() => setShowChat(false)}
-          planContext={{
-            stops: dayPlan.map(s => ({
-              name: getStopName(s),
-              category: getStopCategory(s),
-              timeSlot: s.timeSlot,
-            })),
-            city: cityLabel,
-            timeOfDay: new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening',
-          }}
-          onModification={(mod) => {
-            showToast(`AI suggests: ${mod.action} ${mod.placeType || ''}`);
-          }}
-        />,
-        document.body
-      )}
     </div>
   );
 }
