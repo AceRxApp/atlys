@@ -901,7 +901,7 @@ function ApiKeysTab() {
                     width: `${Math.min(100, (k.monthly_usage / k.monthly_limit) * 100)}%`,
                     background: k.monthly_usage / k.monthly_limit > 0.9
                       ? '#ef4444'
-                      : 'linear-gradient(135deg, #E8940A, #F5A623)',
+                      : 'linear-gradient(135deg, #38A3E8, #6FC3F7)',
                   }}
                 />
               </div>

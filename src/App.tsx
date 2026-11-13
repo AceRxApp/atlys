@@ -205,7 +205,7 @@ function PlaceDeepLink() {
   if (loading) {
     return (
       <div className="text-center px-5 py-20">
-        <div className="w-10 h-[3px] rounded-sm mx-auto animate-shimmer" style={{ background: 'linear-gradient(90deg, rgba(232,148,10,0.3) 25%, #E8940A 50%, rgba(232,148,10,0.3) 75%)', backgroundSize: '200% 100%' }} />
+        <div className="w-10 h-[3px] rounded-sm mx-auto animate-shimmer" style={{ background: 'linear-gradient(90deg, rgba(56,163,232,0.3) 25%, #38A3E8 50%, rgba(56,163,232,0.3) 75%)', backgroundSize: '200% 100%' }} />
         <p className="text-[13px] text-[#A8A29E] mt-4">Loading place...</p>
       </div>
     );
@@ -952,11 +952,11 @@ export default function App() {
               >
                 {isActive && (<>
                   <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-6 h-[3px] rounded-full pointer-events-none" style={{ background: 'var(--accent-amber-gradient)' }} />
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[48px] h-[48px] rounded-full pointer-events-none -z-1" style={{ background: 'radial-gradient(circle, rgba(232,148,10,0.25) 0%, transparent 70%)' }} />
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[48px] h-[48px] rounded-full pointer-events-none -z-1" style={{ background: 'radial-gradient(circle, rgba(56,163,232,0.25) 0%, transparent 70%)' }} />
                 </>)}
                 <tab.icon active={isActive} />
                 <span style={{
-                  background: isActive ? 'linear-gradient(135deg, #E8940A, #F5A623)' : 'none',
+                  background: isActive ? 'linear-gradient(135deg, #38A3E8, #6FC3F7)' : 'none',
                   WebkitBackgroundClip: isActive ? 'text' : 'unset',
                   WebkitTextFillColor: isActive ? 'transparent' : undefined,
                 }}>
@@ -1102,7 +1102,7 @@ export default function App() {
               onClick={() => setShowChat(true)}
               aria-label="Open AI travel assistant"
               className="w-9 h-11 rounded-l-2xl border-none cursor-pointer flex items-center justify-center opacity-60 hover:opacity-100 transition-opacity"
-              style={{ background: 'linear-gradient(135deg, #E8940A, #D85A18)', boxShadow: '-2px 2px 8px rgba(232,148,10,0.3)' }}
+              style={{ background: 'linear-gradient(135deg, #38A3E8, #1C6FA8)', boxShadow: '-2px 2px 8px rgba(56,163,232,0.3)' }}
               title="AI Travel Assistant"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="white" opacity="0.95" /></svg>

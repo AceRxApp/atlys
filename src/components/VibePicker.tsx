@@ -20,10 +20,14 @@ interface Vibe {
 // Luxe, Under the Radar) for modes that answer "what would it feel like to
 // experience this city," not "what mood are you in." Each still runs on an
 // already-rebalanced backend vibe internally.
+// A fourth mode, I'm Moving Here, runs on the new `movinghere` backend vibe —
+// the only one of the four whose vibe key did not already exist. Its day is a
+// normal local day: food belongs in it, but it must not read as a food tour.
 const VIBES: Vibe[] = [
-  { id: 'wander', emoji: '\u{1F6B6}', label: 'Discover This City', tagline: 'Neighborhoods, streets & local life', gradient: 'from-stone-700/40 to-stone-900/20' },
-  { id: 'starthare', emoji: '\u{1F5FA}\u{FE0F}', label: 'A Weekend Here', tagline: 'A well-rounded day of highlights', gradient: 'from-amber-900/40 to-orange-900/20' },
+  { id: 'wander', emoji: '\u{1F6B6}', label: 'Discover This City', tagline: 'Neighborhoods, streets & local life', gradient: 'from-slate-700/40 to-slate-900/20' },
+  { id: 'starthare', emoji: '\u{1F5FA}\u{FE0F}', label: 'A Weekend Here', tagline: 'A well-rounded day of highlights', gradient: 'from-sky-900/40 to-indigo-900/20' },
   { id: 'undertheradar', emoji: '\u{1F4CD}', label: 'Interesting Neighborhoods', tagline: 'Hidden gems & local favorites', gradient: 'from-emerald-900/40 to-teal-900/20' },
+  { id: 'movinghere', emoji: '\u{1F511}', label: 'I’m Moving Here', tagline: 'A normal day as a local', gradient: 'from-cyan-900/40 to-slate-900/20' },
 ];
 
 export default function VibePicker({ onPickVibe, loading = false, cityName, onManual, compact = false }: VibePickerProps) {
@@ -61,7 +65,7 @@ export default function VibePicker({ onPickVibe, loading = false, cityName, onMa
         <p className="text-[13px] text-text-secondary text-center mb-3">
           Pick a vibe for this day
         </p>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {VIBES.map((vibe) => {
             const isSelected = selected.has(vibe.id);
             return (
@@ -87,7 +91,7 @@ export default function VibePicker({ onPickVibe, loading = false, cityName, onMa
                 {isSelected && (
                   <div className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center z-10"
                     style={{ background: 'var(--accent-amber)' }}>
-                    <span className="text-[10px] text-black font-bold">{'\u2713'}</span>
+                    <span className="text-[10px] font-bold" style={{ color: 'var(--text-on-accent)' }}>{'\u2713'}</span>
                   </div>
                 )}
               </button>
@@ -99,8 +103,8 @@ export default function VibePicker({ onPickVibe, loading = false, cityName, onMa
             type="button"
             onClick={handleGo}
             disabled={loading}
-            className="mt-3 w-full py-2.5 rounded-xl font-semibold text-[14px] text-black cursor-pointer border-none transition-all duration-200"
-            style={{ background: 'var(--accent-amber)' }}
+            className="mt-3 w-full py-2.5 rounded-xl font-semibold text-[14px] cursor-pointer border-none transition-all duration-200"
+            style={{ background: 'var(--accent-amber)', color: 'var(--text-on-accent)' }}
           >
             {loading ? 'Building your day...' : `Plan my ${selected.size > 1 ? 'blended ' : ''}day`}
           </button>
@@ -128,7 +132,7 @@ export default function VibePicker({ onPickVibe, loading = false, cityName, onMa
       </div>
 
       {/* Vibe grid */}
-      <div className="grid grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-2 gap-2.5">
         {VIBES.map((vibe) => {
           const isSelected = selected.has(vibe.id);
           const isLoadingThis = loading && isSelected;
@@ -177,7 +181,7 @@ export default function VibePicker({ onPickVibe, loading = false, cityName, onMa
               {isSelected && !isLoadingThis && (
                 <div className="absolute top-3 right-3 z-10 w-6 h-6 rounded-full flex items-center justify-center"
                   style={{ background: 'var(--accent-amber)' }}>
-                  <span className="text-[12px] text-black font-bold">{'\u2713'}</span>
+                  <span className="text-[12px] font-bold" style={{ color: 'var(--text-on-accent)' }}>{'\u2713'}</span>
                 </div>
               )}
 
@@ -204,8 +208,8 @@ export default function VibePicker({ onPickVibe, loading = false, cityName, onMa
           <button
             type="button"
             onClick={handleGo}
-            className="w-full py-3.5 rounded-2xl font-bold text-[16px] text-black cursor-pointer border-none transition-all duration-200 active:scale-[0.98]"
-            style={{ background: 'var(--accent-amber)' }}
+            className="w-full py-3.5 rounded-2xl font-bold text-[16px] cursor-pointer border-none transition-all duration-200 active:scale-[0.98]"
+            style={{ background: 'var(--accent-amber)', color: 'var(--text-on-accent)' }}
           >
             {selected.size === 1
               ? `Plan my ${VIBES.find(v => v.id === Array.from(selected)[0])?.label || ''} day`

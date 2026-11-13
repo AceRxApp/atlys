@@ -75,13 +75,13 @@ function exportDayAsImage(stops: Stop[], dayNum: number, cityName: string) {
 
   // Amber accent line
   const accent = ctx.createLinearGradient(0, 0, W, 0);
-  accent.addColorStop(0, '#E8940A');
-  accent.addColorStop(1, '#C47D08');
+  accent.addColorStop(0, '#38A3E8');
+  accent.addColorStop(1, '#1F7FBF');
   ctx.fillStyle = accent;
   ctx.fillRect(0, 0, W, 4);
 
   // Header
-  ctx.fillStyle = '#E8940A';
+  ctx.fillStyle = '#38A3E8';
   ctx.font = 'bold 14px system-ui, sans-serif';
   ctx.fillText('NXSTOPS', pad, 44);
 
@@ -99,9 +99,9 @@ function exportDayAsImage(stops: Stop[], dayNum: number, cityName: string) {
     // Number circle
     ctx.beginPath();
     ctx.arc(pad + 14, y + 22, 14, 0, Math.PI * 2);
-    ctx.fillStyle = '#E8940A';
+    ctx.fillStyle = '#38A3E8';
     ctx.fill();
-    ctx.fillStyle = '#0C0A09';
+    ctx.fillStyle = '#07131E';
     ctx.font = 'bold 13px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(`${i + 1}`, pad + 14, y + 27);
@@ -1100,7 +1100,7 @@ export default function PlanScreen() {
                         }`}>
                         <div className={`w-5 h-5 rounded-md shrink-0 flex items-center justify-center text-xs ${
                           checked
-                            ? 'bg-accent-gradient text-[#0C0A09] border-none'
+                            ? 'bg-accent-gradient text-[#07131E] border-none'
                             : 'bg-transparent border-2 border-border-strong'
                         }`}>
                           {checked && '\u{2713}'}
@@ -1319,7 +1319,7 @@ export default function PlanScreen() {
           onClick={() => setShowChat(true)}
           className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+80px)] right-0 w-9 h-11 rounded-l-2xl border-none cursor-pointer flex items-center justify-center z-40 opacity-60 hover:opacity-100 transition-opacity"
           aria-label="Open AI assistant"
-          style={{ background: 'linear-gradient(135deg, #E8940A, #D85A18)', boxShadow: '-2px 2px 8px rgba(232,148,10,0.3)' }}
+          style={{ background: 'linear-gradient(135deg, #38A3E8, #1C6FA8)', boxShadow: '-2px 2px 8px rgba(56,163,232,0.3)' }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="white" opacity="0.95" /></svg>
         </button>,

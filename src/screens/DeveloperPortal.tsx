@@ -151,7 +151,7 @@ export default function DeveloperPortal() {
 
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="font-heading text-3xl font-bold mb-2" style={{ background: 'linear-gradient(135deg, #E8940A, #F5A623)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          <h1 className="font-heading text-3xl font-bold mb-2" style={{ background: 'linear-gradient(135deg, #38A3E8, #6FC3F7)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             NxStops API
           </h1>
           <p className="text-text-secondary text-sm">
@@ -170,7 +170,7 @@ export default function DeveloperPortal() {
                   ? 'bg-bg-surface text-text-primary shadow-sm'
                   : 'text-text-secondary hover:text-text-primary'
               }`}
-              style={tab === t ? { background: 'linear-gradient(135deg, rgba(232,148,10,0.15), rgba(245,166,35,0.08))' } : undefined}
+              style={tab === t ? { background: 'linear-gradient(135deg, rgba(56,163,232,0.15), rgba(111,195,247,0.08))' } : undefined}
             >
               {t === 'docs' ? 'Documentation' : t === 'register' ? 'Get API Key' : 'Check Status'}
             </button>
@@ -347,7 +347,7 @@ export default function DeveloperPortal() {
                   >
                     {tier.popular && (
                       <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[10px] font-bold uppercase tracking-wider px-3 py-0.5 rounded-full"
-                        style={{ background: 'linear-gradient(135deg, #E8940A, #F5A623)', color: '#000' }}>
+                        style={{ background: 'linear-gradient(135deg, #38A3E8, #6FC3F7)', color: '#07131E' }}>
                         Most Popular
                       </span>
                     )}
@@ -370,8 +370,8 @@ export default function DeveloperPortal() {
                         className="w-full mt-4 py-2.5 rounded-xl text-sm font-semibold border-none cursor-pointer transition-all"
                         style={
                           tier.popular
-                            ? { background: 'linear-gradient(135deg, #E8940A, #F5A623)', color: '#000' }
-                            : { background: 'rgba(232,148,10,0.15)', color: '#E8940A' }
+                            ? { background: 'linear-gradient(135deg, #38A3E8, #6FC3F7)', color: '#07131E' }
+                            : { background: 'rgba(56,163,232,0.15)', color: '#38A3E8' }
                         }
                       >
                         Upgrade to {tier.name}
@@ -466,7 +466,7 @@ export default function DeveloperPortal() {
                   type="submit"
                   disabled={regLoading}
                   className="w-full py-3 rounded-xl text-sm font-semibold border-none cursor-pointer transition-all disabled:opacity-50"
-                  style={{ background: 'linear-gradient(135deg, #E8940A, #F5A623)', color: '#000' }}
+                  style={{ background: 'linear-gradient(135deg, #38A3E8, #6FC3F7)', color: '#07131E' }}
                 >
                   {regLoading ? 'Submitting...' : 'Request API Key'}
                 </button>
@@ -493,7 +493,7 @@ export default function DeveloperPortal() {
                   type="submit"
                   disabled={checkLoading}
                   className="px-5 py-2.5 rounded-xl text-sm font-semibold border-none cursor-pointer shrink-0 disabled:opacity-50"
-                  style={{ background: 'linear-gradient(135deg, #E8940A, #F5A623)', color: '#000' }}
+                  style={{ background: 'linear-gradient(135deg, #38A3E8, #6FC3F7)', color: '#07131E' }}
                 >
                   {checkLoading ? '...' : 'Check'}
                 </button>
@@ -525,7 +525,7 @@ export default function DeveloperPortal() {
                         width: `${Math.min(100, (keyInfo.monthly_usage / keyInfo.monthly_limit) * 100)}%`,
                         background: keyInfo.monthly_usage / keyInfo.monthly_limit > 0.9
                           ? '#ef4444'
-                          : 'linear-gradient(135deg, #E8940A, #F5A623)',
+                          : 'linear-gradient(135deg, #38A3E8, #6FC3F7)',
                       }}
                     />
                   </div>
@@ -547,13 +547,13 @@ export default function DeveloperPortal() {
 
                 {/* Upgrade CTA */}
                 {keyInfo.status === 'approved' && keyInfo.tier === 'free' && (
-                  <div className="p-3 rounded-xl border border-accent-amber/30" style={{ background: 'rgba(232,148,10,0.08)' }}>
+                  <div className="p-3 rounded-xl border border-accent-amber/30" style={{ background: 'rgba(56,163,232,0.08)' }}>
                     <p className="text-sm font-medium mb-2">Need more requests?</p>
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleUpgrade('basic')}
                         className="flex-1 py-2 rounded-lg text-xs font-semibold border-none cursor-pointer"
-                        style={{ background: 'linear-gradient(135deg, #E8940A, #F5A623)', color: '#000' }}
+                        style={{ background: 'linear-gradient(135deg, #38A3E8, #6FC3F7)', color: '#07131E' }}
                       >
                         Basic — $29/mo
                       </button>

@@ -27,17 +27,14 @@ interface VibeOption {
 // "what would it feel like to experience this city," not "what mood are you
 // in." Each still runs on an already-rebalanced backend vibe internally —
 // only the framing shown to the user changed.
+// A fourth mode, I'm Moving Here, runs on the new `movinghere` backend vibe —
+// the only one of the four whose vibe key did not already exist.
 const BASE_VIBES: VibeOption[] = [
   { id: 'wander', emoji: '\u{1F6B6}', label: 'Discover This City', desc: 'Neighborhoods, streets & local life' },
   { id: 'starthare', emoji: '\u{1F5FA}\u{FE0F}', label: 'A Weekend Here', desc: 'A well-rounded day of highlights' },
   { id: 'undertheradar', emoji: '\u{1F4CD}', label: 'Interesting Neighborhoods', desc: 'Hidden gems & local favorites' },
+  { id: 'movinghere', emoji: '\u{1F511}', label: 'I’m Moving Here', desc: 'A normal day as a local' },
 ];
-
-function getVibesForDuration(_duration: 'full' | 'morning' | 'afternoon' | 'evening'): VibeOption[] {
-  // All three modes work for any duration now — no more swapping a vibe
-  // out for mornings/afternoons.
-  return BASE_VIBES;
-}
 
 const LOADING_MESSAGES = [
   'Finding top spots nearby...',
@@ -588,7 +585,6 @@ export default function HomeScreen() {
   const subscription = useSubscription(user);
 
   const [selectedVibesSet, setSelectedVibesSet] = useState<Set<string>>(new Set());
-  const [selectedDuration, setSelectedDuration] = useState<'full' | 'morning' | 'afternoon' | 'evening'>('full');
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
   const [showPaywall, setShowPaywall] = useState(false);
 
@@ -639,7 +635,8 @@ export default function HomeScreen() {
     }
 
     const vibe = selectedVibe || 'starthare';
-    const success = await planMyDay('explore', selectedDuration, vibe);
+    // Duration picker retired — a plan is always a full day.
+    const success = await planMyDay('explore', 'full', vibe);
     if (success) {
       if (user) {
         subscription.useFeature('plan_my_day');
@@ -652,7 +649,7 @@ export default function HomeScreen() {
 
   // Full-page loading state — fun animated progress
   if (curatedLoading || autoPlanLoading) {
-    const currentVibes = getVibesForDuration(selectedDuration);
+    const currentVibes = BASE_VIBES;
     const vibeLabel = selectedVibesSet.size > 1
       ? Array.from(selectedVibesSet).map(id => currentVibes.find(v => v.id === id)?.label || '').join(' + ')
       : currentVibes.find(v => v.id === (Array.from(selectedVibesSet)[0] || 'starthare'))?.label || 'Explore';
@@ -677,7 +674,7 @@ export default function HomeScreen() {
           subtitle="Your AI-powered city discovery app. Here's how to get started:"
           hints={[
             { emoji: '\u{1F4CD}', title: 'Pick your destination', description: 'Search for any city or tap "Use my location" to explore where you are right now.' },
-            { emoji: '\u{1F3AF}', title: 'Choose how to explore', description: 'Discover the city, plan a weekend, or dig into its neighborhoods — then pick Full Day, Morning, Afternoon, or Evening.' },
+            { emoji: '\u{1F3AF}', title: 'Choose how to explore', description: 'Discover the city, plan a weekend, dig into its neighborhoods, or see what it’s like to actually live here.' },
             { emoji: '\u{1F4CB}', title: 'Get real places, not just a list', description: 'Streets, parks, architecture, and local life — not just restaurants. Add what you like to your Journal.' },
             { emoji: '\u{1F30D}', title: 'Explore featured cities', description: 'Scroll through popular destinations worldwide for trip inspiration.' },
           ]}
@@ -743,7 +740,7 @@ export default function HomeScreen() {
                 className="relative overflow-hidden rounded-xl border border-border-subtle cursor-pointer h-[130px] card-edge-glow"
               >
                 {/* Signature pin dot */}
-                <div className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full z-10" style={{ background: '#F59E0B', boxShadow: '0 0 8px rgba(245,158,11,0.5)' }} />
+                <div className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full z-10" style={{ background: '#38A3E8', boxShadow: '0 0 8px rgba(56,163,232,0.5)' }} />
                 <NativeImg
                   src={dest.image}
                   alt={`${dest.landmark}, ${dest.city}`}
@@ -811,8 +808,8 @@ export default function HomeScreen() {
           <label className="section-label font-heading">How do you want to explore?</label>
           <span className="text-[11px] text-text-tertiary">Pick up to 2</span>
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          {getVibesForDuration(selectedDuration).map((v, i) => {
+        <div className="grid grid-cols-2 gap-2">
+          {BASE_VIBES.map((v, i) => {
             const isVibeSelected = selectedVibesSet.has(v.id);
             return (
             <button key={v.id}
@@ -822,7 +819,7 @@ export default function HomeScreen() {
               style={{ animationDelay: `${i * 50}ms` }}
               className={`flex flex-col items-center gap-1 py-2.5 px-2 rounded-xl cursor-pointer transition-all duration-200 animate-enter-up ${
                 isVibeSelected
-                  ? 'border-[1.5px] border-accent-amber bg-amber-tint-bg15 shadow-[0_0_16px_rgba(232,148,10,0.12)] card-edge-glow'
+                  ? 'border-[1.5px] border-accent-amber bg-amber-tint-bg15 shadow-[0_0_16px_rgba(56,163,232,0.12)] card-edge-glow'
                   : 'border border-border-medium bg-transparent hover:border-border-strong'
               }`}>
               <span className="text-lg">{v.emoji}</span>
@@ -833,46 +830,14 @@ export default function HomeScreen() {
         </div>
       </div>
 
-      {/* ── Duration Picker ── */}
-      <div className="mb-4">
-        <div className="flex gap-2">
-          {([
-            { id: 'full' as const, label: 'Full Day', emoji: '\u2600\uFE0F' },
-            { id: 'morning' as const, label: 'Morning', emoji: '\u{1F305}' },
-            { id: 'afternoon' as const, label: 'Afternoon', emoji: '\u{1F31E}' },
-            { id: 'evening' as const, label: 'Tonight', emoji: '\u{1F303}' },
-          ]).map(d => (
-            <button key={d.id}
-              onClick={() => {
-                setSelectedDuration(d.id);
-                // Clear vibes that aren't available in the new duration
-                const newVibes = getVibesForDuration(d.id);
-                const newVibeIds = new Set(newVibes.map(v => v.id));
-                setSelectedVibesSet(prev => {
-                  const filtered = new Set([...prev].filter(id => newVibeIds.has(id)));
-                  return filtered.size !== prev.size ? filtered : prev;
-                });
-              }}
-              className={`flex-1 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-all ${
-                selectedDuration === d.id
-                  ? 'border-[1.5px] border-accent-amber bg-amber-tint-bg15 text-accent-amber'
-                  : 'border border-border-medium bg-transparent text-text-tertiary'
-              }`}>
-              <span className="block text-sm mb-0.5">{d.emoji}</span>
-              {d.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* ── Generate Button ── */}
       <button
         onClick={handlePlanMyDay}
         disabled={autoPlanLoading}
         className="w-full p-4 rounded-[14px] border-none text-base font-bold cursor-pointer shadow-[0_4px_20px_var(--amber-tint-shadow)] disabled:opacity-50"
-        style={{ background: 'linear-gradient(135deg, var(--accent-amber), var(--accent-amber-dark))', color: '#0C0A09' }}
+        style={{ background: 'linear-gradient(135deg, var(--accent-amber), var(--accent-amber-dark))', color: 'var(--text-on-accent)' }}
       >
-        {autoPlanLoading ? 'Building your plan...' : `Plan My ${selectedDuration === 'full' ? 'Day' : selectedDuration === 'evening' ? 'Night' : selectedDuration.charAt(0).toUpperCase() + selectedDuration.slice(1)}`}
+        {autoPlanLoading ? 'Building your plan...' : 'Plan My Day'}
       </button>
       {!user ? (
         <div className="text-center text-xs text-text-tertiary mt-1.5">

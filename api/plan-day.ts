@@ -20,10 +20,20 @@ const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || '').trim();
 const placeCache = new Map<string, { places: Record<string, unknown>[]; timestamp: number }>();
 const PLACE_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
-// Final plan cache — cache complete AI-generated plans for 5 minutes
-// Same city + vibe + duration returns instantly on second request
+// Per-caller double-submit guard — NOT a shared plan cache.
+// This used to be keyed on location+vibe+duration+group only, which meant
+// every user in the same ~1.1km grid cell who picked the same mode got the
+// IDENTICAL AI itinerary for 5 minutes: same stops, same reason text. The
+// key now carries the caller's identity, so a plan is never handed to
+// someone who did not generate it. The TTL is 60s because that is all this
+// is actually worth: swallowing a double-tap or a client retry so one tap
+// does not bill two AI generations. A deliberate "plan again" a minute
+// later re-rolls, which is the point — see the weighted sampling in the
+// candidate pool. Cost protection lives in placeCache (above), which
+// caches RAW Google candidates and is still shared across all users.
 const planCache = new Map<string, { result: unknown; timestamp: number }>();
-const PLAN_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const PLAN_CACHE_TTL = 60 * 1000; // 60 seconds, per caller
+const PLAN_CACHE_MAX_ENTRIES = 500;
 
 const FIELD_MASK = [
   'places.id', 'places.displayName', 'places.formattedAddress',
@@ -116,6 +126,31 @@ const NON_FOOD_DISCOVERY_CAT_SET = new Set([
   'flea_market', 'shopping_mall', 'bowling_alley',
 ]);
 
+// ── EVERYDAY-LIFE TYPES (movinghere only) ────────────────────────────────
+// The point of "I'm Moving Here" is the infrastructure of an actual life:
+// where you buy food, where you pick up a prescription, which park you'd
+// walk through. Every one of these values is normally filtered OUT of plans
+// by EXCLUDED_PLAN_TYPES and BLOCKED_CATEGORIES, so this vibe also needs the
+// conditional filter allowance further down (see `allowsEverydayLife`).
+//
+// All 15 values below were smoke-tested one-per-request against the live
+// searchNearby endpoint (London, 3km) and every one returned 200 — none of
+// them will trigger the 400 INVALID_ARGUMENT trap documented above.
+const EVERYDAY_LIFE_CORE = [
+  'grocery_store', 'supermarket', 'convenience_store',
+  'pharmacy', 'library', 'park',
+];
+
+// Verified live (200 each) but kept in its OWN searchNearby request anyway:
+// a single invalid value would only cost this list, never the core one.
+const EVERYDAY_LIFE_EXTENDED = [
+  'drugstore', 'barber_shop', 'hair_salon', 'laundry',
+  'florist', 'dog_park', 'farmers_market', 'hardware_store',
+];
+
+// Union used by the filter allowances and the food-cap substitution pool.
+const EVERYDAY_LIFE_CAT_SET = new Set([...EVERYDAY_LIFE_CORE, ...EVERYDAY_LIFE_EXTENDED, 'post_office']);
+
 // Diverse text searches per vibe — we pick random subsets to keep API usage reasonable
 const DIVERSE_TEXT_SEARCHES: Record<string, string[]> = {
   // ── NEW 6 VIBES ──────────────────────────────────────────────────────────
@@ -206,6 +241,16 @@ const DIVERSE_TEXT_SEARCHES: Record<string, string[]> = {
     'community garden neighborhood green space', 'staircase alley hidden passage',
     'local bookshop record shop neighborhood', 'small neighborhood museum house museum',
     'overlooked monument local landmark', 'tucked away courtyard plaza',
+  ],
+  movinghere: [
+    'neighborhood grocery store local supermarket', 'local market fresh produce weekly shop',
+    'neighborhood park playground green space', 'public park dog walking locals',
+    'public library branch reading room', 'neighborhood pharmacy chemist local',
+    'corner coffee shop neighborhood regulars', 'local bakery everyday neighborhood',
+    'residential neighborhood tree lined streets', 'quiet residential street walk housing',
+    'neighborhood hardware store local shop', 'launderette laundromat local services',
+    'local barber shop hair salon neighborhood', 'neighborhood bookshop record shop local',
+    'community garden allotment neighborhood', 'everyday lunch spot weekday locals',
   ],
   // ── LEGACY VIBES (still used by backend fallback + existing plans) ──────
   nightout: [
@@ -342,6 +387,42 @@ function gemScore(p: { rating: number; reviewCount: number }): number {
   // Diminishing returns on review count — more reviews = less "hidden"
   const discoveryFactor = 1 / (1 + Math.log10(Math.max(p.reviewCount || 1, 1)));
   return p.rating * (0.6 + 0.4 * discoveryFactor);
+}
+
+// ── Weighted sampling without replacement ───────────────────────────────────
+// A strict score sort always hands the AI the same top-N most-reviewed places
+// in a city, so two people (or the same person twice) get the same itinerary
+// and a 4.8-star place with 120 reviews never beats a 4.4 with 8,000. Sample
+// instead, using each place's score as its weight. Quality still dominates —
+// weights are normalised and raised to EXPLOIT_POWER — but it is no longer
+// absolute, so the long tail of genuinely good places gets real airtime.
+//
+// SAFETY: this never lowers the quality bar. Every hard floor already runs
+// BEFORE this is called — businessStatus/ghost-listing filters, rating >= 2.5
+// and nightlife rating >= 3.0, MIN_REVIEWS, BLOCKED_CATEGORIES/BLOCKED_NAMES,
+// and the chain + hotel filters. Anything that reaches this function is
+// already good enough to show a user, so a surprising pick is never a bad one.
+const EXPLOIT_POWER = 2.5;
+
+function weightedSampleWithoutReplacement<T>(
+  pool: T[], count: number, scoreFn: (item: T) => number,
+): T[] {
+  if (count <= 0) return [];
+  if (count >= pool.length) return [...pool];
+  // Efraimidis–Spirakis: key = U^(1/w), take the `count` largest keys. One
+  // pass, provably equivalent to sequential weighted draws without
+  // replacement. Higher weight => key closer to 1 => likelier to survive.
+  const scores = pool.map(scoreFn);
+  const maxScore = Math.max(...scores, 1e-6);
+  return pool
+    .map((item, i) => {
+      const norm = Math.max(scores[i], 0) / maxScore;            // 0..1
+      const w = Math.pow(norm, EXPLOIT_POWER) + 1e-6;            // never 0
+      return { item, key: Math.pow(Math.random(), 1 / w) };
+    })
+    .sort((a, b) => b.key - a.key)
+    .slice(0, count)
+    .map(k => k.item);
 }
 
 // ── Region-aware local cuisine ──
@@ -1576,6 +1657,19 @@ const VIBE_CONFIG: Record<string, {
       full: 'Local bakery → neighborhood market → authentic lunch (family-run, generations old) → hidden park or street art → neighborhood cafe → secret dinner spot → locals-only bar → late-night street food',
     },
   },
+  movinghere: {
+    foodTypes: ['cafe', 'coffee_shop', 'bakery', 'restaurant', 'breakfast_restaurant', 'brunch_restaurant', 'sandwich_shop', 'ice_cream_shop'],
+    activityTypes: [...new Set(['park', 'garden', 'plaza', 'market', 'library', 'book_store', 'flea_market', 'historical_landmark', 'cultural_landmark', 'botanical_garden', 'gift_shop', 'clothing_store'])],
+    textSearchKey: 'movinghere',
+    textSearchCount: 10,
+    aiHint: 'I\'M MOVING HERE — this is not a visit, it is a Tuesday. Plan the day of someone who actually LIVES in this neighborhood. Where do they buy groceries? Which park do they cut through on the way home? Which coffee shop would they become a regular at — the one with the weekday crowd, not the one with the weekend queue? Where is the public library, the pharmacy on the corner, the launderette, the barber, the hardware store? Which residential street would you walk down to see what the rent actually gets you? The question EVERY stop must answer is "could I live here?", never "is this worth a trip?". So a neighborhood grocery store or local market where people do their weekly shop IS a real stop, and so is the small park with the playground and the dog walkers, and the branch library, and the block of houses or flats. Keep the whole day inside ONE walkable neighborhood — end to end on foot, not a tour of the city. Food is present because people eat, but this is EXPLICITLY NOT A FOOD TOUR: at most 3 stops on a full day are food or drink and each must be the ordinary everyday kind — the corner cafe, the bakery on the walk to the station, the lunch place with a weekday crowd. NEVER a destination restaurant, NEVER a reservation, NEVER a tasting menu, NEVER a bar as a highlight. Skip landmarks and must-sees entirely unless a resident would genuinely pass one on their commute — and if you include one, describe it the way a resident would, as the thing on the corner they stopped noticing.',
+    structureHint: {
+      morning: 'Corner coffee shop with the weekday regulars → neighborhood park or green space → grocery store or local market → residential street walk → branch library or community space',
+      afternoon: 'Everyday lunch spot with a weekday crowd → neighborhood park → grocery store or market → local shop run (pharmacy, bookshop, hardware store) → residential street walk',
+      evening: 'Walk the residential streets at dusk → simple neighborhood dinner spot locals actually use → corner shop or late grocery → the local park or plaza after dinner',
+      full: 'Corner coffee shop → neighborhood park with dog walkers and playgrounds → grocery store or local market → residential street walk (see what the housing is like) → everyday lunch spot → library, pharmacy or local shop run → second green space or plaza → simple neighborhood dinner',
+    },
+  },
   // ── LEGACY VIBES (backend fallback for existing plans) ──────────────────
   nightout: {
     foodTypes: ['restaurant', 'fine_dining_restaurant', 'steak_house', 'seafood_restaurant', 'wine_bar', 'bar'],
@@ -2096,12 +2190,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Location is required' });
     }
 
-    // Check final plan cache — instant response for repeat city+vibe+duration requests
+    // Per-caller double-submit guard. The identity segment is what stops one
+    // user's itinerary being served to another; it mirrors the rate-limiter
+    // identity above.
     if (mode !== 'curated') {
-      const planCacheKey = `plan_${Math.round(lat * 100)}_${Math.round(lng * 100)}_${vibe || 'starthare'}_${duration || 'full'}_${travelGroup || 'solo'}`;
+      const planIdentity = authUser ? `u:${authUser.id}` : `ip:${getClientIp(req.headers)}`;
+      const planCacheKey = `plan_${planIdentity}_${Math.round(lat * 100)}_${Math.round(lng * 100)}_${vibe || 'starthare'}_${duration || 'full'}_${travelGroup || 'solo'}`;
       const cachedPlan = planCache.get(planCacheKey);
       if (cachedPlan && Date.now() - cachedPlan.timestamp < PLAN_CACHE_TTL) {
-        console.log(`[NxStops Plan] Plan cache hit: ${planCacheKey}`);
+        console.log('[NxStops Plan] Double-submit guard hit');
         return res.status(200).json(cachedPlan.result);
       }
       // Store key for later caching
@@ -2175,6 +2272,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const activityRadius = needsWideRadius ? 15000 : 6000;
       nearbyFetches.push(fetchNearbyPlaces(lat, lng, config.activityTypes, activityRadius).catch(() => []));
       nearbyFetches.push(fetchNearbyPlaces(lat, lng, config.activityTypes, 25000).catch(() => []));
+    }
+
+    // Everyday-life nearby fetch — movinghere only, and deliberately its OWN
+    // two requests. Groceries/pharmacies/libraries cannot arrive via text
+    // search alone: cappedSearches keeps only 4 text queries per request, so
+    // the everyday-life signal has to come from searchNearby. Splitting CORE
+    // from EXTENDED means an invalid type in EXTENDED costs only that one
+    // request — every call here is already .catch(() => []).
+    // Radius is 3km, not 6-15km: "could I live here" is a walkable question.
+    if (vibeKeys.includes('movinghere')) {
+      nearbyFetches.push(fetchNearbyPlaces(lat, lng, EVERYDAY_LIFE_CORE, 3000).catch(() => []));
+      nearbyFetches.push(fetchNearbyPlaces(lat, lng, EVERYDAY_LIFE_EXTENDED, 3000).catch(() => []));
     }
 
     // 1b. Region-aware text searches
@@ -2255,6 +2364,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Under the Radar: hidden gems + local neighborhood food
         const vibeSearches = DIVERSE_TEXT_SEARCHES.undertheradar.sort(() => Math.random() - 0.5).slice(0, 5);
         const localFood = localRegion.foodSearches.sort(() => Math.random() - 0.5).slice(0, 3);
+        shuffledSearches.push(...vibeSearches, ...localFood);
+      } else if (vibeKey === 'movinghere') {
+        // I'm Moving Here: everyday-life terms LEAD. Only the first 4 entries of
+        // shuffledSearches survive the cap below, so these must be pushed
+        // before localFood — same trap documented for indulge above.
+        const vibeSearches = DIVERSE_TEXT_SEARCHES.movinghere.sort(() => Math.random() - 0.5).slice(0, 6);
+        const localFood = localRegion.foodSearches.sort(() => Math.random() - 0.5).slice(0, 1);
         shuffledSearches.push(...vibeSearches, ...localFood);
       } else {
         // Legacy/fallback: local food + cultural mix
@@ -2437,12 +2553,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       'gym', 'fitness_center', 'grocery_store', 'supermarket', 'convenience_store',
       'travel_agency', 'tour_operator',
     ]);
+    // movinghere is the one vibe where a grocery store, a chemist and a
+    // launderette are the POINT, not noise. Allow exactly those categories
+    // back in for this vibe only. BLOCKED_NAMES is deliberately left alone —
+    // Walmart/Costco/Target/7-Eleven are still not "living in the
+    // neighborhood".
+    const allowsEverydayLife = vibeKeys.includes('movinghere');
     const filtered = allTransformed.filter(p => {
       const nameLower = p.name.toLowerCase();
       const isCuratedSeed = seedPlaceIds.has(p.placeId);
       if (CHAIN_KEYWORDS.some(chain => nameLower.includes(chain))) return false;
       // Curated seeds bypass type/hotel filters (e.g. luxe vibe includes hotels)
-      if (!isCuratedSeed && EXCLUDED_PLAN_TYPES.has(p.category)) return false;
+      if (!isCuratedSeed && EXCLUDED_PLAN_TYPES.has(p.category) && !(allowsEverydayLife && EVERYDAY_LIFE_CAT_SET.has(p.category))) return false;
       if (!isCuratedSeed && /\b(hotel|motel|inn|suites|lodge|resort)\b/i.test(nameLower) && !nameLower.includes('restaurant') && !nameLower.includes('bar')) return false;
       // Exclude tour guides, tour operators, and travel agencies — the app is for self-guided exploration
       if (/\b(tour guide|guided tour|walking tour|tour operator|tour company|tour agency|travel agency|private tour|group tour)\b/i.test(nameLower)) return false;
@@ -2479,7 +2601,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Minimum review count — filter out garbage/new/unverified places
     // Lower threshold for hidden-gem vibes and European/island cities where local spots have fewer reviews
     const isSmallCityRegion = !!localRegion || filtered.length < 80;
+    // movinghere gets the 10-review tier everywhere: a branch library or a
+    // corner launderette legitimately has few reviews in most cities.
     const MIN_REVIEWS = vibeKey === 'undertheradar' || vibeKey === 'surprise' ? 5
+      : vibeKey === 'movinghere' ? 10
       : isSmallCityRegion ? 10
       : 25;
 
@@ -2487,7 +2612,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     for (const p of filtered) {
       if (!p.placeId || seen.has(p.placeId)) continue;
       // Skip blocked categories
-      if (BLOCKED_CATEGORIES.has(p.category)) continue;
+      if (BLOCKED_CATEGORIES.has(p.category) && !(allowsEverydayLife && EVERYDAY_LIFE_CAT_SET.has(p.category))) continue;
       // Skip chain restaurants and non-venues
       if (BLOCKED_NAMES.test(p.name)) continue;
       // Skip places with too few reviews (unreliable data)
@@ -2514,19 +2639,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Sort by the right score for this vibe:
     // - undertheradar/surprise: gemScore (rewards low review count = hidden gems)
     // - everyone else: popularityScore (rewards high rating + moderate-to-high review count)
-    const popularityScore = (p: { rating: number; reviewCount: number; placeId: string }) => {
-      // Curated seeds get a massive boost — they're hand-picked and should always rank high
-      const curatedBoost = seedPlaceIds.has(p.placeId) ? 100 : 0;
-      if (!p.rating || p.rating < 3.5) return curatedBoost;
+    // Raw quality, no curated boost — this is what the weighted sampler uses.
+    const rawPopularityScore = (p: { rating: number; reviewCount: number }) => {
+      if (!p.rating || p.rating < 3.5) return 0;
       // Logarithmic popularity: 100 reviews = 2, 1000 = 3, 10000 = 4
       const pop = Math.log10(Math.max(p.reviewCount || 1, 1));
-      return curatedBoost + p.rating * (0.5 + 0.5 * Math.min(pop / 4, 1)); // caps at ~10k reviews
+      return p.rating * (0.5 + 0.5 * Math.min(pop / 4, 1)); // caps at ~10k reviews
     };
-    const curatedGemScore = (p: { rating: number; reviewCount: number; placeId: string }) => {
-      const curatedBoost = seedPlaceIds.has(p.placeId) ? 100 : 0;
-      return curatedBoost + gemScore(p);
-    };
+    // Boosted score — same name, same signature, same behaviour as before, so
+    // every existing call site keeps compiling and the deterministic food-cap
+    // repair stays deterministic. Curated seeds get a massive boost — they're
+    // hand-picked and should always rank high.
+    const popularityScore = (p: { rating: number; reviewCount: number; placeId: string }) =>
+      (seedPlaceIds.has(p.placeId) ? 100 : 0) + rawPopularityScore(p);
+    const curatedGemScore = (p: { rating: number; reviewCount: number; placeId: string }) =>
+      (seedPlaceIds.has(p.placeId) ? 100 : 0) + gemScore(p);
     const sortScore = (vibeKey === 'undertheradar' || vibeKey === 'surprise') ? curatedGemScore : popularityScore;
+    // Per-vibe sampling weight: the same quality signal each vibe already
+    // sorts by, minus the curated boost (a seed scores 100+ vs ~4 for an
+    // ordinary place, which would collapse every other weight to the noise
+    // floor after normalisation). undertheradar/surprise weight on gemScore so
+    // the tail is where the mass is; everyone else on popularity.
+    const sampleWeight = (vibeKey === 'undertheradar' || vibeKey === 'surprise')
+      ? (p: PlanPlace) => gemScore(p)
+      : (p: PlanPlace) => rawPopularityScore(p);
+
+    // Curated seeds are hand-picked for this exact city — pin them, sample the
+    // rest. Returns up to `count` places, seeds first.
+    const samplePool = (pool: PlanPlace[], count: number, weight = sampleWeight): PlanPlace[] => {
+      if (count <= 0) return [];
+      const pinned = pool.filter(p => seedPlaceIds.has(p.placeId)).slice(0, count);
+      const rest = pool.filter(p => !seedPlaceIds.has(p.placeId));
+      return [...pinned, ...weightedSampleWithoutReplacement(rest, count - pinned.length, weight)];
+    };
     allPlaces.sort((a, b) => sortScore(b) - sortScore(a));
 
     // Balance candidate pool: activity-focused vibes need plenty of non-food options
@@ -2557,7 +2702,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const hasLuxe = vibeKeys.includes('luxe');
       const hasNightlife = vibeKeys.some(k => k === 'afterdark' || k === 'nightout');
       const hasFoodVibe = vibeKeys.some(k => k === 'indulge' || k === 'food');
-      const hasActivityVibe = vibeKeys.some(k => ['adventure', 'escape', 'starthare', 'cultural'].includes(k));
+      // movinghere is included here so a blend tilts toward activities (8 food
+      // / 14 activity) rather than the default even split — the whole point of
+      // the vibe is the non-food infrastructure of a neighborhood.
+      const hasActivityVibe = vibeKeys.some(k => ['adventure', 'escape', 'starthare', 'cultural', 'movinghere'].includes(k));
 
       // If luxe is part of the blend, apply luxury filtering first
       let pool = allPlaces;
@@ -2603,21 +2751,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const activityCount = Math.min(activityCandidates.length, targetActivity);
       const nightlifeCount = Math.min(nightlifeCandidates.length, targetNightlife);
       const foodCount = Math.min(foodCandidates.length, 30 - activityCount - nightlifeCount);
+      const blendWeight = hasUnderRadar
+        ? (p: PlanPlace) => gemScore(p) + (isHiddenGem(p) ? 50 : 0)
+        : (p: PlanPlace) => rawPopularityScore(p);
       topPlaces = [
-        ...activityCandidates.slice(0, activityCount),
-        ...nightlifeCandidates.slice(0, nightlifeCount),
-        ...foodCandidates.slice(0, foodCount),
+        ...samplePool(activityCandidates, activityCount, blendWeight),
+        ...samplePool(nightlifeCandidates, nightlifeCount, blendWeight),
+        ...samplePool(foodCandidates, foodCount, blendWeight),
       ]
         .sort((a, b) => (hasUnderRadar ? gemScore(b) + (isHiddenGem(b) ? 50 : 0) : popularityScore(b)) - (hasUnderRadar ? gemScore(a) + (isHiddenGem(a) ? 50 : 0) : popularityScore(a)))
         .slice(0, 30);
       console.log(`[NxStops Plan] Blended pool: ${activityCount} activities + ${nightlifeCount} nightlife + ${foodCount} food${hasUnderRadar ? ' (hidden-gem weighted)' : ''}`);
-    } else if (vibeKey === 'adventure' || vibeKey === 'cultural' || vibeKey === 'starthare' || vibeKey === 'escape' || vibeKey === 'wander' || vibeKey === 'chill') {
+    } else if (vibeKey === 'adventure' || vibeKey === 'cultural' || vibeKey === 'starthare' || vibeKey === 'escape' || vibeKey === 'wander' || vibeKey === 'chill' || vibeKey === 'movinghere') {
       // Activity-heavy vibes: prioritize non-food places
       const foodCandidates = allPlaces.filter(p => isPlaceFood(p));
       const activityCandidates = allPlaces.filter(p => !isPlaceFood(p));
       const activityCount = Math.min(activityCandidates.length, 18);
       const foodCount = Math.min(foodCandidates.length, 30 - activityCount);
-      topPlaces = [...activityCandidates.slice(0, activityCount), ...foodCandidates.slice(0, foodCount)]
+      topPlaces = [...samplePool(activityCandidates, activityCount), ...samplePool(foodCandidates, foodCount)]
         .sort((a, b) => gemScore(b) - gemScore(a))
         .slice(0, 30);
     } else if (vibeKey === 'indulge' || vibeKey === 'food') {
@@ -2628,18 +2779,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const activityCandidates = allPlaces.filter(p => !isPlaceFood(p));
       const activityCount = Math.min(activityCandidates.length, vibeKey === 'indulge' ? 10 : 8);
       const foodCount = Math.min(foodCandidates.length, 30 - activityCount);
-      topPlaces = [...activityCandidates.slice(0, activityCount), ...foodCandidates.slice(0, foodCount)]
+      topPlaces = [...samplePool(activityCandidates, activityCount), ...samplePool(foodCandidates, foodCount)]
         .sort((a, b) => popularityScore(b) - popularityScore(a))
         .slice(0, 30);
     } else if (vibeKey === 'surprise' || vibeKey === 'undertheradar') {
-      // Under the Radar / Local Secrets: heavily favor hidden gems
-      topPlaces = allPlaces
+      // Under the Radar / Local Secrets: heavily favor hidden gems.
+      // sampleWeight is already gemScore for these vibes; add the hidden-gem
+      // bonus so the tail carries the weight it did under the old sort.
+      topPlaces = samplePool(allPlaces, 30, (p) => gemScore(p) + (isHiddenGem(p) ? 50 : 0))
         .sort((a, b) => {
           const aGem = isHiddenGem(a) ? 50 : 0;
           const bGem = isHiddenGem(b) ? 50 : 0;
           return (gemScore(b) + bGem) - (gemScore(a) + aGem);
-        })
-        .slice(0, 30);
+        });
     } else if (vibeKey === 'luxe') {
       // Luxe solo: detect luxury through MULTIPLE signals, not just priceLevel
       const LUXE_CATEGORIES = new Set(['fine_dining_restaurant', 'steak_house', 'sushi_restaurant', 'seafood_restaurant']);
@@ -2676,7 +2828,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const activityCandidates = pool.filter(p => !isPlaceFood(p));
       const activityCount = Math.min(activityCandidates.length, 12);
       const foodCount = Math.min(foodCandidates.length, 30 - activityCount);
-      topPlaces = [...activityCandidates.slice(0, activityCount), ...foodCandidates.slice(0, foodCount)]
+      // Sample ON luxeScore so the luxury floor is preserved — luxePool /
+      // fallback above already enforce rating >= 4.0 && reviews >= 30 (or
+      // 4.5 && 200), and luxeScore returns 0 below 4.0 stars.
+      topPlaces = [
+        ...samplePool(activityCandidates, activityCount, luxeScore),
+        ...samplePool(foodCandidates, foodCount, luxeScore),
+      ]
         .sort((a, b) => luxeScore(b) - luxeScore(a))
         .slice(0, 30);
     } else if (vibeKey === 'stacked') {
@@ -2690,14 +2848,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const nightlifeCount = Math.min(nightlifeCandidates.length, 8);
       const restaurantCount = Math.min(restaurantCandidates.length, 30 - activityCount - nightlifeCount);
       topPlaces = [
-        ...activityCandidates.slice(0, activityCount),
-        ...nightlifeCandidates.slice(0, nightlifeCount),
-        ...restaurantCandidates.slice(0, restaurantCount),
+        ...samplePool(activityCandidates, activityCount),
+        ...samplePool(nightlifeCandidates, nightlifeCount),
+        ...samplePool(restaurantCandidates, restaurantCount),
       ]
         .sort((a, b) => gemScore(b) - gemScore(a))
         .slice(0, 30);
     } else {
-      topPlaces = allPlaces.slice(0, 30);
+      topPlaces = samplePool(allPlaces, 30)
+        .sort((a, b) => sortScore(b) - sortScore(a));
     }
 
     // Ensure at least ~20% of candidates are hidden gems (swap out lowest-scored popular places).
@@ -2709,9 +2868,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (currentGems < gemTarget && gems.length > 0) {
       const needed = Math.min(gemTarget - currentGems, gems.length);
       // Replace lowest-scored places with gems
-      const gemsToAdd = gems.slice(0, needed);
+      const gemsToAdd = weightedSampleWithoutReplacement(gems, needed, (p) => gemScore(p));
       topPlaces = [...topPlaces.slice(0, topPlaces.length - needed), ...gemsToAdd];
     }
+
+    console.log(`[NxStops Plan] Sampling: pool=${allPlaces.length} sampled=${topPlaces.length} exploit=${EXPLOIT_POWER}`);
 
     const gemCount = topPlaces.filter(p => isHiddenGem(p)).length;
     console.log(`[NxStops Plan] vibe="${vibeKey}" duration="${duration || 'full'}" region="${localRegion?.label || 'diverse'}" totalPlaces=${topPlaces.length} hiddenGems=${gemCount}`);
@@ -2721,6 +2882,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       starthare: 'Greatest Hits', indulge: 'Indulge',
       afterdark: 'After Dark', escape: 'Escape',
       luxe: 'Luxe', undertheradar: 'Under the Radar',
+      movinghere: 'I’m Moving Here',
       // Legacy vibes
       nightout: 'Night Out', food: 'Foodie Tour',
       adventure: 'Outdoor Adventure', surprise: 'Under the Radar',
@@ -3295,6 +3457,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         eveningLabel = 'Sunset & Dinner';
         eveningEmoji = '\u{1F305}';
 
+      } else if (vibeKey === 'movinghere') {
+        // ── I'M MOVING HERE — what a normal day here actually looks like ──
+        const everyday = (re: RegExp) => activityPlaces.filter(p => notUsed(p) && cm(p, re));
+        const cafes = foodPlaces.filter(p => cm(p, /cafe|coffee|bakery|breakfast/i));
+        const groceries = everyday(/grocery|supermarket|market|produce|convenience|farmers/i);
+        morningPicks = markUsed([...cafes.slice(0, 2), ...groceries.slice(0, 4)].slice(0, 6));
+        morningLabel = 'Coffee & The Weekly Shop';
+        morningEmoji = '\u{1F6D2}';
+
+        const parks = everyday(/park|garden|green|plaza|playground/i);
+        const services = everyday(/library|pharmac|chemist|drugstore|book_store|bookshop|laundr|barber|salon|hardware|florist|post_office/i);
+        const lunch = foodPlaces.filter(p => notUsed(p));
+        afternoonPicks = markUsed([...parks.slice(0, 3), ...services.slice(0, 3), ...lunch.slice(0, 2)].slice(0, 8));
+        afternoonLabel = 'Parks & Errands';
+        afternoonEmoji = '\u{1F333}';
+
+        const dinner = foodPlaces.filter(p => notUsed(p) && cm(p, /restaurant|bistro|diner|pizza|noodle|sandwich/i));
+        const eveningWalk = everyday(/park|plaza|street|neighborhood|historic|landmark|library/i);
+        eveningPicks = markUsed([...dinner.slice(0, 3), ...eveningWalk.slice(0, 4)].slice(0, 8));
+        eveningLabel = 'The Neighborhood at Night';
+        eveningEmoji = '\u{1F3E1}';
+
       } else {
         // ── DEFAULT (stacked, nightout, etc.) ───────────────────────────
         const morningFood = foodPlaces.filter(p =>
@@ -3466,22 +3650,24 @@ ${isBlended
     ? `ESCAPE/ADVENTURE RATIO FOR ${stopCount} STOPS: ${isFullDay ? '3' : '2'} stops MUST be food/drink (breakfast + lunch + dinner for full day, or breakfast + lunch for partial). The rest (${isFullDay ? '5' : '4'}) MUST be immersive outdoor/peaceful experiences — parks, beaches, hikes, viewpoints, gardens, spas, nature, waterfronts. Food goes between escapes as scenic fuel (beachside cafes, garden restaurants). NEVER skip food entirely.`
     : vibeKey === 'surprise' || vibeKey === 'undertheradar'
       ? `UNDER THE RADAR RATIO FOR ${stopCount} STOPS: Mix ${isFullDay ? '4' : '3'} hidden food/drink spots with ${isFullDay ? '4' : '3'} hidden local experiences (secret markets, tucked-away parks, street art alleys, neighborhood walks). Every food stop MUST feel AUTHENTIC and LOCAL — family-run restaurants, hole-in-the-wall eateries, neighborhood bakeries, street food stalls. NO chains, NO tourist traps, NO places with 5000+ reviews. For full day, include breakfast/brunch, lunch, AND dinner. This is the REAL city experience.`
-      : vibeKey === 'starthare'
-        ? `GREATEST HITS RATIO FOR ${stopCount} STOPS: Mix ${isFullDay ? '3' : '2'} of the city's most CELEBRATED food/drink stops with ${isFullDay ? '5' : '4'} must-see experiences (iconic landmarks, world-class museums, famous viewpoints, celebrated cultural sites). For full day, food MUST include breakfast/brunch, lunch, AND dinner at LEGENDARY spots. Every single stop should be something people TALK about — the "you HAVE to go here" spots.`
-        : vibeKey === 'luxe'
-          ? `LUXE RATIO FOR ${stopCount} STOPS: ONLY pick places rated 4.8+ stars. ${isFullDay ? '3' : '2'} stops should be the city's FINEST dining (breakfast/brunch + lunch + dinner for full day) and ${isFullDay ? '5' : '4'} should be PREMIUM experiences — world-class museums, iconic landmarks, luxury shopping, five-star spas, private galleries. If ANY stop feels budget or casual, YOU HAVE FAILED. Every stop should feel like being a billionaire's daughter.`
-          : vibeKey === 'afterdark' || vibeKey === 'nightout'
-            ? `AFTER DARK RATIO FOR ${stopCount} STOPS: Start with ${isFullDay ? '2' : '1'} dinner/food spot(s) with ENERGY, then ${isFullDay ? '5-6' : '4-5'} nightlife + activity stops (bars, clubs, live music, bowling, karaoke, comedy, rooftop bars). End with late-night food. The arc MUST ESCALATE: dinner → chill drinks → entertainment → PEAK energy → wind-down food. Every nightlife stop should be better than the last.`
-            : isStackedVibe
-              ? `STACKED FULL EXPERIENCE — EXACT CATEGORY BREAKDOWN FOR ${stopCount} STOPS:
+      : vibeKey === 'movinghere'
+        ? `MOVING HERE RATIO FOR ${stopCount} STOPS: at most ${isFullDay ? '3' : '2'} stops may be food or drink, and each must be the ORDINARY everyday kind — the corner coffee shop, the bakery on the walk, the lunch place with a weekday crowd. The other ${isFullDay ? '5' : '4'} MUST be the infrastructure of an actual life here: a grocery store or local market where people do their weekly shop, a REAL neighborhood park (playground, benches, dog walkers — not a tourist viewpoint), a public library or local pharmacy, a residential street worth walking, and one small local business (bookshop, hardware store, barber, launderette). Keep every stop inside ONE walkable neighborhood. NO landmarks, NO must-sees, NO destination restaurants, NO bars as highlights. If this plan would also work as a tourist itinerary, YOU HAVE FAILED.`
+        : vibeKey === 'starthare'
+          ? `GREATEST HITS RATIO FOR ${stopCount} STOPS: Mix ${isFullDay ? '3' : '2'} of the city's most CELEBRATED food/drink stops with ${isFullDay ? '5' : '4'} must-see experiences (iconic landmarks, world-class museums, famous viewpoints, celebrated cultural sites). For full day, food MUST include breakfast/brunch, lunch, AND dinner at LEGENDARY spots. Every single stop should be something people TALK about — the "you HAVE to go here" spots.`
+          : vibeKey === 'luxe'
+            ? `LUXE RATIO FOR ${stopCount} STOPS: ONLY pick places rated 4.8+ stars. ${isFullDay ? '3' : '2'} stops should be the city's FINEST dining (breakfast/brunch + lunch + dinner for full day) and ${isFullDay ? '5' : '4'} should be PREMIUM experiences — world-class museums, iconic landmarks, luxury shopping, five-star spas, private galleries. If ANY stop feels budget or casual, YOU HAVE FAILED. Every stop should feel like being a billionaire's daughter.`
+            : vibeKey === 'afterdark' || vibeKey === 'nightout'
+              ? `AFTER DARK RATIO FOR ${stopCount} STOPS: Start with ${isFullDay ? '2' : '1'} dinner/food spot(s) with ENERGY, then ${isFullDay ? '5-6' : '4-5'} nightlife + activity stops (bars, clubs, live music, bowling, karaoke, comedy, rooftop bars). End with late-night food. The arc MUST ESCALATE: dinner → chill drinks → entertainment → PEAK energy → wind-down food. Every nightlife stop should be better than the last.`
+              : isStackedVibe
+                ? `STACKED FULL EXPERIENCE — EXACT CATEGORY BREAKDOWN FOR ${stopCount} STOPS:
    - EXACTLY 3 RESTAURANTS (breakfast/brunch, lunch, dinner — each a different cuisine). No more.
    - EXACTLY 4 ACTIVITIES (museum, landmark, park, scenic viewpoint, cultural site, shopping).
    - EXACTLY 3 NIGHTLIFE (cocktail bar, rooftop lounge, nightclub, live music).
    VALIDATION: If you have more than 3 restaurants/cafes, YOU HAVE FAILED.`
-              : `Include ${isFullDay ? '3' : '2'} food/drink stops (${isFullDay ? 'breakfast + lunch + dinner' : 'at least 2 meals'}). Food goes BETWEEN activities. Every food stop MUST be a DIFFERENT cuisine.`}
+                : `Include ${isFullDay ? '3' : '2'} food/drink stops (${isFullDay ? 'breakfast + lunch + dinner' : 'at least 2 meals'}). Food goes BETWEEN activities. Every food stop MUST be a DIFFERENT cuisine.`}
 
 ${isStackedVibe ? `3b. STACKED NIGHTLIFE IS MANDATORY: After dinner, include 2-3 nightlife stops. The arc: relaxed morning → active afternoon → elevated dinner → nightlife escalation → wind-down.` : ''}
-${(isBlended || (vibeKey !== 'food' && vibeKey !== 'indulge')) ? `3c. NON-FOOD STOPS ARE MANDATORY: At least ${isFullDay ? (isBlended ? '4' : vibeKey === 'adventure' || vibeKey === 'escape' ? '5' : vibeKey === 'stacked' || vibeKey === 'starthare' ? '5' : vibeKey === 'surprise' || vibeKey === 'undertheradar' ? '4' : vibeKey === 'luxe' ? '5' : vibeKey === 'afterdark' || vibeKey === 'nightout' ? '5' : '3') : '3-4'} stop(s) MUST be a non-food experience. Look at the "cat" field — anything that is NOT a restaurant/cafe/bakery counts as non-food. DO NOT default to all restaurants just because they have higher ratings.` : ''}
+${(isBlended || (vibeKey !== 'food' && vibeKey !== 'indulge')) ? `3c. NON-FOOD STOPS ARE MANDATORY: At least ${isFullDay ? (isBlended ? '4' : vibeKey === 'adventure' || vibeKey === 'escape' ? '5' : vibeKey === 'stacked' || vibeKey === 'starthare' ? '5' : vibeKey === 'surprise' || vibeKey === 'undertheradar' ? '4' : vibeKey === 'luxe' ? '5' : vibeKey === 'afterdark' || vibeKey === 'nightout' ? '5' : vibeKey === 'movinghere' ? '5' : '3') : '3-4'} stop(s) MUST be a non-food experience. Look at the "cat" field — anything that is NOT a restaurant/cafe/bakery counts as non-food. DO NOT default to all restaurants just because they have higher ratings.` : ''}
 
 4. TELL A STORY — AREA JOURNEY: Your plan must tell a coherent story as a journey through distinct areas of the city. Group stops by the area/district/quarter/barrio/arrondissement they're in — use whatever the locals call it (NOT the word "neighborhood" unless that's what locals actually say). Use the lat/lng coordinates to pick stops that are NEAR each other and flow in a logical geographic path — don't zigzag across town. Assign each stop a "neighborhood" value using the REAL local area name (e.g., "Sultanahmet", "Le Marais", "Shibuya", "SoHo", "La Condesa", "Beyoğlu"). Each "reason" MUST be a narrative transition that connects to the previous stop:
    - First stop: "Start your ${localHour < 12 ? 'morning' : localHour < 17 ? 'afternoon' : 'evening'} in [Neighborhood] with..."
@@ -3653,7 +3839,10 @@ Return ONLY this JSON (keep reason + knownFor SHORT — max 8 words each):
         const surplus = foodStops.length - foodCap;
         const swapTargets = foodStops.slice(0, surplus).map(x => x.i);
         const unusedNonFood = topPlaces
-          .filter((p, idx) => !usedIdx.has(idx) && NON_FOOD_DISCOVERY_CAT_SET.has(p.category))
+          // movinghere's non-food stops are grocery stores, pharmacies and
+          // launderettes — widen the substitution pool so the cap can be
+          // repaired with a real everyday-life place for that vibe.
+          .filter((p, idx) => !usedIdx.has(idx) && (NON_FOOD_DISCOVERY_CAT_SET.has(p.category) || (allowsEverydayLife && EVERYDAY_LIFE_CAT_SET.has(p.category))))
           .sort((a, b) => popularityScore(b) - popularityScore(a));
 
         const swapReasonTemplates = [
@@ -3702,6 +3891,14 @@ Return ONLY this JSON (keep reason + knownFor SHORT — max 8 words each):
       // Clean stale entries
       for (const [k, v] of planCache) {
         if (Date.now() - v.timestamp > PLAN_CACHE_TTL) planCache.delete(k);
+      }
+      // Per-caller keys multiply the key space — hard-cap the map so a burst of
+      // distinct callers in one warm instance can't grow it without bound.
+      if (planCache.size > PLAN_CACHE_MAX_ENTRIES) {
+        const victims = [...planCache.entries()]
+          .sort((a, b) => a[1].timestamp - b[1].timestamp)
+          .slice(0, planCache.size - PLAN_CACHE_MAX_ENTRIES);
+        for (const [k] of victims) planCache.delete(k);
       }
     }
 
