@@ -24,10 +24,10 @@ interface Vibe {
 // the only one of the four whose vibe key did not already exist. Its day is a
 // normal local day: food belongs in it, but it must not read as a food tour.
 const VIBES: Vibe[] = [
-  { id: 'wander', emoji: '\u{1F6B6}', label: 'Discover This City', tagline: 'Neighborhoods, streets & local life', gradient: 'from-slate-700/40 to-slate-900/20' },
-  { id: 'starthare', emoji: '\u{1F5FA}\u{FE0F}', label: 'A Weekend Here', tagline: 'A well-rounded day of highlights', gradient: 'from-sky-900/40 to-indigo-900/20' },
-  { id: 'undertheradar', emoji: '\u{1F4CD}', label: 'Interesting Neighborhoods', tagline: 'Hidden gems & local favorites', gradient: 'from-emerald-900/40 to-teal-900/20' },
-  { id: 'movinghere', emoji: '\u{1F511}', label: 'I’m Moving Here', tagline: 'A normal day as a local', gradient: 'from-cyan-900/40 to-slate-900/20' },
+  { id: 'wander', emoji: '\u{1F6B6}', label: 'Discover This City', tagline: 'Neighborhoods, streets & local life', gradient: 'from-slate-300/50 to-slate-400/30' },
+  { id: 'starthare', emoji: '\u{1F5FA}\u{FE0F}', label: 'A Weekend Here', tagline: 'A well-rounded day of highlights', gradient: 'from-sky-200/60 to-indigo-200/40' },
+  { id: 'undertheradar', emoji: '\u{1F4CD}', label: 'Interesting Neighborhoods', tagline: 'Hidden gems & local favorites', gradient: 'from-emerald-200/60 to-teal-200/40' },
+  { id: 'movinghere', emoji: '\u{1F511}', label: 'I’m Moving Here', tagline: 'A normal day as a local', gradient: 'from-cyan-200/60 to-slate-200/40' },
 ];
 
 export default function VibePicker({ onPickVibe, loading = false, cityName, onManual, compact = false }: VibePickerProps) {
